@@ -1,5 +1,6 @@
 {% extends 'iroad_tenants/base.html' %}
 {% load static %}
+{% load i18n %}
 
 {% block title %}{% if is_view %}View{% elif is_edit %}Edit{% else %}Create{% endif %} Price List | iRoad Admin{% endblock %}
 {% block breadcrumb %}{% endblock %}
@@ -32,12 +33,12 @@
         <div class="page-header-row">
           <div class="page-header-left">
             <h1 class="page-title">{% if is_view %}Price List Details{% elif is_edit %}Edit Price List{% else %}Create Price List{% endif %}</h1>
-            <p class="page-subtitle">{% if is_view %}View complete price list header and item lines.{% elif is_edit %}Update the price list header and item lines, then save.{% else %}Fill in the details below to register a new price list in the system.{% endif %}</p>
+            <!-- <p class="page-subtitle">{% if is_view %}View complete price list header and item lines.{% elif is_edit %}Update the price list header and item lines, then save.{% else %}Fill in the details below to register a new price list in the system.{% endif %}</p> -->
           </div>
           {% if not is_view %}
           <div class="page-header-right">
             <a href="{% url 'iroad_tenants:tenant_price_list_master_list' %}" class="btn btn-outline-secondary">
-              <i class="bi bi-arrow-left"></i> Back to List
+              <i class="bi bi-arrow-left"></i> Back
             </a>
           </div>
           {% endif %}
@@ -52,8 +53,7 @@
             <div class="form-card-icon blue"><i class="bi bi-info-circle"></i></div>
             <div class="form-card-header-text">
               <h2 class="form-card-title">Header</h2>
-              <p class="form-card-desc">Price list identity, target, status, currency, and validity.</p>
-            </div>
+      </div>
           </div>
           <div class="form-card-body">
             <div class="field-group">
@@ -81,7 +81,7 @@
             </div>
 
             <div class="field-group">
-              <h3 class="field-group-title"><i class="bi bi-bullseye"></i>Target &amp; Currency</h3>
+              <h3 class="field-group-title"><i class="bi bi-bullseye"></i>{% if is_edit or is_view %}Target &amp; Currency{% else %}Target{% endif %}</h3>
               <div class="fields-grid cols-3">
                 <div class="field">
                   <label for="targetClient" class="form-label">Client <span class="required">*</span></label>
@@ -96,10 +96,12 @@
                   {% if field_errors.client_account_id %}<span class="text-danger small">{{ field_errors.client_account_id }}</span>{% endif %}
                   <span class="field-hint">Client this price list applies to.</span>
                 </div>
+                {% if is_edit or is_view %}
                 <div class="field">
                   <label class="form-label">Base Currency (Locked)</label>
                   <input type="text" class="form-control" value="{{ tenant_base_currency|default:'SAR' }}" readonly />
                 </div>
+                {% endif %}
               </div>
             </div>
 
@@ -136,6 +138,7 @@
                 </div>
               </div>
             </div>
+            {% if is_edit or is_view %}
             <div class="field-group">
               <h3 class="field-group-title"><i class="bi bi-card-text"></i>Notes</h3>
               <div class="fields-grid cols-1">
@@ -144,6 +147,7 @@
                 </div>
               </div>
             </div>
+            {% endif %}
           </div>
         </div>
 
@@ -152,8 +156,7 @@
             <div class="form-card-icon amber"><i class="bi bi-list-ul"></i></div>
             <div class="form-card-header-text">
               <h2 class="form-card-title">Item Lines</h2>
-              <p class="form-card-desc">The price list consists of a header and multiple item lines. Trip lines display route and inbound/outbound prices.</p>
-            </div>
+      </div>
           </div>
           <div class="form-card-body">
             <div class="pl-lines-toolbar">
@@ -216,7 +219,7 @@
           <div class="form-actions-left">
             {% if is_view %}
             <a href="{% url 'iroad_tenants:tenant_price_list_master_list' %}" class="btn btn-outline-secondary">
-              <i class="bi bi-arrow-left"></i> Back to List
+              <i class="bi bi-arrow-left"></i> {% translate "Back" %}
             </a>
             {% else %}
             <button type="reset" class="btn btn-outline-secondary">

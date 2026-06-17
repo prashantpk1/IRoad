@@ -72,10 +72,10 @@
   <div class="page-header-row">
     <div class="page-header-left">
       <h1 class="page-title">Organization Profile</h1>
-      <p class="page-subtitle">
+      <!-- <p class="page-subtitle">
         View your organization's identity, address, contact details, and
         system settings.
-      </p>
+      </p> -->
     </div>
     <div class="page-header-right">
       <a
@@ -99,9 +99,7 @@
       </div>
       <div class="form-card-header-text">
         <h2 class="form-card-title">Organization Identity</h2>
-        <p class="form-card-desc">
-          Basic information and identification of the organization.
-        </p>
+
       </div>
     </div>
     <div class="form-card-body">
@@ -188,9 +186,6 @@
       </div>
       <div class="form-card-header-text">
         <h2 class="form-card-title">Address Information</h2>
-        <p class="form-card-desc">
-          Location and address details for the organization.
-        </p>
       </div>
     </div>
     <div class="form-card-body">
@@ -271,9 +266,6 @@
       </div>
       <div class="form-card-header-text">
         <h2 class="form-card-title">Contact Details</h2>
-        <p class="form-card-desc">
-          Official contact information for the organization.
-        </p>
       </div>
     </div>
     <div class="form-card-body">
@@ -314,7 +306,7 @@
       </div>
       <div class="form-card-header-text">
         <h2 class="form-card-title">System Configuration</h2>
-        <p class="form-card-desc">Default system settings and formats.</p>
+        
       </div>
     </div>
     <div class="form-card-body">
@@ -339,7 +331,7 @@
           <div class="field">
             <label class="form-label">System Language</label>
             <div class="view-field-box">
-              <p class="view-value">{{ org.system_language|default:"-" }}</p>
+              <p class="view-value">{{ org_language_label|default:"-" }}</p>
             </div>
           </div>
           <div class="field">
@@ -359,19 +351,19 @@
           <div class="field">
             <label class="form-label">Date Format</label>
             <div class="view-field-box">
-              <p class="view-value">{{ org.date_format|default:"-" }}</p>
+              <p class="view-value">{{ org_date_format_label|default:"-" }}</p>
             </div>
           </div>
           <div class="field">
             <label class="form-label">Number Format</label>
             <div class="view-field-box">
-              <p class="view-value">{{ org.number_format|default:"-" }}</p>
+              <p class="view-value">{{ org_number_format_label|default:"-" }}</p>
             </div>
           </div>
           <div class="field">
             <label class="form-label">Negative Format</label>
             <div class="view-field-box">
-              <p class="view-value">{{ org.negative_format|default:"-" }}</p>
+              <p class="view-value">{{ org_negative_format_label|default:"-" }}</p>
             </div>
           </div>
         </div>
@@ -387,10 +379,6 @@
       </div>
       <div class="form-card-header-text">
         <h2 class="form-card-title">Support & Instructions</h2>
-        <p class="form-card-desc">
-          Contact information for support and specific instructions for
-          drivers.
-        </p>
       </div>
     </div>
     <div class="form-card-body">

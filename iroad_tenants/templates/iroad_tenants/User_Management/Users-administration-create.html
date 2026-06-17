@@ -63,13 +63,13 @@
         {% if is_deleted_user %}Deleted User{% else %}User Administration{% endif %} &mdash;
         <span style="color: var(--primary-color)">{{ editing_user.username }}</span>
       </h1>
-      <p class="page-subtitle">
+      <!-- <p class="page-subtitle">
         {% if is_deleted_user %}
           This account is soft-deleted. Use Restore to clear deletion; the account stays Inactive until you activate it.
         {% else %}
           Read-only view of this user account.
         {% endif %}
-      </p>
+      </p> -->
     </div>
     <div class="page-header-right">
       <div class="eal-header-actions">
@@ -107,8 +107,7 @@
         </div>
         <div class="form-card-header-text">
           <h2 class="form-card-title">User Account Details</h2>
-          <p class="form-card-desc">Core identity and contact information for the user.</p>
-        </div>
+      </div>
       </div>
       <div class="form-card-body">
         <p class="small text-uppercase fw-semibold text-secondary mb-3" style="letter-spacing: 0.06em">
@@ -165,8 +164,7 @@
         </div>
         <div class="form-card-header-text">
           <h2 class="form-card-title">Security &amp; Access</h2>
-          <p class="form-card-desc">Authentication and role-based permissions.</p>
-        </div>
+      </div>
       </div>
       <div class="form-card-body">
         <p class="small text-uppercase fw-semibold text-secondary mb-3" style="letter-spacing: 0.06em">
@@ -325,8 +323,7 @@
         </div>
         <div class="form-card-header-text">
           <h2 class="form-card-title">System &amp; Audit</h2>
-          <p class="form-card-desc">Historical activity and audit trail for this user account.</p>
-        </div>
+      </div>
       </div>
       <div class="form-card-body">
         <p class="small text-uppercase fw-semibold text-secondary mb-3" style="letter-spacing: 0.06em">
@@ -376,7 +373,7 @@
   <div class="page-header-row">
     <div class="page-header-left">
       <h1 class="page-title">{% if is_edit_mode %}Edit User Administration{% else %}Create User Administration{% endif %}</h1>
-      <p class="page-subtitle">{% if is_edit_mode %}Update the details below to edit this user account.{% else %}Fill in the details below to create a new user account.{% endif %}</p>
+      <!-- <p class="page-subtitle">{% if is_edit_mode %}Update the details below to edit this user account.{% else %}Fill in the details below to create a new user account.{% endif %}</p> -->
     </div>
     <div class="page-header-right">
       <div class="eal-header-actions">
@@ -413,10 +410,7 @@
                         </div>
                         <div class="form-card-header-text">
                             <h2 class="form-card-title">User Account Details</h2>
-                            <p class="form-card-desc">
-                                Core identity and contact information for the user.
-                            </p>
-                        </div>
+      </div>
                     </div>
                     <div class="form-card-body">
                         <div class="field-group">
@@ -494,10 +488,7 @@
                         </div>
                         <div class="form-card-header-text">
                             <h2 class="form-card-title">Security &amp; Access</h2>
-                            <p class="form-card-desc">
-                                Authentication and role-based permissions.
-                            </p>
-                        </div>
+      </div>
                     </div>
                     <div class="form-card-body">
                         <div class="field-group">

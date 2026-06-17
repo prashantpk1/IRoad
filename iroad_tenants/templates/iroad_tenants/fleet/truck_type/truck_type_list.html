@@ -23,11 +23,6 @@
     color: #7f8aa3;
   }
   .tt-type-table .eal-table td { vertical-align: middle; }
-  .tt-type-table .eal-actions-cell {
-    display: flex;
-    align-items: center;
-    gap: 4px;
-  }
   .eal-sort-link {
     display: inline-flex;
     align-items: center;
@@ -69,9 +64,9 @@
   <div class="page-header-row">
     <div class="page-header-left">
       <h1 class="page-title">{% translate "Truck Type Master" %}</h1>
-      <p class="page-subtitle">
+      <!-- <p class="page-subtitle">
         {% translate "Manage and view all truck types (code, labels, status)." %}
-      </p>
+      </p> -->
     </div>
     <div class="page-header-right">
       <div class="eal-header-actions">
@@ -225,42 +220,60 @@
             {% endif %}
           </td>
           <td>
-            <div class="eal-actions-cell">
-              <a
-                class="eal-row-btn"
-                href="{% url 'iroad_tenants:truck_type_master_edit' row.truck_type_id %}?mode=view"
-                title="{% translate 'View' %}"
-              >
-                <i class="bi bi-eye"></i>
-              </a>
-              <a
-                class="eal-row-btn"
-                href="{% url 'iroad_tenants:truck_type_master_edit' row.truck_type_id %}"
-                title="{% translate 'Edit' %}"
-              >
-                <i class="bi bi-pencil"></i>
-              </a>
-              {% if row.status == 'Active' %}
+            <div class="dropdown eal-actions-cell">
               <button
+                class="eal-row-btn"
                 type="button"
-                class="eal-row-btn danger tt-status-trigger"
-                title="{% translate 'Deactivate' %}"
-                data-truck-type-id="{{ row.truck_type_id }}"
-                data-new-status="Inactive"
+                data-bs-toggle="dropdown"
+                data-bs-boundary="viewport"
+                aria-expanded="false"
+                title="{% translate 'Actions' %}"
               >
-                <i class="bi bi-trash3"></i>
+                <i class="bi bi-three-dots-vertical"></i>
               </button>
-              {% else %}
-              <button
-                type="button"
-                class="eal-row-btn tt-status-trigger"
-                title="{% translate 'Activate' %}"
-                data-truck-type-id="{{ row.truck_type_id }}"
-                data-new-status="Active"
+              <ul
+                class="dropdown-menu dropdown-menu-end shadow-sm"
+                style="border-radius: 8px; border-color: #e2e8f0; min-width: 180px;"
               >
-                <i class="bi bi-arrow-counterclockwise"></i>
-              </button>
-              {% endif %}
+                <li>
+                  <a
+                    class="dropdown-item"
+                    href="{% url 'iroad_tenants:truck_type_master_edit' row.truck_type_id %}?mode=view"
+                  >
+                    <i class="bi bi-eye text-info me-2"></i>{% translate "View" %}
+                  </a>
+                </li>
+                <li>
+                  <a
+                    class="dropdown-item"
+                    href="{% url 'iroad_tenants:truck_type_master_edit' row.truck_type_id %}"
+                  >
+                    <i class="bi bi-pencil text-primary me-2"></i>{% translate "Edit" %}
+                  </a>
+                </li>
+                <li><hr class="dropdown-divider" /></li>
+                <li>
+                  {% if row.status == 'Active' %}
+                  <button
+                    type="button"
+                    class="dropdown-item text-danger tt-status-trigger"
+                    data-truck-type-id="{{ row.truck_type_id }}"
+                    data-new-status="Inactive"
+                  >
+                    <i class="bi bi-trash3 me-2"></i>{% translate "Deactivate" %}
+                  </button>
+                  {% else %}
+                  <button
+                    type="button"
+                    class="dropdown-item tt-status-trigger"
+                    data-truck-type-id="{{ row.truck_type_id }}"
+                    data-new-status="Active"
+                  >
+                    <i class="bi bi-arrow-counterclockwise me-2"></i>{% translate "Activate" %}
+                  </button>
+                  {% endif %}
+                </li>
+              </ul>
             </div>
           </td>
         </tr>

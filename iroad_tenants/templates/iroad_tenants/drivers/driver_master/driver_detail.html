@@ -18,12 +18,12 @@
   <div class="page-header-row">
     <div class="page-header-left">
       <h1 class="page-title">Driver Details</h1>
-      <p class="page-subtitle">View comprehensive profile, trip history, and documentation for the driver.</p>
+      <!-- <p class="page-subtitle">View comprehensive profile, trip history, and documentation for the driver.</p> -->
     </div>
     <div class="page-header-right">
       <div class="eal-header-actions">
         <a href="{% url 'iroad_tenants:driver_master' %}" class="eal-btn eal-btn-outline">
-          <i class="bi bi-arrow-left"></i><span>Back to list</span>
+          <i class="bi bi-arrow-left"></i><span>Back</span>
         </a>
       </div>
     </div>
@@ -74,12 +74,12 @@
 </div>
 
 <div class="ch-actions">
-  <a href="{% url 'iroad_tenants:driver_master_edit' driver.driver_id %}" class="ch-action-btn"><i class="bi bi-pencil-square"></i> Edit</a>
-  <a href="{% url 'iroad_tenants:driver_master_edit' driver.driver_id %}?section=driving-license" class="ch-action-btn">
+  <a href="{% url 'iroad_tenants:driver_master_edit' driver.driver_id %}?return_to=details" class="ch-action-btn"><i class="bi bi-pencil-square"></i> Edit</a>
+  <a href="{% url 'iroad_tenants:driver_master_edit' driver.driver_id %}?return_to=details&amp;section=driving-license" class="ch-action-btn">
     <i class="bi bi-card-checklist"></i> Update Licenses
   </a>
   {% if primary_treasury %}
-  <a href="{% url 'iroad_tenants:driver_transaction_create' %}?treasury_id={{ primary_treasury.treasury_id }}" class="ch-action-btn"><i class="bi bi-wallet"></i> Add Wallet Transaction</a>
+  <a href="{% url 'iroad_tenants:driver_transaction_create' %}?treasury_id={{ primary_treasury.treasury_id }}&amp;return_to=details&amp;driver_id={{ driver.driver_id }}" class="ch-action-btn"><i class="bi bi-wallet"></i> Add Wallet Transaction</a>
   {% else %}
   <a href="{% url 'iroad_tenants:driver_treasury_create' %}" class="ch-action-btn" title="Create a treasury for this driver first"><i class="bi bi-wallet"></i> Add Wallet Transaction</a>
   {% endif %}
@@ -101,10 +101,10 @@
     <i class="bi bi-person-check"></i> Activate Driver
   </button>
   {% endif %}
-  <a href="{% url 'iroad_tenants:driver_master_edit' driver.driver_id %}" class="ch-action-btn" title="Manage linked app user in Basic Information">
+  <a href="{% url 'iroad_tenants:driver_master_edit' driver.driver_id %}?return_to=details" class="ch-action-btn" title="Manage linked app user in Basic Information">
     <i class="bi bi-phone-vibrate"></i> Suspend App Access
   </a>
-  <a href="{% url 'iroad_tenants:driver_master_edit' driver.driver_id %}" class="ch-action-btn" title="Change linked user account in Basic Information">
+  <a href="{% url 'iroad_tenants:driver_master_edit' driver.driver_id %}?return_to=details" class="ch-action-btn" title="Change linked user account in Basic Information">
     <i class="bi bi-key"></i> Reset Password
   </a>
 </div>
@@ -290,7 +290,7 @@
       <div class="cd-details-section mb-4">
         <div class="cd-details-header d-flex justify-content-between align-items-center">
           <span>Uploaded Documents</span>
-          <a href="{% url 'iroad_tenants:driver_attachment_create' driver.driver_id %}" class="btn btn-primary btn-sm">
+          <a href="{% url 'iroad_tenants:driver_attachment_create' driver.driver_id %}?return_to=details" class="btn btn-primary btn-sm">
             <i class="bi bi-upload"></i> Upload File
           </a>
         </div>
@@ -619,6 +619,8 @@
         <input type="hidden" name="driver_id" id="dmDetailConfirmId" value="" />
         <input type="hidden" name="new_status" id="dmDetailConfirmStatus" value="" />
         <input type="hidden" name="redirect_query" value="" />
+        <input type="hidden" name="return_to" value="details" />
+        <input type="hidden" name="detail_tab" value="overview" />
         <div class="modal-header">
           <h5 class="modal-title" id="driverDetailStatusTitle">Confirm</h5>
           <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
@@ -641,6 +643,8 @@
     <div class="modal-content">
       <form method="post" action="" id="driverAttachmentDeleteForm">
         {% csrf_token %}
+        <input type="hidden" name="return_to" value="details" />
+        <input type="hidden" name="detail_tab" value="licenses-docs" />
         <div class="modal-header">
           <h5 class="modal-title" id="driverAttachmentDeleteTitle">Delete attachment</h5>
           <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
@@ -956,6 +960,26 @@
       });
     });
   }
+
+  (function activateTabFromQuery() {
+    var params = new URLSearchParams(window.location.search);
+    var tabKey = (params.get("tab") || "").trim().toLowerCase();
+    var tabMap = {
+      overview: "#pane-overview",
+      "licenses-docs": "#pane-licenses-docs",
+      "assigned-trucks": "#pane-assigned-trucks",
+      shipments: "#pane-shipments",
+      "movements-log": "#pane-movements-log",
+      wallet: "#pane-wallet",
+    };
+    var target = tabMap[tabKey];
+    if (!target) return;
+    var tabBtn = document.querySelector(
+      '.cd-tab[data-bs-target="' + target + '"]',
+    );
+    if (!tabBtn || !window.bootstrap || !bootstrap.Tab) return;
+    bootstrap.Tab.getOrCreateInstance(tabBtn).show();
+  })();
 })();
 </script>
 {% endblock %}

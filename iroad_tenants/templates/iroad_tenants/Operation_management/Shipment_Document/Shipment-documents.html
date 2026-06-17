@@ -223,12 +223,28 @@
         <div class="page-header-row">
           <div class="page-header-left">
             <h1 class="page-title">{% if shipment_document_is_edit %}Edit Shipment Document{% else %}Shipment Documents{% endif %}</h1>
-            <p class="page-subtitle">
+            <!-- <p class="page-subtitle">
               {% if shipment_document_is_edit %}Update document blueprint and page custody for this shipment.{% else %}Define which documents this shipment must produce (Layer 0 of the POD pipeline).{% endif %}
-            </p>
+            </p> -->
+          </div>
+          <div class="page-header-right ms-auto">
+            <a href="{% url 'iroad_tenants:tenant_operation_shipment_documents_list' %}" class="btn btn-outline-secondary">
+              <i class="bi bi-arrow-left me-1"></i>Back
+            </a>
           </div>
         </div>
       </div>
+
+      {% if shipment_document_form_errors %}
+      <div class="alert alert-danger alert-dismissible fade show mb-3" role="alert">
+        {% if shipment_document_form_errors.non_field_errors %}
+        {{ shipment_document_form_errors.non_field_errors }}
+        {% else %}
+        Please fix the highlighted errors below. Your entered data has been kept.
+        {% endif %}
+        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+      </div>
+      {% endif %}
 
       <!-- Shipment Documents Form -->
       <form
@@ -246,10 +262,7 @@
             </div>
             <div class="form-card-header-text">
               <h2 class="form-card-title">Header Fields</h2>
-              <p class="form-card-desc">
-                Anchor to one shipment; booking and item are derived from that shipment.
-              </p>
-            </div>
+      </div>
           </div>
           <div class="form-card-body">
             <!-- Row 1: Document ID -->
@@ -308,6 +321,7 @@
                         type="text"
                         class="form-control has-icon {% if shipment_document_form_errors.booking_id %}is-invalid{% endif %}"
                         id="bookingNo"
+                        name="booking_no"
                         value="{{ shipment_document_form_data.booking_no|default:'' }}"
                         placeholder="Search or type booking no..."
                         autocomplete="off"
@@ -531,12 +545,13 @@
                 <div class="field">
                   <label for="notes" class="form-label">Notes</label>
                   <textarea
-                    class="form-control"
+                    class="form-control {% if shipment_document_form_errors.notes %}is-invalid{% endif %}"
                     id="notes"
                     name="notes"
                     rows="3"
                     placeholder="Rejection reason or internal notes (required if Rejected)"
                   >{{ shipment_document_form_data.notes|default:'' }}</textarea>
+                  {% if shipment_document_form_errors.notes %}<div class="invalid-feedback d-block">{{ shipment_document_form_errors.notes }}</div>{% endif %}
                 </div>
               </div>
             </div>
@@ -551,12 +566,14 @@
             </div>
             <div class="form-card-header-text">
               <h2 class="form-card-title">Subform Line Fields</h2>
-              <p class="form-card-desc">
-                One row per physical page — chain of custody and soft copy per page.
-              </p>
-            </div>
+      </div>
           </div>
           <div class="form-card-body">
+            {% if shipment_document_form_errors.page_count %}
+            <div class="alert alert-danger py-2 px-3 mb-3" role="alert">
+              {{ shipment_document_form_errors.page_count }}
+            </div>
+            {% endif %}
             <div class="table-responsive">
               <table
                 class="sd-lines-table table table-sm table-hover align-middle mb-0"

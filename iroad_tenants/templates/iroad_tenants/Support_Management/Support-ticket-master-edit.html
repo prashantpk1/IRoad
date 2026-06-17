@@ -24,9 +24,9 @@
             <h1 class="page-title">
               {% if is_ticket_edit %}Edit {{ ticket.ticket_no }}{% else %}Create Support Ticket{% endif %}
             </h1>
-            <p class="page-subtitle">
+            <!-- <p class="page-subtitle">
               {% if is_ticket_edit %}Update subject and category for this ticket.{% else %}Fill in the details below to create a new support ticket.{% endif %}
-            </p>
+            </p> -->
           </div>
           <div class="page-header-right">
             <a
@@ -57,8 +57,7 @@
             </div>
             <div class="form-card-header-text">
               <h2 class="form-card-title">Ticket Information</h2>
-              <p class="form-card-desc">Edit subject and category while the ticket is open.</p>
-            </div>
+      </div>
           </div>
           <div class="form-card-body">
             <div class="fields-grid cols-2">
@@ -107,6 +106,7 @@
       <!-- Create Support Ticket -->
       <form id="supportTicketForm" method="post" enctype="multipart/form-data" novalidate>
         {% csrf_token %}
+        <input type="hidden" name="remove_pending_attachment" id="removePendingAttachment" value="0" />
         <div class="form-card" data-section="1">
           <div class="form-card-header">
             <div class="form-card-icon blue">
@@ -114,8 +114,7 @@
             </div>
             <div class="form-card-header-text">
               <h2 class="form-card-title">Ticket Information</h2>
-              <p class="form-card-desc">Basic details about the support ticket.</p>
-            </div>
+      </div>
           </div>
           <div class="form-card-body">
             <div class="field-group">
@@ -195,8 +194,7 @@
             </div>
             <div class="form-card-header-text">
               <h2 class="form-card-title">Message &amp; Attachment</h2>
-              <p class="form-card-desc">Reply content and optional file attachment.</p>
-            </div>
+      </div>
           </div>
           <div class="form-card-body">
             <div class="field-group">
@@ -239,6 +237,12 @@
                     />
                   </div>
                   {% if form_errors.attachment %}<div class="invalid-feedback d-block">{{ form_errors.attachment }}</div>{% endif %}
+                  {% if pending_attachment_name %}
+                  <div class="mt-2 d-flex align-items-center gap-2" id="pendingAttachmentRow">
+                    <span class="field-hint mb-0"><i class="bi bi-paperclip"></i> {{ pending_attachment_name }}</span>
+                    <button type="button" class="btn btn-sm btn-link text-danger p-0" id="removePendingAttachmentBtn">Remove</button>
+                  </div>
+                  {% endif %}
                   <span class="field-hint">Image, PDF or log file</span>
                 </div>
               </div>
@@ -263,5 +267,48 @@
 
 {% endblock %}
 
-{% block extra_js %}{% endblock %}
+{% block extra_js %}
+<script>
+(function () {
+  var form = document.getElementById("supportTicketForm");
+  var attachmentInput = document.getElementById("attachment");
+  var removePendingAttachment = document.getElementById("removePendingAttachment");
+  var removePendingAttachmentBtn = document.getElementById("removePendingAttachmentBtn");
+  var pendingAttachmentRow = document.getElementById("pendingAttachmentRow");
+  var messageBody = document.getElementById("message_body");
+
+  if (removePendingAttachmentBtn) {
+    removePendingAttachmentBtn.addEventListener("click", function () {
+      if (removePendingAttachment) {
+        removePendingAttachment.value = "1";
+      }
+      if (attachmentInput) {
+        attachmentInput.value = "";
+      }
+      if (pendingAttachmentRow) {
+        pendingAttachmentRow.remove();
+      }
+    });
+  }
+
+  if (attachmentInput) {
+    attachmentInput.addEventListener("change", function () {
+      if (removePendingAttachment && attachmentInput.files && attachmentInput.files.length) {
+        removePendingAttachment.value = "0";
+      }
+    });
+  }
+
+  if (form) {
+    form.addEventListener("submit", function (event) {
+      if (messageBody && !(messageBody.value || "").trim()) {
+        event.preventDefault();
+        messageBody.classList.add("is-invalid");
+        messageBody.focus();
+      }
+    });
+  }
+})();
+</script>
+{% endblock %}
 

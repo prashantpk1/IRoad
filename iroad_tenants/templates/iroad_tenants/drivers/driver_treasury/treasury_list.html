@@ -4,6 +4,10 @@
 {% block title %}Driver Treasury | iRoad{% endblock %}
 {% block breadcrumb %}{% endblock %}
 
+{% block extra_css %}
+{% include 'iroad_tenants/partials/eal_list_live_search_css.html' %}
+{% endblock %}
+
 {% block content %}
 <div class="page-header">
   <nav aria-label="breadcrumb">
@@ -19,7 +23,7 @@
   <div class="page-header-row">
     <div class="page-header-left">
       <h1 class="page-title">Driver Treasury</h1>
-      <p class="page-subtitle">Manage driver treasury accounts</p>
+      <!-- <p class="page-subtitle">Manage driver treasury accounts</p> -->
     </div>
     <div class="page-header-right">
       <div class="eal-header-actions">
@@ -73,13 +77,11 @@
 
 <div
   class="eal-table-card"
-  data-eal-filterable-table
-  data-eal-server-paginated="1"
-  data-eal-global-search-columns="1,2,3,4,5"
+  data-eal-filter-skip="1"
 >
   <div class="eal-toolbar eal-toolbar--inline-filters">
     <div class="eal-toolbar-left w-100">
-      <div class="eal-toolbar-filters-row flex-wrap gap-2">
+      <div class="eal-toolbar-filters-row">
         <div class="eal-search eal-search--toolbar-grow">
           <i class="bi bi-search"></i>
           <input
@@ -121,7 +123,7 @@
           <th class="eal-col-check">
             <input type="checkbox" class="eal-custom-check" id="dtListSelectAll" aria-label="Select all" />
           </th>
-          <th>#</th>
+          <th data-eal-skip-filter="1">#</th>
           <th>
             <a href="{{ sort_url_treasury_code }}" class="tm-sort-link{% if sort_key == 'treasury_code' %} is-active{% endif %}">
               Treasury Code
@@ -167,7 +169,7 @@
               </span>
             </a>
           </th>
-          <th>Actions</th>
+          <th data-eal-skip-filter="1">Actions</th>
         </tr>
       </thead>
       <tbody>
@@ -378,6 +380,8 @@
 
 {% block extra_js %}
 {{ block.super }}
+{% url 'iroad_tenants:driver_treasury_list' as driver_treasury_list_url %}
+{% include 'iroad_tenants/partials/eal_list_live_search_js.html' with list_url=driver_treasury_list_url search_input_id='driverTreasurySearch' clear_btn_id='driverTreasurySearchClear' filter_select_ids='dtListStatus' %}
 <script>
 (function () {
   var modalEl = document.getElementById("driverTreasuryStatusModal");

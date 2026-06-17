@@ -47,10 +47,7 @@
             </div>
             <div class="form-card-header-text">
               <h2 class="form-card-title">Tenant-Level Configuration</h2>
-              <p class="form-card-desc">
-                Configure default values and notifications for client contracts.
-              </p>
-            </div>
+      </div>
           </div>
           <div class="form-card-body">
             <!-- Contract Handling -->
@@ -152,16 +149,79 @@
                   {% if settings_errors.notification_frequency %}<div class="invalid-feedback d-block">{{ settings_errors.notification_frequency }}</div>{% endif %}
                 </div>
                 <div class="field">
-                  <label for="notificationAudience" class="form-label"
+                  <label for="notificationAudienceDropdown" class="form-label"
                     >Notification Audience</label
                   >
-                  <select class="form-select {% if settings_errors.notification_audience %}is-invalid{% endif %}" id="notificationAudience" name="notification_audience">
-                    <option value="System Admin" {% if settings_data.notification_audience == 'System Admin' %}selected{% endif %}>System Admin</option>
-                    <option value="Admin+Finance" {% if settings_data.notification_audience == 'Admin+Finance' %}selected{% endif %}>Admin + Finance</option>
-                  </select>
+                  <div class="dropdown">
+                    <button
+                      class="form-select text-start bg-white d-flex justify-content-between align-items-center w-100 {% if settings_errors.notification_audience %}is-invalid{% endif %}"
+                      type="button"
+                      id="notificationAudienceDropdown"
+                      data-bs-toggle="dropdown"
+                      aria-expanded="false"
+                      data-bs-auto-close="outside"
+                    >
+                      <span
+                        id="selectedAudienceText"
+                        class="text-truncate {% if not settings_data.notification_audiences %}text-muted{% endif %}"
+                      >
+                        {% if settings_data.notification_audiences %}
+                          {% if settings_data.notification_audiences|length == 1 %}
+                            {% if settings_data.notification_audiences.0 == 'Admin+Finance' %}Admin + Finance{% else %}{{ settings_data.notification_audiences.0 }}{% endif %}
+                          {% elif settings_data.notification_audiences|length == 2 %}
+                            System Admin, Admin + Finance
+                          {% else %}
+                            {{ settings_data.notification_audiences|length }} Audiences Selected
+                          {% endif %}
+                        {% else %}
+                          Select Audience
+                        {% endif %}
+                      </span>
+                    </button>
+                    <ul
+                      class="dropdown-menu w-100 p-2 shadow-sm"
+                      aria-labelledby="notificationAudienceDropdown"
+                      style="max-height: 200px; overflow-y: auto"
+                    >
+                      <li>
+                        <div class="form-check mb-1">
+                          <input
+                            class="form-check-input audience-checkbox"
+                            type="checkbox"
+                            name="notification_audience"
+                            value="System Admin"
+                            id="audienceSystemAdmin"
+                            {% if 'System Admin' in settings_data.notification_audiences %}checked{% endif %}
+                          />
+                          <label
+                            class="form-check-label w-100 cursor-pointer"
+                            for="audienceSystemAdmin"
+                            >System Admin</label
+                          >
+                        </div>
+                      </li>
+                      <li>
+                        <div class="form-check mb-1">
+                          <input
+                            class="form-check-input audience-checkbox"
+                            type="checkbox"
+                            name="notification_audience"
+                            value="Admin+Finance"
+                            id="audienceAdminFinance"
+                            {% if 'Admin+Finance' in settings_data.notification_audiences %}checked{% endif %}
+                          />
+                          <label
+                            class="form-check-label w-100 cursor-pointer"
+                            for="audienceAdminFinance"
+                            >Admin + Finance</label
+                          >
+                        </div>
+                      </li>
+                    </ul>
+                  </div>
                   {% if settings_errors.notification_audience %}<div class="invalid-feedback d-block">{{ settings_errors.notification_audience }}</div>{% endif %}
                   <span class="field-hint"
-                    >Select notification target audience.</span
+                    >Select one or more audiences from the dropdown</span
                   >
                 </div>
               </div>
@@ -199,5 +259,36 @@
         updateGracePeriodState();
         handlingModeSelect.addEventListener("change", updateGracePeriodState);
       }
+
+      (function () {
+        const audienceCheckboxes = document.querySelectorAll(".audience-checkbox");
+        const selectedAudienceText = document.getElementById("selectedAudienceText");
+        const audienceDropdown = document.getElementById("notificationAudienceDropdown");
+        if (!audienceCheckboxes.length || !selectedAudienceText) return;
+
+        function updateSelectedAudience() {
+          const selected = Array.from(audienceCheckboxes)
+            .filter((cb) => cb.checked)
+            .map((cb) => cb.nextElementSibling.textContent.trim());
+
+          if (selected.length === 0) {
+            selectedAudienceText.textContent = "Select Audience";
+            selectedAudienceText.classList.add("text-muted");
+          } else if (selected.length <= 2) {
+            if (audienceDropdown) audienceDropdown.classList.remove("is-invalid");
+            selectedAudienceText.textContent = selected.join(", ");
+            selectedAudienceText.classList.remove("text-muted");
+          } else {
+            if (audienceDropdown) audienceDropdown.classList.remove("is-invalid");
+            selectedAudienceText.textContent = selected.length + " Audiences Selected";
+            selectedAudienceText.classList.remove("text-muted");
+          }
+        }
+
+        audienceCheckboxes.forEach((cb) => {
+          cb.addEventListener("change", updateSelectedAudience);
+        });
+        updateSelectedAudience();
+      })();
     </script>
 {% endblock %}

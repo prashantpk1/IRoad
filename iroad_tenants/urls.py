@@ -125,6 +125,11 @@ from .views import (
     TenantRouteMasterDetailView,
     TenantRouteMasterEditView,
     TenantRouteMasterListView,
+    TenantServiceItemCategoryCreateView,
+    TenantServiceItemCategoryDeleteView,
+    TenantServiceItemCategoryDetailView,
+    TenantServiceItemCategoryEditView,
+    TenantServiceItemCategoryListView,
     TenantServiceItemMasterCreateView,
     TenantServiceItemMasterDetailView,
     TenantServiceItemMasterDeleteView,
@@ -136,10 +141,11 @@ from .views import (
     TenantServiceItemSettingsView,
     TenantUsersAdministrationToggleStatusView,
     TenantUsersAdministrationView,
-    TenantPriceListMasterCreateView,
     TenantPriceListMasterDeleteView,
     TenantPriceListMasterDetailView,
+    TenantPriceListMasterDuplicateView,
     TenantPriceListMasterEditView,
+    TenantPriceListMasterToggleStatusView,
     TenantOperationBookingAssignTruckView,
     TenantOperationBookingCancelView,
     TenantOperationBookingDeleteView,
@@ -195,8 +201,6 @@ from .views import (
     TenantTreasuryPrintView,
     TenantSalesInvoiceReportUpdateView,
     TenantSalesInvoiceReportStatusUpdateView,
-    TenantPriceListMasterDeleteView,
-    TenantPriceListMasterEditView,
 
 )
 from iroad_tenants.list_exports import (
@@ -204,6 +208,7 @@ from iroad_tenants.list_exports import (
     DriverMasterExportView,
     TenantAddressMasterExportView,
     TenantCargoCategoryExportView,
+    TenantServiceItemCategoryExportView,
     TenantCargoMasterExportView,
     TenantClientContactsExportView,
     TenantClientContractExportView,
@@ -929,6 +934,36 @@ urlpatterns = [
         name='tenant_service_item_master_export',
     ),
     path(
+        'master-data/services/categories/',
+        TenantServiceItemCategoryListView.as_view(),
+        name='tenant_service_item_category_list',
+    ),
+    path(
+        'master-data/services/categories/export/',
+        TenantServiceItemCategoryExportView.as_view(),
+        name='tenant_service_item_category_export',
+    ),
+    path(
+        'master-data/services/categories/create/',
+        TenantServiceItemCategoryCreateView.as_view(),
+        name='tenant_service_item_category_create',
+    ),
+    path(
+        'master-data/services/categories/<uuid:category_id>/edit/',
+        TenantServiceItemCategoryEditView.as_view(),
+        name='tenant_service_item_category_edit',
+    ),
+    path(
+        'master-data/services/categories/<uuid:category_id>/delete/',
+        TenantServiceItemCategoryDeleteView.as_view(),
+        name='tenant_service_item_category_delete',
+    ),
+    path(
+        'master-data/services/categories/<uuid:category_id>/',
+        TenantServiceItemCategoryDetailView.as_view(),
+        name='tenant_service_item_category_detail',
+    ),
+    path(
         'master-data/services/service-items/create/',
         TenantServiceItemMasterCreateView.as_view(),
         name='tenant_service_item_master_create',
@@ -973,21 +1008,30 @@ urlpatterns = [
         TenantPriceListMasterCreateView.as_view(),
         name='tenant_price_list_master_create',
     ),
-    
- path(
-        'master-data/services/price-lists/<str:price_list_ref>/',
-        TenantPriceListMasterDetailView.as_view(),
-        name='tenant_price_list_master_detail',
-    ),
     path(
         'master-data/services/price-lists/<str:price_list_ref>/edit/',
         TenantPriceListMasterEditView.as_view(),
         name='tenant_price_list_master_edit',
     ),
     path(
+        'master-data/services/price-lists/<str:price_list_ref>/duplicate/',
+        TenantPriceListMasterDuplicateView.as_view(),
+        name='tenant_price_list_master_duplicate',
+    ),
+    path(
+        'master-data/services/price-lists/<str:price_list_ref>/toggle-status/',
+        TenantPriceListMasterToggleStatusView.as_view(),
+        name='tenant_price_list_master_toggle_status',
+    ),
+    path(
         'master-data/services/price-lists/<str:price_list_ref>/delete/',
         TenantPriceListMasterDeleteView.as_view(),
         name='tenant_price_list_master_delete',
+    ),
+    path(
+        'master-data/services/price-lists/<str:price_list_ref>/',
+        TenantPriceListMasterDetailView.as_view(),
+        name='tenant_price_list_master_detail',
     ),
     path(
         'operations/booking/create/',

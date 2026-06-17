@@ -51,6 +51,30 @@
         justify-content: center;
         flex-shrink: 0;
       }
+      .pl-route-chip .pl-route-arrow--outbound {
+        background: #ecfdf5;
+        color: #16a34a;
+      }
+      .pl-route-chip .pl-route-arrow--inbound {
+        background: #fef2f2;
+        color: #dc2626;
+      }
+      .pl-route-chip .pl-route-arrow--round {
+        background: #e8f0fe;
+        color: #2563eb;
+      }
+      .pl-route-chip .pl-route-arrow--stacked {
+        flex-direction: column;
+        gap: 0;
+        line-height: 0.8;
+        font-size: 0.62rem;
+      }
+      .pl-route-chip .pl-route-arrow--stacked .pl-route-arrow-out {
+        color: #16a34a;
+      }
+      .pl-route-chip .pl-route-arrow--stacked .pl-route-arrow-in {
+        color: #dc2626;
+      }
       .pl-route-chip > span:not(.pl-route-arrow) {
         max-width: 140px;
         overflow: hidden;
@@ -82,7 +106,7 @@
         <div class="page-header-row">
           <div class="page-header-left">
             <h1 class="page-title">Booking List</h1>
-            <p class="page-subtitle">View and manage all bookings.</p>
+            <!-- <p class="page-subtitle">View and manage all bookings.</p> -->
           </div>
           <div class="page-header-right">
             <div class="eal-header-actions">
@@ -188,7 +212,8 @@
           class="eal-table-card"
           data-eal-filterable-table
           data-eal-server-paginated="1"
-          data-eal-global-search-columns="1,2,3,4,5,6,7,8,9"
+          data-eal-global-search-columns="2,3,4,5,6,7,8,9,10"
+          data-eal-empty-colspan="12"
         >
           <div class="eal-toolbar">
             <div class="eal-toolbar-left">
@@ -222,6 +247,14 @@
             <table class="eal-table">
               <thead>
                 <tr>
+                  <th class="eal-col-check">
+                    <input
+                      type="checkbox"
+                      class="eal-custom-check"
+                      id="ealSelectAll"
+                      aria-label="Select all bookings on this page"
+                    />
+                  </th>
                   <th>SN</th>
                   <th>Booking No</th>
                   <th>Creation Date</th>
@@ -237,7 +270,14 @@
               </thead>
               <tbody>
                 {% for row in booking_rows %}
-                <tr>
+                <tr data-eal-export-id="{{ row.booking_no|escape }}">
+                  <td class="eal-col-check">
+                    <input
+                      type="checkbox"
+                      class="eal-custom-check eal-row-check"
+                      aria-label="Select booking {{ row.booking_no }}"
+                    />
+                  </td>
                   <td>{{ row.sn }}</td>
                   <td><span class="eal-entity-id">{{ row.booking_no }}</span></td>
                   <td>{{ row.creation_date|date:"d M Y"|default:"-" }}</td>
@@ -252,8 +292,16 @@
                     {% if row.route_chip %}
                     <div class="pl-route-chip" title="{{ row.route_chip.title }}">
                       <span>{{ row.route_chip.origin }}</span>
-                      <span class="pl-route-arrow" aria-hidden="true">
-                        <i class="bi bi-arrow-left-right"></i>
+                      <span
+                        class="pl-route-arrow pl-route-arrow--{{ row.route_chip.arrow_variant|default:'outbound' }}{% if row.route_chip.arrow_variant == 'round' %} pl-route-arrow--stacked{% endif %}"
+                        aria-hidden="true"
+                      >
+                        {% if row.route_chip.arrow_variant == 'round' %}
+                        <i class="bi bi-arrow-right pl-route-arrow-out"></i>
+                        <i class="bi bi-arrow-left pl-route-arrow-in"></i>
+                        {% else %}
+                        <i class="bi bi-arrow-right"></i>
+                        {% endif %}
                       </span>
                       <span>{{ row.route_chip.destination }}</span>
                     </div>
@@ -333,7 +381,7 @@
                 </tr>
                 {% empty %}
                 <tr>
-                  <td colspan="11" class="text-center text-muted py-4">
+                  <td colspan="12" class="text-center text-muted py-4">
                     No bookings found.
                   </td>
                 </tr>

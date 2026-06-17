@@ -4,6 +4,68 @@
 {% block title %}Sales Invoice Report | iRoad{% endblock %}
 {% block breadcrumb %}{% endblock %}
 
+{% block extra_css %}
+{% include 'iroad_tenants/partials/eal_list_live_search_css.html' %}
+<style>
+  .eal-toolbar--sir-list .eal-toolbar-filters-shell {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+    width: 100%;
+  }
+  .eal-toolbar--sir-list .eal-toolbar-filters-row--search > .eal-search.eal-search--toolbar-grow {
+    flex: 1 1 auto;
+    width: 100%;
+    max-width: none;
+  }
+  .eal-toolbar--sir-list .eal-toolbar-filters-row--filters {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.625rem 1rem;
+    width: 100%;
+  }
+  .eal-toolbar--sir-list .eal-toolbar-filter-pair {
+    flex: 0 1 auto;
+  }
+  .eal-toolbar--sir-list .eal-toolbar-filter-pair .form-select-sm,
+  .eal-toolbar--sir-list .eal-toolbar-filter-pair .form-control-sm {
+    width: auto;
+    min-width: 9.5rem;
+    max-width: 14rem;
+  }
+  .eal-toolbar--sir-list #sirClient.form-select-sm {
+    min-width: 11.5rem;
+    max-width: 16rem;
+  }
+  .eal-toolbar--sir-list .sir-toolbar-reset {
+    margin-left: auto;
+    flex-shrink: 0;
+  }
+  @media (max-width: 767px) {
+    .eal-toolbar--sir-list .eal-toolbar-filters-row--filters {
+      flex-direction: column;
+      align-items: stretch;
+    }
+    .eal-toolbar--sir-list .eal-toolbar-filter-pair {
+      width: 100%;
+      justify-content: flex-start;
+    }
+    .eal-toolbar--sir-list .eal-toolbar-filter-pair .form-select-sm,
+    .eal-toolbar--sir-list .eal-toolbar-filter-pair .form-control-sm {
+      flex: 1 1 auto;
+      min-width: 0;
+      max-width: none;
+      width: 100%;
+    }
+    .eal-toolbar--sir-list .sir-toolbar-reset {
+      margin-left: 0;
+      width: 100%;
+    }
+  }
+</style>
+{% endblock %}
+
 {% block content %}
 <div class="page-header">
   <nav aria-label="breadcrumb">
@@ -17,7 +79,6 @@
   <div class="page-header-row">
     <div class="page-header-left">
       <h1 class="page-title">Sales Invoice Reports</h1>
-      <p class="page-subtitle">View and manage billing worksheet reports.</p>
     </div>
     <div class="page-header-right">
       <a href="{% url 'iroad_tenants:sales_invoice_report_create' %}" class="eal-btn eal-btn-primary">
@@ -47,64 +108,63 @@
   </div>
 </div>
 
-<div
-  class="eal-table-card"
-  data-eal-filterable-table
-  data-eal-server-paginated="1"
-  data-eal-global-search-columns="1,2,3,4,5,6,7"
->
-  <div class="eal-toolbar eal-toolbar--inline-filters">
+<div class="eal-table-card" data-eal-filter-skip="1">
+  <div class="eal-toolbar eal-toolbar--inline-filters eal-toolbar--sir-list">
     <div class="eal-toolbar-left w-100">
-      <div class="eal-toolbar-filters-row flex-wrap gap-2">
-        <div class="eal-search eal-search--toolbar-grow">
-          <i class="bi bi-search"></i>
-          <input
-            type="search"
-            id="salesInvoiceReportSearch"
-            data-eal-global-search
-            value="{{ search_q|default:'' }}"
-            autocomplete="off"
-            placeholder="Search sales invoice reports..."
-            aria-label="Search sales invoice reports"
-          />
-          <button
-            type="button"
-            class="eal-search-clear-btn"
-            id="salesInvoiceReportSearchClear"
-            title="Clear search"
-            aria-label="Clear search"
-            hidden
-          >
-            <i class="bi bi-x-lg"></i>
-          </button>
+      <div class="eal-toolbar-filters-shell">
+        <div class="eal-toolbar-filters-row eal-toolbar-filters-row--search">
+          <div class="eal-search eal-search--toolbar-grow">
+            <i class="bi bi-search"></i>
+            <input
+              type="search"
+              id="salesInvoiceReportSearch"
+              data-eal-global-search
+              value="{{ search_q|default:'' }}"
+              autocomplete="off"
+              placeholder="Search sales invoice reports..."
+              aria-label="Search sales invoice reports"
+            />
+            <button
+              type="button"
+              class="eal-search-clear-btn"
+              id="salesInvoiceReportSearchClear"
+              title="Clear search"
+              aria-label="Clear search"
+              hidden
+            >
+              <i class="bi bi-x-lg"></i>
+            </button>
+          </div>
         </div>
-        <div class="eal-toolbar-filter-pair">
-          <label class="form-label mb-0 small text-nowrap text-muted" for="sirStatus">Status</label>
-          <select class="form-select form-select-sm" id="sirStatus" name="status" data-query-param="status">
-            <option value="">All Status</option>
-            <option value="Draft" {% if status_filter == 'Draft' %}selected{% endif %}>Draft</option>
-            <option value="Verified" {% if status_filter == 'Verified' %}selected{% endif %}>Verified</option>
-            <option value="Converted" {% if status_filter == 'Converted' %}selected{% endif %}>Converted</option>
-          </select>
+        <div class="eal-toolbar-filters-row eal-toolbar-filters-row--filters">
+          <div class="eal-toolbar-filter-pair">
+            <label class="form-label mb-0 small text-nowrap text-muted" for="sirStatus">Status</label>
+            <select class="form-select form-select-sm" id="sirStatus" name="status" data-query-param="status">
+              <option value="">All Status</option>
+              <option value="Draft" {% if status_filter == 'Draft' %}selected{% endif %}>Draft</option>
+              <option value="Verified" {% if status_filter == 'Verified' %}selected{% endif %}>Verified</option>
+              <option value="Converted" {% if status_filter == 'Converted' %}selected{% endif %}>Converted</option>
+            </select>
+          </div>
+          <div class="eal-toolbar-filter-pair">
+            <label class="form-label mb-0 small text-nowrap text-muted" for="sirClient">Client</label>
+            <select class="form-select form-select-sm" id="sirClient" name="client" data-query-param="client">
+              <option value="">All Clients</option>
+              {% for c in client_choices %}
+              <option value="{{ c.account_id }}" {% if client_filter == c.account_id|stringformat:'s' %}selected{% endif %}>{{ c.account_no }} - {{ c.display_name }}</option>
+              {% endfor %}
+            </select>
+          </div>
+          <div class="eal-toolbar-filter-pair">
+            <label class="form-label mb-0 small text-nowrap text-muted" for="sirFromDate">From</label>
+            <input class="form-control form-control-sm" id="sirFromDate" type="date" name="date_from" data-query-param="date_from" value="{{ date_from }}" />
+          </div>
+          <div class="eal-toolbar-filter-pair">
+            <label class="form-label mb-0 small text-nowrap text-muted" for="sirToDate">To</label>
+            <input class="form-control form-control-sm" id="sirToDate" type="date" name="date_to" data-query-param="date_to" value="{{ date_to }}" />
+          </div>
+          <a href="{% url 'iroad_tenants:sales_invoice_report_list' %}" class="btn btn-sm btn-outline-secondary sir-toolbar-reset">Reset</a>
         </div>
-        <div class="eal-toolbar-filter-pair">
-          <label class="form-label mb-0 small text-nowrap text-muted" for="sirClient">Client</label>
-          <select class="form-select form-select-sm" id="sirClient" name="client" data-query-param="client">
-            <option value="">All Clients</option>
-            {% for c in client_choices %}
-            <option value="{{ c.account_id }}" {% if client_filter == c.account_id|stringformat:'s' %}selected{% endif %}>{{ c.account_no }} - {{ c.display_name }}</option>
-            {% endfor %}
-          </select>
-        </div>
-        <div class="eal-toolbar-filter-pair">
-          <label class="form-label mb-0 small text-nowrap text-muted" for="sirFromDate">From</label>
-          <input class="form-control form-control-sm" id="sirFromDate" type="date" name="date_from" data-query-param="date_from" value="{{ date_from }}" />
-        </div>
-        <div class="eal-toolbar-filter-pair">
-          <label class="form-label mb-0 small text-nowrap text-muted" for="sirToDate">To</label>
-          <input class="form-control form-control-sm" id="sirToDate" type="date" name="date_to" data-query-param="date_to" value="{{ date_to }}" />
-        </div>
-        <a href="{% url 'iroad_tenants:sales_invoice_report_list' %}" class="btn btn-sm btn-outline-secondary">Reset</a>
       </div>
     </div>
   </div>
@@ -122,7 +182,7 @@
           <th>Currency</th>
           <th>Total</th>
           <th>Status</th>
-          <th>Actions</th>
+          <th data-eal-skip-filter="1">Actions</th>
         </tr>
       </thead>
       <tbody>
@@ -180,24 +240,12 @@
     </table>
   </div>
 
-  <div class="eal-pagination">
-    <div class="eal-pagination-info">
-      Showing <strong>{{ reports_page.start_index|default:0 }}-{{ reports_page.end_index|default:0 }}</strong>
-      of <strong>{{ reports_page.paginator.count|default:0 }}</strong> sales invoice reports
-    </div>
-    <div class="eal-pagination-controls">
-      {% if reports_page.has_previous %}
-      <a class="eal-page-btn" href="?page={{ reports_page.previous_page_number }}&q={{ search_q }}&status={{ status_filter }}&client={{ client_filter }}&date_from={{ date_from }}&date_to={{ date_to }}"><i class="bi bi-chevron-left"></i></a>
-      {% else %}
-      <span class="eal-page-btn disabled opacity-50"><i class="bi bi-chevron-left"></i></span>
-      {% endif %}
-      <span class="eal-page-btn active">{{ reports_page.number|default:1 }}</span>
-      {% if reports_page.has_next %}
-      <a class="eal-page-btn" href="?page={{ reports_page.next_page_number }}&q={{ search_q }}&status={{ status_filter }}&client={{ client_filter }}&date_from={{ date_from }}&date_to={{ date_to }}"><i class="bi bi-chevron-right"></i></a>
-      {% else %}
-      <span class="eal-page-btn disabled opacity-50"><i class="bi bi-chevron-right"></i></span>
-      {% endif %}
-    </div>
-  </div>
+  {% include 'iroad_tenants/partials/eal_list_pagination.html' with page_obj=reports_page pagination_label='sales invoice reports' %}
 </div>
+{% endblock %}
+
+{% block extra_js %}
+{{ block.super }}
+{% url 'iroad_tenants:sales_invoice_report_list' as sales_invoice_report_list_url %}
+{% include 'iroad_tenants/partials/eal_list_live_search_js.html' with list_url=sales_invoice_report_list_url search_input_id='salesInvoiceReportSearch' clear_btn_id='salesInvoiceReportSearchClear' filter_select_ids='sirStatus,sirClient,sirFromDate,sirToDate' %}
 {% endblock %}

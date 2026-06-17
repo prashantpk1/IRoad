@@ -1,0 +1,79 @@
+{% extends 'iroad_tenants/base.html' %}
+{% load static %}
+{% load i18n %}
+
+{% block title %}{% translate "Service Category Detail" %} | {{ category.category_code }} | iRoad{% endblock %}
+{% block breadcrumb %}{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <nav aria-label="breadcrumb">
+    <ol class="breadcrumb">
+      <li class="breadcrumb-item">
+        <a href="{% url 'iroad_tenants:tenant_dashboard' %}">{% translate "Dashboard" %}</a>
+      </li>
+      <li class="breadcrumb-item">{% translate "Master Data" %}</li>
+      <li class="breadcrumb-item">{% translate "Services Management" %}</li>
+      <li class="breadcrumb-item active" aria-current="page">{% translate "Service Category Detail" %}</li>
+    </ol>
+  </nav>
+  <div class="page-header-row">
+    <div class="page-header-left">
+      <h1 class="page-title">{% translate "Service Category Detail" %}</h1>
+      <!-- <p class="page-subtitle">{% translate "Read-only category details." %}</p> -->
+    </div>
+    <div class="page-header-right">
+      <div class="eal-header-actions">
+        <a href="{{ back_to_list_url }}" class="eal-btn eal-btn-outline">
+          <i class="bi bi-arrow-left"></i>
+          <span>{% translate "Back" %}</span>
+        </a>
+        <a href="{{ edit_category_url }}" class="eal-btn eal-btn-primary">
+          <i class="bi bi-pencil-square"></i>
+          <span>{% translate "Edit" %}</span>
+        </a>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="form-card mb-3" data-section="1">
+  <div class="form-card-header">
+    <div class="form-card-icon blue"><i class="bi bi-tags"></i></div>
+    <div class="form-card-header-text">
+      <h2 class="form-card-title">{% translate "Category Details" %}</h2>
+      </div>
+  </div>
+  <div class="form-card-body">
+    <p class="small text-uppercase fw-semibold text-secondary mb-3" style="letter-spacing: 0.06em">
+      <i class="bi bi-info-circle"></i> {% translate "Category Information" %}
+    </p>
+    <div class="fields-grid cols-2">
+      <div class="field">
+        <label class="form-label">{% translate "Category Code" %}</label>
+        <p class="detail-view-value"><span class="eal-entity-id">{{ category.category_code }}</span></p>
+      </div>
+      <div class="field">
+        <label class="form-label">{% translate "Status" %}</label>
+        <p class="detail-view-value">
+          {% if category.status == 'Active' %}
+          <span class="status-badge active">{% translate "Active" %}</span>
+          {% else %}
+          <span class="status-badge inactive">{% translate "Inactive" %}</span>
+          {% endif %}
+        </p>
+      </div>
+    </div>
+    <div class="fields-grid cols-2" style="margin-top: 20px">
+      <div class="field">
+        <label class="form-label">{% translate "Name (English)" %}</label>
+        <p class="detail-view-value">{{ category.name_english }}</p>
+      </div>
+      <div class="field">
+        <label class="form-label">{% translate "Name (Arabic)" %}</label>
+        <p class="detail-view-value eal-arabic" lang="ar" dir="rtl">{{ category.name_arabic|default:"—" }}</p>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

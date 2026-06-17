@@ -7,6 +7,7 @@ from django.contrib import messages
 from django.db import connection
 from django.shortcuts import redirect
 from django.urls import reverse
+from django.utils import translation
 
 from iroad_tenants.subscription_access import (
     is_subscription_setup_request,
@@ -14,6 +15,10 @@ from iroad_tenants.subscription_access import (
     tenant_portal_is_owner_admin,
 )
 from iroad_tenants.tenant_schema import lock_portal_tenant_schema, unlock_portal_tenant_schema
+from iroad_tenants.tenant_system_config import (
+    activate_tenant_system_config,
+    resolve_tenant_system_config,
+)
 from superadmin.models import TenantProfile
 from superadmin.redis_helpers import get_tenant_session
 from superadmin.tenant_portal_auth import get_tenant_portal_cookie_payload
@@ -103,3 +108,33 @@ class TenantSubscriptionGateMiddleware:
             extra_tags='tenant',
         )
         return redirect(reverse('iroad_tenants:tenant_subscription_plan'))
+
+
+class TenantSystemConfigurationMiddleware:
+    """
+    Apply Organization Profile system settings (timezone, language, formats)
+    for every tenant portal request.
+    """
+
+    PREFIX = '/tenant/'
+
+    def __init__(self, get_response):
+        self.get_response = get_response
+
+    def __call__(self, request):
+        if not request.path.startswith(self.PREFIX):
+            return self.get_response(request)
+
+        config = resolve_tenant_system_config(request)
+        request.tenant_system_config = config
+
+        from django.utils import timezone as dj_tz
+
+        previous_tz = dj_tz.get_current_timezone()
+        previous_language = translation.get_language()
+        activate_tenant_system_config(config)
+        try:
+            return self.get_response(request)
+        finally:
+            dj_tz.activate(previous_tz)
+            translation.activate(previous_language)

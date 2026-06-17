@@ -28,9 +28,9 @@
               POD Record &mdash;
               <span style="color: var(--primary-color)">{{ pod_detail.record_no }}</span>
             </h1>
-            <p class="page-subtitle">
+            <!-- <p class="page-subtitle">
               Full details for this proof of delivery record.
-            </p>
+            </p> -->
           </div>
           <div class="page-header-right">
             <div class="eal-header-actions">
@@ -39,7 +39,7 @@
                 class="eal-btn eal-btn-outline"
               >
                 <i class="bi bi-arrow-left"></i>
-                <span>Back to List</span>
+                <span>Back</span>
               </a>
               <a class="eal-btn eal-btn-primary" href="{% url 'iroad_tenants:tenant_operation_shipment_pod_create' %}?record_no={{ pod_detail.record_no|urlencode }}">
                 <i class="bi bi-pencil-square"></i>
@@ -62,10 +62,7 @@
               </div>
               <div class="form-card-header-text">
                 <h2 class="form-card-title">POD Header - Header Info</h2>
-                <p class="form-card-desc">
-                  Mirror view of POD header record fields.
-                </p>
-              </div>
+      </div>
             </div>
             <div class="form-card-body">
               <div class="fields-grid cols-2">
@@ -89,10 +86,7 @@
               </div>
               <div class="form-card-header-text">
                 <h2 class="form-card-title">POD Header - Document Info</h2>
-                <p class="form-card-desc">
-                  Mirror of document fields from transaction form.
-                </p>
-              </div>
+      </div>
             </div>
             <div class="form-card-body">
               <div class="fields-grid cols-3">
@@ -132,10 +126,7 @@
                 <h2 class="form-card-title">
                   POD Header - Booking and Shipment Info
                 </h2>
-                <p class="form-card-desc">
-                  Mirror of booking and shipment linked fields.
-                </p>
-              </div>
+      </div>
             </div>
             <div class="form-card-body">
               <div class="fields-grid cols-3">
@@ -163,10 +154,7 @@
               </div>
               <div class="form-card-header-text">
                 <h2 class="form-card-title">POD Header - POD Status Info</h2>
-                <p class="form-card-desc">
-                  Mirror of POD status fields and collection statuses.
-                </p>
-              </div>
+      </div>
             </div>
             <div class="form-card-body">
               <div class="pod-status-grid">
@@ -353,10 +341,7 @@
           </div>
           <div class="form-card-header-text">
             <h2 class="form-card-title">POD Pages</h2>
-            <p class="form-card-desc">
-              Mirror of POD Pages subtable fields from transaction form.
-            </p>
-          </div>
+      </div>
         </div>
         <div class="form-card-body" style="padding: 0">
           <div class="eal-table-wrap">

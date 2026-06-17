@@ -1,370 +1,745 @@
-{% extends 'iroad_tenants/base.html' %}
-{% load static %}
-
-{% block title %}Truck Attachments | iRoad{% endblock %}
-{% block breadcrumb %}{% endblock %}
-
-{% block content %}
-<div class="page-header">
-  <nav aria-label="breadcrumb">
-    <ol class="breadcrumb">
-      <li class="breadcrumb-item"><a href="{% url 'iroad_tenants:tenant_dashboard' %}">Dashboard</a></li>
-      <li class="breadcrumb-item">Operations</li>
-      <li class="breadcrumb-item">Fleet Management</li>
-      <li class="breadcrumb-item active" aria-current="page">Truck Attachments</li>
-    </ol>
-  </nav>
-  <div class="page-header-row">
-    <div class="page-header-left">
-      <h1 class="page-title">Truck Attachments</h1>
-      <p class="page-subtitle">
-        Upload and manage attachment documents for trucks in the fleet.
-      </p>
-    </div>
-  </div>
-</div>
-
-<form
-  id="truckAttachmentsForm"
-  method="post"
-  enctype="multipart/form-data"
-  class="needs-validation"
-  novalidate
-  {% if is_edit %}
-  action="{% url 'iroad_tenants:truck_attachment_edit' truck_id=truck.truck_id attachment_id=attachment.attachment_id %}"
-  {% elif truck %}
-  action="{% url 'iroad_tenants:truck_attachment_create' truck_id=truck.truck_id %}"
-  {% else %}
-  action="{% url 'iroad_tenants:truck_attachment_create_all' %}"
-  {% endif %}
->
-  {% csrf_token %}
-  {% if form_non_field_errors %}
-  <div class="alert alert-danger" role="alert">{{ form_non_field_errors }}</div>
-  {% endif %}
-
-  <!-- Section 1: Attachment Details -->
-  <div class="form-card mb-3" data-section="1">
-    <div class="form-card-header">
-      <div class="form-card-icon blue">
-        <i class="bi bi-paperclip"></i>
-      </div>
-      <div class="form-card-header-text">
-        <h2 class="form-card-title">Attachment Details</h2>
-        <p class="form-card-desc">
-          Primary details about the truck attachment including the associated truck and dates.
-        </p>
-      </div>
-    </div>
-    <div class="form-card-body">
-      <div class="field-group">
-        <h3 class="field-group-title">
-          <i class="bi bi-card-heading"></i>
-          Attachment Identity
-        </h3>
-        <div class="fields-grid cols-2">
-          <div class="field">
-            <label class="form-label" for="taAttachmentNo">Attachment No</label>
-            <input
-              type="text"
-              class="form-control"
-              id="taAttachmentNo"
-              readonly
-              placeholder="Auto-generated"
-              value="{% if is_edit and attachment.attachment_no %}{{ attachment.attachment_no }}{% else %}{{ attachment_no_preview|default:'' }}{% endif %}"
-              aria-readonly="true"
-            />
-            <span class="field-hint">Unique attachment reference</span>
-          </div>
-          <div class="field">
-            <label class="form-label" for="taDocRefNumber">Doc Ref Number</label>
-            <input
-              type="text"
-              class="form-control {% if form_errors.doc_ref_number %}is-invalid{% endif %}"
-              id="taDocRefNumber"
-              name="doc_ref_number"
-              placeholder="Enter document reference number"
-              value="{{ form_data.doc_ref_number|default:'' }}"
-            />
-            {% if form_errors.doc_ref_number %}<div class="text-danger small">{{ form_errors.doc_ref_number }}</div>{% endif %}
-          </div>
-        </div>
-        <div class="fields-grid cols-2">
-          <div class="field">
-            <label class="form-label" for="taArabicLabel">Arabic Label</label>
-            <input
-              type="text"
-              class="form-control {% if form_errors.arabic_label %}is-invalid{% endif %}"
-              id="taArabicLabel"
-              name="arabic_label"
-              dir="rtl"
-              placeholder="Enter Arabic label"
-              value="{{ form_data.arabic_label|default:'' }}"
-            />
-            {% if form_errors.arabic_label %}<div class="text-danger small">{{ form_errors.arabic_label }}</div>{% endif %}
-          </div>
-          <div class="field">
-            <label class="form-label" for="taEnglishLabel">English Label</label>
-            <input
-              type="text"
-              class="form-control {% if form_errors.english_label %}is-invalid{% endif %}"
-              id="taEnglishLabel"
-              name="english_label"
-              placeholder="Enter English label"
-              value="{{ form_data.english_label|default:'' }}"
-            />
-            {% if form_errors.english_label %}<div class="text-danger small">{{ form_errors.english_label }}</div>{% endif %}
-          </div>
-        </div>
-      </div>
-
-      <div class="field-group">
-        <h3 class="field-group-title">
-          <i class="bi bi-truck"></i>
-          Truck &amp; Date
-        </h3>
-        <div class="fields-grid cols-2">
-          <div class="field">
-            <label class="form-label" for="taTruck">Truck <span class="required">*</span></label>
-            {% if show_truck_selector %}
-            <select
-              class="form-select {% if truck_error %}is-invalid{% endif %}"
-              id="taTruck"
-              name="truck_id"
-              required
-            >
-              <option value="">-Select truck-</option>
-              {% for t in trucks_for_select %}
-              <option value="{{ t.truck_id }}" {% if selected_truck_id == t.truck_id|stringformat:'s' %}selected{% endif %}>
-                {{ t.truck_code }}{% if t.truck_type %} — {{ t.truck_type.english_label }}{% endif %}
-              </option>
-              {% endfor %}
-            </select>
-            {% if truck_error %}<div class="text-danger small">{{ truck_error }}</div>{% endif %}
-            <span class="field-hint">Select the truck this attachment belongs to</span>
-            {% else %}
-            <input
-              type="text"
-              class="form-control"
-              id="taTruck"
-              readonly
-              value="{{ truck.truck_code }}{% if truck.truck_type %} — {{ truck.truck_type.english_label }}{% endif %}"
-              aria-readonly="true"
-            />
-            <span class="field-hint">Select the truck this attachment belongs to</span>
-            {% endif %}
-          </div>
-          <div class="field">
-            <label class="form-label" for="taAttachmentDate">
-              Attachment Date <span class="required">*</span>
-            </label>
-            <div class="input-icon-wrapper">
-              <i class="bi bi-calendar-event"></i>
-              <input
-                type="date"
-                class="form-control has-icon {% if form_errors.attachment_date %}is-invalid{% endif %}"
-                id="taAttachmentDate"
-                name="attachment_date"
-                value="{{ form_data.attachment_date|default:'' }}"
-                required
-              />
-            </div>
-            {% if form_errors.attachment_date %}<div class="text-danger small">{{ form_errors.attachment_date }}</div>{% endif %}
-            <span class="field-hint">Date when the document was attached</span>
-          </div>
-        </div>
-      </div>
-
-      <div class="field-group">
-        <h3 class="field-group-title">
-          <i class="bi bi-clock-history"></i>
-          Expiry Settings
-        </h3>
-        <div class="setting-row">
-          <div class="setting-row-info">
-            <label class="form-label" for="taIsExpiryApplicable">Is Expiry Applicable</label>
-            <span class="field-hint">Enable this if the attached document has an expiration date.</span>
-          </div>
-          <label class="setting-toggle">
-            <input
-              type="checkbox"
-              name="is_expiry_applicable"
-              id="taIsExpiryApplicable"
-              {% if form_data.is_expiry_applicable %}checked{% endif %}
-            />
-            <span class="toggle-track"></span>
-            <span class="toggle-label js-ta-expiry-label">Disabled</span>
-          </label>
-        </div>
-        {% if form_errors.is_expiry_applicable %}<div class="text-danger small">{{ form_errors.is_expiry_applicable }}</div>{% endif %}
-
-        <div class="fields-grid cols-2" id="taExpiryDateWrapper">
-          <div class="field">
-            <label class="form-label" for="taExpiryDate">Expiry Date</label>
-            <div class="input-icon-wrapper">
-              <i class="bi bi-calendar-x"></i>
-              <input
-                type="date"
-                class="form-control has-icon {% if form_errors.expiry_date %}is-invalid{% endif %}"
-                id="taExpiryDate"
-                name="expiry_date"
-                value="{{ form_data.expiry_date|default:'' }}"
-                {% if not form_data.is_expiry_applicable %}disabled{% endif %}
-              />
-            </div>
-            {% if form_errors.expiry_date %}<div class="text-danger small">{{ form_errors.expiry_date }}</div>{% endif %}
-            <span class="field-hint">Expiration date of the attached document</span>
-          </div>
-        </div>
-      </div>
-
-      <div class="field-group">
-        <h3 class="field-group-title">
-          <i class="bi bi-toggles"></i>
-          Status
-        </h3>
-        <div class="fields-grid cols-2">
-          <div class="field">
-            <label class="form-label" for="taRecordStatus">
-              Status <span class="required">*</span>
-            </label>
-            <select
-              class="form-select {% if form_errors.record_status %}is-invalid{% endif %}"
-              id="taRecordStatus"
-              name="record_status"
-              required
-            >
-              <option value="" {% if not form_data.record_status %}selected{% endif %}>-Select status-</option>
-              {% for value, label in record_status_choices %}
-              <option value="{{ value }}" {% if form_data.record_status == value %}selected{% endif %}>{{ label }}</option>
-              {% endfor %}
-            </select>
-            {% if form_errors.record_status %}<div class="text-danger small">{{ form_errors.record_status }}</div>{% endif %}
-            <span class="field-hint">Current status of the attachment</span>
-          </div>
-        </div>
-      </div>
-    </div>
-  </div>
-
-  <!-- Section 2: File Upload & Notes -->
-  <div class="form-card mb-3" data-section="2">
-    <div class="form-card-header">
-      <div class="form-card-icon green">
-        <i class="bi bi-file-earmark-arrow-up"></i>
-      </div>
-      <div class="form-card-header-text">
-        <h2 class="form-card-title">File Upload &amp; Notes</h2>
-        <p class="form-card-desc">
-          Upload the attachment file and add any relevant notes or remarks.
-        </p>
-      </div>
-    </div>
-    <div class="form-card-body">
-      <div class="field-group">
-        <h3 class="field-group-title">
-          <i class="bi bi-upload"></i>
-          Attachment File
-        </h3>
-        <div class="fields-grid cols-1">
-          <div class="field">
-            {% if is_edit and attachment.attachment_file %}
-            <div class="mb-3">
-              <label class="form-label small text-muted">Current File</label>
-              <div class="d-flex align-items-center gap-2">
-                <i class="bi bi-paperclip"></i>
-                <span>{{ attachment.attachment_file.name|slice:"20:" }}</span>
-                <a href="{{ attachment.attachment_file.url }}" target="_blank" class="btn btn-sm btn-outline-secondary">
-                  <i class="bi bi-download"></i> View Current
-                </a>
-              </div>
-              <small class="text-muted">
-                Upload a new file below to replace the current file.
-                Leave empty to keep the current file.
-              </small>
-            </div>
-            {% endif %}
-            <label class="form-label" for="taAttachmentFile">
-              Attachment File {% if not is_edit %}<span class="required">*</span>{% endif %}
-            </label>
-            <input
-              type="file"
-              class="form-control {% if form_errors.attachment_file %}is-invalid{% endif %}"
-              id="taAttachmentFile"
-              name="attachment_file"
-              accept=".pdf,.doc,.docx,.jpg,.jpeg,.png,.xlsx,.xls"
-              {% if not is_edit %}required{% endif %}
-            />
-            {% if form_errors.attachment_file %}<div class="text-danger small">{{ form_errors.attachment_file }}</div>{% endif %}
-            <span class="field-hint">Accepted formats: PDF, DOC, DOCX, JPG, PNG, XLSX (Max 10MB)</span>
-          </div>
-        </div>
-      </div>
-      <div class="field-group">
-        <h3 class="field-group-title">
-          <i class="bi bi-journal-text"></i>
-          File Notes
-        </h3>
-        <div class="fields-grid cols-1">
-          <div class="field">
-            <label class="form-label" for="taFileNotes">File Notes</label>
-            <textarea
-              class="form-control {% if form_errors.file_notes %}is-invalid{% endif %}"
-              id="taFileNotes"
-              name="file_notes"
-              rows="4"
-              placeholder="Enter any additional notes or remarks about this attachment..."
-              required
-            >{{ form_data.file_notes|default:'' }}</textarea>
-            <span class="field-hint">Optional notes describing the attachment content or purpose</span>
-            {% if form_errors.file_notes %}<div class="text-danger small">{{ form_errors.file_notes }}</div>{% endif %}
-          </div>
-        </div>
-      </div>
-    </div>
-  </div>
-
-  <div class="form-actions-bar">
-    <div class="form-actions-left">
-      <button type="reset" class="btn btn-outline-secondary">
-        <i class="bi bi-arrow-counterclockwise"></i>
-        Reset Form
-      </button>
-    </div>
-    <div class="form-actions-right">
-      <button type="submit" class="btn btn-primary">
-        <i class="bi bi-check-circle"></i>
-        Save Attachment
-      </button>
-    </div>
-  </div>
-</form>
-{% endblock %}
-
-{% block extra_js %}
-{{ block.super }}
-<script>
-(function () {
-  var toggle = document.getElementById("taIsExpiryApplicable");
-  var wrapper = document.getElementById("taExpiryDateWrapper");
-  var expiryInput = document.getElementById("taExpiryDate");
-  var labelEl = document.querySelector(".js-ta-expiry-label");
-
-  function refresh() {
-    var on = !!(toggle && toggle.checked);
-    if (labelEl) labelEl.textContent = on ? "Enabled" : "Disabled";
-    if (expiryInput) {
-      expiryInput.disabled = !on;
-      if (!on) expiryInput.value = "";
-    }
-    if (wrapper) {
-      wrapper.style.opacity = on ? "1" : "0.5";
-    }
-  }
-
-  if (toggle) toggle.addEventListener("change", refresh);
-  refresh();
-})();
-</script>
-{% endblock %}
-
+{% extends 'iroad_tenants/base.html' %}
+
+{% load static %}
+
+
+
+{% block title %}Truck Attachments | iRoad{% endblock %}
+
+{% block breadcrumb %}{% endblock %}
+
+
+
+{% block content %}
+
+<div class="page-header">
+
+  <nav aria-label="breadcrumb">
+
+    <ol class="breadcrumb">
+
+      <li class="breadcrumb-item"><a href="{% url 'iroad_tenants:tenant_dashboard' %}">Dashboard</a></li>
+
+      <li class="breadcrumb-item">Operations</li>
+
+      <li class="breadcrumb-item">Fleet Management</li>
+
+      <li class="breadcrumb-item active" aria-current="page">Truck Attachments</li>
+
+    </ol>
+
+  </nav>
+
+  <div class="page-header-row">
+
+    <div class="page-header-left">
+
+      <h1 class="page-title">Truck Attachments</h1>
+
+      <!-- <p class="page-subtitle">
+
+        Upload and manage attachment documents for trucks in the fleet.
+
+      </p> -->
+
+    </div>
+
+    <div class="page-header-right">
+      <div class="eal-header-actions">
+        <a href="{% if truck_cancel_url %}{{ truck_cancel_url }}{% else %}{% url 'iroad_tenants:truck_attachment_all_list' %}{% endif %}" class="eal-btn eal-btn-outline">
+          <i class="bi bi-arrow-left"></i>
+          <span>Back</span>
+        </a>
+      </div>
+    </div>
+
+  </div>
+
+</div>
+
+
+
+<form
+
+  id="truckAttachmentsForm"
+
+  method="post"
+
+  enctype="multipart/form-data"
+
+  class="needs-validation"
+
+  novalidate
+
+  {% if is_edit %}
+
+  action="{% url 'iroad_tenants:truck_attachment_edit' truck_id=truck.truck_id attachment_id=attachment.attachment_id %}"
+
+  {% elif truck %}
+
+  action="{% url 'iroad_tenants:truck_attachment_create' truck_id=truck.truck_id %}"
+
+  {% else %}
+
+  action="{% url 'iroad_tenants:truck_attachment_create_all' %}"
+
+  {% endif %}
+
+>
+
+  {% csrf_token %}
+  {% if truck_return_to %}
+  <input type="hidden" name="return_to" value="{{ truck_return_to }}" />
+  {% endif %}
+  {% if truck_id_for_return %}
+  <input type="hidden" name="truck_id" value="{{ truck_id_for_return }}" />
+  {% endif %}
+  {% if truck_return_to and request.GET.tab %}
+  <input type="hidden" name="detail_tab" value="{{ request.GET.tab }}" />
+  {% endif %}
+
+  {% if form_non_field_errors %}
+
+  <div class="alert alert-danger" role="alert">{{ form_non_field_errors }}</div>
+
+  {% endif %}
+
+
+
+  <!-- Section 1: Attachment Details -->
+
+  <div class="form-card mb-3" data-section="1">
+
+    <div class="form-card-header">
+
+      <div class="form-card-icon blue">
+
+        <i class="bi bi-paperclip"></i>
+
+      </div>
+
+      <div class="form-card-header-text">
+
+        <h2 class="form-card-title">Attachment Details</h2>
+      </div>
+
+    </div>
+
+    <div class="form-card-body">
+
+      <div class="field-group">
+
+        <h3 class="field-group-title">
+
+          <i class="bi bi-card-heading"></i>
+
+          Attachment Identity
+
+        </h3>
+
+        <div class="fields-grid cols-2">
+
+          <div class="field">
+
+            <label class="form-label" for="taAttachmentNo">Attachment No</label>
+
+            <input
+
+              type="text"
+
+              class="form-control"
+
+              id="taAttachmentNo"
+
+              readonly
+
+              placeholder="Auto-generated"
+
+              value="{% if is_edit and attachment.attachment_no %}{{ attachment.attachment_no }}{% else %}{{ attachment_no_preview|default:'' }}{% endif %}"
+
+              aria-readonly="true"
+
+            />
+
+            <span class="field-hint">Unique attachment reference</span>
+
+          </div>
+
+          <div class="field">
+
+            <label class="form-label" for="taDocRefNumber">Doc Ref Number</label>
+
+            <input
+
+              type="text"
+
+              class="form-control {% if form_errors.doc_ref_number %}is-invalid{% endif %}"
+
+              id="taDocRefNumber"
+
+              name="doc_ref_number"
+
+              placeholder="Enter document reference number"
+
+              value="{{ form_data.doc_ref_number|default:'' }}"
+
+            />
+
+            {% if form_errors.doc_ref_number %}<div class="text-danger small">{{ form_errors.doc_ref_number }}</div>{% endif %}
+
+          </div>
+
+        </div>
+
+        <div class="fields-grid cols-2">
+
+          <div class="field">
+
+            <label class="form-label" for="taArabicLabel">Arabic Label</label>
+
+            <input
+
+              type="text"
+
+              class="form-control {% if form_errors.arabic_label %}is-invalid{% endif %}"
+
+              id="taArabicLabel"
+
+              name="arabic_label"
+
+              dir="rtl"
+
+              placeholder="Enter Arabic label"
+
+              value="{{ form_data.arabic_label|default:'' }}"
+
+            />
+
+            {% if form_errors.arabic_label %}<div class="text-danger small">{{ form_errors.arabic_label }}</div>{% endif %}
+
+          </div>
+
+          <div class="field">
+
+            <label class="form-label" for="taEnglishLabel">English Label</label>
+
+            <input
+
+              type="text"
+
+              class="form-control {% if form_errors.english_label %}is-invalid{% endif %}"
+
+              id="taEnglishLabel"
+
+              name="english_label"
+
+              placeholder="Enter English label"
+
+              value="{{ form_data.english_label|default:'' }}"
+
+            />
+
+            {% if form_errors.english_label %}<div class="text-danger small">{{ form_errors.english_label }}</div>{% endif %}
+
+          </div>
+
+        </div>
+
+      </div>
+
+
+
+      <div class="field-group">
+
+        <h3 class="field-group-title">
+
+          <i class="bi bi-truck"></i>
+
+          Truck &amp; Date
+
+        </h3>
+
+        <div class="fields-grid cols-2">
+
+          <div class="field">
+
+            <label class="form-label" for="taTruck">Truck <span class="required">*</span></label>
+
+            {% if show_truck_selector %}
+
+            <select
+
+              class="form-select {% if truck_error %}is-invalid{% endif %}"
+
+              id="taTruck"
+
+              name="truck_id"
+
+              required
+
+            >
+
+              <option value="">-Select truck-</option>
+
+              {% for t in trucks_for_select %}
+
+              <option value="{{ t.truck_id }}" {% if selected_truck_id == t.truck_id|stringformat:'s' %}selected{% endif %}>
+
+                {{ t.truck_code }}{% if t.truck_type %} — {{ t.truck_type.english_label }}{% endif %}
+
+              </option>
+
+              {% endfor %}
+
+            </select>
+
+            {% if truck_error %}<div class="text-danger small">{{ truck_error }}</div>{% endif %}
+
+            <span class="field-hint">Select the truck this attachment belongs to</span>
+
+            {% else %}
+
+            <input
+
+              type="text"
+
+              class="form-control"
+
+              id="taTruck"
+
+              readonly
+
+              value="{{ truck.truck_code }}{% if truck.truck_type %} — {{ truck.truck_type.english_label }}{% endif %}"
+
+              aria-readonly="true"
+
+            />
+
+            <span class="field-hint">Select the truck this attachment belongs to</span>
+
+            {% endif %}
+
+          </div>
+
+          <div class="field">
+
+            <label class="form-label" for="taAttachmentDate">
+
+              Attachment Date <span class="required">*</span>
+
+            </label>
+
+            <div class="input-icon-wrapper">
+
+              <i class="bi bi-calendar-event"></i>
+
+              <input
+
+                type="date"
+
+                class="form-control has-icon {% if form_errors.attachment_date %}is-invalid{% endif %}"
+
+                id="taAttachmentDate"
+
+                name="attachment_date"
+
+                value="{{ form_data.attachment_date|default:'' }}"
+
+                required
+
+              />
+
+            </div>
+
+            {% if form_errors.attachment_date %}<div class="text-danger small">{{ form_errors.attachment_date }}</div>{% endif %}
+
+            <span class="field-hint">Date when the document was attached</span>
+
+          </div>
+
+        </div>
+
+      </div>
+
+
+
+      <div class="field-group">
+
+        <h3 class="field-group-title">
+
+          <i class="bi bi-clock-history"></i>
+
+          Expiry Settings
+
+        </h3>
+
+        <div class="setting-row">
+
+          <div class="setting-row-info">
+
+            <label class="form-label" for="taIsExpiryApplicable">Is Expiry Applicable</label>
+
+            <span class="field-hint">Enable this if the attached document has an expiration date.</span>
+
+          </div>
+
+          <label class="setting-toggle">
+
+            <input
+
+              type="checkbox"
+
+              name="is_expiry_applicable"
+
+              id="taIsExpiryApplicable"
+
+              {% if form_data.is_expiry_applicable %}checked{% endif %}
+
+            />
+
+            <span class="toggle-track"></span>
+
+            <span class="toggle-label js-ta-expiry-label">Disabled</span>
+
+          </label>
+
+        </div>
+
+        {% if form_errors.is_expiry_applicable %}<div class="text-danger small">{{ form_errors.is_expiry_applicable }}</div>{% endif %}
+
+
+
+        <div class="fields-grid cols-2" id="taExpiryDateWrapper">
+
+          <div class="field">
+
+            <label class="form-label" for="taExpiryDate">Expiry Date</label>
+
+            <div class="input-icon-wrapper">
+
+              <i class="bi bi-calendar-x"></i>
+
+              <input
+
+                type="date"
+
+                class="form-control has-icon {% if form_errors.expiry_date %}is-invalid{% endif %}"
+
+                id="taExpiryDate"
+
+                name="expiry_date"
+
+                value="{{ form_data.expiry_date|default:'' }}"
+
+                {% if not form_data.is_expiry_applicable %}disabled{% endif %}
+
+              />
+
+            </div>
+
+            {% if form_errors.expiry_date %}<div class="text-danger small">{{ form_errors.expiry_date }}</div>{% endif %}
+
+            <span class="field-hint">Expiration date of the attached document</span>
+
+          </div>
+
+        </div>
+
+      </div>
+
+
+
+      <div class="field-group">
+
+        <h3 class="field-group-title">
+
+          <i class="bi bi-toggles"></i>
+
+          Status
+
+        </h3>
+
+        <div class="fields-grid cols-2">
+
+          <div class="field">
+
+            <label class="form-label" for="taRecordStatus">
+
+              Status <span class="required">*</span>
+
+            </label>
+
+            <select
+
+              class="form-select {% if form_errors.record_status %}is-invalid{% endif %}"
+
+              id="taRecordStatus"
+
+              name="record_status"
+
+              required
+
+            >
+
+              <option value="" {% if not form_data.record_status %}selected{% endif %}>-Select status-</option>
+
+              {% for value, label in record_status_choices %}
+
+              <option value="{{ value }}" {% if form_data.record_status == value %}selected{% endif %}>{{ label }}</option>
+
+              {% endfor %}
+
+            </select>
+
+            {% if form_errors.record_status %}<div class="text-danger small">{{ form_errors.record_status }}</div>{% endif %}
+
+            <span class="field-hint">Current status of the attachment</span>
+
+          </div>
+
+        </div>
+
+      </div>
+
+    </div>
+
+  </div>
+
+
+
+  <!-- Section 2: File Upload & Notes -->
+
+  <div class="form-card mb-3" data-section="2">
+
+    <div class="form-card-header">
+
+      <div class="form-card-icon green">
+
+        <i class="bi bi-file-earmark-arrow-up"></i>
+
+      </div>
+
+      <div class="form-card-header-text">
+
+        <h2 class="form-card-title">File Upload &amp; Notes</h2>
+      </div>
+
+    </div>
+
+    <div class="form-card-body">
+
+      <div class="field-group">
+
+        <h3 class="field-group-title">
+
+          <i class="bi bi-upload"></i>
+
+          Attachment File
+
+        </h3>
+
+        <div class="fields-grid cols-1">
+
+          <div class="field">
+
+            {% if is_edit and attachment.attachment_file %}
+
+            <div class="mb-3">
+
+              <label class="form-label small text-muted">Current File</label>
+
+              <div class="d-flex align-items-center gap-2">
+
+                <i class="bi bi-paperclip"></i>
+
+                <span>{{ attachment.attachment_file.name|slice:"20:" }}</span>
+
+                <a href="{{ attachment.attachment_file.url }}" target="_blank" class="btn btn-sm btn-outline-secondary">
+
+                  <i class="bi bi-download"></i> View Current
+
+                </a>
+
+              </div>
+
+              <small class="text-muted">
+
+                Upload a new file below to replace the current file.
+
+                Leave empty to keep the current file.
+
+              </small>
+
+            </div>
+
+            {% endif %}
+
+            <label class="form-label" for="taAttachmentFile">
+
+              Attachment File {% if not is_edit %}<span class="required">*</span>{% endif %}
+
+            </label>
+
+            <input
+
+              type="file"
+
+              class="form-control {% if form_errors.attachment_file %}is-invalid{% endif %}"
+
+              id="taAttachmentFile"
+
+              name="attachment_file"
+
+              accept=".pdf,.doc,.docx,.jpg,.jpeg,.png,.xlsx,.xls"
+
+              {% if not is_edit %}required{% endif %}
+
+            />
+
+            {% if form_errors.attachment_file %}<div class="text-danger small">{{ form_errors.attachment_file }}</div>{% endif %}
+
+            <span class="field-hint">Accepted formats: PDF, DOC, DOCX, JPG, PNG, XLSX (Max 10MB)</span>
+
+          </div>
+
+        </div>
+
+      </div>
+
+      <div class="field-group">
+
+        <h3 class="field-group-title">
+
+          <i class="bi bi-journal-text"></i>
+
+          File Notes
+
+        </h3>
+
+        <div class="fields-grid cols-1">
+
+          <div class="field">
+
+            <label class="form-label" for="taFileNotes">File Notes</label>
+
+            <textarea
+
+              class="form-control {% if form_errors.file_notes %}is-invalid{% endif %}"
+
+              id="taFileNotes"
+
+              name="file_notes"
+
+              rows="4"
+
+              placeholder="Enter any additional notes or remarks about this attachment..."
+
+              required
+
+            >{{ form_data.file_notes|default:'' }}</textarea>
+
+            <span class="field-hint">Optional notes describing the attachment content or purpose</span>
+
+            {% if form_errors.file_notes %}<div class="text-danger small">{{ form_errors.file_notes }}</div>{% endif %}
+
+          </div>
+
+        </div>
+
+      </div>
+
+    </div>
+
+  </div>
+
+
+
+  <div class="form-actions-bar">
+
+    <div class="form-actions-left">
+      {% if truck_cancel_url %}
+      <a href="{{ truck_cancel_url }}" class="btn btn-outline-secondary">
+        <i class="bi bi-x-lg"></i>
+        Cancel
+      </a>
+      {% else %}
+      <button type="reset" class="btn btn-outline-secondary">
+        <i class="bi bi-arrow-counterclockwise"></i>
+        Reset Form
+      </button>
+      {% endif %}
+    </div>
+
+    <div class="form-actions-right">
+
+      <button type="submit" class="btn btn-primary">
+
+        <i class="bi bi-check-circle"></i>
+
+        Save Attachment
+
+      </button>
+
+    </div>
+
+  </div>
+
+</form>
+
+{% endblock %}
+
+
+
+{% block extra_js %}
+
+{{ block.super }}
+
+<script>
+
+(function () {
+
+  var toggle = document.getElementById("taIsExpiryApplicable");
+
+  var wrapper = document.getElementById("taExpiryDateWrapper");
+
+  var expiryInput = document.getElementById("taExpiryDate");
+
+  var labelEl = document.querySelector(".js-ta-expiry-label");
+
+
+
+  function refresh() {
+
+    var on = !!(toggle && toggle.checked);
+
+    if (labelEl) labelEl.textContent = on ? "Enabled" : "Disabled";
+
+    if (expiryInput) {
+
+      expiryInput.disabled = !on;
+
+      if (!on) expiryInput.value = "";
+
+    }
+
+    if (wrapper) {
+
+      wrapper.style.opacity = on ? "1" : "0.5";
+
+    }
+
+  }
+
+
+
+  if (toggle) toggle.addEventListener("change", refresh);
+
+  refresh();
+
+})();
+
+</script>
+
+{% endblock %}
+
+

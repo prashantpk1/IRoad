@@ -9,6 +9,14 @@ from tenant_workspace.models import (
     TenantClientAccount,
 )
 
+CARGO_UOM_CHOICES = [
+    ('', _('Select UOM')),
+    ('Boxes', _('Boxes')),
+    ('Pallets', _('Pallets')),
+    ('Kilograms', _('Kilograms')),
+    ('Pieces', _('Pieces')),
+]
+
 
 class TenantCargoCategoryForm(forms.ModelForm):
     category_code_preview = forms.CharField(
@@ -49,6 +57,15 @@ class TenantCargoCategoryForm(forms.ModelForm):
         else:
             self.fields['category_code_preview'].initial = self.instance.category_code
         self.fields['status'].choices = TenantCargoCategory.Status.choices
+        self.fields['name_english'].required = True
+        self.fields['name_arabic'].required = True
+        self.fields['status'].required = True
+
+    def clean_name_arabic(self):
+        value = (self.cleaned_data.get('name_arabic') or '').strip()
+        if not value:
+            raise ValidationError(_('Arabic name is required.'))
+        return value
 
 
 class TenantCargoMasterForm(forms.ModelForm):
@@ -86,6 +103,16 @@ class TenantCargoMasterForm(forms.ModelForm):
             'notes',
             'status',
         )
+        labels = {
+            'uom': _('UOM (Unit of Measure)'),
+            'weight_per_unit': _('Weight per Unit (kg)'),
+            'volume_per_unit': _('Volume per Unit (m³)'),
+            'length': _('Length (m)'),
+            'width': _('Width (m)'),
+            'height': _('Height (m)'),
+            'min_temp': _('Min Temp (°C)'),
+            'max_temp': _('Max Temp (°C)'),
+        }
         widgets = {
             'client_account': forms.Select(attrs={'class': 'form-select'}),
             'display_name': forms.TextInput(
@@ -106,37 +133,72 @@ class TenantCargoMasterForm(forms.ModelForm):
             'client_sku_external_ref': forms.TextInput(
                 attrs={'class': 'form-control', 'placeholder': _('e.g. SKU-12345')}
             ),
-            'uom': forms.TextInput(
+            'weight_per_unit': forms.NumberInput(
                 attrs={
                     'class': 'form-control',
-                    'placeholder': _('e.g. Boxes, Pallets, kg'),
+                    'step': '0.01',
+                    'min': '0',
+                    'placeholder': '0.00',
                 }
             ),
-            'weight_per_unit': forms.NumberInput(
-                attrs={'class': 'form-control', 'step': '0.001', 'min': '0'}
-            ),
             'volume_per_unit': forms.NumberInput(
-                attrs={'class': 'form-control', 'step': '0.001', 'min': '0'}
+                attrs={
+                    'class': 'form-control',
+                    'step': '0.01',
+                    'min': '0',
+                    'placeholder': '0.00',
+                }
             ),
             'length': forms.NumberInput(
-                attrs={'class': 'form-control', 'step': '0.001', 'min': '0'}
+                attrs={
+                    'class': 'form-control',
+                    'step': '0.01',
+                    'min': '0',
+                    'placeholder': '0.00',
+                }
             ),
             'width': forms.NumberInput(
-                attrs={'class': 'form-control', 'step': '0.001', 'min': '0'}
+                attrs={
+                    'class': 'form-control',
+                    'step': '0.01',
+                    'min': '0',
+                    'placeholder': '0.00',
+                }
             ),
             'height': forms.NumberInput(
-                attrs={'class': 'form-control', 'step': '0.001', 'min': '0'}
+                attrs={
+                    'class': 'form-control',
+                    'step': '0.01',
+                    'min': '0',
+                    'placeholder': '0.00',
+                }
             ),
             'refrigerated_goods': forms.CheckboxInput(
                 attrs={'class': 'form-check-input', 'id': 'refrigeratedGoods'}
             ),
-            'min_temp': forms.NumberInput(attrs={'class': 'form-control', 'step': '0.01'}),
-            'max_temp': forms.NumberInput(attrs={'class': 'form-control', 'step': '0.01'}),
+            'min_temp': forms.NumberInput(
+                attrs={
+                    'class': 'form-control',
+                    'step': '0.01',
+                    'placeholder': _('E.g., -18'),
+                }
+            ),
+            'max_temp': forms.NumberInput(
+                attrs={
+                    'class': 'form-control',
+                    'step': '0.01',
+                    'placeholder': _('E.g., 4'),
+                }
+            ),
             'dangerous_goods': forms.CheckboxInput(
                 attrs={'class': 'form-check-input', 'id': 'dangerousGoods'}
             ),
             'notes': forms.Textarea(
-                attrs={'class': 'form-control', 'rows': 3, 'placeholder': _('Notes')}
+                attrs={
+                    'class': 'form-control',
+                    'rows': 3,
+                    'placeholder': _('Enter any additional instructions or remarks...'),
+                }
             ),
             'status': forms.Select(attrs={'class': 'form-select'}),
         }
@@ -174,6 +236,30 @@ class TenantCargoMasterForm(forms.ModelForm):
         self.fields['cargo_category'].label_from_instance = (
             lambda obj: f'{obj.category_code} — {obj.name_english}'
         )
+
+        uom_choices = list(CARGO_UOM_CHOICES)
+        current_uom = ''
+        if self.instance.pk:
+            current_uom = (self.instance.uom or '').strip()
+        if self.is_bound:
+            current_uom = (self.data.get(self.add_prefix('uom')) or current_uom or '').strip()
+        valid_uom_keys = {value for value, _ in uom_choices if value}
+        if current_uom and current_uom not in valid_uom_keys:
+            uom_choices.append((current_uom, current_uom))
+        self.fields['uom'] = forms.ChoiceField(
+            choices=uom_choices,
+            required=True,
+            label=_('UOM (Unit of Measure)'),
+            widget=forms.Select(attrs={'class': 'form-select'}),
+        )
+        if current_uom:
+            self.fields['uom'].initial = current_uom
+
+    def clean_uom(self):
+        uom = (self.cleaned_data.get('uom') or '').strip()
+        if not uom:
+            raise ValidationError(_('Select a unit of measure.'))
+        return uom
 
     def clean_client_account(self):
         acc = self.cleaned_data.get('client_account')

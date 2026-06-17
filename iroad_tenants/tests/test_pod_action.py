@@ -6,9 +6,13 @@ from unittest import TestCase
 from unittest.mock import MagicMock, patch
 
 from iroad_tenants.operation_runtime.pod_action import (
+    _allocate_unique_pod_record_no,
+    _find_existing_pod_for_source,
+    _sync_a7_action_log_media_to_pod_pages,
     apply_a7_shipment_pod_type_classification,
     apply_a7h_hard_pod_physical_posting,
     apply_pod_posting_from_action_log,
+    birth_pod_from_action_log,
 )
 from tenant_workspace.models import TenantShipment, TenantShipmentDocumentPage
 
@@ -122,6 +126,45 @@ class ApplyA7HardPodPostingTests(TestCase):
                     mock_standard_posting.assert_called_once()
 
 
+class SyncA7ActionLogMediaToPodPagesTests(TestCase):
+    @patch('iroad_tenants.operation_runtime.pod_action.TenantShipmentPodPage')
+    def test_writes_media_directly_to_pod_pages_without_delivery_note(self, mock_pod_page_model):
+        photo = SimpleNamespace(
+            file=SimpleNamespace(name='uploads/photo1.jpg'),
+            media_type='photo',
+            description='',
+        )
+        video = SimpleNamespace(
+            file=SimpleNamespace(name='uploads/clip.mp4'),
+            media_type='video',
+            description='',
+        )
+        action_log = MagicMock()
+        action_log.pk = 'log-1'
+        action_log.media_rows.all.return_value.order_by.return_value = [photo, video]
+
+        pod_line_1 = MagicMock()
+        pod_line_2 = MagicMock()
+        pod_line_3 = MagicMock()
+        mock_pod_page_model.objects.filter.return_value.order_by.return_value = [
+            pod_line_1,
+        ]
+        mock_pod_page_model.objects.create.side_effect = [pod_line_2, pod_line_3]
+
+        pod_document = MagicMock()
+        _sync_a7_action_log_media_to_pod_pages(
+            action_log=action_log,
+            pod_document=pod_document,
+        )
+
+        self.assertEqual(pod_line_1.map_url, 'uploads/photo1.jpg')
+        self.assertEqual(pod_line_1.attachment_label, 'photo1.jpg')
+        self.assertEqual(pod_line_1.digital_evidence_status, 'Collected')
+        mock_pod_page_model.objects.create.assert_called_once()
+        self.assertEqual(pod_line_2.map_url, 'uploads/clip.mp4')
+        self.assertEqual(pod_line_2.attachment_label, 'clip.mp4')
+
+
 class ApplyA7hHardPodPhysicalPostingTests(TestCase):
     @patch('iroad_tenants.views._tenant_shipment_document_refresh_shipment_pod')
     @patch('iroad_tenants.operation_runtime.pod_action.TenantShipmentPodPage')
@@ -160,4 +203,60 @@ class ApplyA7hHardPodPhysicalPostingTests(TestCase):
             page.completion_status,
             TenantShipmentDocumentPage.CompletionStatus.COMPLETED,
         )
+        document.save.assert_called_once()
+        update_fields = document.save.call_args.kwargs.get('update_fields', [])
+        self.assertIn('status', update_fields)
+        self.assertEqual(document.status, mock_document_model.Status.VERIFIED)
         mock_refresh.assert_called_once_with(shipment)
+
+
+class BirthPodFromActionLogTests(TestCase):
+    @patch('iroad_tenants.operation_runtime.pod_action.TenantShipmentDocument')
+    def test_allocate_unique_pod_record_no_skips_existing(self, mock_document_model):
+        mock_document_model.objects.filter.return_value.exists.side_effect = [True, False]
+        with patch(
+            'iroad_tenants.views._next_auto_number_for_form',
+            side_effect=[('POD-0043', 43), ('POD-0044', 44)],
+        ):
+            record_no, record_sequence = _allocate_unique_pod_record_no()
+        self.assertEqual(record_no, 'POD-0044')
+        self.assertEqual(record_sequence, 44)
+
+    @patch('iroad_tenants.operation_runtime.pod_action.TenantShipmentDocument')
+    def test_find_existing_pod_by_source_document(self, mock_document_model):
+        source = MagicMock(pk='dn-1')
+        existing = MagicMock()
+        mock_document_model.objects.filter.return_value.first.return_value = existing
+        result = _find_existing_pod_for_source(shipment=MagicMock(), source_document=source)
+        self.assertIs(result, existing)
+        mock_document_model.objects.filter.assert_called_once_with(
+            source_document_id='dn-1',
+        )
+
+    @patch('iroad_tenants.operation_runtime.pod_action.apply_a7_shipment_pod_type_classification')
+    @patch('iroad_tenants.operation_runtime.pod_action.TenantShipmentPodPage')
+    @patch('iroad_tenants.operation_runtime.pod_action._find_existing_pod_for_source')
+    @patch('iroad_tenants.operation_runtime.pod_action.TenantShipmentDocument')
+    def test_birth_pod_returns_existing_without_save(
+        self,
+        mock_document_model,
+        mock_find_existing,
+        mock_pod_page_model,
+        mock_classify,
+    ):
+        shipment = MagicMock()
+        shipment.booking_id = None
+        action_log = MagicMock()
+        action_log.shipment = shipment
+        action_log.operation_action = SimpleNamespace(action_code='A7')
+        source_document = MagicMock(pk='dn-1')
+        mock_document_model.objects.filter.return_value.order_by.return_value.first.return_value = (
+            source_document
+        )
+        existing_pod = MagicMock()
+        mock_find_existing.return_value = existing_pod
+
+        result = birth_pod_from_action_log(action_log)
+
+        self.assertIs(result, existing_pod)
+        mock_classify.assert_not_called()

@@ -1,219 +1,490 @@
 {% extends 'iroad_tenants/base.html' %}
 
+{% load humanize %}
+
+
+
 {% block title %}Truck Movement Log List | iRoad Admin{% endblock %}
+
+
+
+{% block extra_css %}
+
+{% include 'iroad_tenants/partials/eal_list_live_search_css.html' %}
+
+<style>
+
+  .eal-stats-row--tml {
+
+    grid-template-columns: repeat(3, 1fr);
+
+  }
+
+  .eal-stats-row--tml .eal-stat-value {
+
+    font-size: 1.5rem;
+
+    line-height: 1.1;
+
+  }
+
+  .eal-stats-row--tml .eal-stat-label {
+
+    font-size: 0.9rem;
+
+  }
+
+  .eal-table--tml thead th {
+
+    font-size: 0.72rem;
+
+    font-weight: 600;
+
+    letter-spacing: 0.04em;
+
+    text-transform: uppercase;
+
+    color: #94a3b8;
+
+    white-space: nowrap;
+
+  }
+
+  .tml-route-cell {
+
+    max-width: 220px;
+
+    overflow: hidden;
+
+    text-overflow: ellipsis;
+
+    white-space: nowrap;
+
+  }
+
+  .status-badge.tml-mov-done {
+
+    background: #f0fdf4;
+
+    color: #166534;
+
+    border: 1px solid #bbf7d0;
+
+  }
+
+  .status-badge.tml-mov-inprog {
+
+    background: #eff6ff;
+
+    color: #1d4ed8;
+
+    border: 1px solid #bfdbfe;
+
+  }
+
+  .status-badge.tml-mov-sched {
+
+    background: #fff7ed;
+
+    color: #c2410c;
+
+    border: 1px solid #fed7aa;
+
+  }
+
+  .status-badge.tml-mov-cancel {
+
+    background: #fef2f2;
+
+    color: #b91c1c;
+
+    border: 1px solid #fecaca;
+
+  }
+
+  @media (max-width: 991px) {
+
+    .eal-stats-row--tml {
+
+      grid-template-columns: repeat(2, 1fr);
+
+    }
+
+  }
+
+  @media (max-width: 575px) {
+
+    .eal-stats-row--tml {
+
+      grid-template-columns: 1fr;
+
+    }
+
+  }
+
+</style>
+
+{% endblock %}
+
+
 
 {% block content %}
 
+
+
       <div class="page-header">
+
         <nav aria-label="breadcrumb">
+
           <ol class="breadcrumb">
+
             <li class="breadcrumb-item">
+
               <a href="{% url 'iroad_tenants:tenant_dashboard' %}">Dashboard</a>
+
             </li>
+
             <li class="breadcrumb-item">Operations</li>
+
             <li class="breadcrumb-item">Operations Management</li>
+
             <li class="breadcrumb-item active" aria-current="page">
+
               Truck Movement Log List
+
             </li>
+
           </ol>
+
         </nav>
+
         <div class="page-header-row">
+
           <div class="page-header-left">
+
             <h1 class="page-title">Truck Movement Log List</h1>
-            <p class="page-subtitle">
-              View and manage all truck movement log entries.
-            </p>
+
           </div>
+
           <div class="page-header-right">
+
             <div class="eal-header-actions">
+
               {% include 'iroad_tenants/partials/eal_export_link.html' with export_url_name='iroad_tenants:tenant_operation_truck_movement_log_export' export_filename='truck_movement_logs_export.csv' %}
+
               <a href="{% url 'iroad_tenants:tenant_operation_truck_movement_log_create' %}" class="eal-btn eal-btn-primary">
+
                 <i class="bi bi-plus-lg"></i>
+
                 <span>Add Movement Log</span>
+
               </a>
+
             </div>
+
           </div>
+
         </div>
+
       </div>
 
-      <div class="eal-stats-row">
+
+
+      <div class="eal-stats-row eal-stats-row--tml">
+
         <div class="eal-stat-card">
-          <div class="eal-stat-icon purple">
-            <i class="bi bi-truck"></i>
-          </div>
-          <div>
-            <div class="eal-stat-value">{{ movement_stats.total|default:0 }}</div>
-            <div class="eal-stat-label">Total Movements</div>
-          </div>
-        </div>
-        <div class="eal-stat-card">
-          <div class="eal-stat-icon green">
-            <i class="bi bi-check-circle"></i>
-          </div>
-          <div>
-            <div class="eal-stat-value">{{ movement_stats.completed|default:0 }}</div>
-            <div class="eal-stat-label">Completed</div>
-          </div>
-        </div>
-        <div class="eal-stat-card">
-          <div class="eal-stat-icon amber">
-            <i class="bi bi-hourglass-split"></i>
-          </div>
-          <div>
-            <div class="eal-stat-value">{{ movement_stats.in_progress|default:0 }}</div>
-            <div class="eal-stat-label">In Progress</div>
-          </div>
-        </div>
-        <div class="eal-stat-card">
+
           <div class="eal-stat-icon blue">
-            <i class="bi bi-x-octagon"></i>
+
+            <i class="bi bi-truck"></i>
+
           </div>
+
           <div>
-            <div class="eal-stat-value">{{ movement_stats.scheduled_cancelled|default:0 }}</div>
-            <div class="eal-stat-label">Scheduled / Cancelled</div>
+
+            <div class="eal-stat-value">{{ movement_stats.total|default:0 }}</div>
+
+            <div class="eal-stat-label">Total</div>
+
           </div>
+
         </div>
+
+        <div class="eal-stat-card">
+
+          <div class="eal-stat-icon green">
+
+            <i class="bi bi-signpost-2"></i>
+
+          </div>
+
+          <div>
+
+            <div class="eal-stat-value">{{ movement_stats.total_distance_km|floatformat:0|intcomma|default:0 }}</div>
+
+            <div class="eal-stat-label">Total Distance (km)</div>
+
+          </div>
+
+        </div>
+
+        <div class="eal-stat-card">
+
+          <div class="eal-stat-icon green">
+
+            <i class="bi bi-check-circle"></i>
+
+          </div>
+
+          <div>
+
+            <div class="eal-stat-value">{{ movement_stats.completed|default:0 }}</div>
+
+            <div class="eal-stat-label">Completed</div>
+
+          </div>
+
+        </div>
+
+        <div class="eal-stat-card">
+
+          <div class="eal-stat-icon amber">
+
+            <i class="bi bi-hourglass-split"></i>
+
+          </div>
+
+          <div>
+
+            <div class="eal-stat-value">{{ movement_stats.in_progress|default:0 }}</div>
+
+            <div class="eal-stat-label">In Progress</div>
+
+          </div>
+
+        </div>
+
+        <div class="eal-stat-card">
+
+          <div class="eal-stat-icon purple">
+
+            <i class="bi bi-box-seam"></i>
+
+          </div>
+
+          <div>
+
+            <div class="eal-stat-value">{{ movement_stats.loaded|default:0 }}</div>
+
+            <div class="eal-stat-label">Loaded</div>
+
+          </div>
+
+        </div>
+
+        <div class="eal-stat-card">
+
+          <div class="eal-stat-icon red">
+
+            <i class="bi bi-box"></i>
+
+          </div>
+
+          <div>
+
+            <div class="eal-stat-value">{{ movement_stats.empty|default:0 }}</div>
+
+            <div class="eal-stat-label">Empty</div>
+
+          </div>
+
+        </div>
+
       </div>
+
+
 
       <div
+
         class="eal-table-card"
+
         data-eal-filterable-table
+
         data-eal-server-paginated="1"
-        data-eal-global-search-columns="1,2,3,4,5,6,7"
+
+        data-eal-empty-colspan="10"
+
+        data-eal-empty-filter-message="No movement logs match the selected search/filter criteria."
+
+        data-eal-global-search-columns="0,1,2,3,4,5,6,7,8,9"
+
       >
+
         <div class="eal-toolbar">
+
           <div class="eal-toolbar-left">
+
             <div class="eal-search">
+
               <i class="bi bi-search"></i>
+
               <input
+
                 type="search"
+
                 id="truckMovementLogSearch"
+
                 data-eal-global-search
-                value="{{ movement_search_q|default:'' }}"
+
+                value="{{ search_q|default:movement_search_q|default:'' }}"
+
                 autocomplete="off"
+
                 placeholder="Search movement logs&hellip;"
+
                 aria-label="Search movement logs"
+
               />
+
               <button
+
                 type="button"
+
                 class="eal-search-clear-btn"
+
                 id="truckMovementLogSearchClear"
+
                 title="Clear search"
+
                 aria-label="Clear search"
+
                 hidden
+
               >
+
                 <i class="bi bi-x-lg"></i>
+
               </button>
+
             </div>
+
           </div>
+
         </div>
+
+
 
         <div class="eal-table-wrap">
-          <table class="eal-table">
+
+          <table class="eal-table eal-table--tml">
+
             <thead>
+
               <tr>
-                <th class="eal-col-check">
-                  <input
-                    type="checkbox"
-                    class="eal-custom-check"
-                    id="ealSelectAll"
-                  />
-                </th>
-                <th>
-                  Movement No.
-                  <span class="sort-indicator">
-                    <i class="bi bi-caret-up-fill"></i>
-                    <i class="bi bi-caret-down-fill"></i>
-                  </span>
-                </th>
-                <th>
-                  Truck
-                  <span class="sort-indicator">
-                    <i class="bi bi-caret-up-fill"></i>
-                    <i class="bi bi-caret-down-fill"></i>
-                  </span>
-                </th>
-                <th>
-                  Driver
-                  <span class="sort-indicator">
-                    <i class="bi bi-caret-up-fill"></i>
-                    <i class="bi bi-caret-down-fill"></i>
-                  </span>
-                </th>
-                <th>
-                  From Location
-                  <span class="sort-indicator">
-                    <i class="bi bi-caret-up-fill"></i>
-                    <i class="bi bi-caret-down-fill"></i>
-                  </span>
-                </th>
-                <th>
-                  To Location
-                  <span class="sort-indicator">
-                    <i class="bi bi-caret-up-fill"></i>
-                    <i class="bi bi-caret-down-fill"></i>
-                  </span>
-                </th>
-                <th>
-                  Start Time
-                  <span class="sort-indicator">
-                    <i class="bi bi-caret-up-fill"></i>
-                    <i class="bi bi-caret-down-fill"></i>
-                  </span>
-                </th>
-                <th>
-                  End Time
-                  <span class="sort-indicator">
-                    <i class="bi bi-caret-up-fill"></i>
-                    <i class="bi bi-caret-down-fill"></i>
-                  </span>
-                </th>
-                <th>
-                  Status
-                  <span class="sort-indicator">
-                    <i class="bi bi-caret-up-fill"></i>
-                    <i class="bi bi-caret-down-fill"></i>
-                  </span>
-                </th>
+
+                <th>Movement No</th>
+
+                <th>Movement Date</th>
+
+                <th>Movement Source</th>
+
+                <th>Shipment</th>
+
+                <th>Truck</th>
+
+                <th>Driver</th>
+
+                <th>Route (From - To)</th>
+
+                <th>Start Time</th>
+
+                <th>End Time</th>
+
+                <th>Status</th>
+
               </tr>
+
             </thead>
+
             <tbody>
-              {% for row in movement_rows %}
+
+              {% for row in movement_list_rows %}
+
+              {% with m=row.obj %}
+
               <tr>
-                <td class="eal-col-check"><input type="checkbox" class="eal-custom-check" /></td>
-                <td><span class="eal-entity-id">{{ row.movement_no }}</span></td>
-                <td><div class="eal-name-cell"><span class="eal-name-text">{% if row.truck %}{{ row.truck.truck_code }}{% else %}-{% endif %}</span></div></td>
-                <td>{% if row.driver %}{{ row.driver.driver_code }}{% else %}-{% endif %}</td>
-                <td>{% if row.from_location_point %}{{ row.from_location_point.display_label }}{% else %}-{% endif %}</td>
-                <td>{% if row.to_location_point %}{{ row.to_location_point.display_label }}{% else %}-{% endif %}</td>
-                <td>{% if row.start_time %}{{ row.start_time|date:"d M Y, H:i" }}{% else %}-{% endif %}</td>
-                <td>{% if row.end_time %}{{ row.end_time|date:"d M Y, H:i" }}{% else %}-{% endif %}</td>
-                <td><span class="status-badge {% if row.status == 'Completed' %}active{% elif row.status == 'In Progress' %}in-transit{% elif row.status == 'Cancelled' %}inactive{% else %}pending{% endif %}">{{ row.status }}</span></td>
+
+                <td>
+
+                  <a href="{% url 'iroad_tenants:tenant_operation_truck_movement_log_detail' m.movement_id %}" class="eal-entity-id text-decoration-none">{{ row.movement_no }}</a>
+
+                </td>
+
+                <td>{% if row.movement_date %}{{ row.movement_date|date:"d M Y" }}{% else %}—{% endif %}</td>
+
+                <td>{{ row.source_label }}</td>
+
+                <td>
+
+                  {% if row.shipment_id %}
+
+                  <a href="{% url 'iroad_tenants:tenant_operation_shipment_detail' row.shipment_id %}" class="eal-entity-id text-decoration-none">{{ row.shipment_no }}</a>
+
+                  {% else %}
+
+                  —
+
+                  {% endif %}
+
+                </td>
+
+                <td>{{ row.truck_display }}</td>
+
+                <td>{{ row.driver_name }}</td>
+
+                <td><span class="tml-route-cell" title="{{ row.route_display }}">{{ row.route_display }}</span></td>
+
+                <td>{% if row.start_time %}{{ row.start_time|date:"H:i" }}{% else %}—{% endif %}</td>
+
+                <td>{% if row.end_time %}{{ row.end_time|date:"H:i" }}{% else %}—{% endif %}</td>
+
+                <td>
+
+                  <span class="status-badge tml-mov-{{ row.status_badge }}">{{ row.status_label }}</span>
+
+                </td>
+
               </tr>
+
+              {% endwith %}
+
               {% empty %}
-              <tr><td colspan="9" class="text-center text-muted py-4">No truck movement logs found.</td></tr>
+
+              <tr><td colspan="10" class="text-center text-muted py-4">No truck movement logs found.</td></tr>
+
               {% endfor %}
+
             </tbody>
+
           </table>
+
         </div>
 
-        <div class="eal-pagination">
-          <div class="eal-pagination-info">
-            Showing
-            <strong>{{ pagination_start }}&ndash;{{ pagination_end }}</strong>
-            of
-            <strong>{{ pagination_total }}</strong>
-            movement logs
-          </div>
-          <div class="eal-pagination-controls">
-            {% if movement_page.has_previous %}
-            <a class="eal-page-btn" title="Previous" href="?page={{ movement_page.previous_page_number }}{% if movement_search_q %}&q={{ movement_search_q }}{% endif %}"><i class="bi bi-chevron-left"></i></a>
-            {% else %}<button class="eal-page-btn" title="Previous" disabled><i class="bi bi-chevron-left"></i></button>{% endif %}
-            <button class="eal-page-btn active">{{ movement_page.number|default:1 }}</button>
-            {% if movement_page.has_next %}
-            <a class="eal-page-btn" title="Next" href="?page={{ movement_page.next_page_number }}{% if movement_search_q %}&q={{ movement_search_q }}{% endif %}"><i class="bi bi-chevron-right"></i></a>
-            {% else %}<button class="eal-page-btn" title="Next" disabled><i class="bi bi-chevron-right"></i></button>{% endif %}
-          </div>
-        </div>
+
+
+        {% include 'iroad_tenants/partials/eal_list_pagination.html' with page_obj=movement_page pagination_label='movement logs' %}
+
       </div>
+
 {% endblock %}
+
+
+
+{% block extra_js %}
+
+{% url 'iroad_tenants:tenant_operation_truck_movement_log_list' as truck_movement_list_url %}
+
+{% include 'iroad_tenants/partials/eal_list_live_search_js.html' with list_url=truck_movement_list_url search_input_id='truckMovementLogSearch' clear_btn_id='truckMovementLogSearchClear' %}
+
+{% endblock %}
+

@@ -38,13 +38,13 @@
         Shipment Document Detail &mdash;
         <span style="color: var(--primary-color)">{{ document.record_no }}</span>
       </h1>
-      <p class="page-subtitle">Read-only shipment document review.</p>
+      <!-- <p class="page-subtitle">Read-only shipment document review.</p> -->
     </div>
     <div class="page-header-right">
       <div class="eal-header-actions">
         <a href="{{ back_to_list_url }}" class="eal-btn eal-btn-outline">
           <i class="bi bi-arrow-left"></i>
-          <span>Back to List</span>
+          <span>Back</span>
         </a>
         <a href="{{ download_document_url }}" class="eal-btn eal-btn-outline">
           <i class="bi bi-download"></i>
@@ -70,8 +70,7 @@
         </div>
         <div class="form-card-header-text">
           <h2 class="form-card-title">Header Fields</h2>
-          <p class="form-card-desc">Primary document identification and properties.</p>
-        </div>
+      </div>
       </div>
       <div class="form-card-body">
         <p class="small text-uppercase fw-semibold text-secondary mb-3" style="letter-spacing: 0.06em">
@@ -297,8 +296,7 @@
         </div>
         <div class="form-card-header-text">
           <h2 class="form-card-title">Subform Line Fields</h2>
-          <p class="form-card-desc">Line items detailing specific pages and attachments.</p>
-        </div>
+      </div>
       </div>
       <div class="form-card-body" style="padding: 0">
         <div class="eal-table-wrap">

@@ -17,6 +17,101 @@
   #podLinesTable .pod-line-doc-page {
     min-width: 104px;
   }
+
+  .pod-booking-lookup {
+    position: relative;
+    width: 100%;
+  }
+
+  .pod-booking-lookup .form-control.has-icon {
+    padding-right: 42px;
+    width: 100%;
+  }
+
+  .pod-booking-dropdown-toggle {
+    position: absolute;
+    top: 50%;
+    right: 6px;
+    transform: translateY(-50%);
+    z-index: 2;
+    width: 28px;
+    height: 28px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border: 0;
+    border-radius: 8px;
+    background: transparent;
+    color: #64748b;
+    cursor: pointer;
+    padding: 0;
+    line-height: 1;
+  }
+
+  .pod-booking-dropdown-toggle:hover,
+  .pod-booking-dropdown-toggle:focus {
+    background: #eff6ff;
+    color: #2563eb;
+  }
+
+  .pod-booking-lookup-menu {
+    display: none;
+    position: absolute;
+    z-index: 30;
+    top: calc(100% + 6px);
+    left: 0;
+    right: 0;
+    max-height: 240px;
+    overflow-y: auto;
+    background: #fff;
+    border: 1px solid #dbe4f0;
+    border-radius: 12px;
+    box-shadow: 0 16px 32px rgba(15, 23, 42, 0.14);
+    padding: 6px;
+  }
+
+  .pod-booking-lookup-menu.show {
+    display: block;
+  }
+
+  .pod-booking-lookup-option {
+    display: block;
+    width: 100%;
+    border: 0;
+    background: transparent;
+    border-radius: 9px;
+    text-align: left;
+    padding: 9px 10px;
+    cursor: pointer;
+    color: #0f172a;
+  }
+
+  .pod-booking-lookup-option:hover,
+  .pod-booking-lookup-option:focus {
+    background: #eff6ff;
+  }
+
+  .pod-booking-lookup-code {
+    display: block;
+    font-size: 13px;
+    font-weight: 700;
+    line-height: 1.2;
+    color: #0f172a;
+  }
+
+  .pod-booking-lookup-meta {
+    display: block;
+    margin-top: 3px;
+    font-size: 12px;
+    color: #64748b;
+    line-height: 1.25;
+  }
+
+  .pod-booking-lookup-empty {
+    padding: 12px;
+    color: #64748b;
+    font-size: 13px;
+  }
 </style>
 {% endblock %}
 
@@ -38,10 +133,21 @@
         <div class="page-header-row">
           <div class="page-header-left">
             <h1 class="page-title">Shipment POD</h1>
-            <p class="page-subtitle">
+            <!-- <p class="page-subtitle">
               Manage proof of delivery records - track document lifecycle, GPS
               proof, and audit-ready attachments.
-            </p>
+            </p> -->
+          </div>
+          <div class="page-header-right">
+            <div class="eal-header-actions">
+              <a
+                href="{% url 'iroad_tenants:tenant_operation_shipment_pod_list' %}"
+                class="eal-btn eal-btn-outline"
+              >
+                <i class="bi bi-arrow-left"></i>
+                <span>Back</span>
+              </a>
+            </div>
           </div>
         </div>
       </div>
@@ -59,10 +165,7 @@
             </div>
             <div class="form-card-header-text">
               <h2 class="form-card-title">POD Header</h2>
-              <p class="form-card-desc">
-                Primary POD record, linked shipment document, booking, and delivery proof status.
-              </p>
-            </div>
+      </div>
           </div>
           <div class="form-card-body">
             <div class="field-group">
@@ -100,6 +203,7 @@
                       data-booking-id="{{ shipment.booking_id|default:'' }}"
                       data-booking-no="{{ shipment.booking_no|default:'' }}"
                       data-booking-item="{{ shipment.booking_item|default:'' }}"
+                      data-pod-type="{{ shipment.pod_type|default:'' }}"
                       {% if pod_form_data.shipment_id == shipment.shipment_id %}selected{% endif %}
                     >{{ shipment.shipment_no }}</option>
                     {% endfor %}
@@ -139,7 +243,7 @@
                   >
                   <select class="form-select {% if form_errors.source_document_id %}is-invalid{% endif %}" id="sourceDocumentId" name="source_document_id" required>
                     <option value="" {% if not pod_form_data.source_document_id %}selected{% endif %} disabled>
-                      - Select Delivery Note -
+                      - Select Doc Ref -
                     </option>
                     {% for doc in delivery_note_options %}
                     <option
@@ -156,7 +260,7 @@
                     {% endfor %}
                   </select>
                   {% if form_errors.source_document_id %}<div class="invalid-feedback d-block">{{ form_errors.source_document_id }}</div>{% endif %}
-                  <span class="field-hint">Delivery note document (FK)</span>
+                  <span class="field-hint">Document reference (FK)</span>
                 </div>
                 <div class="field">
                   <label for="pageCount" class="form-label"
@@ -177,29 +281,62 @@
                   <label for="bookingNo" class="form-label"
                     >Booking No</label
                   >
-                  <input type="hidden" id="bookingId" name="booking_id" value="{{ pod_form_data.booking_id|default:'' }}" />
-                  <input
-                    type="text"
-                    class="form-control {% if form_errors.booking_id %}is-invalid{% endif %}"
-                    id="bookingNo"
-                    value="{{ pod_form_data.booking_no|default:'' }}"
-                    placeholder="Select shipment to load booking"
-                    readonly
-                  />
+                  <div class="input-icon-wrapper pod-booking-lookup">
+                    <i class="bi bi-search"></i>
+                    <input type="hidden" id="bookingId" name="booking_id" value="{{ pod_form_data.booking_id|default:'' }}" />
+                    <input
+                      type="text"
+                      class="form-control has-icon {% if form_errors.booking_id %}is-invalid{% endif %}"
+                      id="bookingNo"
+                      name="booking_no"
+                      value="{{ pod_form_data.booking_no|default:'' }}"
+                      placeholder="Search or type booking no..."
+                      autocomplete="off"
+                    />
+                    <button type="button" class="pod-booking-dropdown-toggle" id="bookingNoToggle" aria-label="Show booking list">
+                      <i class="bi bi-chevron-down"></i>
+                    </button>
+                    <div class="pod-booking-lookup-menu" id="bookingNoOptions">
+                      {% for booking in booking_options %}
+                      <button
+                        type="button"
+                        class="pod-booking-lookup-option"
+                        data-booking-id="{{ booking.booking_id }}"
+                        data-booking-no="{{ booking.booking_no }}"
+                        data-booking-item="{{ booking.booking_item }}"
+                        data-pod-type="{{ booking.pod_type|default:'' }}"
+                      >
+                        <span class="pod-booking-lookup-code">{{ booking.booking_no }}</span>
+                        <span class="pod-booking-lookup-meta">{{ booking.booking_item|default:'No booking item' }}</span>
+                      </button>
+                      {% empty %}
+                      <div class="pod-booking-lookup-empty">No shipment bookings available.</div>
+                      {% endfor %}
+                    </div>
+                  </div>
                   {% if form_errors.booking_id %}<div class="invalid-feedback d-block">{{ form_errors.booking_id }}</div>{% endif %}
                 </div>
                 <div class="field">
                   <label for="bookingItem" class="form-label"
                     >Booking Item</label
                   >
-                  <input
-                    type="text"
-                    class="form-control"
-                    id="bookingItem"
-                    value="{{ pod_form_data.booking_item|default:'' }}"
-                    placeholder="Select shipment to load booking item"
-                    readonly
-                  />
+                  <select class="form-select {% if form_errors.booking_item %}is-invalid{% endif %}" id="bookingItem" name="booking_item">
+                    <option value="" {% if not pod_form_data.booking_item %}selected{% endif %} disabled>
+                      - Select Booking Item -
+                    </option>
+                    {% for item in booking_item_options %}
+                    <option
+                      value="{{ item.booking_item }}"
+                      data-booking-id="{{ item.booking_id }}"
+                      data-booking-no="{{ item.booking_no }}"
+                      data-pod-type="{{ item.pod_type|default:'' }}"
+                      {% if pod_form_data.booking_item == item.booking_item %}selected{% endif %}
+                    >
+                      {{ item.booking_item }}
+                    </option>
+                    {% endfor %}
+                  </select>
+                  {% if form_errors.booking_item %}<div class="invalid-feedback d-block">{{ form_errors.booking_item }}</div>{% endif %}
                 </div>
                 <div class="field">
                   <label for="shipmentRef" class="form-label"
@@ -216,6 +353,7 @@
                       data-booking-id="{{ shipment.booking_id|default:'' }}"
                       data-booking-no="{{ shipment.booking_no|default:'' }}"
                       data-booking-item="{{ shipment.booking_item|default:'' }}"
+                      data-pod-type="{{ shipment.pod_type|default:'' }}"
                       {% if pod_form_data.shipment_id == shipment.shipment_id %}selected{% endif %}
                     >{{ shipment.shipment_no }}{% if shipment.booking_no %} - {{ shipment.booking_no }}{% endif %}</option>
                     {% endfor %}
@@ -235,9 +373,9 @@
                     <option value="" {% if not pod_form_data.pod_type %}selected{% endif %} disabled>
                       - Select POD Type -
                     </option>
-                    <option value="soft" {% if pod_form_data.pod_type == 'soft' %}selected{% endif %}>Soft Copy</option>
-                    <option value="hard" {% if pod_form_data.pod_type == 'hard' %}selected{% endif %}>Hard Copy</option>
-                    <option value="digital" {% if pod_form_data.pod_type == 'digital' %}selected{% endif %}>Digital Evidence</option>
+                    {% for pod_type in operation_pod_type_options %}
+                    <option value="{{ pod_type }}" {% if pod_form_data.pod_type == pod_type %}selected{% endif %}>{{ pod_type }}</option>
+                    {% endfor %}
                   </select>
                   {% if form_errors.pod_type %}<div class="invalid-feedback d-block">{{ form_errors.pod_type }}</div>{% endif %}
                 </div>
@@ -332,11 +470,7 @@
             </div>
             <div class="form-card-header-text">
               <h2 class="form-card-title">Hard Copy Tracking</h2>
-              <p class="form-card-desc">
-                Physical document location, current holder, and handover
-                tracking.
-              </p>
-            </div>
+      </div>
             <span class="pod-section-badge hard"
               ><i class="bi bi-file-earmark"></i> Hard Copy</span
             >
@@ -410,10 +544,7 @@
             </div>
             <div class="form-card-header-text">
               <h2 class="form-card-title">POD Pages</h2>
-              <p class="form-card-desc">
-                Add one row for each POD page and attach supporting proof.
-              </p>
-            </div>
+      </div>
             <button
               type="button"
               class="btn btn-primary btn-sm pod-add-line-btn"
@@ -600,31 +731,51 @@
             podActionLogOptions = [];
           }
         }
-        // ── POD Type Toggle (Soft / Hard) ──────────────
+        // ── POD Type (Digital / Soft / Hard — same as Booking & Shipment) ──
         const podTypeSelect = document.getElementById("podType");
         const softSection = document.getElementById("softCopySection");
         const hardSection = document.getElementById("hardCopySection");
         const modeIndicator = document.getElementById("podModeIndicator");
         const podForm = document.getElementById("digitalPodForm");
 
-        if (podTypeSelect) {
-          podTypeSelect.addEventListener("change", function () {
-            const value = this.value;
-            if (value === "soft") {
-              if (softSection) softSection.style.display = "";
-              if (hardSection) hardSection.style.display = "none";
-              if (modeIndicator) modeIndicator.className = "pod-mode-indicator";
-            } else if (value === "hard") {
-              if (softSection) softSection.style.display = "none";
-              if (hardSection) hardSection.style.display = "";
-              if (modeIndicator) {
-                modeIndicator.className = "pod-mode-indicator hard-mode";
-                modeIndicator.innerHTML =
-                  '<i class="bi bi-file-earmark-ruled"></i><span>Hard Copy Mode</span>';
-              }
-              podForm.classList.add("pod-mode-hard");
+        function normalizePodTypeToken(value) {
+          return String(value || "").trim().toLowerCase();
+        }
+
+        function applyPodTypeMode(value) {
+          const token = normalizePodTypeToken(value);
+          if (token === "soft") {
+            if (softSection) softSection.style.display = "";
+            if (hardSection) hardSection.style.display = "none";
+            if (modeIndicator) modeIndicator.className = "pod-mode-indicator";
+            if (podForm) podForm.classList.remove("pod-mode-hard");
+          } else if (token === "hard") {
+            if (softSection) softSection.style.display = "none";
+            if (hardSection) hardSection.style.display = "";
+            if (modeIndicator) {
+              modeIndicator.className = "pod-mode-indicator hard-mode";
+              modeIndicator.innerHTML =
+                '<i class="bi bi-file-earmark-ruled"></i><span>Hard Copy Mode</span>';
             }
+            if (podForm) podForm.classList.add("pod-mode-hard");
+          } else {
+            if (softSection) softSection.style.display = "";
+            if (hardSection) hardSection.style.display = "none";
+            if (modeIndicator) modeIndicator.className = "pod-mode-indicator";
+            if (podForm) podForm.classList.remove("pod-mode-hard");
+          }
+        }
+
+        function setPodTypeValue(value) {
+          if (!podTypeSelect || !value) return;
+          const exists = Array.prototype.some.call(podTypeSelect.options, function (option) {
+            return option.value === value;
           });
+          if (!exists) {
+            podTypeSelect.add(new Option(value, value));
+          }
+          podTypeSelect.value = value;
+          applyPodTypeMode(value);
         }
 
         const shipmentRefSelect = document.getElementById("shipmentRef");
@@ -635,9 +786,221 @@
         const pageCountInput = document.getElementById("pageCount");
         const bookingIdInput = document.getElementById("bookingId");
         const bookingNoInput = document.getElementById("bookingNo");
-        const bookingItemInput = document.getElementById("bookingItem");
+        const bookingNoMenu = document.getElementById("bookingNoOptions");
+        const bookingNoToggle = document.getElementById("bookingNoToggle");
+        const bookingItemSelect = document.getElementById("bookingItem");
         const podLinesBody = document.getElementById("podLinesBody");
         let lineCounter = podLinesBody ? podLinesBody.querySelectorAll("tr").length || 1 : 1;
+
+        function selectedOption(selectEl) {
+          if (!selectEl || selectEl.selectedIndex < 0) return null;
+          return selectEl.options[selectEl.selectedIndex];
+        }
+
+        function findBookingOption(bookingNoValue) {
+          const normalized = String(bookingNoValue || "").trim().toLowerCase();
+          if (!bookingNoMenu || !normalized) return null;
+          const options = bookingNoMenu.querySelectorAll("[data-booking-no]");
+          for (let i = 0; i < options.length; i += 1) {
+            if (String(options[i].getAttribute("data-booking-no") || "").trim().toLowerCase() === normalized) {
+              return options[i];
+            }
+          }
+          return null;
+        }
+
+        function hideBookingMenu() {
+          if (bookingNoMenu) bookingNoMenu.classList.remove("show");
+        }
+
+        function filterBookingMenu() {
+          if (!bookingNoMenu || !bookingNoInput) return;
+          const term = String(bookingNoInput.value || "").trim().toLowerCase();
+          const options = bookingNoMenu.querySelectorAll(".pod-booking-lookup-option");
+          let visibleCount = 0;
+          Array.prototype.forEach.call(options, function (option) {
+            const bookingNo = String(option.getAttribute("data-booking-no") || "").toLowerCase();
+            const bookingItem = String(option.getAttribute("data-booking-item") || "").toLowerCase();
+            const isVisible = !term || bookingNo.indexOf(term) !== -1 || bookingItem.indexOf(term) !== -1;
+            option.hidden = !isVisible;
+            if (isVisible) visibleCount += 1;
+          });
+          bookingNoMenu.classList.toggle(
+            "show",
+            visibleCount > 0 || !!bookingNoMenu.querySelector(".pod-booking-lookup-empty")
+          );
+        }
+
+        function filterBookingItemsForBooking(bookingNoValue) {
+          if (!bookingItemSelect) return;
+          let matchedCount = 0;
+          Array.prototype.forEach.call(bookingItemSelect.options, function (option, index) {
+            if (index === 0) {
+              option.hidden = false;
+              option.disabled = false;
+              return;
+            }
+            const optionBookingNo = option.getAttribute("data-booking-no") || "";
+            const isMatch = !bookingNoValue || !optionBookingNo || optionBookingNo === bookingNoValue;
+            option.hidden = !isMatch;
+            option.disabled = !isMatch;
+            if (isMatch) matchedCount += 1;
+          });
+          const selectedItem = selectedOption(bookingItemSelect);
+          if (selectedItem && selectedItem.disabled) {
+            bookingItemSelect.value = "";
+          }
+          if (!bookingItemSelect.value && matchedCount === 1) {
+            Array.prototype.some.call(bookingItemSelect.options, function (option) {
+              if (option.value && !option.disabled) {
+                bookingItemSelect.value = option.value;
+                return true;
+              }
+              return false;
+            });
+          }
+        }
+
+        function filterSelectOptionsForBooking(selectEl, bookingNoValue, bookingItemValue) {
+          if (!selectEl) return [];
+          const matched = [];
+          Array.prototype.forEach.call(selectEl.options, function (opt, index) {
+            if (index === 0) {
+              opt.hidden = false;
+              opt.disabled = false;
+              return;
+            }
+            const optionBookingNo = opt.getAttribute("data-booking-no") || "";
+            const optionBookingItem = opt.getAttribute("data-booking-item") || "";
+            const bookingMatch = !bookingNoValue || optionBookingNo === bookingNoValue;
+            const itemMatch = !bookingItemValue || optionBookingItem === bookingItemValue;
+            const isMatch = bookingMatch && itemMatch;
+            opt.hidden = !isMatch;
+            opt.disabled = !isMatch;
+            if (isMatch) matched.push(opt);
+          });
+          return matched;
+        }
+
+        function filterShipmentsForSelection(bookingNoValue, bookingItemValue) {
+          if (!shipmentRefSelect) return [];
+          const matched = filterSelectOptionsForBooking(
+            shipmentRefSelect,
+            bookingNoValue,
+            bookingItemValue
+          );
+          const selectedShipment = selectedOption(shipmentRefSelect);
+          if (!selectedShipment || selectedShipment.hidden || selectedShipment.disabled) {
+            shipmentRefSelect.value = matched.length ? matched[0].value : "";
+          }
+          return matched;
+        }
+
+        function filterDocNoForSelection(bookingNoValue, bookingItemValue) {
+          if (!docNoInput) return;
+          const matched = filterSelectOptionsForBooking(docNoInput, bookingNoValue, bookingItemValue);
+          const selectedDoc = selectedOption(docNoInput);
+          if (!selectedDoc || selectedDoc.hidden || selectedDoc.disabled) {
+            docNoInput.value = matched.length ? matched[0].value : "";
+          }
+        }
+
+        function setBookingIdFromOption(bookingOpt) {
+          if (!bookingIdInput) return;
+          bookingIdInput.value = bookingOpt ? bookingOpt.getAttribute("data-booking-id") || "" : "";
+        }
+
+        function syncPodTypeFromLinkage() {
+          let podType = "";
+          const shipmentOption = selectedOption(shipmentRefSelect);
+          if (shipmentOption && shipmentOption.value) {
+            podType = shipmentOption.getAttribute("data-pod-type") || "";
+          }
+          if (!podType && bookingItemSelect && bookingItemSelect.value) {
+            const itemOption = selectedOption(bookingItemSelect);
+            podType = itemOption ? itemOption.getAttribute("data-pod-type") || "" : "";
+          }
+          if (!podType && bookingNoInput && bookingNoInput.value) {
+            const bookingOpt = findBookingOption(bookingNoInput.value);
+            podType = bookingOpt ? bookingOpt.getAttribute("data-pod-type") || "" : "";
+          }
+          if (podType) {
+            setPodTypeValue(podType);
+          }
+        }
+
+        function syncShipmentDependentFields() {
+          const shipmentOption = selectedOption(shipmentRefSelect);
+          if (!shipmentOption || !shipmentOption.value) {
+            syncPodTypeFromLinkage();
+            filterSourceDocumentsForShipment();
+            syncAllActionLogSelects();
+            return;
+          }
+          const shipmentId = shipmentOption.value || "";
+          if (docNoInput && docNoInput.value !== shipmentId) {
+            docNoInput.value = shipmentId;
+          }
+          syncPodTypeFromLinkage();
+          filterSourceDocumentsForShipment();
+          syncAllActionLogSelects();
+        }
+
+        function applyBookingLookup() {
+          if (!bookingNoInput) return;
+          const typedBookingNo = String(bookingNoInput.value || "").trim();
+          const bookingOpt = findBookingOption(typedBookingNo);
+          const resolvedBookingNo = bookingOpt
+            ? bookingOpt.getAttribute("data-booking-no") || ""
+            : typedBookingNo;
+          setBookingIdFromOption(bookingOpt);
+          filterBookingItemsForBooking(resolvedBookingNo);
+          if (bookingItemSelect && bookingOpt) {
+            const resolvedBookingItem = bookingOpt.getAttribute("data-booking-item") || "";
+            if (resolvedBookingItem) {
+              ensureSelectOption(bookingItemSelect, resolvedBookingItem);
+              bookingItemSelect.value = resolvedBookingItem;
+            }
+          }
+          const currentItem = bookingItemSelect ? bookingItemSelect.value : "";
+          filterShipmentsForSelection(resolvedBookingNo, currentItem);
+          filterDocNoForSelection(resolvedBookingNo, currentItem);
+          syncShipmentDependentFields();
+        }
+
+        function syncFromBookingItem() {
+          if (!bookingItemSelect) return;
+          const itemOption = selectedOption(bookingItemSelect);
+          const itemBookingNo = itemOption ? itemOption.getAttribute("data-booking-no") || "" : "";
+          const itemBookingId = itemOption ? itemOption.getAttribute("data-booking-id") || "" : "";
+          if (itemBookingNo && bookingNoInput) bookingNoInput.value = itemBookingNo;
+          if (bookingIdInput && itemBookingId) bookingIdInput.value = itemBookingId;
+          filterShipmentsForSelection(itemBookingNo, bookingItemSelect.value);
+          filterDocNoForSelection(itemBookingNo, bookingItemSelect.value);
+          syncShipmentDependentFields();
+        }
+
+        function syncBookingFromShipment() {
+          const shipmentOption = selectedOption(shipmentRefSelect);
+          if (!shipmentOption || !shipmentOption.value) {
+            syncShipmentDependentFields();
+            return;
+          }
+          const bookingNo = shipmentOption.getAttribute("data-booking-no") || "";
+          const bookingId = shipmentOption.getAttribute("data-booking-id") || "";
+          const bookingItem = shipmentOption.getAttribute("data-booking-item") || "";
+          if (bookingNoInput) bookingNoInput.value = bookingNo;
+          if (bookingIdInput) bookingIdInput.value = bookingId;
+          filterBookingItemsForBooking(bookingNo);
+          if (bookingItemSelect && bookingItem) {
+            ensureSelectOption(bookingItemSelect, bookingItem);
+            bookingItemSelect.value = bookingItem;
+          }
+          filterShipmentsForSelection(bookingNo, bookingItem);
+          filterDocNoForSelection(bookingNo, bookingItem);
+          if (docNoInput) docNoInput.value = shipmentOption.value;
+          syncShipmentDependentFields();
+        }
 
         function renumberLines() {
           if (!podLinesBody) return;
@@ -861,38 +1224,85 @@
           populatePodLinesFromSourcePages(getSourceDocumentPages());
         }
 
-        if (shipmentRefSelect && docNoInput) {
-          function syncShipmentFields() {
-            const option = shipmentRefSelect.options[shipmentRefSelect.selectedIndex];
-            if (!option || !option.value) return;
-            const shipmentId = option.value || "";
-            const bookingId = option.getAttribute("data-booking-id") || "";
-            const bookingNo = option.getAttribute("data-booking-no") || "";
-            const bookingItem = option.getAttribute("data-booking-item") || "";
-            if (docNoInput && shipmentId) {
-              docNoInput.value = shipmentId;
-            }
-            if (bookingIdInput) {
-              bookingIdInput.value = bookingId;
-            }
-            if (bookingNoInput) {
-              bookingNoInput.value = bookingNo;
-            }
-            if (bookingItemInput) {
-              bookingItemInput.value = bookingItem;
-            }
-            filterSourceDocumentsForShipment();
-            syncAllActionLogSelects();
+        if (bookingNoInput) {
+          bookingNoInput.addEventListener("input", function () {
+            filterBookingMenu();
+            applyBookingLookup();
+          });
+          bookingNoInput.addEventListener("focus", filterBookingMenu);
+          bookingNoInput.addEventListener("change", function () {
+            applyBookingLookup();
+            hideBookingMenu();
+          });
+        }
+
+        if (bookingNoMenu && bookingNoInput) {
+          if (bookingNoToggle) {
+            bookingNoToggle.addEventListener("mousedown", function (event) {
+              event.preventDefault();
+              bookingNoInput.focus();
+              filterBookingMenu();
+            });
           }
-          shipmentRefSelect.addEventListener("change", syncShipmentFields);
+          bookingNoMenu.addEventListener("mousedown", function (event) {
+            const option = event.target.closest(".pod-booking-lookup-option");
+            if (!option) return;
+            event.preventDefault();
+            bookingNoInput.value = option.getAttribute("data-booking-no") || "";
+            setBookingIdFromOption(option);
+            if (bookingItemSelect) {
+              const selectedBookingItem = option.getAttribute("data-booking-item") || "";
+              if (selectedBookingItem) {
+                ensureSelectOption(bookingItemSelect, selectedBookingItem);
+                bookingItemSelect.value = selectedBookingItem;
+              }
+            }
+            applyBookingLookup();
+            hideBookingMenu();
+          });
+          document.addEventListener("mousedown", function (event) {
+            if (
+              bookingNoMenu.contains(event.target) ||
+              bookingNoInput.contains(event.target) ||
+              (bookingNoToggle && bookingNoToggle.contains(event.target))
+            ) {
+              return;
+            }
+            hideBookingMenu();
+          });
+        }
+
+        if (bookingItemSelect) {
+          bookingItemSelect.addEventListener("change", syncFromBookingItem);
+        }
+
+        if (shipmentRefSelect) {
+          shipmentRefSelect.addEventListener("change", syncBookingFromShipment);
+        }
+
+        if (docNoInput && shipmentRefSelect) {
           docNoInput.addEventListener("change", function () {
             if (docNoInput.value) {
               shipmentRefSelect.value = docNoInput.value;
-              syncShipmentFields();
+              syncBookingFromShipment();
             }
           });
-          if (shipmentRefSelect.value) {
-            syncShipmentFields();
+        }
+
+        if (bookingNoInput && bookingNoInput.value) {
+          applyBookingLookup();
+        } else if (shipmentRefSelect && shipmentRefSelect.value) {
+          syncBookingFromShipment();
+        } else {
+          syncShipmentDependentFields();
+        }
+
+        if (podTypeSelect) {
+          podTypeSelect.addEventListener("change", function () {
+            applyPodTypeMode(this.value);
+          });
+          if (podTypeSelect.value) {
+            applyPodTypeMode(podTypeSelect.value);
           }
         }
         if (sourceDocumentSelect) {

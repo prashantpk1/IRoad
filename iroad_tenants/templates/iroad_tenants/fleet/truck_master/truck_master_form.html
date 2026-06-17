@@ -20,10 +20,15 @@
   <div class="page-header-row">
     <div class="page-header-left">
       <h1 class="page-title">Truck Master</h1>
-      <p class="page-subtitle">
+      <!-- <p class="page-subtitle">
         Register and manage truck details, plate information, and<br />
         specifications.
-      </p>
+      </p> -->
+    </div>
+    <div class="page-header-right ms-auto">
+      <a href="{% if truck_cancel_url %}{{ truck_cancel_url }}{% else %}{% url 'iroad_tenants:truck_master' %}{% endif %}" class="btn btn-outline-secondary">
+        <i class="bi bi-arrow-left me-1"></i>Back
+      </a>
     </div>
   </div>
 </div>
@@ -34,6 +39,12 @@
 
 <form id="truckMasterForm" method="post" enctype="multipart/form-data" class="needs-validation" novalidate>
   {% csrf_token %}
+  {% if truck_return_to %}
+  <input type="hidden" name="return_to" value="{{ truck_return_to }}" />
+  {% endif %}
+  {% if truck_return_to and request.GET.tab %}
+  <input type="hidden" name="detail_tab" value="{{ request.GET.tab }}" />
+  {% endif %}
   {{ form.sourcing_mode }}
   {{ form.vendor_account_id }}
   {% if form.sourcing_mode.errors %}<div class="text-danger small">{{ form.sourcing_mode.errors }}</div>{% endif %}
@@ -50,9 +61,6 @@
       </div>
       <div class="form-card-header-text">
         <h2 class="form-card-title">Basic Info &amp; Ownership</h2>
-        <p class="form-card-desc">
-          Truck code, status, registration country, and owner details.
-        </p>
       </div>
     </div>
     <div class="form-card-body">
@@ -155,7 +163,6 @@
       </div>
       <div class="form-card-header-text">
         <h2 class="form-card-title">Plate &amp; Registration</h2>
-        <p class="form-card-desc">Plate number (Saudi / Non-Saudi) and plate image.</p>
       </div>
     </div>
     <div class="form-card-body">
@@ -328,7 +335,6 @@
       </div>
       <div class="form-card-header-text">
         <h2 class="form-card-title">Specifications</h2>
-        <p class="form-card-desc">Axles, tires, weights, and volume details.</p>
       </div>
     </div>
     <div class="form-card-body">
@@ -383,7 +389,6 @@
       </div>
       <div class="form-card-header-text">
         <h2 class="form-card-title">Default Driver</h2>
-        <p class="form-card-desc">Driver lookup linked to this truck (view only).</p>
       </div>
     </div>
     <div class="form-card-body">
@@ -397,26 +402,14 @@
         </div>
         <div class="field">
           <label class="form-label" for="tmAssignedDateTime">Assigned Date (Date-Time)</label>
-          {% if is_edit and truck %}
           <input
             type="text"
             class="form-control"
             id="tmAssignedDateTime"
             readonly
-            value="{{ truck.updated_at|localtime|date:'m/d/Y h:i A' }}"
+            value="{% if default_driver_assigned_at %}{{ default_driver_assigned_at|localtime|date:'m/d/Y h:i A' }}{% elif is_edit and truck %}{{ truck.updated_at|localtime|date:'m/d/Y h:i A' }}{% else %}{% now 'm/d/Y h:i A' %}{% endif %}"
             aria-readonly="true"
           />
-          {% else %}
-          <input
-            type="text"
-            class="form-control"
-            id="tmAssignedDateTime"
-            readonly
-            value=""
-            placeholder="—"
-            aria-readonly="true"
-          />
-          {% endif %}
         </div>
       </div>
     </div>
@@ -430,7 +423,7 @@
         Reset Form
       </button>
       {% else %}
-      <a href="{% url 'iroad_tenants:truck_master' %}" class="btn btn-outline-secondary">
+      <a href="{% if truck_cancel_url %}{{ truck_cancel_url }}{% else %}{% url 'iroad_tenants:truck_master' %}{% endif %}" class="btn btn-outline-secondary">
         <i class="bi bi-x-lg"></i>
         Cancel
       </a>

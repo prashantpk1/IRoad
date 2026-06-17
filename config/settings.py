@@ -47,6 +47,8 @@ CSRF_TRUSTED_ORIGINS = [
     "https://*.trycloudflare.com",
     "http://127.0.0.1:8000",
     "http://localhost:8000",
+    "http://127.0.0.1:8001",
+    "http://localhost:8001",
 ]
 
 # Optional: current cloudflared/ngrok URL (changes when you restart the tunnel).
@@ -165,6 +167,7 @@ MIDDLEWARE = [
     # Before tenant gate middleware (uses messages.warning on subscription redirect).
     'django.contrib.messages.middleware.MessageMiddleware',
     'iroad_tenants.middleware.TenantPortalSchemaMiddleware',
+    'iroad_tenants.middleware.TenantSystemConfigurationMiddleware',
     'iroad_tenants.middleware.TenantSubscriptionGateMiddleware',
     # After Auth (and Message) so flash messages on timeout redirect persist.
     'superadmin.middleware.SessionTimeoutMiddleware',
@@ -189,6 +192,7 @@ TEMPLATES = [
                 'iroad_tenants.context_processors.tenant_web_push_config',
                 'iroad_tenants.context_processors.tenant_dashboard_search_routes',
                 'iroad_tenants.context_processors.tenant_in_app_notifications',
+                'iroad_tenants.context_processors.tenant_system_configuration',
             ],
             # Explicit path so {% load cms_locale %} works even if auto-discovery
             # of app templatetags packages fails (e.g. import/shadowing issues).

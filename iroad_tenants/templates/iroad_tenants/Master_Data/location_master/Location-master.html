@@ -21,9 +21,15 @@
             </li>
           </ol>
         </nav>
-        <div class="page-header-row">
+        <div class="page-header-row align-items-start">
           <div class="page-header-left">
             <h1 class="page-title">{% if is_view %}Location Detail{% elif is_edit %}Edit Location{% else %}Location Master{% endif %}</h1>
+            <!-- <p class="page-subtitle">{% translate "Define the core details for this location, including names, codes, and serviceability." %}</p> -->
+          </div>
+          <div class="page-header-right ms-auto">
+            <a href="{% url 'iroad_tenants:tenant_location_master_list' %}" class="btn btn-outline-secondary">
+              <i class="bi bi-arrow-left me-1"></i>{% translate "Back" %}
+            </a>
           </div>
         </div>
       </div>
@@ -43,11 +49,7 @@
             </div>
             <div class="form-card-header-text">
               <h2 class="form-card-title">Location Details</h2>
-              <p class="form-card-desc">
-                Define the core details for this location, including names,
-                codes, and serviceability.
-              </p>
-            </div>
+      </div>
           </div>
 
           <div class="form-card-body">
@@ -194,21 +196,11 @@
             </button>
           </div>
           <div class="form-actions-right">
-            <a href="{% url 'iroad_tenants:tenant_location_master_list' %}" class="btn btn-outline-secondary me-2">
-              <i class="bi bi-arrow-left"></i>
-              Back
-            </a>
-            {% if is_view and location %}
-            <a href="{% url 'iroad_tenants:tenant_location_master_edit' location.location_id %}" class="btn btn-primary me-2">
-              <i class="bi bi-pencil"></i>
-              Edit
-            </a>
-            {% endif %}
             {% if not is_view %}
-              <button type="submit" class="btn btn-primary">
-                <i class="bi bi-check-circle"></i>
-                {% if is_edit %}Update Location{% else %}Save Location{% endif %}
-              </button>
+            <button type="submit" class="btn btn-primary">
+              <i class="bi bi-check-circle"></i>
+              {% if is_edit %}{% translate "Update Location" %}{% else %}{% translate "Save Location" %}{% endif %}
+            </button>
             {% endif %}
           </div>
         </div>

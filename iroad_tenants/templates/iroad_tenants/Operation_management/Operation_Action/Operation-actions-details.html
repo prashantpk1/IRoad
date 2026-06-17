@@ -21,9 +21,9 @@
               Operation Action &mdash;
               <span style="color: var(--primary-color)">{{ operation_action.action_code }}</span>
             </h1>
-            <p class="page-subtitle">
+            <!-- <p class="page-subtitle">
               Full details for this operation action configuration.
-            </p>
+            </p> -->
           </div>
           <div class="page-header-right">
             <div class="eal-header-actions">
@@ -32,7 +32,7 @@
                 class="eal-btn eal-btn-outline"
               >
                 <i class="bi bi-arrow-left"></i>
-                <span>Back to List</span>
+                <span>Back</span>
               </a>
               <a
                 href="{% url 'iroad_tenants:tenant_operation_action_log_list' %}"
@@ -59,8 +59,7 @@
               </div>
               <div class="form-card-header-text">
                 <h2 class="form-card-title">Header</h2>
-                <p class="form-card-desc">Action identity and status values.</p>
-              </div>
+      </div>
             </div>
             <div class="form-card-body">
               <div class="fields-grid cols-2">
@@ -93,10 +92,7 @@
               </div>
               <div class="form-card-header-text">
                 <h2 class="form-card-title">Action Scope &amp; Sequence</h2>
-                <p class="form-card-desc">
-                  Scope, category and sequence setup values.
-                </p>
-              </div>
+      </div>
             </div>
             <div class="form-card-body">
               <div class="fields-grid cols-3">
@@ -123,10 +119,7 @@
               </div>
               <div class="form-card-header-text">
                 <h2 class="form-card-title">Operation Impact</h2>
-                <p class="form-card-desc">
-                  Auto posting, collection and status impact values.
-                </p>
-              </div>
+      </div>
             </div>
             <div class="form-card-body">
               <div class="fields-grid cols-2">

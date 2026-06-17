@@ -26,10 +26,10 @@
         <div class="page-header-row">
           <div class="page-header-left">
             <h1 class="page-title">{% if is_edit_mode %}Edit Client Account{% else %}New Client Account{% endif %}</h1>
-            <p class="page-subtitle">
+            <!-- <p class="page-subtitle">
               {% if is_edit_mode %}Update client account details. Fill in the details below; fields{% else %}Create a new client account. Fill in the details below; fields{% endif %}
               marked with * are required.
-            </p>
+            </p> -->
           </div>
           <div class="page-header-right">
             <div class="eal-header-actions">
@@ -53,10 +53,7 @@
             </div>
             <div class="form-card-header-text">
               <h2 class="form-card-title">Account & Status</h2>
-              <p class="form-card-desc">
-                Account identifier, client type and status.
-              </p>
-            </div>
+      </div>
           </div>
           <div class="form-card-body">
             <div class="field-group">
@@ -94,6 +91,19 @@
                     <option value="Business" {% if form_data.client_type == 'Business' %}selected{% endif %}>Business</option>
                   </select>
                   {% if form_errors.client_type %}<div class="invalid-feedback d-block">{{ form_errors.client_type }}</div>{% endif %}
+                </div>
+                <div class="field">
+                  <label for="createdAt" class="form-label">Created At</label>
+                  <input
+                    type="text"
+                    class="form-control"
+                    id="createdAt"
+                    name="created_at"
+                    placeholder="—"
+                    value="{{ form_data.created_at|default:'' }}"
+                    readonly
+                  />
+                  <span class="field-hint">Set on save</span>
                 </div>
                 <div class="field client-account-individual-section" id="clientAccountIndividualSection">
                   <label for="nationalId" class="form-label">
@@ -140,10 +150,7 @@
             </div>
             <div class="form-card-header-text">
               <h2 class="form-card-title">Names & Currency</h2>
-              <p class="form-card-desc">
-                Client names and preferred currency for billing.
-              </p>
-            </div>
+      </div>
           </div>
           <div class="form-card-body">
             <div class="field-group">
@@ -232,8 +239,7 @@
             </div>
             <div class="form-card-header-text">
               <h2 class="form-card-title">Billing Address</h2>
-              <p class="form-card-desc">Legal / billing address only.</p>
-            </div>
+      </div>
           </div>
           <div class="form-card-body">
             <div class="field-group">
@@ -428,8 +434,7 @@
             </div>
             <div class="form-card-header-text">
               <h2 class="form-card-title">Business Details</h2>
-              <p class="form-card-desc">Shown when Client Type is Business.</p>
-            </div>
+      </div>
           </div>
           <div class="form-card-body">
             <div class="field-group">

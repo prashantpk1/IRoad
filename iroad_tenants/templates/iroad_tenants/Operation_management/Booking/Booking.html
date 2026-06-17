@@ -19,9 +19,14 @@
         <div class="page-header-row">
           <div class="page-header-left">
             <h1 class="page-title">Booking</h1>
-            <p class="page-subtitle">
+            <!-- <p class="page-subtitle">
               {% if booking_is_edit %}Edit booking details.{% else %}Create or edit a booking and link operational details.{% endif %}
-            </p>
+            </p> -->
+          </div>
+          <div class="page-header-right ms-auto">
+            <a href="{% url 'iroad_tenants:tenant_operation_booking_list' %}" class="btn btn-outline-secondary">
+              <i class="bi bi-arrow-left me-1"></i>Back
+            </a>
           </div>
         </div>
       </div>
@@ -31,10 +36,20 @@
         {% csrf_token %}
         <div
           id="bookingValidationBanner"
-          class="alert alert-danger alert-dismissible fade show mb-3{% if not booking_form_errors %} d-none{% endif %}"
+          class="alert alert-danger alert-dismissible fade show mb-3{% if not booking_validation_errors and not booking_form_errors %} d-none{% endif %}"
           role="alert"
         >
-          Please fix the highlighted errors.
+          <div data-banner-body>
+            {% if booking_validation_errors %}
+            <ul class="mb-0 ps-3">
+              {% for msg in booking_validation_errors %}
+              <li>{{ msg }}</li>
+              {% endfor %}
+            </ul>
+            {% else %}
+            Please fix the highlighted errors below. Your entered data has been kept.
+            {% endif %}
+          </div>
           <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
         </div>
         {% if booking_has_active_shipment %}
@@ -105,6 +120,9 @@
                     name="booking_date"
                     value="{{ booking_form_data.booking_date|default:'' }}"
                   />
+                  {% if booking_form_errors.booking_date %}
+                  <div class="invalid-feedback d-block">{{ booking_form_errors.booking_date }}</div>
+                  {% endif %}
                 </div>
               </div>
               <div class="fields-grid cols-3">
@@ -965,10 +983,21 @@
           });
         }
 
-        function showBookingValidationBanner(show) {
+        function showBookingValidationBanner(show, messages) {
           if (!bookingValidationBanner) return;
+          var body = bookingValidationBanner.querySelector("[data-banner-body]");
           if (show) {
             bookingValidationBanner.classList.remove("d-none");
+            if (body && messages && messages.length) {
+              body.innerHTML =
+                '<ul class="mb-0 ps-3">' +
+                messages
+                  .map(function (message) {
+                    return "<li>" + String(message) + "</li>";
+                  })
+                  .join("") +
+                "</ul>";
+            }
           } else {
             bookingValidationBanner.classList.add("d-none");
           }
@@ -1518,7 +1547,7 @@
             }
           }
 
-          showBookingValidationBanner(errors.length > 0);
+          showBookingValidationBanner(errors.length > 0, errors);
           applyBookingFieldHighlights(fieldErrors);
           if (errors.length && bookingValidationBanner) {
             bookingValidationBanner.scrollIntoView({ behavior: "smooth", block: "nearest" });

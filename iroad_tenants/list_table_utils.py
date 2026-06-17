@@ -327,6 +327,25 @@ def prepare_eal_list(
     return page, pagination_ctx
 
 
+EXPORT_SELECTED_PARAM = 'selected'
+
+
+def parse_export_selected_values(request) -> list[str]:
+    """Parse comma-separated export selection ids from the query string."""
+    raw = (request.GET.get(EXPORT_SELECTED_PARAM) or '').strip()
+    if not raw:
+        return []
+    return [part.strip() for part in raw.split(',') if part.strip()]
+
+
+def apply_list_export_selection(queryset, request, field_name: str):
+    """Restrict export queryset to explicitly selected row ids when provided."""
+    selected = parse_export_selected_values(request)
+    if not selected or not field_name:
+        return queryset
+    return queryset.filter(**{f'{field_name}__in': selected})
+
+
 def build_csv_http_response(
     filename: str,
     headers: list[str],

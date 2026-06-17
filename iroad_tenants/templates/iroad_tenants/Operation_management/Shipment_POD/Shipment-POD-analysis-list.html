@@ -20,9 +20,9 @@
         <div class="page-header-row">
           <div class="page-header-left">
             <h1 class="page-title">Shipment PODs</h1>
-            <p class="page-subtitle">
+            <!-- <p class="page-subtitle">
               View and manage all shipment POD records in one place.
-            </p>
+            </p> -->
           </div>
           <div class="page-header-right">
             <div class="eal-header-actions">
@@ -133,6 +133,14 @@
           <table class="eal-table">
             <thead>
               <tr>
+                <th class="eal-col-check">
+                  <input
+                    type="checkbox"
+                    class="eal-custom-check"
+                    id="ealSelectAll"
+                    aria-label="Select all POD records on this page"
+                  />
+                </th>
                 <th>Record No</th>
                 <th>Record Date</th>
                 <th>Booking No</th>
@@ -149,7 +157,14 @@
             </thead>
             <tbody>
               {% for row in pod_rows %}
-              <tr>
+              <tr data-eal-export-id="{{ row.record_no|escape }}">
+                <td class="eal-col-check">
+                  <input
+                    type="checkbox"
+                    class="eal-custom-check eal-row-check"
+                    aria-label="Select POD record {{ row.record_no }}"
+                  />
+                </td>
                 <td><span class="eal-entity-id">{{ row.record_no }}</span></td>
                 <td>{{ row.record_date|date:"d M Y" }}</td>
                 <td>{{ row.booking_no }}</td>
@@ -177,7 +192,7 @@
               </tr>
               {% empty %}
               <tr>
-                <td colspan="12" class="text-center text-muted py-4">No POD records found.</td>
+                <td colspan="13" class="text-center text-muted py-4">No POD records found.</td>
               </tr>
               {% endfor %}
             </tbody>

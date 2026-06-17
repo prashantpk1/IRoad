@@ -74,13 +74,13 @@
         Booking Detail &mdash;
         <span style="color: var(--primary-color)">{{ booking.booking_no }}</span>
       </h1>
-      <p class="page-subtitle">Read-only booking review.</p>
+      <!-- <p class="page-subtitle">Read-only booking review.</p> -->
     </div>
     <div class="page-header-right">
       <div class="eal-header-actions">
         <a href="{% url 'iroad_tenants:tenant_operation_booking_list' %}" class="eal-btn eal-btn-outline">
           <i class="bi bi-arrow-left"></i>
-          <span>Back to List</span>
+          <span>Back</span>
         </a>
         {% if booking.booking_status != 'Cancelled' and not booking_has_active_shipment %}
         <a href="{% url 'iroad_tenants:tenant_operation_booking_assign_truck' booking.booking_id %}" class="eal-btn eal-btn-outline">
@@ -109,8 +109,7 @@
         </div>
         <div class="form-card-header-text">
           <h2 class="form-card-title">Booking Information</h2>
-          <p class="form-card-desc">Booking identity, dates, status, and POD summary.</p>
-        </div>
+      </div>
       </div>
       <div class="form-card-body">
         <p class="small text-uppercase fw-semibold text-secondary mb-3" style="letter-spacing: 0.06em">
@@ -200,8 +199,7 @@
         </div>
         <div class="form-card-header-text">
           <h2 class="form-card-title">Service Details</h2>
-          <p class="form-card-desc">Client, pricing, route, and commercial details.</p>
-        </div>
+      </div>
       </div>
       <div class="form-card-body">
         <p class="small text-uppercase fw-semibold text-secondary mb-3" style="letter-spacing: 0.06em">
@@ -300,8 +298,7 @@
         </div>
         <div class="form-card-header-text">
           <h2 class="form-card-title">Truck &amp; Driver</h2>
-          <p class="form-card-desc">Primary truck and driver assignment for this booking.</p>
-        </div>
+      </div>
       </div>
       <div class="form-card-body">
         <div class="fields-grid cols-2">
@@ -316,6 +313,58 @@
             <p class="detail-view-value">
               {% if booking.assigned_driver %}{{ booking.assigned_driver }}{% else %}—{% endif %}
             </p>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- POD & COD -->
+    <div class="form-card" data-section="pod-cod">
+      <div class="form-card-header">
+        <div class="form-card-icon blue">
+          <i class="bi bi-file-check"></i>
+        </div>
+        <div class="form-card-header-text">
+          <h2 class="form-card-title">POD &amp; COD</h2>
+      </div>
+      </div>
+      <div class="form-card-body">
+        <div class="fields-grid cols-3">
+          <div class="field">
+            <label class="form-label">POD Type</label>
+            <p class="detail-view-value">{{ booking.pod_type|default:"—" }}</p>
+          </div>
+          <div class="field">
+            <label class="form-label">POD Status</label>
+            <p class="detail-view-value">
+              {% if booking_derived_pod_status == 'Compliant' %}
+              <span class="status-badge active">{{ booking_derived_pod_status }}</span>
+              {% elif booking_derived_pod_status == 'Not Compliant' %}
+              <span class="status-badge inactive">{{ booking_derived_pod_status }}</span>
+              {% elif booking_derived_pod_status %}
+              <span class="status-badge pending">{{ booking_derived_pod_status }}</span>
+              {% else %}
+              —
+              {% endif %}
+            </p>
+          </div>
+          <div class="field">
+            <label class="form-label">POD Doc Count</label>
+            <p class="detail-view-value">{{ booking_pod_cod.pod_doc_count|default:0 }}</p>
+          </div>
+        </div>
+        <div class="fields-grid cols-3" style="margin-top: 20px">
+          <div class="field">
+            <label class="form-label">COD Amount</label>
+            <p class="detail-view-value">{{ booking_pod_cod.cod_amount|floatformat:2 }}</p>
+          </div>
+          <div class="field">
+            <label class="form-label">COD Payment Status (auto Update)</label>
+            <p class="detail-view-value">{{ booking_pod_cod.cod_payment_status }}</p>
+          </div>
+          <div class="field">
+            <label class="form-label">Additional Charges</label>
+            <p class="detail-view-value">{{ booking_pod_cod.additional_charges|floatformat:2 }}</p>
           </div>
         </div>
       </div>
@@ -471,8 +520,7 @@
         </div>
         <div class="form-card-header-text">
           <h2 class="form-card-title">Booking Lines</h2>
-          <p class="form-card-desc">Outbound and backload lines with assignment and POD counts.</p>
-        </div>
+      </div>
       </div>
       <div class="form-card-body" style="padding: 0">
         <div class="eal-table-wrap">
@@ -542,8 +590,7 @@
         </div>
         <div class="form-card-header-text">
           <h2 class="form-card-title">Cargo</h2>
-          <p class="form-card-desc">Cargo item, weight, quantity, and totals.</p>
-        </div>
+      </div>
       </div>
       <div class="form-card-body" style="padding: 0">
         <div class="eal-table-wrap">

@@ -2,6 +2,10 @@
 
 {% block title %}Shipment List | iRoad Admin{% endblock %}
 
+{% block extra_css %}
+{% include 'iroad_tenants/partials/pl_route_chip_styles.html' %}
+{% endblock %}
+
 {% block content %}
 <!-- Page Header -->
       <div class="page-header">
@@ -20,10 +24,10 @@
         <div class="page-header-row">
           <div class="page-header-left">
             <h1 class="page-title">Shipment List</h1>
-            <p class="page-subtitle">
+            <!-- <p class="page-subtitle">
               View and manage shipments. Create manually with <strong>Add Shipment</strong>, or automatically when a driver
               action with <strong>Auto Shipment Post</strong> enabled is logged.
-            </p>
+            </p> -->
           </div>
           <div class="page-header-right">
             <div class="eal-header-actions">
@@ -231,7 +235,7 @@
                   data-sales-report-status="{{ shipment.sales_invoice_status|default:'' }}"
                   data-sales-order-item="{{ shipment.sales_order_item_ref|default:'' }}"
                   data-cod-amount="{{ shipment.cod_amount|floatformat:2 }}"
-                  data-cod-payment-status="{% if shipment.order_type == 'COD' or shipment.cod_amount %}{{ shipment.collection_status }}{% else %}Not Applicable{% endif %}"
+                  data-cod-payment-status="{% if shipment.order_type == 'COD' or shipment.cod_amount %}{{ shipment.cod_payment_status }}{% else %}Not Applicable{% endif %}"
                   data-booking-item="{{ shipment.booking_item_ref|default:'' }}"
                   data-booking-item-type="{{ shipment.booking_item_type|default:'' }}"
                   data-sourcing-mode="{{ shipment.sourcing_mode|default:'' }}"
@@ -264,39 +268,66 @@
                     <span>{% if shipment.booking %}{{ shipment.booking.booking_no }}{% else %}-{% endif %}</span>
                   </td>
                   <td>{{ shipment.order_type|default:"-" }}</td>
-                  <td>{{ shipment.route_display|default:"-" }}</td>
                   <td>
-                    <span class="status-badge {% if shipment.collection_status == 'Collected' %}in-transit{% else %}pending{% endif %}">{{ shipment.collection_status }}</span>
+                    {% include 'iroad_tenants/partials/pl_route_chip.html' with route_chip=shipment.route_chip route_fallback=shipment.route_display|default:"-" %}
+                  </td>
+                  <td>
+                    <span class="status-badge {% if shipment.cod_payment_status == 'Collected' %}in-transit{% elif shipment.cod_payment_status == 'Cancelled' %}inactive{% else %}pending{% endif %}">{{ shipment.cod_payment_status }}</span>
                   </td>
                   <td>
                     <div class="dropdown eal-actions-cell">
-                      <button class="eal-row-btn" type="button" data-bs-toggle="dropdown" aria-expanded="false" title="Actions">
+                      <button class="eal-row-btn" type="button" data-bs-toggle="dropdown" data-bs-boundary="viewport" aria-expanded="false" title="Actions">
                         <i class="bi bi-three-dots-vertical"></i>
                       </button>
-                      <ul class="dropdown-menu dropdown-menu-end shadow-sm" style="border-radius: 8px; border-color: #e2e8f0">
-                        <li><a class="dropdown-item" href="{% url 'iroad_tenants:tenant_operation_shipment_edit' shipment.shipment_id %}"><i class="bi bi-pencil text-primary me-2"></i> Edit</a></li>
-                        <li><a class="dropdown-item" href="{% url 'iroad_tenants:tenant_operation_shipment_detail' shipment.shipment_id %}"><i class="bi bi-eye text-info me-2"></i> View</a></li>
-                        <li><a class="dropdown-item" href="{% url 'iroad_tenants:tenant_shipment_print' shipment.shipment_id %}" target="_blank" rel="noopener"><i class="bi bi-printer text-success me-2"></i> Print</a></li>
-                        <li><a class="dropdown-item" href="{% url 'iroad_tenants:tenant_operation_shipment_update' shipment.shipment_id %}"><i class="bi bi-arrow-repeat text-secondary me-2"></i> Update</a></li>
+                      <ul class="dropdown-menu dropdown-menu-end shadow-sm" style="border-radius: 8px; border-color: #e2e8f0; min-width: 180px;">
+                        <li>
+                          <a class="dropdown-item" href="{% url 'iroad_tenants:tenant_operation_shipment_edit' shipment.shipment_id %}">
+                            <i class="bi bi-pencil text-primary me-2"></i>Edit
+                          </a>
+                        </li>
+                        <li>
+                          <a class="dropdown-item" href="{% url 'iroad_tenants:tenant_operation_shipment_detail' shipment.shipment_id %}">
+                            <i class="bi bi-eye text-info me-2"></i>View
+                          </a>
+                        </li>
+                        <li>
+                          <a class="dropdown-item" href="{% url 'iroad_tenants:tenant_operation_shipment_update' shipment.shipment_id %}">
+                            <i class="bi bi-arrow-repeat text-secondary me-2"></i>Update
+                          </a>
+                        </li>
                         {% if not shipment.ui_locks.lock_delivery_address %}
-                        <li><a class="dropdown-item" href="{% url 'iroad_tenants:tenant_operation_shipment_edit' shipment.shipment_id %}#shipment-address-section"><i class="bi bi-pin-map text-success me-2"></i> Update Address</a></li>
+                        <li>
+                          <a class="dropdown-item" href="{% url 'iroad_tenants:tenant_operation_shipment_edit' shipment.shipment_id %}#shipment-address-section">
+                            <i class="bi bi-pin-map text-success me-2"></i>Update Address
+                          </a>
+                        </li>
                         {% endif %}
                         {% if not shipment.ui_locks.lock_cargo %}
-                        <li><a class="dropdown-item" href="{% url 'iroad_tenants:tenant_operation_shipment_edit' shipment.shipment_id %}#shipment-cargo-section"><i class="bi bi-box-seam text-warning me-2"></i> Update Cargo</a></li>
+                        <li>
+                          <a class="dropdown-item" href="{% url 'iroad_tenants:tenant_operation_shipment_edit' shipment.shipment_id %}#shipment-cargo-section">
+                            <i class="bi bi-box text-warning me-2"></i>Update Cargo
+                          </a>
+                        </li>
                         {% endif %}
                         <li>
                           {% if shipment.booking_action_id %}
-                          <a class="dropdown-item" href="{% url 'iroad_tenants:tenant_operation_booking_assign_truck' shipment.booking_action_id %}"><i class="bi bi-truck text-info me-2"></i> Update Truck</a>
+                          <a class="dropdown-item" href="{% url 'iroad_tenants:tenant_operation_booking_assign_truck' shipment.booking_action_id %}">
+                            <i class="bi bi-truck text-info me-2"></i>Update Truck
+                          </a>
                           {% else %}
-                          <a class="dropdown-item" href="{% url 'iroad_tenants:tenant_operation_shipment_edit' shipment.shipment_id %}#shipment-booking-section"><i class="bi bi-truck text-info me-2"></i> Update Truck</a>
+                          <a class="dropdown-item" href="{% url 'iroad_tenants:tenant_operation_shipment_edit' shipment.shipment_id %}#shipment-booking-section">
+                            <i class="bi bi-truck text-info me-2"></i>Update Truck
+                          </a>
                           {% endif %}
                         </li>
                         {% if shipment.ui_locks.can_delete %}
                         <li><hr class="dropdown-divider" /></li>
                         <li>
-                          <form method="post" action="{% url 'iroad_tenants:tenant_operation_shipment_delete' shipment.shipment_id %}" onsubmit="return confirm('Delete shipment {{ shipment.shipment_no }}?');">
+                          <form method="post" action="{% url 'iroad_tenants:tenant_operation_shipment_delete' shipment.shipment_id %}" onsubmit="return confirm('Delete shipment {{ shipment.shipment_no|escapejs }}?');">
                             {% csrf_token %}
-                            <button type="submit" class="dropdown-item text-danger"><i class="bi bi-trash3 me-2"></i> Delete</button>
+                            <button type="submit" class="dropdown-item text-danger">
+                              <i class="bi bi-trash3 me-2"></i>Delete
+                            </button>
                           </form>
                         </li>
                         {% endif %}

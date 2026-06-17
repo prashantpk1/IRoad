@@ -21,6 +21,7 @@ from django.core.exceptions import ValidationError
 from django.core.validators import validate_email
 from django.core.paginator import Paginator
 from django.core.files.storage import default_storage
+from django.core.files import File
 from django.db import IntegrityError, ProgrammingError, connection
 from iroad_tenants.tenant_schema import restore_public_schema
 from django.db.models.deletion import ProtectedError
@@ -113,6 +114,7 @@ from tenant_workspace.models import (
     TenantCargoMasterAttachment,
     TenantLocationMaster,
     TenantRouteMaster,
+    TenantServiceItemCategory,
     TenantServiceItemMaster,
     TenantPriceList,
     TenantPriceListTripLine,
@@ -166,9 +168,11 @@ from iroad_tenants.subscription_limits import (
 )
 from iroad_tenants.tenant_dashboard_overview import build_tenant_dashboard_overview
 from iroad_tenants.tenant_permission_matrix import (
+    TENANT_PERMISSION_FLAGS,
     TENANT_PERMISSION_MATRIX,
     enrich_permission_matrix_rows,
     resolve_canonical_form_name,
+    resolve_canonical_permission_location,
 )
 from iroad_tenants.tenant_dashboard_search import (
     _empty_results,
@@ -182,6 +186,7 @@ from iroad_tenants.tenant_dashboard_search import (
 )
 from iroad_tenants.forms_tenant_address import TenantAddressMasterForm
 from iroad_tenants.forms_tenant_cargo import TenantCargoCategoryForm, TenantCargoMasterForm
+from iroad_tenants.forms_tenant_service import TenantServiceItemCategoryForm
 from iroad_tenants.forms_tenant_location import TenantLocationMasterForm
 from iroad_tenants.forms_tenant_route import TenantRouteMasterForm
 from iroad_tenants.forms_truck_type import TruckTypeMasterForm
@@ -250,6 +255,7 @@ from iroad_tenants.operation_field_catalog import (
     normalize_operation_pod_status,
     normalize_operation_pod_type,
     operation_field_options_context,
+    operation_pod_type_options,
     operation_pod_status_options,
     operation_sales_report_lookup_json,
     operation_sales_report_status_label,
@@ -507,11 +513,9 @@ SURCHARGE_SALES_REF_PREFIX = 'SST'
 SUPPORT_TICKET_MASTER_AUTO_FORM_CODE = 'support-ticket-master'
 SUPPORT_TICKET_MASTER_AUTO_FORM_LABEL = 'Support Ticket Master'
 SUPPORT_TICKET_REF_PREFIX = 'TKT'
-SERVICE_ITEM_CATEGORY_OPTIONS = (
-    'Service Category 1',
-    'Service Category 2',
-    'Service Category 3',
-)
+SERVICE_ITEM_CATEGORY_AUTO_FORM_CODE = 'service-item-category'
+SERVICE_ITEM_CATEGORY_AUTO_FORM_LABEL = 'Service Category'
+SERVICE_ITEM_CATEGORY_REF_PREFIX = 'SC'
 
 MAX_CARGO_ATTACHMENT_BYTES = 10 * 1024 * 1024
 
@@ -572,6 +576,85 @@ def _validate_support_attachment_upload(upload, *, allow_empty=True):
     if ext not in SUPPORT_ATTACHMENT_ALLOWED_EXT:
         return 'Attachment must be Image, PDF, or LOG file.'
     return ''
+
+
+SUPPORT_TICKET_PENDING_ATTACHMENT_SESSION_PREFIX = 'support_ticket_pending_attachment:'
+
+
+def _support_ticket_pending_attachment_key(scope_id):
+    return f'{SUPPORT_TICKET_PENDING_ATTACHMENT_SESSION_PREFIX}{scope_id}'
+
+
+def _pending_support_attachment_display(request, scope_id):
+    meta = request.session.get(_support_ticket_pending_attachment_key(scope_id))
+    if not meta:
+        return ''
+    return (meta.get('original_name') or '').strip()
+
+
+def _clear_support_ticket_pending_attachment(request, scope_id):
+    key = _support_ticket_pending_attachment_key(scope_id)
+    meta = request.session.pop(key, None)
+    if meta and meta.get('storage_path'):
+        try:
+            default_storage.delete(meta['storage_path'])
+        except OSError:
+            pass
+    request.session.modified = True
+
+
+def _stash_support_ticket_pending_attachment(request, scope_id, upload):
+    """Keep a valid upload across validation-error re-renders."""
+    _clear_support_ticket_pending_attachment(request, scope_id)
+    ext = os.path.splitext(getattr(upload, 'name', '') or '')[1].lower()
+    storage_name = (
+        f'support_pending/{scope_id}/{uuid.uuid4().hex}{ext}'
+    )
+    default_storage.save(storage_name, upload)
+    request.session[_support_ticket_pending_attachment_key(scope_id)] = {
+        'storage_path': storage_name,
+        'original_name': getattr(upload, 'name', '') or os.path.basename(storage_name),
+    }
+    request.session.modified = True
+
+
+def _resolve_support_ticket_attachment_upload(request, scope_id, upload=None):
+    """
+    Return the uploaded file for save, reusing a stashed attachment when the
+    browser cannot resubmit file inputs after a validation error.
+    """
+    if (request.POST.get('remove_pending_attachment') or '').strip() == '1':
+        _clear_support_ticket_pending_attachment(request, scope_id)
+        return None
+
+    if upload:
+        return upload
+
+    meta = request.session.get(_support_ticket_pending_attachment_key(scope_id))
+    if not meta:
+        return None
+
+    storage_path = (meta.get('storage_path') or '').strip()
+    original_name = (meta.get('original_name') or '').strip()
+    if not storage_path or not default_storage.exists(storage_path):
+        _clear_support_ticket_pending_attachment(request, scope_id)
+        return None
+
+    return File(default_storage.open(storage_path, 'rb'), name=original_name or os.path.basename(storage_path))
+
+
+def _remember_support_ticket_attachment_on_validation_error(
+    request,
+    scope_id,
+    upload,
+    form_errors,
+):
+    """Persist a valid attachment when other fields fail validation."""
+    if (request.POST.get('remove_pending_attachment') or '').strip() == '1':
+        _clear_support_ticket_pending_attachment(request, scope_id)
+        return
+    if upload and 'attachment' not in form_errors:
+        _stash_support_ticket_pending_attachment(request, scope_id, upload)
 
 
 def _tenant_support_ticket_default_ticket_date():
@@ -709,6 +792,10 @@ def _tenant_support_ticket_detail_page_context(request, ticket, *, form_data=Non
         'assigned_to_role': assignee_parts['role'],
         'form_data': form_data or {},
         'form_errors': form_errors or {},
+        'pending_attachment_name': _pending_support_attachment_display(
+            request,
+            str(ticket.ticket_id),
+        ),
     }
 
 
@@ -774,6 +861,7 @@ def _client_contract_settings_template_dict(settings_obj):
         'post_expiry_notification_days': settings_obj.post_expiry_notification_days,
         'notification_frequency': settings_obj.notification_frequency,
         'notification_audience': settings_obj.notification_audience,
+        'notification_audiences': settings_obj.get_notification_audience_list(),
     }
 
 
@@ -835,12 +923,19 @@ def _resolve_client_header_contact(contacts):
     return contacts[0]
 
 
+def _format_client_account_created_at(value):
+    """Display label for client account created_at (date + time)."""
+    if not value:
+        return ''
+    if isinstance(value, str):
+        return value
+    return timezone.localtime(value).strftime('%b %d, %Y, %I:%M %p')
+
+
 def _client_account_bootstrap_dict(account: TenantClientAccount, header_contact=None):
     """JSON-serializable client header/overview for client-details.js bootstrap."""
     created = getattr(account, 'created_at', None)
-    created_label = ''
-    if created:
-        created_label = timezone.localtime(created).strftime('%b %d, %Y, %I:%M %p')
+    created_label = _format_client_account_created_at(created)
     header_email, header_phone = _client_header_contact_fields(header_contact)
     return {
         'account_no': account.account_no,
@@ -1125,7 +1220,7 @@ def _tenant_context_from_session(request, *, _debug_label=''):
         'can_view_cargo_master': 'Cargo Master' in permission_forms,
         'can_view_booking': 'Booking' in permission_forms,
         'can_view_shipment': 'Shipment' in permission_forms,
-        'can_view_sales_invoicing': 'Sales Invoicing' in permission_forms,
+        'can_view_sales_invoicing': 'Sales Invoice Report' in permission_forms,
         'jwt_claims': jwt_claims,
     }
 
@@ -1179,6 +1274,10 @@ def _activate_tenant_workspace_schema(request, *, _debug_label=''):
 
 def _organization_base_currency(request):
     """Tenant workspace organization profile preferred/base currency (e.g. SAR)."""
+    cached = getattr(request, 'tenant_system_config', None)
+    if cached and cached.get('base_currency_code'):
+        return cached['base_currency_code']
+
     registry = _activate_tenant_workspace_schema(request)
     if registry is None:
         return ''
@@ -1580,6 +1679,12 @@ class TenantSupportTicketCreateView(View):
         tenant = context['tenant']
         form_errors, form_data, attachment = _tenant_support_ticket_validate_create(request)
         if form_errors:
+            _remember_support_ticket_attachment_on_validation_error(
+                request,
+                'new',
+                attachment,
+                form_errors,
+            )
             context.update({
                 'categories': SupportCategory.objects.filter(
                     is_active=True,
@@ -1588,8 +1693,11 @@ class TenantSupportTicketCreateView(View):
                 'default_ticket_date': _tenant_support_ticket_default_ticket_date(),
                 'form_data': form_data,
                 'form_errors': form_errors,
+                'pending_attachment_name': _pending_support_attachment_display(request, 'new'),
             })
             return render(request, self.template_name, context)
+
+        attachment = _resolve_support_ticket_attachment_upload(request, 'new', attachment)
 
         category = SupportCategory.objects.filter(
             category_id=form_data['category_id'],
@@ -1619,6 +1727,7 @@ class TenantSupportTicketCreateView(View):
         if attachment:
             first_reply.attachment = attachment
         first_reply.save()
+        _clear_support_ticket_pending_attachment(request, 'new')
 
         messages.success(
             request,
@@ -1795,7 +1904,14 @@ class TenantSupportTicketDetailView(View):
             return redirect('iroad_tenants:tenant_support_ticket_detail', ticket_id=ticket.ticket_id)
 
         form_errors, form_data, attachment = _tenant_support_ticket_validate_reply(request)
+        scope_id = str(ticket.ticket_id)
         if form_errors:
+            _remember_support_ticket_attachment_on_validation_error(
+                request,
+                scope_id,
+                attachment,
+                form_errors,
+            )
             ticket = SupportTicket.objects.select_related(
                 'category',
                 'assigned_to',
@@ -1813,6 +1929,8 @@ class TenantSupportTicketDetailView(View):
             )
             return render(request, self.template_name, context)
 
+        attachment = _resolve_support_ticket_attachment_upload(request, scope_id, attachment)
+
         actor_id = _current_tenant_actor_id(request) or str(context['tenant'].tenant_id)
         reply = TicketReply(
             ticket=ticket,
@@ -1824,6 +1942,7 @@ class TenantSupportTicketDetailView(View):
         if attachment:
             reply.attachment = attachment
         reply.save()
+        _clear_support_ticket_pending_attachment(request, scope_id)
         ticket.status = 'In_Progress'
         ticket.save(update_fields=['status'])
         messages.success(request, 'Reply submitted successfully.', extra_tags='tenant')
@@ -1863,51 +1982,39 @@ class TenantCargoMasterListView(View):
             return response
 
         qs = TenantCargoMaster.objects.select_related('client_account', 'cargo_category')
-        cid = request.GET.get('client', '').strip()
-        filter_client_value = ''
 
         status_raw = (request.GET.get('status') or '').strip().lower()
         if 'status' not in request.GET:
             qs = qs.filter(status=TenantCargoMaster.Status.ACTIVE)
-            filter_status = ''
-        elif not status_raw:
+        elif not status_raw or status_raw == 'active':
             qs = qs.filter(status=TenantCargoMaster.Status.ACTIVE)
-            filter_status = 'active'
-        elif status_raw == 'all':
-            filter_status = 'all'
         elif status_raw == 'inactive':
             qs = qs.filter(status=TenantCargoMaster.Status.INACTIVE)
-            filter_status = 'inactive'
-        elif status_raw == 'active':
+        elif status_raw != 'all':
             qs = qs.filter(status=TenantCargoMaster.Status.ACTIVE)
-            filter_status = 'active'
-        else:
-            qs = qs.filter(status=TenantCargoMaster.Status.ACTIVE)
-            filter_status = 'active'
 
-        if cid:
-            filter_client_value = cid
+        category_chip = (request.GET.get('category') or 'all').strip()
+        if category_chip and category_chip.lower() != 'all':
             try:
-                cid_uuid = uuid.UUID(cid)
-                qs = qs.filter(client_account_id=cid_uuid)
+                qs = qs.filter(cargo_category_id=uuid.UUID(category_chip))
             except ValueError:
-                qs = qs.filter(client_account__account_no__iexact=cid)
+                qs = qs.filter(cargo_category__name_english__iexact=category_chip)
+        else:
+            category_chip = 'all'
 
         cargo_column_filters = {
-            0: 'cargo_code',
-            1: 'client_account__display_name',
-            2: 'cargo_category__name_english',
-            3: 'display_name',
+            1: 'cargo_code',
+            2: 'client_account__display_name',
+            3: 'cargo_category__name_english',
             4: 'english_label',
             5: 'arabic_label',
             6: 'client_sku_external_ref',
             7: 'status',
         }
         cargo_sort_cols = {
-            0: 'cargo_code',
-            1: 'client_account__display_name',
-            2: 'cargo_category__name_english',
-            3: 'display_name',
+            1: 'cargo_code',
+            2: 'client_account__display_name',
+            3: 'cargo_category__name_english',
             4: 'english_label',
             5: 'arabic_label',
             6: 'client_sku_external_ref',
@@ -1943,19 +2050,32 @@ class TenantCargoMasterListView(View):
             )
         )
 
-        clients = list(
-            TenantClientAccount.objects.filter(
-                status=TenantClientAccount.Status.ACTIVE,
-            ).order_by('display_name')[:500]
+        cargo_categories = list(
+            TenantCargoCategory.objects.filter(
+                status=TenantCargoCategory.Status.ACTIVE,
+            ).order_by('name_english')[:50]
         )
+        cargo_list_base = reverse('iroad_tenants:tenant_cargo_master_list')
+        category_chip_links = [
+            (
+                cat,
+                cargo_list_base
+                + copy_eal_list_params(
+                    request,
+                    set_params={'category': str(cat.category_id)},
+                ),
+            )
+            for cat in cargo_categories
+        ]
 
         context.update(
             {
                 'cargos_page': page,
-                'filter_status': filter_status,
-                'filter_client_value': filter_client_value,
+                'cargo_list_chip': category_chip,
+                'cargo_chip_all_url': cargo_list_base
+                + copy_eal_list_params(request, remove=['category']),
+                'cargo_category_chip_links': category_chip_links,
                 'stats': stats,
-                'client_filter_choices': clients,
                 'tenant_schema_name': getattr(tenant_registry, 'schema_name', ''),
                 **list_ctx,
             }
@@ -2260,7 +2380,7 @@ def _tenant_cargo_master_activity_entries(cargo, attachments):
 
 
 class TenantCargoMasterDetailView(View):
-    template_name = 'iroad_tenants/Master_Data/cargo_master/Cargo-master.html'
+    template_name = 'iroad_tenants/Master_Data/cargo_master/Cargo-master-detail.html'
 
     def get(self, request, cargo_id):
         context = _tenant_context_from_session(request)
@@ -2277,6 +2397,7 @@ class TenantCargoMasterDetailView(View):
         try:
             cargo = (
                 TenantCargoMaster.objects.select_related('client_account', 'cargo_category')
+                .prefetch_related('attachments')
                 .filter(pk=cargo_id)
                 .first()
             )
@@ -2289,17 +2410,16 @@ class TenantCargoMasterDetailView(View):
                 'iroad_tenants:tenant_cargo_master_edit',
                 kwargs={'cargo_id': cargo.cargo_id},
             )
+            attachments = list(cargo.attachments.all())
 
             context.update(
                 {
-                    'form': TenantCargoMasterForm(instance=cargo),
-                    'cargo_instance': cargo,
-                    'existing_attachments': list(cargo.attachments.all()),
+                    'cargo': cargo,
+                    'attachments': attachments,
+                    'activity_log': _tenant_cargo_master_activity_entries(cargo, attachments),
                     'tenant_schema_name': getattr(tenant_registry, 'schema_name', ''),
                     'back_to_list_url': list_url,
                     'edit_cargo_url': edit_url,
-                    'is_edit': True,
-                    'is_view': True,
                 }
             )
             return render(request, self.template_name, context)
@@ -2360,11 +2480,19 @@ class TenantCargoCategoryListView(View):
             elif scope == 'inactive':
                 qs = qs.filter(status=TenantCargoCategory.Status.INACTIVE)
 
+            category_column_filters = {
+                1: 'category_code',
+                2: 'name_english',
+                3: 'name_arabic',
+                4: 'status',
+            }
             page, list_ctx = prepare_eal_list(
                 request,
                 qs,
                 search_fields=['name_english', 'name_arabic', 'category_code'],
-                default_order=('-created_at',),
+                column_field_map=category_column_filters,
+                sort_col_field_map=category_column_filters,
+                default_order=('category_code',),
             )
             stats = {
                 'total': TenantCargoCategory.objects.count(),
@@ -2375,11 +2503,18 @@ class TenantCargoCategoryListView(View):
                     status=TenantCargoCategory.Status.INACTIVE
                 ).count(),
             }
+            category_list_base = reverse('iroad_tenants:tenant_cargo_category_list')
             context.update(
                 {
                     'categories_page': page,
                     'category_scope': scope,
                     'category_stats': stats,
+                    'category_chip_all_url': category_list_base
+                    + copy_eal_list_params(request, set_params={'scope': 'all'}),
+                    'category_chip_active_url': category_list_base
+                    + copy_eal_list_params(request, set_params={'scope': 'active'}),
+                    'category_chip_inactive_url': category_list_base
+                    + copy_eal_list_params(request, set_params={'scope': 'inactive'}),
                     'tenant_schema_name': getattr(tenant_registry, 'schema_name', ''),
                     **list_ctx,
                 }
@@ -2520,7 +2655,7 @@ def _tenant_cargo_category_activity_entries(category):
 
 
 class TenantCargoCategoryDetailView(View):
-    template_name = 'iroad_tenants/Master_Data/cargo_master/Cargo-category-config.html'
+    template_name = 'iroad_tenants/Master_Data/cargo_master/Cargo-category-detail.html'
 
     def get(self, request, category_id):
         context = _tenant_context_from_session(request)
@@ -2548,13 +2683,11 @@ class TenantCargoCategoryDetailView(View):
 
             context.update(
                 {
-                    'form': TenantCargoCategoryForm(instance=category),
-                    'category_instance': category,
+                    'category': category,
+                    'activity_log': _tenant_cargo_category_activity_entries(category),
                     'tenant_schema_name': getattr(tenant_registry, 'schema_name', ''),
                     'back_to_list_url': list_url,
                     'edit_category_url': edit_url,
-                    'is_edit': True,
-                    'is_view': True,
                 }
             )
             return render(request, self.template_name, context)
@@ -2696,6 +2829,371 @@ class TenantCargoCategoryDeleteView(View):
 
             messages.success(request, f'Category {label} deleted.', extra_tags='tenant')
             return _redirect_cargo_category_list(request)
+        finally:
+            restore_public_schema(request)
+
+
+def _redirect_service_item_category_list(request):
+    return _tenant_redirect(request, 'iroad_tenants:tenant_service_item_category_list')
+
+
+def _tenant_service_management_access_guard(request, context):
+    if context is None:
+        response = redirect('login')
+        clear_tenant_portal_cookie(response, request=request)
+        return response
+    if not context.get('is_tenant_admin'):
+        messages.error(
+            request,
+            'You do not have permission to manage Services Management.',
+            extra_tags='tenant',
+        )
+        return _tenant_redirect(request, 'iroad_tenants:tenant_dashboard')
+    return None
+
+
+def _tenant_service_item_category_choices(*, selected_category_id=None):
+    qs = TenantServiceItemCategory.objects.all()
+    if selected_category_id:
+        qs = qs.filter(
+            Q(status=TenantServiceItemCategory.Status.ACTIVE)
+            | Q(category_id=selected_category_id)
+        )
+    else:
+        qs = qs.filter(status=TenantServiceItemCategory.Status.ACTIVE)
+    return list(qs.order_by('name_english'))
+
+
+def _tenant_resolve_service_item_category(raw_category_id, *, selected_category_id=None):
+    category_id = (raw_category_id or '').strip()
+    if not category_id:
+        return None, 'Category is required.'
+    try:
+        category_uuid = uuid.UUID(category_id)
+    except ValueError:
+        return None, 'Please select a valid category.'
+    qs = TenantServiceItemCategory.objects.filter(category_id=category_uuid)
+    if selected_category_id:
+        qs = qs.filter(
+            Q(status=TenantServiceItemCategory.Status.ACTIVE)
+            | Q(category_id=selected_category_id)
+        )
+    else:
+        qs = qs.filter(status=TenantServiceItemCategory.Status.ACTIVE)
+    category = qs.first()
+    if category is None:
+        return None, 'Please select an active service category.'
+    return category, None
+
+
+class TenantServiceItemCategoryListView(View):
+    template_name = 'iroad_tenants/Master_Data/service_item_master/Service-category-config-list.html'
+
+    def get(self, request):
+        context = _tenant_context_from_session(request)
+        denied = _tenant_service_management_access_guard(request, context)
+        if denied:
+            return denied
+
+        tenant_registry = _activate_tenant_workspace_schema(request)
+        if tenant_registry is None:
+            response = redirect('login')
+            clear_tenant_portal_cookie(response, request=request)
+            return response
+
+        try:
+            scope = (request.GET.get('scope') or 'all').lower()
+            if scope not in ('all', 'active', 'inactive'):
+                scope = 'all'
+
+            qs = TenantServiceItemCategory.objects.all().order_by('-created_at')
+            if scope == 'active':
+                qs = qs.filter(status=TenantServiceItemCategory.Status.ACTIVE)
+            elif scope == 'inactive':
+                qs = qs.filter(status=TenantServiceItemCategory.Status.INACTIVE)
+
+            category_column_filters = {
+                1: 'category_code',
+                2: 'name_english',
+                3: 'name_arabic',
+                4: 'status',
+            }
+            page, list_ctx = prepare_eal_list(
+                request,
+                qs,
+                search_fields=['name_english', 'name_arabic', 'category_code'],
+                column_field_map=category_column_filters,
+                sort_col_field_map=category_column_filters,
+                default_order=('category_code',),
+            )
+            stats = {
+                'total': TenantServiceItemCategory.objects.count(),
+                'active': TenantServiceItemCategory.objects.filter(
+                    status=TenantServiceItemCategory.Status.ACTIVE
+                ).count(),
+                'inactive': TenantServiceItemCategory.objects.filter(
+                    status=TenantServiceItemCategory.Status.INACTIVE
+                ).count(),
+            }
+            category_list_base = reverse('iroad_tenants:tenant_service_item_category_list')
+            context.update(
+                {
+                    'categories_page': page,
+                    'category_scope': scope,
+                    'category_stats': stats,
+                    'category_chip_all_url': category_list_base
+                    + copy_eal_list_params(request, set_params={'scope': 'all'}),
+                    'category_chip_active_url': category_list_base
+                    + copy_eal_list_params(request, set_params={'scope': 'active'}),
+                    'category_chip_inactive_url': category_list_base
+                    + copy_eal_list_params(request, set_params={'scope': 'inactive'}),
+                    'tenant_schema_name': getattr(tenant_registry, 'schema_name', ''),
+                    **list_ctx,
+                }
+            )
+            return render(request, self.template_name, context)
+        finally:
+            restore_public_schema(request)
+
+
+class TenantServiceItemCategoryCreateView(View):
+    template_name = 'iroad_tenants/Master_Data/service_item_master/Service-category-config.html'
+
+    def get(self, request):
+        context = _tenant_context_from_session(request)
+        denied = _tenant_service_management_access_guard(request, context)
+        if denied:
+            return denied
+
+        tenant_registry = _activate_tenant_workspace_schema(request)
+        if tenant_registry is None:
+            response = redirect('login')
+            clear_tenant_portal_cookie(response, request=request)
+            return response
+
+        try:
+            preview = _preview_next_service_item_category_code()
+            form = TenantServiceItemCategoryForm()
+            context.update(
+                {
+                    'form': form,
+                    'preview_category_code': preview,
+                    'is_edit': False,
+                    'tenant_schema_name': getattr(tenant_registry, 'schema_name', ''),
+                }
+            )
+            return render(request, self.template_name, context)
+        finally:
+            restore_public_schema(request)
+
+    def post(self, request):
+        context = _tenant_context_from_session(request)
+        denied = _tenant_service_management_access_guard(request, context)
+        if denied:
+            return denied
+
+        tenant_registry = _activate_tenant_workspace_schema(request)
+        if tenant_registry is None:
+            response = redirect('login')
+            clear_tenant_portal_cookie(response, request=request)
+            return response
+
+        redirect_resp = None
+        try:
+            form = TenantServiceItemCategoryForm(request.POST)
+            if not form.is_valid():
+                preview = _preview_next_service_item_category_code()
+                context.update(
+                    {
+                        'form': form,
+                        'preview_category_code': preview,
+                        'is_edit': False,
+                        'tenant_schema_name': getattr(tenant_registry, 'schema_name', ''),
+                    }
+                )
+                return render(request, self.template_name, context)
+
+            with db_transaction.atomic():
+                category_code, category_sequence = _next_auto_number_for_form(
+                    SERVICE_ITEM_CATEGORY_AUTO_FORM_CODE,
+                    SERVICE_ITEM_CATEGORY_AUTO_FORM_LABEL,
+                    SERVICE_ITEM_CATEGORY_REF_PREFIX,
+                )
+                category = form.save(commit=False)
+                category.category_code = category_code
+                category.category_sequence = category_sequence
+                category.full_clean()
+                category.save()
+
+            messages.success(
+                request,
+                f'Service category {category.category_code} created.',
+                extra_tags='tenant',
+            )
+            redirect_resp = _redirect_service_item_category_list(request)
+        finally:
+            restore_public_schema(request)
+
+        return redirect_resp
+
+
+class TenantServiceItemCategoryDetailView(View):
+    template_name = 'iroad_tenants/Master_Data/service_item_master/Service-category-detail.html'
+
+    def get(self, request, category_id):
+        context = _tenant_context_from_session(request)
+        denied = _tenant_service_management_access_guard(request, context)
+        if denied:
+            return denied
+
+        tenant_registry = _activate_tenant_workspace_schema(request)
+        if tenant_registry is None:
+            response = redirect('login')
+            clear_tenant_portal_cookie(response, request=request)
+            return response
+
+        try:
+            category = TenantServiceItemCategory.objects.filter(pk=category_id).first()
+            if not category:
+                messages.error(request, 'Category not found.', extra_tags='tenant')
+                return _redirect_service_item_category_list(request)
+
+            list_url = reverse('iroad_tenants:tenant_service_item_category_list')
+            edit_url = reverse(
+                'iroad_tenants:tenant_service_item_category_edit',
+                kwargs={'category_id': category.category_id},
+            )
+            context.update(
+                {
+                    'category': category,
+                    'tenant_schema_name': getattr(tenant_registry, 'schema_name', ''),
+                    'back_to_list_url': list_url,
+                    'edit_category_url': edit_url,
+                }
+            )
+            return render(request, self.template_name, context)
+        finally:
+            restore_public_schema(request)
+
+
+class TenantServiceItemCategoryEditView(View):
+    template_name = 'iroad_tenants/Master_Data/service_item_master/Service-category-config.html'
+
+    def _load(self, category_id):
+        return TenantServiceItemCategory.objects.filter(pk=category_id).first()
+
+    def get(self, request, category_id):
+        context = _tenant_context_from_session(request)
+        denied = _tenant_service_management_access_guard(request, context)
+        if denied:
+            return denied
+
+        tenant_registry = _activate_tenant_workspace_schema(request)
+        if tenant_registry is None:
+            response = redirect('login')
+            clear_tenant_portal_cookie(response, request=request)
+            return response
+
+        try:
+            category = self._load(category_id)
+            if not category:
+                messages.error(request, 'Category not found.', extra_tags='tenant')
+                return _redirect_service_item_category_list(request)
+
+            form = TenantServiceItemCategoryForm(instance=category)
+            context.update(
+                {
+                    'form': form,
+                    'preview_category_code': category.category_code,
+                    'is_edit': True,
+                    'edit_category_id': category.category_id,
+                    'tenant_schema_name': getattr(tenant_registry, 'schema_name', ''),
+                }
+            )
+            return render(request, self.template_name, context)
+        finally:
+            restore_public_schema(request)
+
+    def post(self, request, category_id):
+        context = _tenant_context_from_session(request)
+        denied = _tenant_service_management_access_guard(request, context)
+        if denied:
+            return denied
+
+        tenant_registry = _activate_tenant_workspace_schema(request)
+        if tenant_registry is None:
+            response = redirect('login')
+            clear_tenant_portal_cookie(response, request=request)
+            return response
+
+        redirect_resp = None
+        try:
+            category = self._load(category_id)
+            if not category:
+                messages.error(request, 'Category not found.', extra_tags='tenant')
+                return _redirect_service_item_category_list(request)
+
+            form = TenantServiceItemCategoryForm(request.POST, instance=category)
+            if not form.is_valid():
+                context.update(
+                    {
+                        'form': form,
+                        'preview_category_code': category.category_code,
+                        'is_edit': True,
+                        'edit_category_id': category.category_id,
+                        'tenant_schema_name': getattr(tenant_registry, 'schema_name', ''),
+                    }
+                )
+                return render(request, self.template_name, context)
+
+            updated = form.save()
+            TenantServiceItemMaster.objects.filter(service_category_id=updated.category_id).update(
+                category_name=updated.name_english,
+            )
+            messages.success(
+                request,
+                f'Service category {updated.category_code} updated.',
+                extra_tags='tenant',
+            )
+            redirect_resp = _redirect_service_item_category_list(request)
+        finally:
+            restore_public_schema(request)
+
+        return redirect_resp
+
+
+class TenantServiceItemCategoryDeleteView(View):
+    def post(self, request, category_id):
+        context = _tenant_context_from_session(request)
+        denied = _tenant_service_management_access_guard(request, context)
+        if denied:
+            return denied
+
+        tenant_registry = _activate_tenant_workspace_schema(request)
+        if tenant_registry is None:
+            response = redirect('login')
+            clear_tenant_portal_cookie(response, request=request)
+            return response
+
+        try:
+            category = TenantServiceItemCategory.objects.filter(pk=category_id).first()
+            if not category:
+                messages.error(request, 'Category not found.', extra_tags='tenant')
+                return _redirect_service_item_category_list(request)
+
+            label = category.category_code
+            try:
+                category.delete()
+            except ProtectedError:
+                messages.error(
+                    request,
+                    'Cannot delete this category while service items reference it.',
+                    extra_tags='tenant',
+                )
+                return _redirect_service_item_category_list(request)
+
+            messages.success(request, f'Category {label} deleted.', extra_tags='tenant')
+            return _redirect_service_item_category_list(request)
         finally:
             restore_public_schema(request)
 
@@ -4340,40 +4838,68 @@ class TenantServiceItemMasterListView(View):
             clear_tenant_portal_cookie(response, request=request)
             return response
         try:
+            qs = TenantServiceItemMaster.objects.select_related(
+                'route',
+                'route__origin_point',
+                'route__destination_point',
+            )
+            service_item_scope = (request.GET.get('scope') or 'all').strip().lower()
+            if service_item_scope not in ('all', 'service', 'trip', 'active', 'inactive'):
+                service_item_scope = 'all'
+            if service_item_scope == 'service':
+                qs = qs.filter(service_type=TenantServiceItemMaster.ServiceType.SERVICE)
+            elif service_item_scope == 'trip':
+                qs = qs.filter(service_type=TenantServiceItemMaster.ServiceType.TRIP)
+            elif service_item_scope == 'active':
+                qs = qs.filter(status=TenantServiceItemMaster.Status.ACTIVE)
+            elif service_item_scope == 'inactive':
+                qs = qs.filter(status=TenantServiceItemMaster.Status.INACTIVE)
+
             item_column_filters = {
                 1: 'service_code',
                 2: 'english_name',
                 3: 'arabic_name',
-                4: 'service_type',
-                5: 'status',
-            }
-            item_sort_cols = {
-                1: 'service_code',
-                2: 'english_name',
-                3: 'arabic_name',
-                4: 'service_type',
-                5: 'status',
+                4: 'category_name',
+                5: 'service_type',
+                6: 'status',
+                7: 'sell_price',
             }
             items_page, list_ctx = prepare_eal_list(
                 request,
-                TenantServiceItemMaster.objects.all(),
+                qs,
                 search_fields=[
                     'service_code',
                     'english_name',
                     'arabic_name',
                     'service_type',
                     'category_name',
+                    'route__route_label',
+                    'route__origin_point__display_label',
+                    'route__destination_point__display_label',
                 ],
                 column_field_map=item_column_filters,
-                sort_col_field_map=item_sort_cols,
-                default_order=('-created_at',),
+                sort_col_field_map=item_column_filters,
+                default_order=('service_code',),
+                column_filter_types={7: 'number'},
             )
             service_items = list(items_page.object_list)
             all_items_qs = TenantServiceItemMaster.objects.all()
+            service_item_list_base = reverse('iroad_tenants:tenant_service_item_master_list')
             context.update(
                 {
                     'service_items': service_items,
                     'service_items_page': items_page,
+                    'service_item_scope': service_item_scope,
+                    'service_item_chip_all_url': service_item_list_base
+                    + copy_eal_list_params(request, set_params={'scope': 'all'}),
+                    'service_item_chip_service_url': service_item_list_base
+                    + copy_eal_list_params(request, set_params={'scope': 'service'}),
+                    'service_item_chip_trip_url': service_item_list_base
+                    + copy_eal_list_params(request, set_params={'scope': 'trip'}),
+                    'service_item_chip_active_url': service_item_list_base
+                    + copy_eal_list_params(request, set_params={'scope': 'active'}),
+                    'service_item_chip_inactive_url': service_item_list_base
+                    + copy_eal_list_params(request, set_params={'scope': 'inactive'}),
                     'service_item_stats': {
                         'total': all_items_qs.count(),
                         'service_type': all_items_qs.filter(
@@ -4386,7 +4912,6 @@ class TenantServiceItemMasterListView(View):
                             status=TenantServiceItemMaster.Status.ACTIVE,
                         ).count(),
                     },
-                    'search_q': list_ctx['search_q'],
                     'tenant_schema_name': getattr(tenant_registry, 'schema_name', ''),
                     **list_ctx,
                 }
@@ -4428,7 +4953,7 @@ class TenantServiceItemMasterCreateView(View):
                 {
                     'preview_service_item_code': _preview_next_service_item_code(),
                     'route_options': active_routes,
-                    'service_item_category_options': SERVICE_ITEM_CATEGORY_OPTIONS,
+                    'service_item_categories': _tenant_service_item_category_choices(),
                     'form_action_url': reverse('iroad_tenants:tenant_service_item_master_create'),
                     'page_title': 'Create Service Item',
                     'submit_label': 'Save Service Item',
@@ -4464,13 +4989,19 @@ class TenantServiceItemMasterCreateView(View):
                 'status': (request.POST.get('status') or '').strip() or TenantServiceItemMaster.Status.ACTIVE,
                 'english_name': (request.POST.get('english_name') or '').strip(),
                 'arabic_name': (request.POST.get('arabic_name') or '').strip(),
-                'category_name': (request.POST.get('category_name') or '').strip(),
+                'service_category_id': (request.POST.get('service_category_id') or '').strip(),
                 'route_id': (request.POST.get('route_id') or '').strip(),
                 'sell_price': (request.POST.get('sell_price') or '').strip(),
                 'outbound_sell_price': (request.POST.get('outbound_sell_price') or '').strip(),
                 'inbound_sell_price': (request.POST.get('inbound_sell_price') or '').strip(),
             }
             field_errors = {}
+            category_obj, category_error = _tenant_resolve_service_item_category(
+                form_data['service_category_id'],
+            )
+            if category_error:
+                field_errors['service_category_id'] = category_error
+            form_data['category_name'] = category_obj.name_english if category_obj else ''
 
             if form_data['service_type'] not in {
                 TenantServiceItemMaster.ServiceType.SERVICE,
@@ -4484,13 +5015,6 @@ class TenantServiceItemMasterCreateView(View):
                 field_errors['status'] = 'Please select a valid status.'
             if not form_data['english_name']:
                 field_errors['english_name'] = 'English name is required.'
-            if not form_data['category_name']:
-                field_errors['category_name'] = 'Category is required.'
-            if (
-                form_data['category_name']
-                and form_data['category_name'] not in SERVICE_ITEM_CATEGORY_OPTIONS
-            ):
-                field_errors['category_name'] = 'Please select a valid category.'
 
             def _parse_decimal(raw_value, field_name, required=True):
                 value = (raw_value or '').strip()
@@ -4549,7 +5073,9 @@ class TenantServiceItemMasterCreateView(View):
                             .select_related('origin_point', 'destination_point')
                             .order_by('route_code')
                         ),
-                        'service_item_category_options': SERVICE_ITEM_CATEGORY_OPTIONS,
+                        'service_item_categories': _tenant_service_item_category_choices(
+                            selected_category_id=form_data.get('service_category_id') or None,
+                        ),
                         'form_action_url': reverse('iroad_tenants:tenant_service_item_master_create'),
                         'page_title': 'Create Service Item',
                         'submit_label': 'Save Service Item',
@@ -4574,7 +5100,8 @@ class TenantServiceItemMasterCreateView(View):
                 status=form_data['status'],
                 english_name=form_data['english_name'],
                 arabic_name=form_data['arabic_name'],
-                category_name=form_data['category_name'],
+                service_category=category_obj,
+                category_name=category_obj.name_english,
                 route=route_obj,
                 sell_price=sell_price_value or Decimal('0'),
                 outbound_sell_price=outbound_value,
@@ -4605,7 +5132,9 @@ class TenantServiceItemMasterCreateView(View):
                         .select_related('origin_point', 'destination_point')
                         .order_by('route_code')
                     ),
-                    'service_item_category_options': SERVICE_ITEM_CATEGORY_OPTIONS,
+                    'service_item_categories': _tenant_service_item_category_choices(
+                        selected_category_id=form_data.get('service_category_id') or None,
+                    ),
                     'form_action_url': reverse('iroad_tenants:tenant_service_item_master_create'),
                     'page_title': 'Create Service Item',
                     'submit_label': 'Save Service Item',
@@ -4658,6 +5187,7 @@ class TenantServiceItemMasterEditView(View):
                 'status': item.status,
                 'english_name': item.english_name,
                 'arabic_name': item.arabic_name,
+                'service_category_id': str(item.service_category_id or ''),
                 'category_name': item.category_name,
                 'route_id': str(item.route_id or ''),
                 'sell_price': str(item.sell_price),
@@ -4668,7 +5198,9 @@ class TenantServiceItemMasterEditView(View):
                 {
                     'preview_service_item_code': item.service_code,
                     'route_options': active_routes,
-                    'service_item_category_options': SERVICE_ITEM_CATEGORY_OPTIONS,
+                    'service_item_categories': _tenant_service_item_category_choices(
+                        selected_category_id=item.service_category_id,
+                    ),
                     'form_action_url': reverse('iroad_tenants:tenant_service_item_master_edit', kwargs={'service_item_id': item.service_item_id}),
                     'page_title': 'Edit Service Item',
                     'submit_label': 'Update Service Item',
@@ -4709,13 +5241,20 @@ class TenantServiceItemMasterEditView(View):
                 'status': (request.POST.get('status') or '').strip() or item.status,
                 'english_name': (request.POST.get('english_name') or '').strip(),
                 'arabic_name': (request.POST.get('arabic_name') or '').strip(),
-                'category_name': (request.POST.get('category_name') or '').strip(),
+                'service_category_id': (request.POST.get('service_category_id') or '').strip(),
                 'route_id': (request.POST.get('route_id') or '').strip(),
                 'sell_price': (request.POST.get('sell_price') or '').strip(),
                 'outbound_sell_price': (request.POST.get('outbound_sell_price') or '').strip(),
                 'inbound_sell_price': (request.POST.get('inbound_sell_price') or '').strip(),
             }
             field_errors = {}
+            category_obj, category_error = _tenant_resolve_service_item_category(
+                form_data['service_category_id'],
+                selected_category_id=item.service_category_id,
+            )
+            if category_error:
+                field_errors['service_category_id'] = category_error
+            form_data['category_name'] = category_obj.name_english if category_obj else ''
 
             if form_data['status'] not in {
                 TenantServiceItemMaster.Status.ACTIVE,
@@ -4724,10 +5263,6 @@ class TenantServiceItemMasterEditView(View):
                 field_errors['status'] = 'Please select a valid status.'
             if not form_data['english_name']:
                 field_errors['english_name'] = 'English name is required.'
-            if not form_data['category_name']:
-                field_errors['category_name'] = 'Category is required.'
-            if form_data['category_name'] and form_data['category_name'] not in SERVICE_ITEM_CATEGORY_OPTIONS:
-                field_errors['category_name'] = 'Please select a valid category.'
 
             def _parse_decimal(raw_value, field_name, required=True):
                 value = (raw_value or '').strip()
@@ -4777,7 +5312,9 @@ class TenantServiceItemMasterEditView(View):
                             .select_related('origin_point', 'destination_point')
                             .order_by('route_code')
                         ),
-                        'service_item_category_options': SERVICE_ITEM_CATEGORY_OPTIONS,
+                        'service_item_categories': _tenant_service_item_category_choices(
+                            selected_category_id=item.service_category_id,
+                        ),
                         'form_action_url': reverse('iroad_tenants:tenant_service_item_master_edit', kwargs={'service_item_id': item.service_item_id}),
                         'page_title': 'Edit Service Item',
                         'submit_label': 'Update Service Item',
@@ -4793,7 +5330,8 @@ class TenantServiceItemMasterEditView(View):
             item.status = form_data['status']
             item.english_name = form_data['english_name']
             item.arabic_name = form_data['arabic_name']
-            item.category_name = form_data['category_name']
+            item.service_category = category_obj
+            item.category_name = category_obj.name_english if category_obj else ''
             item.route = route_obj
             item.sell_price = sell_price_value or Decimal('0')
             item.outbound_sell_price = outbound_value
@@ -4821,7 +5359,13 @@ class TenantServiceItemMasterEditView(View):
                         .select_related('origin_point', 'destination_point')
                         .order_by('route_code')
                     ),
-                    'service_item_category_options': SERVICE_ITEM_CATEGORY_OPTIONS,
+                    'service_item_categories': _tenant_service_item_category_choices(
+                        selected_category_id=(
+                            form_data.get('service_category_id')
+                            if 'form_data' in locals()
+                            else None
+                        ),
+                    ),
                     'form_action_url': reverse('iroad_tenants:tenant_service_item_master_edit', kwargs={'service_item_id': service_item_id}),
                     'page_title': 'Edit Service Item',
                     'submit_label': 'Update Service Item',
@@ -4895,7 +5439,9 @@ class TenantServiceItemMasterDetailView(View):
                         .select_related('origin_point', 'destination_point')
                         .order_by('route_code')
                     ),
-                    'service_item_category_options': SERVICE_ITEM_CATEGORY_OPTIONS,
+                    'service_item_categories': _tenant_service_item_category_choices(
+                        selected_category_id=item.service_category_id,
+                    ),
                     'form_action_url': '#',
                     'page_title': 'View Service Item',
                     'submit_label': '',
@@ -4906,6 +5452,7 @@ class TenantServiceItemMasterDetailView(View):
                         'status': item.status,
                         'english_name': item.english_name,
                         'arabic_name': item.arabic_name,
+                        'service_category_id': str(item.service_category_id or ''),
                         'category_name': item.category_name,
                         'route_id': str(item.route_id or ''),
                         'sell_price': str(item.sell_price),
@@ -5077,11 +5624,20 @@ class TenantPriceListMasterListView(View):
                 .prefetch_related('trip_lines', 'service_lines')
                 .order_by('-created_at')
             )
+            price_list_list_base = reverse('iroad_tenants:tenant_price_list_master_list')
             context.update(
                 {
                     'price_lists_page': page,
                     'filter_status': filter_status,
                     'filter_client_id': filter_client_id,
+                    'price_list_chip_all_url': price_list_list_base
+                    + copy_eal_list_params(request, set_params={'status': 'all'}),
+                    'price_list_chip_draft_url': price_list_list_base
+                    + copy_eal_list_params(request, set_params={'status': 'draft'}),
+                    'price_list_chip_active_url': price_list_list_base
+                    + copy_eal_list_params(request, set_params={'status': 'active'}),
+                    'price_list_chip_inactive_url': price_list_list_base
+                    + copy_eal_list_params(request, set_params={'status': 'inactive'}),
                     'client_filter_choices': list(
                         TenantClientAccount.objects.filter(
                             status=TenantClientAccount.Status.ACTIVE,
@@ -6031,6 +6587,147 @@ class TenantPriceListMasterEditView(View):
             restore_public_schema(request)
 
 
+class TenantPriceListMasterDuplicateView(View):
+    """Clone a price list header and all line overrides as a new Draft record."""
+
+    def post(self, request, price_list_ref):
+        context = _tenant_context_from_session(request)
+        if context is None:
+            response = redirect('login')
+            clear_tenant_portal_cookie(response, request=request)
+            return response
+        if not context.get('is_tenant_admin'):
+            messages.error(request, 'You do not have permission to manage Services Management.', extra_tags='tenant')
+            return _tenant_redirect(request, 'iroad_tenants:tenant_dashboard')
+        tenant_registry = _activate_tenant_workspace_schema(request)
+        if tenant_registry is None:
+            response = redirect('login')
+            clear_tenant_portal_cookie(response, request=request)
+            return response
+        try:
+            source = _resolve_price_list_by_ref(price_list_ref)
+            if source is None:
+                messages.error(request, 'Price list not found.', extra_tags='tenant')
+                return _tenant_redirect(request, 'iroad_tenants:tenant_price_list_master_list')
+
+            with db_transaction.atomic():
+                price_list_code, price_list_sequence = _next_auto_number_for_form(
+                    PRICE_LIST_MASTER_AUTO_FORM_CODE,
+                    PRICE_LIST_MASTER_AUTO_FORM_LABEL,
+                    PRICE_LIST_MASTER_REF_PREFIX,
+                )
+                copy_name = f'{source.price_list_name.strip()} (Copy)'[:200]
+                duplicate = TenantPriceList(
+                    price_list_code=price_list_code,
+                    price_list_sequence=price_list_sequence,
+                    price_list_name=copy_name,
+                    client_account=source.client_account,
+                    status=TenantPriceList.Status.DRAFT,
+                    effective_from=source.effective_from,
+                    effective_to=source.effective_to,
+                    base_currency=source.base_currency,
+                    notes=source.notes,
+                )
+                duplicate.full_clean()
+                duplicate.save()
+
+                for line in source.trip_lines.all():
+                    trip_line = TenantPriceListTripLine(
+                        price_list=duplicate,
+                        trip_service=line.trip_service,
+                        trip_type=line.trip_type,
+                        sell_price_override=line.sell_price_override,
+                        buy_price_override=line.buy_price_override,
+                        notes=line.notes,
+                    )
+                    trip_line.full_clean()
+                    trip_line.save()
+
+                for line in source.service_lines.all():
+                    service_line = TenantPriceListServiceLine(
+                        price_list=duplicate,
+                        service_item=line.service_item,
+                        sell_price_override=line.sell_price_override,
+                        buy_price_override=line.buy_price_override,
+                        notes=line.notes,
+                    )
+                    service_line.full_clean()
+                    service_line.save()
+
+            messages.success(
+                request,
+                f'{duplicate.price_list_code} duplicated from {source.price_list_code}.',
+                extra_tags='tenant',
+            )
+            return _tenant_redirect(
+                request,
+                'iroad_tenants:tenant_price_list_master_edit',
+                price_list_ref=duplicate.price_list_code,
+            )
+        except ValidationError as exc:
+            detail = '; '.join(exc.messages) if exc.messages else str(exc)
+            messages.error(request, detail or 'Unable to duplicate price list.', extra_tags='tenant')
+            return _tenant_redirect(request, 'iroad_tenants:tenant_price_list_master_list')
+        except IntegrityError:
+            messages.error(
+                request,
+                'Unable to duplicate due to duplicate/constraint rules.',
+                extra_tags='tenant',
+            )
+            return _tenant_redirect(request, 'iroad_tenants:tenant_price_list_master_list')
+        finally:
+            restore_public_schema(request)
+
+
+class TenantPriceListMasterToggleStatusView(View):
+    """Deactivate Active/Draft lists or reactivate an Inactive list."""
+
+    def post(self, request, price_list_ref):
+        context = _tenant_context_from_session(request)
+        if context is None:
+            response = redirect('login')
+            clear_tenant_portal_cookie(response, request=request)
+            return response
+        if not context.get('is_tenant_admin'):
+            messages.error(request, 'You do not have permission to manage Services Management.', extra_tags='tenant')
+            return _tenant_redirect(request, 'iroad_tenants:tenant_dashboard')
+        tenant_registry = _activate_tenant_workspace_schema(request)
+        if tenant_registry is None:
+            response = redirect('login')
+            clear_tenant_portal_cookie(response, request=request)
+            return response
+        try:
+            price_list = _resolve_price_list_by_ref(price_list_ref)
+            if price_list is None:
+                messages.error(request, 'Price list not found.', extra_tags='tenant')
+                return _tenant_redirect(request, 'iroad_tenants:tenant_price_list_master_list')
+
+            if price_list.status == TenantPriceList.Status.INACTIVE:
+                price_list.status = TenantPriceList.Status.ACTIVE
+            else:
+                price_list.status = TenantPriceList.Status.INACTIVE
+
+            try:
+                price_list.full_clean()
+                price_list.save(update_fields=['status', 'updated_at'])
+            except (ValidationError, IntegrityError):
+                messages.error(
+                    request,
+                    'Unable to change status (for example: only one Active price list is allowed per client).',
+                    extra_tags='tenant',
+                )
+                return _tenant_redirect(request, 'iroad_tenants:tenant_price_list_master_list')
+
+            messages.success(
+                request,
+                f'{price_list.price_list_code} status changed to {price_list.status}.',
+                extra_tags='tenant',
+            )
+            return _tenant_redirect(request, 'iroad_tenants:tenant_price_list_master_list')
+        finally:
+            restore_public_schema(request)
+
+
 class TenantPriceListMasterDeleteView(View):
     """Soft delete by setting price list inactive."""
 
@@ -6107,12 +6804,7 @@ class TenantSalesInvoiceReportListView(View):
                 qs = qs.filter(report_date__lte=date_to)
 
             qs = qs.order_by('-report_date', '-created_at')
-            paginator = Paginator(qs, 10)
-            try:
-                page_no = max(1, int(request.GET.get('page') or 1))
-            except ValueError:
-                page_no = 1
-            page = paginator.get_page(page_no)
+            page, list_ctx = paginate_tenant_list(request, qs)
             # Evaluate page rows (and select_related client) before render; context
             # processors reset the connection to public during template rendering.
             list(page.object_list)
@@ -6158,6 +6850,7 @@ class TenantSalesInvoiceReportListView(View):
                         'total_surcharge': total_surcharge,
                     },
                     'tenant_schema_name': getattr(tenant_registry, 'schema_name', ''),
+                    **list_ctx,
                 }
             )
             return render(request, self.template_name, context)
@@ -6460,11 +7153,7 @@ class TenantShipmentPrintView(View):
                 {
                     'shipment': shipment,
                     'booking': booking,
-                    'cod_payment_status': (
-                        shipment.collection_status
-                        if shipment.cod_amount and shipment.cod_amount > 0
-                        else 'Not Applicable'
-                    ),
+                    'cod_payment_status': _tenant_shipment_cod_payment_status(shipment),
                     'additional_charges': shipment.total_additional_charges,
                 },
             )
@@ -7620,6 +8309,20 @@ def _tenant_shipment_activity_entries(shipment):
     return entries
 
 
+def _tenant_shipment_documents_list_queryset():
+    """
+    Shipment Documents portal scope: source documents (REC / DN) only.
+
+    POD child records (POD-*) are listed under Shipment POD, not here.
+    """
+    pod_prefix = f'{SHIPMENT_POD_REF_PREFIX}-'
+    return TenantShipmentDocument.objects.exclude(
+        record_no__startswith=pod_prefix,
+    ).exclude(
+        document_type__iexact='pod',
+    )
+
+
 class TenantOperationShipmentDocumentsListView(View):
     template_name = 'iroad_tenants/Operation_management/Shipment_Document/Shipment-documents-list.html'
 
@@ -7635,11 +8338,11 @@ class TenantOperationShipmentDocumentsListView(View):
             clear_tenant_portal_cookie(response, request=request)
             return response
         try:
-            qs = TenantShipmentDocument.objects.select_related(
+            qs = _tenant_shipment_documents_list_queryset().select_related(
                 'booking',
                 'shipment',
             ).order_by('-created_at')
-            stats_qs = TenantShipmentDocument.objects.all()
+            stats_qs = _tenant_shipment_documents_list_queryset()
             paginator = Paginator(qs, 10)
             shipment_documents_page = paginator.get_page(request.GET.get('page') or 1)
             context.update(
@@ -7742,12 +8445,15 @@ class TenantOperationShipmentDocumentsCreateView(View):
                     f'(check lines: {", ".join(str(n) for n in incomplete)}).'
                 )
         if header_status == TenantShipmentDocument.Status.REJECTED and not (form_data.get('notes') or '').strip():
-            form_errors['status'] = 'Add notes explaining the rejection before setting status to Rejected.'
+            form_errors['notes'] = 'Add notes explaining the rejection before setting status to Rejected.'
 
         booking, shipment = _tenant_shipment_document_resolve_linkage(form_data, form_errors)
+        _tenant_shipment_document_enrich_form_data(form_data)
         return form_errors, line_errors, line_rows, record_date, document_date, booking, shipment
 
     def _form_context(self, tenant_registry, form_data=None, form_errors=None, document=None, line_rows=None):
+        if form_data is not None:
+            form_data = _tenant_shipment_document_enrich_form_data(form_data)
         booking_options, shipments, booking_item_options = _tenant_shipment_document_linkage_options()
         if line_rows is None:
             line_rows = []
@@ -7825,91 +8531,12 @@ class TenantOperationShipmentDocumentsCreateView(View):
         }
 
     def _line_rows_from_request(self, request, form_data):
-        line_extra_refs = request.POST.getlist('line_extra_ref[]')
-        line_page_nos = request.POST.getlist('line_page_no[]')
-        line_statuses = request.POST.getlist('line_status[]')
-        line_locations = request.POST.getlist('line_physical_location[]')
-        line_attachments = request.FILES.getlist('line_attachment[]')
-        line_existing_attachment_labels = request.POST.getlist('line_existing_attachment_label[]')
-        max_lines = max(
-            len(request.POST.getlist('line_doc_ref_no[]')),
-            len(line_extra_refs),
-            len(line_page_nos),
-            len(line_statuses),
-            len(line_locations),
-            len(line_attachments),
-            len(line_existing_attachment_labels),
-            1,
+        return _tenant_shipment_document_parse_line_rows_from_request(
+            request,
+            form_data,
+            line_completion_statuses=self.line_completion_statuses,
+            line_signer_locations=self.line_signer_locations,
         )
-        is_delivery_note = bool(form_data.get('is_delivery_note'))
-        rows = []
-        errors = []
-        for idx in range(max_lines):
-            extra_ref = line_extra_refs[idx].strip() if idx < len(line_extra_refs) else ''
-            page_no = line_page_nos[idx].strip() if idx < len(line_page_nos) else ''
-            line_status = line_statuses[idx].strip() if idx < len(line_statuses) else ''
-            line_location = normalize_operation_physical_location(
-                line_locations[idx] if idx < len(line_locations) else '',
-            )
-            existing_attachment_label = (
-                line_existing_attachment_labels[idx].strip()
-                if idx < len(line_existing_attachment_labels)
-                else ''
-            )
-            attachment = request.FILES.get(f'line_attachment_{idx}')
-            if attachment is None and idx < len(line_attachments):
-                attachment = line_attachments[idx]
-            existing_storage_path = existing_attachment_label if (
-                existing_attachment_label and '/' in existing_attachment_label
-            ) else ''
-            attachment_label = ''
-            attachment_file = attachment
-            attachment_storage_path = existing_storage_path
-            if attachment is not None:
-                attachment_label = os.path.basename(getattr(attachment, 'name', '') or '')
-            elif existing_storage_path:
-                attachment_label = os.path.basename(existing_storage_path)
-            elif existing_attachment_label:
-                attachment_label = existing_attachment_label
-            if not any([extra_ref, page_no, line_status, line_location, attachment_label, attachment_storage_path]) and idx > 0:
-                continue
-            if not page_no:
-                page_no = str(len(rows) + 1)
-            if is_delivery_note:
-                line_status = line_status or 'Not Completed'
-            else:
-                line_status = ''
-            row = {
-                'doc_ref_no': form_data.get('document_ref_no', ''),
-                'extra_ref': extra_ref,
-                'page_no': page_no,
-                'status': line_status,
-                'physical_location': line_location,
-                'attachment_label': attachment_label,
-                'attachment_file': attachment_file,
-                'attachment_storage_path': attachment_storage_path,
-            }
-            row_no = len(rows) + 1
-            if not page_no.isdigit() or int(page_no) < 1:
-                errors.append(f'Line {row_no}: Page No must be a positive number.')
-            if is_delivery_note and line_status not in self.line_completion_statuses:
-                errors.append(f'Line {row_no}: Status must be Completed or Not Completed.')
-            if line_location not in self.line_signer_locations:
-                errors.append(f'Line {row_no}: Physical location is required.')
-            if not attachment_file and not attachment_storage_path:
-                errors.append(f'Line {row_no}: Attachment is required.')
-            rows.append(row)
-        if not rows:
-            rows.append({
-                'doc_ref_no': form_data.get('document_ref_no', ''),
-                'extra_ref': '',
-                'page_no': '1',
-                'status': 'Not Completed' if is_delivery_note else '',
-                'physical_location': '',
-                'attachment_label': '',
-            })
-            errors.append('At least one document page line is required.')
-        return rows, errors
 
     def _form_data_from_document(self, document):
         shipment = document.shipment
@@ -8000,7 +8627,16 @@ class TenantOperationShipmentDocumentsCreateView(View):
                 if not TenantShipmentDocument.objects.filter(record_no=record_no).exists():
                     break
             if TenantShipmentDocument.objects.filter(record_no=record_no).exists():
-                context.update(self._form_context(tenant_registry, form_data=form_data))
+                context.update(self._form_context(
+                    tenant_registry,
+                    form_data=form_data,
+                    form_errors={
+                        'non_field_errors': (
+                            'Unable to allocate a unique shipment document number. '
+                            'Please check Auto Number Configuration.'
+                        ),
+                    },
+                ))
                 messages.error(
                     request,
                     'Unable to allocate a unique shipment document number. Please check Auto Number Configuration.',
@@ -8170,7 +8806,10 @@ class TenantOperationShipmentPodCreateView(View):
         booking = document.booking
         if booking is None and linked_shipment and linked_shipment.booking_id:
             booking = linked_shipment.booking
-        pod_type = _normalize_shipment_pod_type(getattr(linked_shipment, 'pod_type', '')).lower()
+        pod_type = _normalize_shipment_pod_type(
+            getattr(linked_shipment, 'pod_type', ''),
+            default=TenantShipment.PodType.DIGITAL,
+        )
         receiver_user_id = ''
         if document.receiver_user_id:
             receiver_user_id = str(document.receiver_user_id)
@@ -8201,6 +8840,9 @@ class TenantOperationShipmentPodCreateView(View):
         elif form_data and form_data.get('shipment_id'):
             include_shipment_id = form_data['shipment_id']
         shipment_options = _tenant_shipment_pod_linkage_options(include_shipment_id=include_shipment_id)
+        booking_options, booking_item_options = _tenant_shipment_pod_booking_linkage_from_shipments(
+            shipment_options
+        )
         delivery_note_options = _tenant_shipment_pod_delivery_note_options()
         user_options = list(
             TenantUser.objects.filter(status=TenantUser.Status.ACTIVE)
@@ -8251,6 +8893,9 @@ class TenantOperationShipmentPodCreateView(View):
             'pod_form_data': pod_form_data,
             'form_errors': form_errors or {},
             'shipment_options': shipment_options,
+            'booking_options': booking_options,
+            'booking_item_options': booking_item_options,
+            'operation_pod_type_options': operation_pod_type_options(),
             'delivery_note_options': delivery_note_options,
             'delivery_note_pages_json': json.dumps(_tenant_shipment_pod_delivery_note_pages_map()),
             'pod_line_page_options': _tenant_shipment_pod_line_page_options(source_document),
@@ -8326,6 +8971,8 @@ class TenantOperationShipmentPodCreateView(View):
                 'source_document_id': (request.POST.get('source_document_id') or '').strip(),
                 'page_count': (request.POST.get('page_count') or '').strip(),
                 'booking_id': (request.POST.get('booking_id') or '').strip(),
+                'booking_no': (request.POST.get('booking_no') or '').strip(),
+                'booking_item': (request.POST.get('booking_item') or '').strip(),
                 'shipment_id': (request.POST.get('shipment_id') or '').strip(),
                 'pod_type': (request.POST.get('pod_type') or '').strip(),
                 'physical_location': (request.POST.get('document_location') or '').strip(),
@@ -8351,7 +8998,11 @@ class TenantOperationShipmentPodCreateView(View):
             if page_count < 1:
                 form_errors['page_count'] = 'Page Count must be at least 1.'
                 page_count = 1
-            if form_data['pod_type'] not in self.POD_TYPE_TO_SHIPMENT_VALUE:
+            form_data['pod_type'] = normalize_operation_pod_type(
+                form_data.get('pod_type'),
+                default='',
+            )
+            if form_data['pod_type'] not in operation_pod_type_options():
                 form_errors['pod_type'] = 'Select a valid POD type.'
 
             booking, shipment = _tenant_shipment_document_resolve_linkage(form_data, form_errors)
@@ -8471,6 +9122,16 @@ class TenantOperationShipmentPodCreateView(View):
                 return render(request, self.template_name, context)
 
             created_by_label = (context.get('display_name') or '').strip()
+            if receiver_user is not None:
+                created_by_label = (
+                    receiver_user.username or receiver_user.full_name or created_by_label
+                ).strip()
+            else:
+                session_user = _tenant_operation_action_log_resolve_user(created_by_label)
+                if session_user is not None:
+                    created_by_label = (
+                        session_user.username or session_user.full_name or created_by_label
+                    ).strip()
 
             if existing_document is None:
                 record_no = ''
@@ -8532,8 +9193,8 @@ class TenantOperationShipmentPodCreateView(View):
                 )
                 document.save()
 
-            if not is_posted:
-                shipment.pod_type = self.POD_TYPE_TO_SHIPMENT_VALUE[form_data['pod_type']]
+            if not is_posted and form_data['pod_type']:
+                shipment.pod_type = form_data['pod_type']
                 shipment.save(update_fields=['pod_type', 'updated_at'])
 
             TenantShipmentPodPage.objects.filter(document=document).delete()
@@ -8694,87 +9355,22 @@ class TenantOperationDocumentHandoverCreateView(View):
         if form_data and form_data.get('shipment_id'):
             include_shipment_id = form_data['shipment_id']
         shipment_options = _tenant_shipment_pod_linkage_options(include_shipment_id=include_shipment_id)
-        booking_options = []
-        seen_booking_ids = set()
-        for row in shipment_options:
-            booking_id = row.get('booking_id') or ''
-            if not booking_id or booking_id in seen_booking_ids:
-                continue
-            seen_booking_ids.add(booking_id)
-            booking_options.append(
-                {
-                    'booking_id': booking_id,
-                    'booking_no': row.get('booking_no') or '',
-                    'booking_item': row.get('booking_item') or '',
-                }
-            )
-        booking_item_options = []
-        seen_booking_items = set()
-        for row in shipment_options:
-            booking_item = (row.get('booking_item') or '').strip()
-            if not booking_item or booking_item in seen_booking_items:
-                continue
-            seen_booking_items.add(booking_item)
-            booking_item_options.append(
-                {
-                    'booking_item': booking_item,
-                    'booking_id': row.get('booking_id') or '',
-                    'booking_no': row.get('booking_no') or '',
-                }
-            )
-        delivery_note_options = _tenant_shipment_pod_delivery_note_options()
-        pod_record_options = list(
-            TenantShipmentDocument.objects.select_related('shipment', 'booking')
-            .exclude(is_delivery_note=True)
-            .order_by('-created_at')[:500]
-        )
-        default_receiver_user_id = _tenant_session_tenant_user_id(request)
-        received_user_options = []
-        for user in TenantUser.objects.filter(status=TenantUser.Status.ACTIVE).order_by('full_name', 'username'):
-            label = (user.full_name or user.username or '').strip()
-            if user.username and user.username not in label:
-                label = f'{label} ({user.username})' if label else user.username
-            if label:
-                received_user_options.append(
-                    {
-                        'user_id': str(user.pk),
-                        'label': label,
-                    }
-                )
-        default_form = {
-            'handover_date': timezone.localdate().isoformat(),
-            'status': TenantDocumentHandover.Status.DRAFT,
-            'receiver_user_id': default_receiver_user_id,
-        }
-        handover_form_data = form_data or default_form
-        if not handover_form_data.get('receiver_user_id') and default_receiver_user_id:
-            handover_form_data['receiver_user_id'] = default_receiver_user_id
         source_document = None
+        handover_form_data = form_data or {}
         document_id = (handover_form_data.get('document_id') or '').strip()
         if document_id:
             source_document = (
                 TenantShipmentDocument.objects.filter(pk=document_id, is_delivery_note=True).first()
             )
-        return {
-            'preview_handover_no': _preview_next_auto_number_for_form(
-                form_code=DOCUMENT_HANDOVER_AUTO_FORM_CODE,
-                form_label=DOCUMENT_HANDOVER_AUTO_FORM_LABEL,
-                prefix=DOCUMENT_HANDOVER_REF_PREFIX,
-            ),
-            'handover_form_data': handover_form_data,
-            'handover_form_errors': form_errors or {},
-            'handover_line_rows': line_rows or [],
-            'handover_line_page_options': _tenant_shipment_pod_line_page_options(source_document),
-            'booking_options': booking_options,
-            'booking_item_options': booking_item_options,
-            'shipment_options': shipment_options,
-            'delivery_note_options': delivery_note_options,
-            'delivery_note_pages_json': json.dumps(_tenant_shipment_pod_delivery_note_pages_map()),
-            'pod_record_options': pod_record_options,
-            'received_user_options': received_user_options,
-            'default_receiver_user_id': default_receiver_user_id,
-            'tenant_schema_name': tenant_registry.schema_name,
-        }
+        return _tenant_document_handover_form_context_payload(
+            request=request,
+            tenant_registry=tenant_registry,
+            shipment_options=shipment_options,
+            form_data=form_data,
+            form_errors=form_errors,
+            line_rows=line_rows,
+            source_document=source_document,
+        )
 
     @staticmethod
     def _parse_handover_lines(raw_value):
@@ -9906,7 +10502,7 @@ class TenantOperationActionsListView(View):
                     | Q(sequence_category__icontains=search_q)
                     | Q(status__icontains=search_q)
                 )
-            paginator = Paginator(action_qs, 25)
+            paginator = Paginator(action_qs, 10)
             page_obj = paginator.get_page(request.GET.get('page') or 1)
             context.update(
                 {
@@ -10667,7 +11263,7 @@ def _tenant_operation_action_log_lookup_context(
             }
             for driver in DriverMaster.active_objects.order_by('driver_code')[:500]
         ],
-        'action_options': action_options_payload(action_dropdown_options),
+        'action_options': action_options_payload(list(action_dropdown_options)),
         'action_allowed_context_label': action_dropdown_context_label(
             booking=booking,
             shipment=shipment,
@@ -10896,6 +11492,7 @@ def _tenant_operation_action_log_form_context(action_log, *, form_data=None):
     context = {
         'action_log_form': form_data,
         'action_log_form_errors': {},
+        'action_log_error_summary': [],
         'action_log_is_edit': True,
         'action_log_page_title': f'Edit Action Log {form_data["log_no"]}',
         'action_log_submit_label': 'Update Action Log',
@@ -10985,6 +11582,40 @@ def _tenant_operation_action_log_recent_duplicate(
     return qs.first()
 
 
+def _tenant_operation_action_log_error_field_labels():
+    return {
+        'log_date': 'Log Date (Date-Time)',
+        'operation_action_id': 'Action',
+        'created_by_id': 'User',
+        'booking_id': 'Booking',
+        'booking_item': 'Existing shipment line',
+        'booking_item_type': 'Booking line (Auto Shipment Post)',
+        'shipment_id': 'Shipment',
+        'movement_id': 'Movement',
+        'truck_id': 'Truck',
+        'driver_id': 'Driver',
+    }
+
+
+def _tenant_operation_action_log_error_summary(form_errors):
+    labels = _tenant_operation_action_log_error_field_labels()
+    return [
+        {
+            'field_key': key,
+            'field_label': labels.get(key, key.replace('_', ' ').title()),
+            'message': str(message),
+        }
+        for key, message in (form_errors or {}).items()
+        if message
+    ]
+
+
+def _tenant_operation_action_log_attach_errors(context, form_errors):
+    context['action_log_form_errors'] = form_errors or {}
+    context['action_log_error_summary'] = _tenant_operation_action_log_error_summary(form_errors)
+    return context
+
+
 def _tenant_operation_action_log_create_form_context(
     *,
     display_name='',
@@ -11009,6 +11640,7 @@ def _tenant_operation_action_log_create_form_context(
     context = {
         'action_log_form': form_data,
         'action_log_form_errors': form_errors or {},
+        'action_log_error_summary': _tenant_operation_action_log_error_summary(form_errors),
         'action_log_is_edit': False,
         'action_log_page_title': 'Action Log',
         'action_log_submit_label': 'Save Action Log',
@@ -11771,7 +12403,7 @@ class TenantOperationActionLogEditView(View):
             )
             if form_errors:
                 context.update(_tenant_operation_action_log_form_context(action_log, form_data=form_data))
-                context['action_log_form_errors'] = form_errors
+                _tenant_operation_action_log_attach_errors(context, form_errors)
                 messages.error(request, 'Please fix the highlighted action log fields.', extra_tags='tenant')
                 return render(request, self.template_name, context)
 
@@ -11780,7 +12412,7 @@ class TenantOperationActionLogEditView(View):
             if operation_action is None:
                 form_errors['operation_action_id'] = 'Invalid operation action selected.'
                 context.update(_tenant_operation_action_log_form_context(action_log, form_data=form_data))
-                context['action_log_form_errors'] = form_errors
+                _tenant_operation_action_log_attach_errors(context, form_errors)
                 messages.error(request, 'Please fix the highlighted action log fields.', extra_tags='tenant')
                 return render(request, self.template_name, context)
 
@@ -11799,7 +12431,7 @@ class TenantOperationActionLogEditView(View):
             if policy_error:
                 form_errors['operation_action_id'] = policy_error
                 context.update(_tenant_operation_action_log_form_context(action_log, form_data=form_data))
-                context['action_log_form_errors'] = form_errors
+                _tenant_operation_action_log_attach_errors(context, form_errors)
                 messages.error(request, policy_error, extra_tags='tenant')
                 return render(request, self.template_name, context)
 
@@ -12129,11 +12761,7 @@ class TenantShipmentPrintView(View):
                 {
                     'shipment': shipment,
                     'booking': booking,
-                    'cod_payment_status': (
-                        shipment.collection_status
-                        if shipment.cod_amount and shipment.cod_amount > 0
-                        else 'Not Applicable'
-                    ),
+                    'cod_payment_status': _tenant_shipment_cod_payment_status(shipment),
                     'additional_charges': shipment.total_additional_charges,
                 },
             )
@@ -12223,6 +12851,16 @@ def _tenant_booking_field_errors_from_messages(errors):
     if not errors:
         return {}
 
+    multi_field_patterns = (
+        (
+            'another booking line is still in progress',
+            ('booking_line_truck_1', 'booking_line_driver_1'),
+        ),
+        (
+            'another booking is already in progress',
+            ('booking_line_truck_1', 'booking_line_driver_1'),
+        ),
+    )
     patterns = (
         ('backload truck', 'booking_line_truck_2'),
         ('backload driver', 'booking_line_driver_2'),
@@ -12237,17 +12875,17 @@ def _tenant_booking_field_errors_from_messages(errors):
         ('cargo weight', 'cargo_weight_1'),
         ('cargo unit', 'cargo_unit_1'),
         ('cargo item', 'cargo_id_1'),
-        ('execution date', 'execution_date'),
-        ('scheduled bookings must', 'booking_date'),
-        ('booking date', 'booking_date'),
+        ('execution date cannot be before', 'execution_date'),
+        ('execution date is required', 'execution_date'),
+        ('scheduled bookings must have a booking date after today', 'booking_date'),
         ('order type', 'order_type'),
         ('trip type', 'trip_type'),
         ('price list', 'sales_order_no'),
         ('client account', 'client_account'),
         ('selected service', 'service_lookup'),
-        ('service', 'service_lookup'),
         ('route must match', 'route_lookup'),
-        ('route', 'route_lookup'),
+        ('please select a valid route', 'route_lookup'),
+        ('route is required', 'route_lookup'),
         ('sell price', 'sell_price'),
         ('truck is required on booking line 2', 'booking_line_truck_2'),
         ('driver is required on booking line 2', 'booking_line_driver_2'),
@@ -12255,12 +12893,23 @@ def _tenant_booking_field_errors_from_messages(errors):
         ('driver is required on booking line 1', 'booking_line_driver_1'),
         ('truck is required', 'booking_line_truck_1'),
         ('driver is required', 'booking_line_driver_1'),
+        ('selected truck does not match', 'booking_line_truck_1'),
+        ('selected backload truck', 'booking_line_truck_2'),
         ('sourcing', 'sourcing_mode'),
     )
 
     field_errors = {}
     for msg in errors:
         lower = msg.lower()
+        matched = False
+        for pattern, field_keys in multi_field_patterns:
+            if pattern in lower:
+                for field_key in field_keys:
+                    field_errors.setdefault(field_key, msg)
+                matched = True
+                break
+        if matched:
+            continue
         for pattern, field_key in patterns:
             if pattern in lower:
                 field_errors.setdefault(field_key, msg)
@@ -12287,6 +12936,7 @@ def _tenant_booking_render_validation_error_response(
         )
     )
     if validation_errors:
+        context['booking_validation_errors'] = list(validation_errors)
         context['booking_form_errors'] = _tenant_booking_field_errors_from_messages(
             validation_errors,
         )
@@ -12479,11 +13129,15 @@ def _tenant_booking_form_options_context(tenant_registry, booking=None, form_dat
             'booking_line_truck_1': str(booking.assigned_truck_id or ''),
             'booking_line_driver_1': str(booking.assigned_driver_id or ''),
             'booking_line_cod_amount_1': str(booking.booking_line_cod_amount),
-            'booking_line_pod_doc_count_1': str(booking.booking_line_pod_doc_count),
+            'booking_line_pod_doc_count_1': str(
+                _tenant_booking_line_pod_doc_count(booking, 'Outbound')
+            ),
             'booking_line_truck_2': str(booking.booking_line_backload_truck_id or ''),
             'booking_line_driver_2': str(booking.booking_line_backload_driver_id or ''),
             'booking_line_cod_amount_2': str(booking.booking_line_backload_cod_amount),
-            'booking_line_pod_doc_count_2': str(booking.booking_line_backload_pod_doc_count),
+            'booking_line_pod_doc_count_2': str(
+                _tenant_booking_line_pod_doc_count(booking, 'Backload')
+            ),
             'loading_booking_item_1': _tenant_booking_normalize_booking_item(
                 booking.trip_type,
                 booking.loading_booking_item,
@@ -12620,26 +13274,152 @@ def _tenant_booking_derived_pod_status(booking):
     """Doc §3.3: readonly POD status derived from linked shipment POD states."""
     if booking is None:
         return TenantShipment.PodStatus.PENDING
-    stored = (booking.pod_status or '').strip()
-    if stored:
-        return stored
+    from iroad_tenants.operation_runtime.side_effects import (
+        derive_pod_status_from_shipment_rows,
+    )
+
     shipment_statuses = list(
         TenantShipment.objects.filter(booking_id=booking.booking_id)
         .exclude(shipment_status=TenantShipment.ShipmentStatus.CANCELLED)
         .values_list('pod_status', flat=True)
     )
-    if not shipment_statuses:
-        return TenantShipment.PodStatus.PENDING
-    statuses = [(status or '').strip() for status in shipment_statuses if (status or '').strip()]
-    if not statuses:
-        return TenantShipment.PodStatus.PENDING
-    if TenantShipment.PodStatus.NOT_COMPLIANT in statuses:
-        return TenantShipment.PodStatus.NOT_COMPLIANT
-    if all(status == TenantShipment.PodStatus.COMPLIANT for status in statuses):
-        return TenantShipment.PodStatus.COMPLIANT
-    if TenantShipment.PodStatus.HARD_COPY_RECEIVED in statuses:
-        return TenantShipment.PodStatus.HARD_COPY_RECEIVED
-    return TenantShipment.PodStatus.PENDING
+    if shipment_statuses:
+        return derive_pod_status_from_shipment_rows(shipment_statuses)
+    stored = (booking.pod_status or '').strip()
+    return stored or TenantShipment.PodStatus.PENDING
+
+
+def _tenant_booking_shipment_for_line(booking, line_type):
+    """Latest non-cancelled shipment for a booking line type."""
+    if booking is None:
+        return None
+    normalized = (line_type or 'Outbound').strip()
+    shipment = (
+        TenantShipment.objects.filter(
+            booking_id=booking.booking_id,
+            booking_item_type=normalized,
+        )
+        .exclude(shipment_status=TenantShipment.ShipmentStatus.CANCELLED)
+        .order_by('-created_at')
+        .first()
+    )
+    if shipment is None and normalized == 'Outbound':
+        shipment = (
+            TenantShipment.objects.filter(
+                booking_id=booking.booking_id,
+                booking_item_type='Inbound',
+            )
+            .exclude(shipment_status=TenantShipment.ShipmentStatus.CANCELLED)
+            .order_by('-created_at')
+            .first()
+        )
+    return shipment
+
+
+def _tenant_booking_line_pod_doc_count(booking, line_type, *, shipment=None):
+    """Resolved POD doc count for a booking line (linked shipment wins)."""
+    is_backload = (line_type or '').strip() == 'Backload'
+    stored = (
+        int(booking.booking_line_backload_pod_doc_count or 0)
+        if is_backload
+        else int(booking.booking_line_pod_doc_count or 0)
+    )
+    if shipment is None:
+        shipment = _tenant_booking_shipment_for_line(booking, line_type)
+    if shipment is not None:
+        return int(shipment.pod_doc_count or 0)
+    return stored
+
+
+def _tenant_booking_sync_pod_doc_counts_to_shipments(booking):
+    """Push booking line POD doc counts to linked shipments after portal save."""
+    if booking is None:
+        return
+    for line_type, count in (
+        ('Outbound', int(booking.booking_line_pod_doc_count or 0)),
+        ('Backload', int(booking.booking_line_backload_pod_doc_count or 0)),
+    ):
+        shipment = _tenant_booking_shipment_for_line(booking, line_type)
+        if shipment is None:
+            continue
+        if int(shipment.pod_doc_count or 0) == count:
+            continue
+        shipment.pod_doc_count = count
+        shipment.save(update_fields=['pod_doc_count', 'updated_at'])
+
+
+def _tenant_booking_sync_pod_doc_count_from_shipment(shipment):
+    """Mirror shipment POD doc count onto the matching booking line column."""
+    if shipment is None or not shipment.booking_id:
+        return
+    booking = shipment.booking
+    if booking is None:
+        booking = TenantBooking.objects.filter(pk=shipment.booking_id).first()
+    if booking is None:
+        return
+    line_key = _tenant_booking_shipment_line_key(booking, shipment.booking_item_type)
+    count = int(shipment.pod_doc_count or 0)
+    update_fields = []
+    if line_key == 'Backload':
+        if int(booking.booking_line_backload_pod_doc_count or 0) != count:
+            booking.booking_line_backload_pod_doc_count = count
+            update_fields.append('booking_line_backload_pod_doc_count')
+    elif int(booking.booking_line_pod_doc_count or 0) != count:
+        booking.booking_line_pod_doc_count = count
+        update_fields.append('booking_line_pod_doc_count')
+    if update_fields:
+        update_fields.append('updated_at')
+        booking.save(update_fields=update_fields)
+
+
+def _tenant_shipment_cod_payment_status(shipment):
+    """Portal/mobile display label for COD payment state."""
+    if shipment is None:
+        return 'Not Applicable'
+    cod_amount = shipment.cod_amount or 0
+    if cod_amount <= 0:
+        return 'Not Applicable'
+    if shipment.shipment_status == TenantShipment.ShipmentStatus.CANCELLED:
+        return TenantShipment.CollectionStatus.CANCELLED
+    return shipment.collection_status or TenantShipment.CollectionStatus.PENDING
+
+
+def _tenant_booking_pod_cod_summary(booking):
+    """POD & COD summary for booking detail (aligned with shipment detail card)."""
+    if booking is None:
+        return {
+            'pod_doc_count': 0,
+            'cod_amount': 0,
+            'cod_payment_status': 'Not Applicable',
+            'additional_charges': 0,
+        }
+    outbound_shipment = _tenant_booking_shipment_for_line(booking, 'Outbound')
+    cod_amount = booking.booking_line_cod_amount or 0
+    if booking.trip_type == 'Round':
+        cod_amount = (booking.booking_line_cod_amount or 0) + (
+            booking.booking_line_backload_cod_amount or 0
+        )
+    collection_status = (
+        _tenant_shipment_cod_payment_status(outbound_shipment)
+        if outbound_shipment
+        else ''
+    )
+    return {
+        'pod_doc_count': _tenant_booking_line_pod_doc_count(
+            booking,
+            'Outbound',
+            shipment=outbound_shipment,
+        ),
+        'cod_amount': cod_amount,
+        'cod_payment_status': (
+            collection_status
+            if cod_amount and cod_amount > 0
+            else 'Not Applicable'
+        ),
+        'additional_charges': (
+            outbound_shipment.total_additional_charges if outbound_shipment else 0
+        ),
+    }
 
 
 def _tenant_booking_derived_header_status(booking):
@@ -12663,6 +13443,27 @@ def _tenant_booking_derived_header_status(booking):
     if all(state == 'Executed' for state in non_cancelled):
         return 'Executed'
     return 'Active'
+
+
+def _tenant_booking_eligible_for_shipment_option(
+    booking,
+    *,
+    booking_item_type=None,
+    preserve_booking_id=None,
+):
+    """Exclude cancelled bookings/lines from new shipment dropdowns (doc §3.5)."""
+    if booking is None:
+        return False
+    if preserve_booking_id is not None and booking.booking_id == preserve_booking_id:
+        return True
+    if booking.booking_status == TenantBooking.Status.CANCELLED:
+        return False
+    if _tenant_booking_derived_header_status(booking) == 'Cancelled':
+        return False
+    line_type = (booking_item_type or '').strip()
+    if line_type and _tenant_booking_line_operational_status(booking, line_type) == 'Cancelled':
+        return False
+    return True
 
 
 def _tenant_booking_has_active_shipment(booking, *, booking_item_type=None):
@@ -12736,13 +13537,36 @@ def _tenant_booking_route_endpoint_label(location):
     return (getattr(location, 'location_code', '') or '').strip()
 
 
-def _tenant_booking_route_chip(booking):
-    """Route pill labels for booking list (origin ↔ destination display names)."""
-    title = (booking.route_display or '').strip()
+def _tenant_route_chip_arrow_variant(
+    *,
+    trip_type: str = '',
+    route_direction: str = 'forward',
+    booking_item_type: str = '',
+) -> str:
+    """Directional standard: outbound=green, inbound/backload=red, round=dual."""
+    line_type = (booking_item_type or '').strip().lower()
+    if line_type in {'backload', 'inbound'}:
+        return 'inbound'
+    if (trip_type or '').strip() == 'Round' and not line_type:
+        return 'round'
+    if (route_direction or '').strip().lower() == 'reverse':
+        return 'inbound'
+    return 'outbound'
+
+
+def _tenant_route_chip_from_context(
+    *,
+    route_display: str = '',
+    route=None,
+    route_direction: str = 'forward',
+    trip_type: str = '',
+    booking_item_type: str = '',
+):
+    """Route pill: origin fixed left, directional arrow, destination right."""
+    title = (route_display or '').strip()
     origin_label = ''
     dest_label = ''
-    route = getattr(booking, 'route', None)
-    direction = (getattr(booking, 'route_direction', '') or 'forward').strip().lower()
+    direction = (route_direction or 'forward').strip().lower()
     is_reverse = direction == 'reverse'
     if route is not None:
         route_title = (getattr(route, 'route_label', '') or '').strip()
@@ -12765,18 +13589,73 @@ def _tenant_booking_route_chip(booking):
                 origin_label = parts[0].strip()
             if not dest_label:
                 dest_label = parts[1].strip()
-            if is_reverse:
-                origin_label, dest_label = dest_label, origin_label
+    line_type = (booking_item_type or '').strip().lower()
+    if line_type in {'backload', 'inbound'} and origin_label and dest_label:
+        # Backload leg uses opposite endpoints while origin stays on the left.
+        route_title = (route_display or title or '').strip()
+        parts = re.split(r'\s+(?:to|—|–|-)\s+', route_title, maxsplit=1, flags=re.IGNORECASE)
+        if len(parts) == 2:
+            origin_label, dest_label = parts[0].strip(), parts[1].strip()
+    elif is_reverse and origin_label and dest_label:
+        origin_label, dest_label = dest_label, origin_label
     if not origin_label and not dest_label:
         return None
     if not title:
         title = f'{origin_label} — {dest_label}'
+    arrow_variant = _tenant_route_chip_arrow_variant(
+        trip_type=trip_type,
+        route_direction=route_direction,
+        booking_item_type=booking_item_type,
+    )
     return {
         'origin': origin_label or '—',
         'destination': dest_label or '—',
         'title': title,
         'route_label': title,
+        'arrow_variant': arrow_variant,
     }
+
+
+def _tenant_booking_route_chip(booking):
+    """Route pill labels for booking list (origin ↔ destination display names)."""
+    return _tenant_route_chip_from_context(
+        route_display=getattr(booking, 'route_display', '') or '',
+        route=getattr(booking, 'route', None),
+        route_direction=getattr(booking, 'route_direction', '') or 'forward',
+        trip_type=getattr(booking, 'trip_type', '') or '',
+    )
+
+
+def _tenant_shipment_route_chip(shipment, booking=None):
+    """Directional route chip for shipment detail/list."""
+    if shipment is None:
+        return None
+    booking_row = booking
+    if booking_row is None and getattr(shipment, 'booking_id', None):
+        booking_row = (
+            TenantBooking.objects.select_related(
+                'route',
+                'route__origin_point',
+                'route__destination_point',
+            )
+            .filter(pk=shipment.booking_id)
+            .first()
+        )
+    route = getattr(booking_row, 'route', None) if booking_row is not None else None
+    return _tenant_route_chip_from_context(
+        route_display=(getattr(shipment, 'route_display', None) or '').strip()
+        or (getattr(booking_row, 'route_display', None) or '').strip(),
+        route=route,
+        route_direction=(
+            getattr(booking_row, 'route_direction', '') or 'forward'
+            if booking_row is not None
+            else 'forward'
+        ),
+        trip_type=(
+            getattr(booking_row, 'trip_type', '') or getattr(shipment, 'trip_type', '') or ''
+        ),
+        booking_item_type=getattr(shipment, 'booking_item_type', '') or '',
+    )
 
 
 def _tenant_booking_build_list_rows(bookings, *, start_index, can_delete=False):
@@ -13235,6 +14114,16 @@ def _tenant_shipment_pod_birth_from_action_log(action_log, *, created_by_label='
         form_label=SHIPMENT_POD_AUTO_FORM_LABEL,
         prefix=SHIPMENT_POD_REF_PREFIX,
     )
+    pod_user = getattr(action_log, 'created_by', None)
+    pod_user_label = (created_by_label or '')[:200]
+    if pod_user is not None:
+        pod_user_label = (pod_user.username or pod_user.full_name or pod_user_label)[:200]
+    else:
+        resolved_user = _tenant_operation_action_log_resolve_user(created_by_label)
+        if resolved_user is not None:
+            pod_user_label = (
+                resolved_user.username or resolved_user.full_name or pod_user_label
+            )[:200]
     document = TenantShipmentDocument(
         record_no=record_no,
         record_sequence=record_sequence,
@@ -13246,7 +14135,8 @@ def _tenant_shipment_pod_birth_from_action_log(action_log, *, created_by_label='
         page_count=source_document.page_count or 1,
         status=TenantShipmentDocument.Status.DRAFT,
         source_document=source_document,
-        created_by_label=(created_by_label or '')[:200],
+        receiver_user=pod_user,
+        created_by_label=pod_user_label,
     )
     _tenant_shipment_document_apply_foreign_keys(
         document,
@@ -14201,8 +15091,8 @@ def _tenant_booking_validate_submission(request, *, booking_id=None, has_table=N
             exclude_booking_id=booking_id,
         ):
             errors.append(
-                'Another booking line is still in progress (operational status Planned or In Execution) '
-                'for the same booking date, truck, and driver.'
+                'Another booking is already in progress for the selected truck and driver '
+                'on this date (operational status Planned or In Execution).'
             )
 
     posted_sell_price = _decimal_from_request(request, 'sell_price')
@@ -14761,6 +15651,7 @@ class TenantOperationBookingEditView(View):
             if request.FILES.get('booking_attachment'):
                 booking.booking_attachment = request.FILES['booking_attachment']
             booking.save()
+            _tenant_booking_sync_pod_doc_counts_to_shipments(booking)
             status_label = _tenant_booking_display_status(booking.booking_status)
             messages.success(
                 request,
@@ -14839,8 +15730,11 @@ class TenantOperationBookingListView(View):
             restore_public_schema(request)
 
 
+BOOKING_ACTIVITY_LOG_LIMIT = 10
+
+
 def _tenant_booking_activity_entries(booking):
-    """Timeline entries for booking detail sidebar."""
+    """Timeline entries for booking detail sidebar (latest N only)."""
     entries = []
     seen = set()
 
@@ -14902,7 +15796,7 @@ def _tenant_booking_activity_entries(booking):
         add_entry('Booking Created', created_at, booking.created_by_label, '#dc3545')
 
     entries.sort(key=lambda item: item['timestamp'], reverse=True)
-    return entries
+    return entries[:BOOKING_ACTIVITY_LOG_LIMIT]
 
 
 class TenantOperationBookingDetailView(View):
@@ -14968,14 +15862,7 @@ class TenantOperationBookingDetailView(View):
                     is_backload = line_type == 'Backload'
                     line_truck = booking.booking_line_backload_truck if is_backload else booking.assigned_truck
                     line_driver = booking.booking_line_backload_driver if is_backload else booking.assigned_driver
-                    line_shipment = (
-                        TenantShipment.objects.filter(
-                            booking_id=booking.booking_id,
-                            booking_item_type=line_type,
-                        )
-                        .order_by('-created_at')
-                        .first()
-                    )
+                    line_shipment = _tenant_booking_shipment_for_line(booking, line_type)
                     booking_lines.append(
                         {
                             'sn': idx,
@@ -14990,19 +15877,21 @@ class TenantOperationBookingDetailView(View):
                                 if is_backload
                                 else booking.booking_line_cod_amount
                             ),
-                            'pod_doc_count': (
-                                booking.booking_line_backload_pod_doc_count
-                                if is_backload
-                                else booking.booking_line_pod_doc_count
+                            'pod_doc_count': _tenant_booking_line_pod_doc_count(
+                                booking,
+                                line_type,
+                                shipment=line_shipment,
                             ),
                             'shipment': line_shipment,
                         }
                     )
 
+            booking_pod_cod = _tenant_booking_pod_cod_summary(booking)
             context.update(
                 {
                     'booking': booking,
                     'booking_lines': booking_lines,
+                    'booking_pod_cod': booking_pod_cod,
                     'booking_derived_status': _tenant_booking_derived_header_status(booking),
                     'booking_derived_pod_status': _tenant_booking_derived_pod_status(booking),
                     'booking_sales_report': _tenant_booking_sales_report_linkage(booking),
@@ -15149,6 +16038,9 @@ class TenantOperationShipmentListView(View):
                 'driver',
                 'booking',
                 'booking__client_account',
+                'booking__route',
+                'booking__route__origin_point',
+                'booking__route__destination_point',
                 'client_account',
                 'loading_address',
                 'delivery_address',
@@ -15178,6 +16070,8 @@ class TenantOperationShipmentListView(View):
                 if client is None and shipment.booking_id and shipment.booking:
                     client = shipment.booking.client_account
                 shipment.client_display = client_account_label(client) or '-'
+                shipment.route_chip = _tenant_shipment_route_chip(shipment, shipment.booking)
+                shipment.cod_payment_status = _tenant_shipment_cod_payment_status(shipment)
             stats_qs = TenantShipment.objects.all()
             context.update(
                 {
@@ -15217,7 +16111,12 @@ class TenantOperationShipmentListView(View):
             restore_public_schema(request)
 
 
-def _tenant_shipment_form_options_context(tenant_registry, *, exclude_shipment_id=None):
+def _tenant_shipment_form_options_context(
+    tenant_registry,
+    *,
+    exclude_shipment_id=None,
+    preserve_booking_id=None,
+):
     available_tables = set(connection.introspection.table_names())
     has_table = available_tables.__contains__
     client_accounts = list(
@@ -15275,6 +16174,11 @@ def _tenant_shipment_form_options_context(tenant_registry, *, exclude_shipment_i
     seen_booking_nos = set()
     booking_rows = []
     for booking in booking_options:
+        if not _tenant_booking_eligible_for_shipment_option(
+            booking,
+            preserve_booking_id=preserve_booking_id,
+        ):
+            continue
         service_label = ''
         if booking.service_item_id and booking.service_item:
             service_label = f'{booking.service_item.service_code} - {booking.service_item.english_name}'
@@ -15307,6 +16211,12 @@ def _tenant_shipment_form_options_context(tenant_registry, *, exclude_shipment_i
         for line_type in line_types:
             if (booking.booking_id, line_type) in occupied_lines:
                 continue
+            if not _tenant_booking_eligible_for_shipment_option(
+                booking,
+                booking_item_type=line_type,
+                preserve_booking_id=preserve_booking_id,
+            ):
+                continue
             is_backload = line_type == 'Backload'
             line_truck, line_driver = _tenant_shipment_line_truck_driver(booking, line_type)
             booking_line_rows_for_booking.append(
@@ -15323,11 +16233,10 @@ def _tenant_shipment_form_options_context(tenant_registry, *, exclude_shipment_i
                     'order_type': booking.order_type or '',
                     'sourcing_mode': shipment_sourcing_mode,
                     'pod_type': pod_type,
-                    'pod_doc_count': (
-                        booking.booking_line_backload_pod_doc_count
-                        if is_backload
-                        else booking.booking_line_pod_doc_count
-                    ) or 0,
+                    'pod_doc_count': _tenant_booking_line_pod_doc_count(
+                        booking,
+                        line_type,
+                    ),
                     'pod_status': normalize_operation_pod_status(booking.pod_status or ''),
                     'cod_amount': (
                         booking.booking_line_backload_cod_amount
@@ -15485,12 +16394,10 @@ def _tenant_shipment_booking_line_rows(booking):
                 'service_item_id': booking.service_item_id,
                 'route_id': booking.route_id,
                 'pod_type': pod_type,
-                'pod_doc_count': (
-                    booking.booking_line_backload_pod_doc_count
-                    if is_backload
-                    else booking.booking_line_pod_doc_count
-                )
-                or 0,
+                'pod_doc_count': _tenant_booking_line_pod_doc_count(
+                    booking,
+                    line_type,
+                ),
                 'pod_status': normalize_operation_pod_status(booking.pod_status or ''),
                 'cod_amount': (
                     booking.booking_line_backload_cod_amount
@@ -15736,6 +16643,17 @@ def _tenant_shipment_validate_submission(
             form_errors['booking_no'] = 'Booking must be confirmed and belong to the selected Client Account.'
     if selected_booking is not None and selected_booking.booking_status != TenantBooking.Status.CONFIRMED:
         form_errors['booking_no'] = 'Only active (confirmed) bookings can be used to create a shipment.'
+    if selected_booking is not None and exclude_shipment_id is None:
+        if _tenant_booking_derived_header_status(selected_booking) == 'Cancelled':
+            form_errors['booking_no'] = 'Cancelled bookings cannot be used to create a shipment.'
+        line_type = (shipment_form_data.get('booking_item_type') or '').strip()
+        if (
+            line_type
+            and _tenant_booking_line_operational_status(selected_booking, line_type) == 'Cancelled'
+        ):
+            form_errors['booking_item'] = (
+                'This booking line was cancelled and cannot be used for a new shipment.'
+            )
     if (
         selected_booking is not None
         and selected_client is not None
@@ -16209,20 +17127,21 @@ class TenantOperationShipmentDetailView(View):
                     'cargo',
                     'assigned_truck',
                     'assigned_driver',
+                    'route',
+                    'route__origin_point',
+                    'route__destination_point',
                 )
                 .filter(booking_id=shipment.booking_id)
                 .first()
             )
             shipment_pk = shipment.shipment_id
+            shipment.cod_payment_status = _tenant_shipment_cod_payment_status(shipment)
             context.update(
                 {
                     'shipment': shipment,
                     'booking': booking,
-                    'cod_payment_status': (
-                        shipment.collection_status
-                        if shipment.cod_amount and shipment.cod_amount > 0
-                        else 'Not Applicable'
-                    ),
+                    'shipment_route_chip': _tenant_shipment_route_chip(shipment, booking),
+                    'cod_payment_status': _tenant_shipment_cod_payment_status(shipment),
                     'additional_charges': shipment.total_additional_charges,
                     'tenant_schema_name': tenant_registry.schema_name,
                     'back_to_list_url': reverse('iroad_tenants:tenant_operation_shipment_list'),
@@ -16277,6 +17196,7 @@ class TenantOperationShipmentEditView(View):
                 _tenant_shipment_form_options_context(
                     tenant_registry,
                     exclude_shipment_id=shipment.shipment_id,
+                    preserve_booking_id=shipment.booking_id,
                 )
             )
             context.update(
@@ -16474,6 +17394,7 @@ class TenantOperationShipmentEditView(View):
                     _tenant_shipment_form_options_context(
                         tenant_registry,
                         exclude_shipment_id=shipment.shipment_id,
+                        preserve_booking_id=shipment.booking_id,
                     )
                 )
                 context.update(
@@ -16542,6 +17463,7 @@ class TenantOperationShipmentEditView(View):
                     _tenant_shipment_form_options_context(
                         tenant_registry,
                         exclude_shipment_id=shipment.shipment_id,
+                        preserve_booking_id=shipment.booking_id,
                     )
                 )
                 context.update(
@@ -16652,6 +17574,7 @@ class TenantOperationShipmentUpdateView(View):
             shipment.pod_status = posted_pod_status
             shipment.pod_type = posted_pod_type
             shipment.pod_doc_count = posted_pod_doc_count
+            shipment._original_shipment_status = previous_status
             try:
                 with db_transaction.atomic():
                     _tenant_shipment_validate_status_transition(shipment, shipment.shipment_status)
@@ -16701,8 +17624,9 @@ class TenantOperationShipmentUpdateView(View):
                             idempotency_key=override_key,
                         )
 
-                    # Keep shipment_status as cache derived from latest action log.
-                    _tenant_shipment_sync_status_from_action_log(shipment)
+                    # Manual status override wins — do not re-derive from older action logs.
+                    if not status_changed:
+                        _tenant_shipment_sync_status_from_action_log(shipment)
 
                     # Re-apply admin form values after sync/side effects so manual edits persist.
                     shipment.collection_status = posted_collection
@@ -16714,6 +17638,7 @@ class TenantOperationShipmentUpdateView(View):
                     _tenant_shipment_validate_status_transition(shipment, shipment.shipment_status)
                     shipment.full_clean()
                     shipment.save()
+                    _tenant_booking_sync_pod_doc_count_from_shipment(shipment)
             except ValidationError as exc:
                 messages.error(request, '; '.join(sum(exc.message_dict.values(), [])), extra_tags='tenant')
                 return redirect('iroad_tenants:tenant_operation_shipment_update', shipment_id=shipment.shipment_id)
@@ -16819,6 +17744,141 @@ def _tenant_shipment_document_form_data_from_post(request):
     }
 
 
+def _tenant_shipment_document_enrich_form_data(form_data):
+    """Preserve linkage display fields after a failed create/edit POST."""
+    if not isinstance(form_data, dict):
+        return form_data
+    shipment_id = (form_data.get('shipment_id') or '').strip()
+    shipment = None
+    if shipment_id:
+        shipment = TenantShipment.objects.select_related('booking').filter(pk=shipment_id).first()
+    if shipment is not None:
+        form_data['shipment_id'] = str(shipment.pk)
+        form_data['shipment_ref'] = shipment.shipment_no or form_data.get('shipment_ref', '')
+        if not (form_data.get('booking_item') or '').strip():
+            form_data['booking_item'] = (shipment.booking_item_ref or '').strip()
+        if shipment.booking_id:
+            form_data['booking_id'] = str(shipment.booking_id)
+            if shipment.booking is not None:
+                form_data['booking_no'] = shipment.booking.booking_no
+    if not (form_data.get('booking_no') or '').strip():
+        booking_id = (form_data.get('booking_id') or '').strip()
+        if booking_id:
+            booking = TenantBooking.objects.filter(pk=booking_id).only('booking_no').first()
+            if booking is not None:
+                form_data['booking_no'] = booking.booking_no
+    return form_data
+
+
+def _tenant_shipment_document_parse_line_rows_from_request(
+    request,
+    form_data,
+    *,
+    line_completion_statuses,
+    line_signer_locations,
+):
+    line_extra_refs = request.POST.getlist('line_extra_ref[]')
+    line_page_nos = request.POST.getlist('line_page_no[]')
+    line_statuses = request.POST.getlist('line_status[]')
+    line_locations = request.POST.getlist('line_physical_location[]')
+    line_attachments = request.FILES.getlist('line_attachment[]')
+    line_existing_attachment_labels = request.POST.getlist('line_existing_attachment_label[]')
+    max_lines = max(
+        len(request.POST.getlist('line_doc_ref_no[]')),
+        len(line_extra_refs),
+        len(line_page_nos),
+        len(line_statuses),
+        len(line_locations),
+        len(line_attachments),
+        len(line_existing_attachment_labels),
+        1,
+    )
+    is_delivery_note = bool(form_data.get('is_delivery_note'))
+    rows = []
+    errors = []
+    for idx in range(max_lines):
+        extra_ref = line_extra_refs[idx].strip() if idx < len(line_extra_refs) else ''
+        page_no = line_page_nos[idx].strip() if idx < len(line_page_nos) else ''
+        line_status = line_statuses[idx].strip() if idx < len(line_statuses) else ''
+        line_location = normalize_operation_physical_location(
+            line_locations[idx] if idx < len(line_locations) else '',
+        )
+        existing_attachment_label = (
+            line_existing_attachment_labels[idx].strip()
+            if idx < len(line_existing_attachment_labels)
+            else ''
+        )
+        attachment = request.FILES.get(f'line_attachment_{idx}')
+        if attachment is None and idx < len(line_attachments):
+            attachment = line_attachments[idx]
+        existing_storage_path = existing_attachment_label if (
+            existing_attachment_label and '/' in existing_attachment_label
+        ) else ''
+        attachment_label = ''
+        attachment_file = attachment
+        attachment_storage_path = existing_storage_path
+        if attachment is not None:
+            attachment_label = os.path.basename(getattr(attachment, 'name', '') or '')
+        elif existing_storage_path:
+            attachment_label = os.path.basename(existing_storage_path)
+        elif existing_attachment_label:
+            attachment_label = existing_attachment_label
+        if not any([
+            extra_ref,
+            page_no,
+            line_status,
+            line_location,
+            attachment_label,
+            attachment_storage_path,
+        ]) and idx > 0:
+            continue
+        if not page_no:
+            page_no = str(len(rows) + 1)
+        if is_delivery_note:
+            line_status = line_status or 'Not Completed'
+        else:
+            line_status = ''
+        row = {
+            'doc_ref_no': form_data.get('document_ref_no', ''),
+            'extra_ref': extra_ref,
+            'page_no': page_no,
+            'status': line_status,
+            'physical_location': line_location,
+            'attachment_label': attachment_label,
+            'attachment_file': attachment_file,
+            'attachment_storage_path': attachment_storage_path,
+            '_field_errors': {},
+        }
+        row_no = len(rows) + 1
+        field_errors = row['_field_errors']
+        if not page_no.isdigit() or int(page_no) < 1:
+            field_errors['page_no'] = 'Page No must be a positive number.'
+        if is_delivery_note and line_status not in line_completion_statuses:
+            field_errors['status'] = 'Status must be Completed or Not Completed.'
+        if line_location not in line_signer_locations:
+            field_errors['physical_location'] = 'Physical location is required.'
+        if not attachment_file and not attachment_storage_path:
+            field_errors['attachment'] = 'Attachment is required.'
+        if field_errors:
+            errors.append(
+                f'Line {row_no}: '
+                + ' '.join(str(message) for message in field_errors.values())
+            )
+        rows.append(row)
+    if not rows:
+        rows.append({
+            'doc_ref_no': form_data.get('document_ref_no', ''),
+            'extra_ref': '',
+            'page_no': '1',
+            'status': 'Not Completed' if is_delivery_note else '',
+            'physical_location': '',
+            'attachment_label': '',
+            '_field_errors': {'attachment': 'Attachment is required.'},
+        })
+        errors.append('At least one document page line is required.')
+    return rows, errors
+
+
 def _tenant_shipment_document_resolve_linkage(form_data, form_errors):
     shipment_id = (form_data.get('shipment_id') or '').strip()
     shipment = None
@@ -16921,6 +17981,14 @@ def _tenant_shipment_pod_linkage_options(*, include_shipment_id=None):
             continue
         seen_shipment_ids.add(shipment_id)
         booking = shipment.booking if shipment.booking_id else None
+        booking_pod_type = _normalize_shipment_pod_type(
+            getattr(booking, 'pod_type', '') if booking else '',
+            default='',
+        )
+        shipment_pod_type = _normalize_shipment_pod_type(
+            getattr(shipment, 'pod_type', '') or booking_pod_type,
+            default=TenantShipment.PodType.DIGITAL,
+        )
         shipment_rows.append(
             {
                 'shipment_id': shipment_id,
@@ -16928,9 +17996,46 @@ def _tenant_shipment_pod_linkage_options(*, include_shipment_id=None):
                 'booking_id': str(shipment.booking_id) if shipment.booking_id else '',
                 'booking_no': booking.booking_no if booking else '',
                 'booking_item': (shipment.booking_item_ref or '').strip(),
+                'pod_type': shipment_pod_type,
+                'pod_doc_count': int(shipment.pod_doc_count or 0),
             }
         )
     return shipment_rows
+
+
+def _tenant_shipment_pod_booking_linkage_from_shipments(shipment_options):
+    """Derive booking and booking-item option rows from POD shipment linkage list."""
+    booking_options = []
+    booking_item_options = []
+    seen_booking_ids = set()
+    seen_booking_items = set()
+    for row in shipment_options:
+        booking_id = row.get('booking_id') or ''
+        booking_no = row.get('booking_no') or ''
+        booking_item = (row.get('booking_item') or '').strip()
+        pod_type = row.get('pod_type') or ''
+        if booking_id and booking_id not in seen_booking_ids:
+            seen_booking_ids.add(booking_id)
+            booking_options.append(
+                {
+                    'booking_id': booking_id,
+                    'booking_no': booking_no,
+                    'booking_item': booking_item,
+                    'pod_type': pod_type,
+                }
+            )
+        item_key = (booking_id, booking_item)
+        if booking_item and item_key not in seen_booking_items:
+            seen_booking_items.add(item_key)
+            booking_item_options.append(
+                {
+                    'booking_id': booking_id,
+                    'booking_no': booking_no,
+                    'booking_item': booking_item,
+                    'pod_type': pod_type,
+                }
+            )
+    return booking_options, booking_item_options
 
 
 def _tenant_shipment_pod_delivery_note_options(*, shipment_id=None):
@@ -16949,6 +18054,10 @@ def _tenant_shipment_pod_delivery_note_options(*, shipment_id=None):
                 'document_ref_no': row.document_ref_no,
                 'record_no': row.record_no,
                 'shipment_id': str(row.shipment_id) if row.shipment_id else '',
+                'booking_no': row.booking.booking_no if row.booking_id else '',
+                'booking_item': (
+                    (row.shipment.booking_item_ref or '').strip() if row.shipment_id else ''
+                ),
                 'document_type': row.document_type or '',
                 'document_date': row.document_date.isoformat() if row.document_date else '',
                 'page_count': row.page_count or 1,
@@ -16960,7 +18069,7 @@ def _tenant_shipment_pod_delivery_note_options(*, shipment_id=None):
 def _tenant_shipment_pod_resolve_source_document(form_data, form_errors, *, shipment):
     source_document_id = (form_data.get('source_document_id') or '').strip()
     if not source_document_id:
-        form_errors['source_document_id'] = 'Delivery note document is required.'
+        form_errors['source_document_id'] = 'Doc Ref is required.'
         return None
     source_document = (
         TenantShipmentDocument.objects.filter(
@@ -16971,7 +18080,7 @@ def _tenant_shipment_pod_resolve_source_document(form_data, form_errors, *, ship
         .first()
     )
     if source_document is None:
-        form_errors['source_document_id'] = 'Select a valid delivery note document.'
+        form_errors['source_document_id'] = 'Select a valid Doc Ref.'
         return None
     if shipment and source_document.shipment_id != shipment.pk:
         form_errors['source_document_id'] = 'Document must belong to the selected shipment.'
@@ -17021,13 +18130,20 @@ def _tenant_shipment_pod_status_from_form(form_status):
 
 
 def _tenant_shipment_pod_delivery_note_pages_map():
-    """Map source document_id -> page FK options for line doc_page selects."""
+    """Map delivery-note document_id -> page FK options for line doc_page selects."""
+    return _tenant_document_handover_record_pages_map(delivery_notes_only=True)
+
+
+def _tenant_document_handover_record_pages_map(*, delivery_notes_only=False):
+    """Map document_id -> page options for Document Handover Pages Verification."""
     pages_map = {}
-    for document in (
-        TenantShipmentDocument.objects.filter(is_delivery_note=True)
-        .prefetch_related('document_pages', 'pod_pages')
-        .order_by('-created_at')[:500]
-    ):
+    qs = TenantShipmentDocument.objects.prefetch_related('document_pages', 'pod_pages')
+    if delivery_notes_only:
+        qs = qs.filter(is_delivery_note=True)
+    else:
+        pod_prefix = f'{SHIPMENT_POD_REF_PREFIX}-'
+        qs = qs.filter(Q(is_delivery_note=True) | Q(record_no__startswith=pod_prefix))
+    for document in qs.order_by('-created_at')[:500]:
         pages = []
         doc_pages = list(document.document_pages.order_by('line_no'))
         line_source = doc_pages if doc_pages else list(document.pod_pages.order_by('line_no'))
@@ -17048,8 +18164,117 @@ def _tenant_shipment_pod_delivery_note_pages_map():
                         'line_no': line.line_no,
                     }
                 )
+        if not pages:
+            page_count = max(int(document.page_count or 1), 1)
+            for page_no in range(1, page_count + 1):
+                pages.append(
+                    {
+                        'page_id': f'Page-{page_no}',
+                        'label': f'Page-{page_no}',
+                        'line_no': page_no,
+                    }
+                )
         pages_map[str(document.pk)] = pages
     return pages_map
+
+
+def _tenant_document_handover_pod_record_options():
+    pod_prefix = f'{SHIPMENT_POD_REF_PREFIX}-'
+    return list(
+        TenantShipmentDocument.objects.select_related('shipment', 'booking', 'source_document')
+        .filter(record_no__startswith=pod_prefix)
+        .order_by('-created_at')[:500]
+    )
+
+
+def _tenant_document_handover_form_context_payload(
+    *,
+    request,
+    tenant_registry,
+    shipment_options,
+    form_data=None,
+    form_errors=None,
+    line_rows=None,
+    source_document=None,
+):
+    """Shared template context for Document Handover create/edit forms."""
+    booking_options = []
+    seen_booking_ids = set()
+    for row in shipment_options:
+        booking_id = row.get('booking_id') or ''
+        if not booking_id or booking_id in seen_booking_ids:
+            continue
+        seen_booking_ids.add(booking_id)
+        booking_options.append(
+            {
+                'booking_id': booking_id,
+                'booking_no': row.get('booking_no') or '',
+                'booking_item': row.get('booking_item') or '',
+            }
+        )
+    booking_item_options = []
+    seen_booking_items = set()
+    for row in shipment_options:
+        booking_item = (row.get('booking_item') or '').strip()
+        if not booking_item or booking_item in seen_booking_items:
+            continue
+        seen_booking_items.add(booking_item)
+        booking_item_options.append(
+            {
+                'booking_item': booking_item,
+                'booking_id': row.get('booking_id') or '',
+                'booking_no': row.get('booking_no') or '',
+            }
+        )
+    default_receiver_user_id = _tenant_session_tenant_user_id(request)
+    received_user_options = []
+    for user in TenantUser.objects.filter(status=TenantUser.Status.ACTIVE).order_by(
+        'full_name', 'username'
+    ):
+        label = (user.full_name or user.username or '').strip()
+        if user.username and user.username not in label:
+            label = f'{label} ({user.username})' if label else user.username
+        if label:
+            received_user_options.append(
+                {
+                    'user_id': str(user.pk),
+                    'label': label,
+                }
+            )
+    default_form = {
+        'handover_date': timezone.localdate().isoformat(),
+        'status': TenantDocumentHandover.Status.DRAFT,
+        'receiver_user_id': default_receiver_user_id,
+    }
+    handover_form_data = form_data or default_form
+    if not handover_form_data.get('receiver_user_id') and default_receiver_user_id:
+        handover_form_data['receiver_user_id'] = default_receiver_user_id
+    return {
+        'preview_handover_no': _preview_next_auto_number_for_form(
+            form_code=DOCUMENT_HANDOVER_AUTO_FORM_CODE,
+            form_label=DOCUMENT_HANDOVER_AUTO_FORM_LABEL,
+            prefix=DOCUMENT_HANDOVER_REF_PREFIX,
+        ),
+        'handover_form_data': handover_form_data,
+        'handover_form_errors': form_errors or {},
+        'handover_line_rows': line_rows or [],
+        'handover_line_page_options': _tenant_shipment_pod_line_page_options(source_document),
+        'booking_options': booking_options,
+        'booking_item_options': booking_item_options,
+        'shipment_options': shipment_options,
+        'delivery_note_options': _tenant_shipment_pod_delivery_note_options(),
+        'record_pages_json': json.dumps(_tenant_document_handover_record_pages_map()),
+        'shipment_pod_doc_counts_json': json.dumps(
+            {
+                row['shipment_id']: int(row.get('pod_doc_count') or 0)
+                for row in shipment_options
+            }
+        ),
+        'pod_record_options': _tenant_document_handover_pod_record_options(),
+        'received_user_options': received_user_options,
+        'default_receiver_user_id': default_receiver_user_id,
+        'tenant_schema_name': tenant_registry.schema_name,
+    }
 
 
 def _tenant_shipment_pod_line_page_options(source_document):
@@ -17392,6 +18617,7 @@ def _tenant_shipment_document_refresh_shipment_pod(shipment):
     shipment.pod_doc_count = int(dn_qs.aggregate(total=Sum('page_count')).get('total') or 0)
     if not dn_qs.exists():
         shipment.save(update_fields=['pod_doc_count', 'updated_at'])
+        _tenant_booking_sync_pod_doc_count_from_shipment(shipment)
         return
     if dn_qs.filter(status=TenantShipmentDocument.Status.REJECTED).exists():
         shipment.pod_status = TenantShipment.PodStatus.PENDING
@@ -17402,6 +18628,7 @@ def _tenant_shipment_document_refresh_shipment_pod(shipment):
         # custody is confirmed separately via A7H (sets HARD_COPY_RECEIVED).
         shipment.pod_status = TenantShipment.PodStatus.COMPLIANT
     shipment.save(update_fields=['pod_doc_count', 'pod_status', 'updated_at'])
+    _tenant_booking_sync_pod_doc_count_from_shipment(shipment)
 
 
 def _tenant_shipment_document_save_document_pages(document, form_data, line_rows):
@@ -17563,11 +18790,11 @@ class TenantOperationShipmentDocumentsListView(View):
             clear_tenant_portal_cookie(response, request=request)
             return response
         try:
-            qs = TenantShipmentDocument.objects.select_related(
+            qs = _tenant_shipment_documents_list_queryset().select_related(
                 'booking',
                 'shipment',
             ).order_by('-created_at')
-            stats_qs = TenantShipmentDocument.objects.all()
+            stats_qs = _tenant_shipment_documents_list_queryset()
             paginator = Paginator(qs, 10)
             shipment_documents_page = paginator.get_page(request.GET.get('page') or 1)
             context.update(
@@ -17670,12 +18897,15 @@ class TenantOperationShipmentDocumentsCreateView(View):
                     f'(check lines: {", ".join(str(n) for n in incomplete)}).'
                 )
         if header_status == TenantShipmentDocument.Status.REJECTED and not (form_data.get('notes') or '').strip():
-            form_errors['status'] = 'Add notes explaining the rejection before setting status to Rejected.'
+            form_errors['notes'] = 'Add notes explaining the rejection before setting status to Rejected.'
 
         booking, shipment = _tenant_shipment_document_resolve_linkage(form_data, form_errors)
+        _tenant_shipment_document_enrich_form_data(form_data)
         return form_errors, line_errors, line_rows, record_date, document_date, booking, shipment
 
     def _form_context(self, tenant_registry, form_data=None, form_errors=None, document=None, line_rows=None):
+        if form_data is not None:
+            form_data = _tenant_shipment_document_enrich_form_data(form_data)
         booking_options, shipments, booking_item_options = _tenant_shipment_document_linkage_options()
         if line_rows is None:
             line_rows = []
@@ -17753,91 +18983,12 @@ class TenantOperationShipmentDocumentsCreateView(View):
         }
 
     def _line_rows_from_request(self, request, form_data):
-        line_extra_refs = request.POST.getlist('line_extra_ref[]')
-        line_page_nos = request.POST.getlist('line_page_no[]')
-        line_statuses = request.POST.getlist('line_status[]')
-        line_locations = request.POST.getlist('line_physical_location[]')
-        line_attachments = request.FILES.getlist('line_attachment[]')
-        line_existing_attachment_labels = request.POST.getlist('line_existing_attachment_label[]')
-        max_lines = max(
-            len(request.POST.getlist('line_doc_ref_no[]')),
-            len(line_extra_refs),
-            len(line_page_nos),
-            len(line_statuses),
-            len(line_locations),
-            len(line_attachments),
-            len(line_existing_attachment_labels),
-            1,
+        return _tenant_shipment_document_parse_line_rows_from_request(
+            request,
+            form_data,
+            line_completion_statuses=self.line_completion_statuses,
+            line_signer_locations=self.line_signer_locations,
         )
-        is_delivery_note = bool(form_data.get('is_delivery_note'))
-        rows = []
-        errors = []
-        for idx in range(max_lines):
-            extra_ref = line_extra_refs[idx].strip() if idx < len(line_extra_refs) else ''
-            page_no = line_page_nos[idx].strip() if idx < len(line_page_nos) else ''
-            line_status = line_statuses[idx].strip() if idx < len(line_statuses) else ''
-            line_location = normalize_operation_physical_location(
-                line_locations[idx] if idx < len(line_locations) else '',
-            )
-            existing_attachment_label = (
-                line_existing_attachment_labels[idx].strip()
-                if idx < len(line_existing_attachment_labels)
-                else ''
-            )
-            attachment = request.FILES.get(f'line_attachment_{idx}')
-            if attachment is None and idx < len(line_attachments):
-                attachment = line_attachments[idx]
-            existing_storage_path = existing_attachment_label if (
-                existing_attachment_label and '/' in existing_attachment_label
-            ) else ''
-            attachment_label = ''
-            attachment_file = attachment
-            attachment_storage_path = existing_storage_path
-            if attachment is not None:
-                attachment_label = os.path.basename(getattr(attachment, 'name', '') or '')
-            elif existing_storage_path:
-                attachment_label = os.path.basename(existing_storage_path)
-            elif existing_attachment_label:
-                attachment_label = existing_attachment_label
-            if not any([extra_ref, page_no, line_status, line_location, attachment_label, attachment_storage_path]) and idx > 0:
-                continue
-            if not page_no:
-                page_no = str(len(rows) + 1)
-            if is_delivery_note:
-                line_status = line_status or 'Not Completed'
-            else:
-                line_status = ''
-            row = {
-                'doc_ref_no': form_data.get('document_ref_no', ''),
-                'extra_ref': extra_ref,
-                'page_no': page_no,
-                'status': line_status,
-                'physical_location': line_location,
-                'attachment_label': attachment_label,
-                'attachment_file': attachment_file,
-                'attachment_storage_path': attachment_storage_path,
-            }
-            row_no = len(rows) + 1
-            if not page_no.isdigit() or int(page_no) < 1:
-                errors.append(f'Line {row_no}: Page No must be a positive number.')
-            if is_delivery_note and line_status not in self.line_completion_statuses:
-                errors.append(f'Line {row_no}: Status must be Completed or Not Completed.')
-            if line_location not in self.line_signer_locations:
-                errors.append(f'Line {row_no}: Physical location is required.')
-            if not attachment_file and not attachment_storage_path:
-                errors.append(f'Line {row_no}: Attachment is required.')
-            rows.append(row)
-        if not rows:
-            rows.append({
-                'doc_ref_no': form_data.get('document_ref_no', ''),
-                'extra_ref': '',
-                'page_no': '1',
-                'status': 'Not Completed' if is_delivery_note else '',
-                'physical_location': '',
-                'attachment_label': '',
-            })
-            errors.append('At least one document page line is required.')
-        return rows, errors
 
     def _form_data_from_document(self, document):
         shipment = document.shipment
@@ -17928,7 +19079,16 @@ class TenantOperationShipmentDocumentsCreateView(View):
                 if not TenantShipmentDocument.objects.filter(record_no=record_no).exists():
                     break
             if TenantShipmentDocument.objects.filter(record_no=record_no).exists():
-                context.update(self._form_context(tenant_registry, form_data=form_data))
+                context.update(self._form_context(
+                    tenant_registry,
+                    form_data=form_data,
+                    form_errors={
+                        'non_field_errors': (
+                            'Unable to allocate a unique shipment document number. '
+                            'Please check Auto Number Configuration.'
+                        ),
+                    },
+                ))
                 messages.error(
                     request,
                     'Unable to allocate a unique shipment document number. Please check Auto Number Configuration.',
@@ -18205,9 +19365,32 @@ class TenantOperationShipmentDocumentsDeleteView(View):
             restore_public_schema(request)
 
 
+def _tenant_shipment_pod_user_label(document):
+    """Resolve POD USER column to tenant username (not raw user id)."""
+    receiver_user = getattr(document, 'receiver_user', None)
+    if receiver_user is not None:
+        username = (receiver_user.username or '').strip()
+        if username:
+            return username
+        full_name = (receiver_user.full_name or '').strip()
+        if full_name:
+            return full_name
+
+    raw = (document.created_by_label or '').strip()
+    if not raw:
+        return '—'
+
+    tenant_user = _tenant_operation_action_log_resolve_user(raw)
+    if tenant_user is not None:
+        return (tenant_user.username or tenant_user.full_name or raw).strip()
+
+    return raw
+
+
 def _shipment_pod_display_data(document, shipment=None):
     if shipment is None and document.shipment_id:
         shipment = document.shipment
+    user_label = _tenant_shipment_pod_user_label(document)
     pod_type = getattr(shipment, 'pod_type', '') or document.document_type or ''
     pod_status = getattr(shipment, 'pod_status', '') or (
         'Compliant' if document.status == TenantShipmentDocument.Status.VERIFIED else 'Pending'
@@ -18217,7 +19400,7 @@ def _shipment_pod_display_data(document, shipment=None):
         {
             'title': 'Created',
             'timestamp': document.created_at,
-            'actor': document.created_by_label or 'System',
+            'actor': user_label if user_label != '—' else 'System',
             'color': '#dc3545',
         }
     ]
@@ -18233,7 +19416,7 @@ def _shipment_pod_display_data(document, shipment=None):
             {
                 'title': f'{len(pod_pages)} POD page row{"s" if len(pod_pages) != 1 else ""} saved',
                 'timestamp': latest_page.updated_at or latest_page.created_at,
-                'actor': document.created_by_label or 'System',
+                'actor': user_label if user_label != '—' else 'System',
                 'color': 'var(--primary-color)',
             },
         )
@@ -18243,7 +19426,7 @@ def _shipment_pod_display_data(document, shipment=None):
                 {
                     'title': f'{collected_count} page{"s" if collected_count != 1 else ""} collected',
                     'timestamp': latest_page.updated_at or latest_page.created_at,
-                    'actor': document.created_by_label or 'System',
+                    'actor': user_label if user_label != '—' else 'System',
                     'color': '#ffc107',
                 },
             )
@@ -18253,7 +19436,7 @@ def _shipment_pod_display_data(document, shipment=None):
             {
                 'title': 'Updated',
                 'timestamp': document.updated_at,
-                'actor': document.created_by_label or 'System',
+                'actor': user_label if user_label != '—' else 'System',
                 'color': '#28a745' if pod_status == 'Compliant' else 'var(--primary-color)',
             },
         )
@@ -18273,7 +19456,7 @@ def _shipment_pod_display_data(document, shipment=None):
         'pod_type': pod_type,
         'pod_status': pod_status,
         'physical_location': document.physical_location,
-        'user_label': document.created_by_label,
+        'user_label': user_label,
         'pod_pages': pod_pages,
         'activity_log': activity_log,
     }
@@ -18298,7 +19481,7 @@ class TenantOperationShipmentPodListView(View):
             pod_prefix = f'{SHIPMENT_POD_REF_PREFIX}-'
             qs = (
                 TenantShipmentDocument.objects.select_related(
-                    'shipment', 'booking', 'shipment__booking'
+                    'shipment', 'booking', 'shipment__booking', 'receiver_user'
                 )
                 .prefetch_related('pod_pages')
                 .filter(record_no__startswith=pod_prefix)
@@ -18404,7 +19587,10 @@ class TenantOperationShipmentPodCreateView(View):
         booking = document.booking
         if booking is None and linked_shipment and linked_shipment.booking_id:
             booking = linked_shipment.booking
-        pod_type = _normalize_shipment_pod_type(getattr(linked_shipment, 'pod_type', '')).lower()
+        pod_type = _normalize_shipment_pod_type(
+            getattr(linked_shipment, 'pod_type', ''),
+            default=TenantShipment.PodType.DIGITAL,
+        )
         receiver_user_id = ''
         if document.receiver_user_id:
             receiver_user_id = str(document.receiver_user_id)
@@ -18435,6 +19621,9 @@ class TenantOperationShipmentPodCreateView(View):
         elif form_data and form_data.get('shipment_id'):
             include_shipment_id = form_data['shipment_id']
         shipment_options = _tenant_shipment_pod_linkage_options(include_shipment_id=include_shipment_id)
+        booking_options, booking_item_options = _tenant_shipment_pod_booking_linkage_from_shipments(
+            shipment_options
+        )
         delivery_note_options = _tenant_shipment_pod_delivery_note_options()
         user_options = list(
             TenantUser.objects.filter(status=TenantUser.Status.ACTIVE)
@@ -18485,6 +19674,9 @@ class TenantOperationShipmentPodCreateView(View):
             'pod_form_data': pod_form_data,
             'form_errors': form_errors or {},
             'shipment_options': shipment_options,
+            'booking_options': booking_options,
+            'booking_item_options': booking_item_options,
+            'operation_pod_type_options': operation_pod_type_options(),
             'delivery_note_options': delivery_note_options,
             'delivery_note_pages_json': json.dumps(_tenant_shipment_pod_delivery_note_pages_map()),
             'pod_line_page_options': _tenant_shipment_pod_line_page_options(source_document),
@@ -18560,6 +19752,8 @@ class TenantOperationShipmentPodCreateView(View):
                 'source_document_id': (request.POST.get('source_document_id') or '').strip(),
                 'page_count': (request.POST.get('page_count') or '').strip(),
                 'booking_id': (request.POST.get('booking_id') or '').strip(),
+                'booking_no': (request.POST.get('booking_no') or '').strip(),
+                'booking_item': (request.POST.get('booking_item') or '').strip(),
                 'shipment_id': (request.POST.get('shipment_id') or '').strip(),
                 'pod_type': (request.POST.get('pod_type') or '').strip(),
                 'physical_location': (request.POST.get('document_location') or '').strip(),
@@ -18585,7 +19779,11 @@ class TenantOperationShipmentPodCreateView(View):
             if page_count < 1:
                 form_errors['page_count'] = 'Page Count must be at least 1.'
                 page_count = 1
-            if form_data['pod_type'] not in self.POD_TYPE_TO_SHIPMENT_VALUE:
+            form_data['pod_type'] = normalize_operation_pod_type(
+                form_data.get('pod_type'),
+                default='',
+            )
+            if form_data['pod_type'] not in operation_pod_type_options():
                 form_errors['pod_type'] = 'Select a valid POD type.'
 
             booking, shipment = _tenant_shipment_document_resolve_linkage(form_data, form_errors)
@@ -18705,6 +19903,16 @@ class TenantOperationShipmentPodCreateView(View):
                 return render(request, self.template_name, context)
 
             created_by_label = (context.get('display_name') or '').strip()
+            if receiver_user is not None:
+                created_by_label = (
+                    receiver_user.username or receiver_user.full_name or created_by_label
+                ).strip()
+            else:
+                session_user = _tenant_operation_action_log_resolve_user(created_by_label)
+                if session_user is not None:
+                    created_by_label = (
+                        session_user.username or session_user.full_name or created_by_label
+                    ).strip()
 
             if existing_document is None:
                 record_no = ''
@@ -18766,8 +19974,8 @@ class TenantOperationShipmentPodCreateView(View):
                 )
                 document.save()
 
-            if not is_posted:
-                shipment.pod_type = self.POD_TYPE_TO_SHIPMENT_VALUE[form_data['pod_type']]
+            if not is_posted and form_data['pod_type']:
+                shipment.pod_type = form_data['pod_type']
                 shipment.save(update_fields=['pod_type', 'updated_at'])
 
             TenantShipmentPodPage.objects.filter(document=document).delete()
@@ -18928,87 +20136,22 @@ class TenantOperationDocumentHandoverCreateView(View):
         if form_data and form_data.get('shipment_id'):
             include_shipment_id = form_data['shipment_id']
         shipment_options = _tenant_shipment_pod_linkage_options(include_shipment_id=include_shipment_id)
-        booking_options = []
-        seen_booking_ids = set()
-        for row in shipment_options:
-            booking_id = row.get('booking_id') or ''
-            if not booking_id or booking_id in seen_booking_ids:
-                continue
-            seen_booking_ids.add(booking_id)
-            booking_options.append(
-                {
-                    'booking_id': booking_id,
-                    'booking_no': row.get('booking_no') or '',
-                    'booking_item': row.get('booking_item') or '',
-                }
-            )
-        booking_item_options = []
-        seen_booking_items = set()
-        for row in shipment_options:
-            booking_item = (row.get('booking_item') or '').strip()
-            if not booking_item or booking_item in seen_booking_items:
-                continue
-            seen_booking_items.add(booking_item)
-            booking_item_options.append(
-                {
-                    'booking_item': booking_item,
-                    'booking_id': row.get('booking_id') or '',
-                    'booking_no': row.get('booking_no') or '',
-                }
-            )
-        delivery_note_options = _tenant_shipment_pod_delivery_note_options()
-        pod_record_options = list(
-            TenantShipmentDocument.objects.select_related('shipment', 'booking')
-            .exclude(is_delivery_note=True)
-            .order_by('-created_at')[:500]
-        )
-        default_receiver_user_id = _tenant_session_tenant_user_id(request)
-        received_user_options = []
-        for user in TenantUser.objects.filter(status=TenantUser.Status.ACTIVE).order_by('full_name', 'username'):
-            label = (user.full_name or user.username or '').strip()
-            if user.username and user.username not in label:
-                label = f'{label} ({user.username})' if label else user.username
-            if label:
-                received_user_options.append(
-                    {
-                        'user_id': str(user.pk),
-                        'label': label,
-                    }
-                )
-        default_form = {
-            'handover_date': timezone.localdate().isoformat(),
-            'status': TenantDocumentHandover.Status.DRAFT,
-            'receiver_user_id': default_receiver_user_id,
-        }
-        handover_form_data = form_data or default_form
-        if not handover_form_data.get('receiver_user_id') and default_receiver_user_id:
-            handover_form_data['receiver_user_id'] = default_receiver_user_id
         source_document = None
+        handover_form_data = form_data or {}
         document_id = (handover_form_data.get('document_id') or '').strip()
         if document_id:
             source_document = (
                 TenantShipmentDocument.objects.filter(pk=document_id, is_delivery_note=True).first()
             )
-        return {
-            'preview_handover_no': _preview_next_auto_number_for_form(
-                form_code=DOCUMENT_HANDOVER_AUTO_FORM_CODE,
-                form_label=DOCUMENT_HANDOVER_AUTO_FORM_LABEL,
-                prefix=DOCUMENT_HANDOVER_REF_PREFIX,
-            ),
-            'handover_form_data': handover_form_data,
-            'handover_form_errors': form_errors or {},
-            'handover_line_rows': line_rows or [],
-            'handover_line_page_options': _tenant_shipment_pod_line_page_options(source_document),
-            'booking_options': booking_options,
-            'booking_item_options': booking_item_options,
-            'shipment_options': shipment_options,
-            'delivery_note_options': delivery_note_options,
-            'delivery_note_pages_json': json.dumps(_tenant_shipment_pod_delivery_note_pages_map()),
-            'pod_record_options': pod_record_options,
-            'received_user_options': received_user_options,
-            'default_receiver_user_id': default_receiver_user_id,
-            'tenant_schema_name': tenant_registry.schema_name,
-        }
+        return _tenant_document_handover_form_context_payload(
+            request=request,
+            tenant_registry=tenant_registry,
+            shipment_options=shipment_options,
+            form_data=form_data,
+            form_errors=form_errors,
+            line_rows=line_rows,
+            source_document=source_document,
+        )
 
     @staticmethod
     def _parse_handover_lines(raw_value):
@@ -19313,53 +20456,80 @@ class TenantOperationTruckMovementLogListView(View):
             clear_tenant_portal_cookie(response, request=request)
             return response
         try:
-            search_q = (request.GET.get('q') or '').strip()
             movement_qs = TenantTruckMovementLog.objects.select_related(
                 'booking',
                 'shipment',
                 'truck',
+                'truck__truck_type',
                 'driver',
                 'from_location_point',
                 'to_location_point',
-            ).order_by('-created_at')
-            if search_q:
-                movement_qs = movement_qs.filter(
-                    Q(movement_no__icontains=search_q)
-                    | Q(truck__truck_code__icontains=search_q)
-                    | Q(driver__driver_code__icontains=search_q)
-                    | Q(booking__booking_no__icontains=search_q)
-                    | Q(shipment__shipment_no__icontains=search_q)
-                    | Q(from_location_point__display_label__icontains=search_q)
-                    | Q(to_location_point__display_label__icontains=search_q)
-                    | Q(status__icontains=search_q)
-                )
-
-            paginator = Paginator(movement_qs, 25)
-            page_obj = paginator.get_page(request.GET.get('page') or 1)
+            )
+            movement_column_filters = {
+                0: 'movement_no',
+                1: 'movement_date',
+                2: 'movement_source',
+                3: 'shipment__shipment_no',
+                4: 'truck__truck_code',
+                5: 'driver__english_name',
+                6: 'from_location_point__display_label',
+                7: 'start_time',
+                8: 'end_time',
+                9: 'status',
+            }
+            movement_column_filter_types = {
+                1: 'date',
+                7: 'datetime',
+                8: 'datetime',
+            }
+            movement_sort_cols = dict(movement_column_filters)
+            movement_search_fields = [
+                'movement_no',
+                'movement_source',
+                'truck__truck_code',
+                'driver__driver_code',
+                'driver__english_name',
+                'driver__arabic_name',
+                'booking__booking_no',
+                'shipment__shipment_no',
+                'from_location_point__display_label',
+                'to_location_point__display_label',
+                'status',
+            ]
+            page, list_ctx = prepare_eal_list(
+                request,
+                movement_qs,
+                search_fields=movement_search_fields,
+                column_field_map=movement_column_filters,
+                sort_col_field_map=movement_sort_cols,
+                default_order=('-created_at',),
+                column_filter_types=movement_column_filter_types,
+            )
             all_movements = TenantTruckMovementLog.objects.all()
+            distance_agg = all_movements.aggregate(total_distance=Sum('distance_km'))
             context.update(
                 {
-                    'movement_rows': list(page_obj.object_list),
-                    'truck_movement_rows': list(page_obj.object_list),
-                    'movement_page': page_obj,
-                    'movement_search_q': search_q,
-                    'pagination_total': paginator.count,
-                    'pagination_start': page_obj.start_index() if paginator.count else 0,
-                    'pagination_end': page_obj.end_index() if paginator.count else 0,
+                    'movement_rows': list(page.object_list),
+                    'movement_list_rows': [
+                        _truck_movement_list_row(movement) for movement in page.object_list
+                    ],
+                    'truck_movement_rows': list(page.object_list),
+                    'movement_page': page,
+                    'movement_search_q': list_ctx.get('search_q', ''),
                     'movement_stats': {
                         'total': all_movements.count(),
-                        'completed': all_movements.filter(status=TenantTruckMovementLog.Status.COMPLETED).count(),
+                        'total_distance_km': distance_agg.get('total_distance') or Decimal('0'),
+                        'completed': all_movements.filter(
+                            status=TenantTruckMovementLog.Status.COMPLETED
+                        ).count(),
                         'in_progress': all_movements.filter(
                             status=TenantTruckMovementLog.Status.IN_PROGRESS
                         ).count(),
-                        'scheduled_cancelled': all_movements.filter(
-                            status__in=[
-                                TenantTruckMovementLog.Status.SCHEDULED,
-                                TenantTruckMovementLog.Status.CANCELLED,
-                            ]
-                        ).count(),
+                        'loaded': all_movements.filter(shipment_id__isnull=False).count(),
+                        'empty': all_movements.filter(shipment_id__isnull=True).count(),
                     },
                     'tenant_schema_name': tenant_registry.schema_name,
+                    **list_ctx,
                 }
             )
             return render(request, self.template_name, context)
@@ -19748,7 +20918,7 @@ class TenantOperationActionsListView(View):
                     | Q(sequence_category__icontains=search_q)
                     | Q(status__icontains=search_q)
                 )
-            paginator = Paginator(action_qs, 25)
+            paginator = Paginator(action_qs, 10)
             page_obj = paginator.get_page(request.GET.get('page') or 1)
             context.update(
                 {
@@ -19931,10 +21101,6 @@ def _tenant_surcharge_sales_sync_derived_display(form_data, shipment):
         form_data['booking_id'] = str(shipment.booking_id)
     if not (form_data.get('client_account_id') or '').strip() and shipment.client_account_id:
         form_data['client_account_id'] = str(shipment.client_account_id)
-    if not (form_data.get('currency_code') or '').strip():
-        currency_code = _tenant_surcharge_sales_currency_from_shipment(shipment)
-        form_data['currency_code'] = currency_code
-        form_data['currency'] = currency_code
     booking_id = (form_data.get('booking_id') or '').strip()
     if booking_id:
         booking = TenantBooking.objects.filter(pk=booking_id).first()
@@ -19950,9 +21116,15 @@ def _tenant_surcharge_sales_sync_derived_display(form_data, shipment):
             form_data['client'] = client_account_label(client)
     elif shipment.client_account_id:
         form_data['client'] = client_account_label(shipment.client_account)
-    currency_code = (form_data.get('currency_code') or '').strip()
-    if currency_code:
-        form_data['currency'] = currency_code
+    currency_code = ''
+    if client_id:
+        client = TenantClientAccount.objects.filter(pk=client_id).first()
+        if client:
+            currency_code = (client.preferred_currency or 'SAR')[:8]
+    if not currency_code:
+        currency_code = _tenant_surcharge_sales_currency_from_shipment(shipment)
+    form_data['currency_code'] = currency_code
+    form_data['currency'] = currency_code
 
 
 def _tenant_surcharge_sales_form_data_from_surcharge(surcharge):
@@ -20030,16 +21202,12 @@ def _tenant_surcharge_sales_validate_submission(request, form_data, *, existing_
         else:
             posted_booking_id = (form_data.get('booking_id') or '').strip()
             posted_client_id = (form_data.get('client_account_id') or '').strip()
-            posted_currency = (form_data.get('currency_code') or '').strip().upper()[:8]
             if not posted_booking_id and shipment.booking_id:
                 posted_booking_id = str(shipment.booking_id)
                 form_data['booking_id'] = posted_booking_id
             if not posted_client_id and shipment.client_account_id:
                 posted_client_id = str(shipment.client_account_id)
                 form_data['client_account_id'] = posted_client_id
-            if not posted_currency:
-                posted_currency = _tenant_surcharge_sales_currency_from_shipment(shipment)
-                form_data['currency_code'] = posted_currency
             if posted_booking_id:
                 booking = (
                     TenantBooking.objects.exclude(
@@ -20061,11 +21229,15 @@ def _tenant_surcharge_sales_validate_submission(request, form_data, *, existing_
                     form_errors['client_account_id'] = 'Select a valid active client.'
                 else:
                     form_data['client'] = client_account_label(client)
-            if posted_currency:
-                form_data['currency_code'] = posted_currency
-                if not Currency.objects.filter(currency_code=posted_currency, is_active=True).exists():
-                    form_errors['currency_code'] = 'Select a valid active currency.'
             _tenant_surcharge_sales_sync_derived_display(form_data, shipment)
+            posted_currency = (form_data.get('currency_code') or '').strip().upper()[:8]
+            if posted_currency and not Currency.objects.filter(
+                currency_code=posted_currency,
+                is_active=True,
+            ).exists():
+                posted_currency = 'SAR'
+                form_data['currency_code'] = posted_currency
+                form_data['currency'] = posted_currency
 
     service_item = None
     if not (form_data.get('service_item_id') or '').strip():
@@ -20929,6 +22101,7 @@ class TenantClientAccountCreateView(View):
     def _base_form_data(self):
         return {
             'account_no': '',
+            'created_at': '',
             'client_type': TenantClientAccount.ClientType.INDIVIDUAL,
             'status': TenantClientAccount.Status.ACTIVE,
             'name_arabic': '',
@@ -20988,6 +22161,7 @@ class TenantClientAccountCreateView(View):
             settings_obj = _get_singleton_client_account_settings()
             form_data = self._base_form_data()
             form_data['account_no'] = self._build_preview_account_no()
+            form_data['created_at'] = _format_client_account_created_at(timezone.now())
             _apply_client_account_defaults_from_settings(form_data, settings_obj)
             context.update(
                 {
@@ -21132,6 +22306,7 @@ class TenantClientAccountEditView(TenantClientAccountCreateView):
     def _form_data_from_account(self, account):
         return {
             'account_no': account.account_no,
+            'created_at': _format_client_account_created_at(getattr(account, 'created_at', None)),
             'client_type': account.client_type,
             'status': account.status,
             'name_arabic': account.name_arabic or '',
@@ -22208,11 +23383,36 @@ TENANT_CLIENT_ATTACHMENT_SEARCH_FIELDS = [
 ]
 
 
+def _tenant_client_attachment_list_chip(request):
+    """Normalize toolbar chip filter for client attachments list (all/active/expired/inactive)."""
+    chip = (request.GET.get('chip') or 'all').strip().lower()
+    if chip not in ('all', 'active', 'expired', 'inactive'):
+        return 'all'
+    return chip
+
+
+def _tenant_client_attachment_apply_chip_filter(queryset, chip):
+    """Map toolbar chips to persisted attachment status values."""
+    att = TenantClientAttachment
+    if chip == 'active':
+        return queryset.filter(status=att.Status.VALID)
+    if chip == 'expired':
+        return queryset.filter(status=att.Status.EXPIRED)
+    if chip == 'inactive':
+        return queryset.filter(status=att.Status.DOES_NOT_EXPIRE)
+    return queryset
+
+
 def _tenant_client_attachment_filtered_queryset(request):
     """Client attachment queryset with the same search/filters/sort as the list page."""
+    chip = _tenant_client_attachment_list_chip(request)
+    qs = _tenant_client_attachment_apply_chip_filter(
+        TenantClientAttachment.objects.select_related('client_account'),
+        chip,
+    )
     return build_eal_list_queryset(
         request,
-        TenantClientAttachment.objects.select_related('client_account'),
+        qs,
         search_fields=TENANT_CLIENT_ATTACHMENT_SEARCH_FIELDS,
         column_field_map=TENANT_CLIENT_ATTACHMENT_COLUMN_FILTERS,
         sort_col_field_map=TENANT_CLIENT_ATTACHMENT_SORT_COLS,
@@ -22302,9 +23502,14 @@ class TenantClientAttachmentsListView(View):
             return response
         try:
             att = TenantClientAttachment
+            chip = _tenant_client_attachment_list_chip(request)
+            attachments_qs = _tenant_client_attachment_apply_chip_filter(
+                TenantClientAttachment.objects.select_related('client_account'),
+                chip,
+            )
             attachments_page, list_ctx = prepare_eal_list(
                 request,
-                TenantClientAttachment.objects.select_related('client_account'),
+                attachments_qs,
                 search_fields=TENANT_CLIENT_ATTACHMENT_SEARCH_FIELDS,
                 column_field_map=TENANT_CLIENT_ATTACHMENT_COLUMN_FILTERS,
                 sort_col_field_map=TENANT_CLIENT_ATTACHMENT_SORT_COLS,
@@ -22331,6 +23536,7 @@ class TenantClientAttachmentsListView(View):
                 ).count(),
                 'expired': all_att_qs.filter(status=att.Status.EXPIRED).count(),
             }
+            attachments_list_base = reverse('iroad_tenants:tenant_client_attachments_list')
             context.update(
                 {
                     'client_attachments': rows,
@@ -22338,6 +23544,23 @@ class TenantClientAttachmentsListView(View):
                     'client_attachments_count': list_ctx['pagination_total'],
                     'attachment_stats': attachment_stats,
                     'tenant_schema_name': tenant_registry.schema_name,
+                    'attachments_list_chip': chip,
+                    'attachments_chip_all_url': attachments_list_base + copy_eal_list_params(
+                        request,
+                        remove=['chip'],
+                    ),
+                    'attachments_chip_active_url': attachments_list_base + copy_eal_list_params(
+                        request,
+                        set_params={'chip': 'active'},
+                    ),
+                    'attachments_chip_expired_url': attachments_list_base + copy_eal_list_params(
+                        request,
+                        set_params={'chip': 'expired'},
+                    ),
+                    'attachments_chip_inactive_url': attachments_list_base + copy_eal_list_params(
+                        request,
+                        set_params={'chip': 'inactive'},
+                    ),
                     **list_ctx,
                 }
             )
@@ -23580,7 +24803,14 @@ class TenantClientContractSettingsView(View):
             pre_raw = (request.POST.get('pre_expiry_notification_days') or '').strip()
             post_raw = (request.POST.get('post_expiry_notification_days') or '').strip()
             freq = (request.POST.get('notification_frequency') or '').strip()
-            audience = (request.POST.get('notification_audience') or '').strip()
+            audience_values = [
+                value.strip()
+                for value in request.POST.getlist('notification_audience')
+                if value.strip()
+            ]
+            audience = TenantClientContractSetting.serialize_notification_audiences(
+                audience_values
+            )
 
             settings_data = {
                 'expired_contract_handling_mode': mode,
@@ -23589,6 +24819,7 @@ class TenantClientContractSettingsView(View):
                 'post_expiry_notification_days': post_raw,
                 'notification_frequency': freq,
                 'notification_audience': audience,
+                'notification_audiences': audience_values,
             }
             settings_errors = {}
 
@@ -23601,8 +24832,12 @@ class TenantClientContractSettingsView(View):
                 settings_errors['notification_frequency'] = 'Select a valid frequency.'
 
             valid_audience = {c[0] for c in TenantClientContractSetting.NotificationAudience.choices}
-            if audience not in valid_audience:
+            if not audience_values:
+                settings_errors['notification_audience'] = 'Select at least one audience.'
+            elif any(value not in valid_audience for value in audience_values):
                 settings_errors['notification_audience'] = 'Select a valid audience.'
+            elif not audience:
+                settings_errors['notification_audience'] = 'Select at least one audience.'
 
             def _parse_days(raw, field_key, *, required=False, allow_zero=True):
                 if raw == '':
@@ -24140,16 +25375,21 @@ def _hydrate_truck_master_list_rows(trucks_page):
 
 
 def _address_master_list_stats(filtered_qs):
+    """Stat cards: total, active, pickup-capable, delivery-capable (includes Both)."""
     addr = TenantAddressMaster
+    pickup_categories = (
+        addr.AddressCategory.PICKUP_ADDRESS,
+        addr.AddressCategory.BOTH,
+    )
+    delivery_categories = (
+        addr.AddressCategory.DELIVERY_ADDRESS,
+        addr.AddressCategory.BOTH,
+    )
     return {
         'total': filtered_qs.count(),
-        'pickup_only': filtered_qs.filter(
-            address_category=addr.AddressCategory.PICKUP_ADDRESS
-        ).count(),
-        'delivery_only': filtered_qs.filter(
-            address_category=addr.AddressCategory.DELIVERY_ADDRESS
-        ).count(),
-        'both': filtered_qs.filter(address_category=addr.AddressCategory.BOTH).count(),
+        'active': filtered_qs.filter(status=addr.Status.ACTIVE).count(),
+        'pickup': filtered_qs.filter(address_category__in=pickup_categories).count(),
+        'delivery': filtered_qs.filter(address_category__in=delivery_categories).count(),
     }
 
 
@@ -24171,9 +25411,22 @@ class TenantAddressMasterListView(View):
             return response
 
         qs = TenantAddressMaster.objects.select_related('client_account')
+        stats_qs = qs
         cid = request.GET.get('client', '').strip()
-        filter_client_id = ''
         filter_client_value = ''
+
+        if cid:
+            try:
+                cid_uuid = uuid.UUID(cid)
+                qs = qs.filter(client_account_id=cid_uuid)
+                stats_qs = stats_qs.filter(client_account_id=cid_uuid)
+                filter_client_value = str(cid_uuid)
+            except ValueError:
+                client_row = TenantClientAccount.objects.filter(account_no__iexact=cid).first()
+                if client_row:
+                    qs = qs.filter(client_account_id=client_row.account_id)
+                    stats_qs = stats_qs.filter(client_account_id=client_row.account_id)
+                    filter_client_value = str(client_row.account_id)
 
         # AD-001: default list = Active only; All / Inactive only when explicitly requested.
         status_raw = (request.GET.get('status') or '').strip().lower()
@@ -24195,35 +25448,25 @@ class TenantAddressMasterListView(View):
             qs = qs.filter(status=TenantAddressMaster.Status.ACTIVE)
             filter_status = 'active'
 
-        if cid:
-            try:
-                cid_uuid = uuid.UUID(cid)
-                qs = qs.filter(client_account_id=cid_uuid)
-                filter_client_id = str(cid_uuid)
-            except ValueError:
-                client_row = TenantClientAccount.objects.filter(account_no__iexact=cid).first()
-                if client_row:
-                    qs = qs.filter(client_account_id=client_row.account_id)
-                    filter_client_id = str(client_row.account_id)
-                filter_client_value = cid
-
         address_column_filters = {
             1: 'address_code',
             2: 'client_account__account_no',
             3: 'display_name',
             4: 'address_category',
-            5: 'city',
-            6: 'contact_name',
-            7: 'phone_no',
+            5: 'default_pickup_address',
+            6: 'default_delivery_address',
+            7: 'status',
+            8: 'city',
         }
         address_sort_cols = {
             1: 'address_code',
             2: 'client_account__account_no',
             3: 'display_name',
             4: 'address_category',
-            5: 'city',
-            6: 'contact_name',
-            7: 'phone_no',
+            5: 'default_pickup_address',
+            6: 'default_delivery_address',
+            7: 'status',
+            8: 'city',
         }
         page, list_ctx = prepare_eal_list(
             request,
@@ -24234,8 +25477,6 @@ class TenantAddressMasterListView(View):
                 'city',
                 'client_account__display_name',
                 'client_account__account_no',
-                'contact_name',
-                'phone_no',
             ],
             column_field_map=address_column_filters,
             sort_col_field_map=address_sort_cols,
@@ -24245,15 +25486,13 @@ class TenantAddressMasterListView(View):
         stats = _address_master_list_stats(
             build_eal_list_queryset(
                 request,
-                qs,
+                stats_qs,
                 search_fields=[
                     'display_name',
                     'address_code',
                     'city',
                     'client_account__display_name',
                     'client_account__account_no',
-                    'contact_name',
-                    'phone_no',
                 ],
                 column_field_map=address_column_filters,
                 sort_col_field_map=address_sort_cols,
@@ -24266,14 +25505,7 @@ class TenantAddressMasterListView(View):
                 status=TenantClientAccount.Status.ACTIVE,
             ).order_by('display_name')[:500]
         )
-        if filter_client_id and not filter_client_value:
-            matched_client = next(
-                (ca for ca in clients if str(ca.account_id) == filter_client_id),
-                None,
-            )
-            if matched_client:
-                filter_client_value = matched_client.account_no
-
+        filter_client_id = filter_client_value
         context.update(
             {
                 'addresses_page': page,
@@ -25203,6 +26435,109 @@ class TruckTypeMasterEditView(View):
         return redirect_resp
 
 
+def _truck_form_return_to_details(request):
+    return (request.POST.get('return_to') or request.GET.get('return_to') or '').strip() == 'details'
+
+
+def _truck_detail_tab_from_request(request):
+    tab = (request.GET.get('tab') or request.POST.get('detail_tab') or '').strip()
+    if tab:
+        return tab
+    section = (request.GET.get('section') or request.POST.get('section') or '').strip().lower()
+    if section in ('documents', 'attachments', 'documents-attachments'):
+        return 'documents'
+    if section in ('movements', 'movements-log'):
+        return 'movements'
+    if section == 'shipments':
+        return 'shipments'
+    if section in ('drivers', 'assigned-drivers'):
+        return 'assigned-drivers'
+    return 'overview'
+
+
+def _truck_details_tab_url(truck_id, tab=''):
+    base = reverse(
+        'iroad_tenants:truck_master_detail',
+        kwargs={'truck_id': truck_id},
+    )
+    tab = (tab or '').strip()
+    if tab and tab != 'overview':
+        return f'{base}?{urlencode({"tab": tab})}'
+    return base
+
+
+def _truck_detail_cancel_url(
+    request,
+    truck_id,
+    tab='overview',
+    list_url_name='iroad_tenants:truck_master',
+):
+    if _truck_form_return_to_details(request) and truck_id:
+        return _truck_details_tab_url(
+            truck_id,
+            _truck_detail_tab_from_request(request) or tab,
+        )
+    return reverse(list_url_name)
+
+
+def _redirect_after_truck_detail_save(request, truck_id, tab, list_redirect):
+    if _truck_form_return_to_details(request) and truck_id:
+        return redirect(
+            _truck_details_tab_url(
+                truck_id,
+                tab or _truck_detail_tab_from_request(request),
+            )
+        )
+    return list_redirect(request) if callable(list_redirect) else list_redirect
+
+
+def _truck_form_return_extras(
+    request,
+    truck=None,
+    *,
+    tab='overview',
+    list_url_name='iroad_tenants:truck_master',
+):
+    truck_pk = ''
+    if truck is not None and getattr(truck, 'pk', None):
+        truck_pk = str(truck.pk)
+    else:
+        truck_pk = (request.GET.get('truck_id') or request.POST.get('truck_id') or '').strip()
+    return {
+        'truck_return_to': 'details' if _truck_form_return_to_details(request) else '',
+        'truck_cancel_url': _truck_detail_cancel_url(
+            request,
+            truck_pk,
+            tab=tab,
+            list_url_name=list_url_name,
+        ),
+        'truck_id_for_return': truck_pk,
+    }
+
+
+def _truck_master_list_status_redirect(request, truck_pk=''):
+    if _truck_form_return_to_details(request) and truck_pk:
+        tab = (request.POST.get('detail_tab') or '').strip() or 'overview'
+        return redirect(_truck_details_tab_url(truck_pk, tab))
+    rq = (request.POST.get('redirect_query') or '').strip()
+    base = reverse('iroad_tenants:truck_master')
+    if rq:
+        return redirect(f'{base}?{rq}')
+    return _tenant_redirect(request, 'iroad_tenants:truck_master')
+
+
+def _redirect_after_truck_attachment_save(request, truck):
+    truck_id = str(truck.pk) if truck and getattr(truck, 'pk', None) else ''
+    if _truck_form_return_to_details(request) and truck_id:
+        return redirect(
+            _truck_details_tab_url(
+                truck_id,
+                _truck_detail_tab_from_request(request) or 'documents',
+            )
+        )
+    return redirect('iroad_tenants:truck_attachment_all_list')
+
+
 class TruckMasterListView(View):
     """TR-001 list: search, status / sourcing / type filters, stats, deactivate via POST."""
 
@@ -25374,11 +26709,7 @@ class TruckMasterListView(View):
         new_status = (request.POST.get('new_status') or '').strip()
         if new_status not in (TruckMaster.Status.ACTIVE, TruckMaster.Status.INACTIVE):
             messages.error(request, 'Invalid status.', extra_tags='tenant')
-            rq = (request.POST.get('redirect_query') or '').strip()
-            base = reverse('iroad_tenants:truck_master')
-            if rq:
-                return redirect(f'{base}?{rq}')
-            return _tenant_redirect(request, 'iroad_tenants:truck_master')
+            return _truck_master_list_status_redirect(request, truck_pk)
 
         tenant_registry = _activate_tenant_workspace_schema(request)
         if tenant_registry is None:
@@ -25425,11 +26756,26 @@ class TruckMasterListView(View):
         finally:
             restore_public_schema(request)
 
-        rq = (request.POST.get('redirect_query') or '').strip()
-        base = reverse('iroad_tenants:truck_master')
-        if rq:
-            return redirect(f'{base}?{rq}')
-        return _tenant_redirect(request, 'iroad_tenants:truck_master')
+        return _truck_master_list_status_redirect(request, truck_pk)
+
+
+def _truck_default_driver_assigned_at(truck=None):
+    """Display timestamp for Default Driver assigned date on truck master form."""
+    now = timezone.now()
+    if truck is None:
+        return now
+    current = (
+        truck.driver_assignments.filter(assigned_to__isnull=True)
+        .order_by('-assigned_from')
+        .first()
+    )
+    if current and current.assigned_from:
+        return current.assigned_from
+    if truck.default_driver_id_id:
+        latest = truck.driver_assignments.order_by('-assigned_from').first()
+        if latest and latest.assigned_from:
+            return latest.assigned_from
+    return now
 
 
 def _sync_truck_driver_assignment_history(truck, previous_driver_id=None):
@@ -25504,6 +26850,7 @@ class TruckMasterCreateView(View):
                     'settings_driver_assignment_required': bool(settings.driver_assignment_required),
                     'page_title': 'Add Truck',
                     'is_edit': False,
+                    'default_driver_assigned_at': _truck_default_driver_assigned_at(),
                     'tenant_schema_name': schema_name,
                     'subscription_resource_limit': subscription_limit_status(
                         context['tenant'],
@@ -25747,6 +27094,7 @@ class TruckMasterEditView(View):
                 {
                     'form': form,
                     'truck': truck,
+                    'default_driver_assigned_at': _truck_default_driver_assigned_at(truck),
                     'settings_default_status_effective': _settings_effective_truck_status(
                         settings.default_truck_status
                     ),
@@ -25754,6 +27102,7 @@ class TruckMasterEditView(View):
                     'page_title': 'Edit Truck',
                     'is_edit': True,
                     'tenant_schema_name': getattr(tenant_registry, 'schema_name', ''),
+                    **_truck_form_return_extras(request, truck),
                 }
             )
             return render(request, self.template_name, context)
@@ -25781,6 +27130,7 @@ class TruckMasterEditView(View):
 
             immutable_code = truck.truck_code
             previous_driver_id = truck.default_driver_id_id
+            truck_return_extras = _truck_form_return_extras(request, truck)
             settings = TruckSettings.get_or_create_singleton()
             form = TruckMasterForm(request.POST, request.FILES, instance=truck)
             if not form.is_valid():
@@ -25795,6 +27145,7 @@ class TruckMasterEditView(View):
                         'page_title': 'Edit Truck',
                         'is_edit': True,
                         'tenant_schema_name': getattr(tenant_registry, 'schema_name', ''),
+                        **truck_return_extras,
                     }
                 )
                 messages.error(request, 'Please fix the highlighted errors.', extra_tags='tenant')
@@ -25818,6 +27169,7 @@ class TruckMasterEditView(View):
                         'page_title': 'Edit Truck',
                         'is_edit': True,
                         'tenant_schema_name': getattr(tenant_registry, 'schema_name', ''),
+                        **truck_return_extras,
                     }
                 )
                 messages.error(request, 'Please fix the highlighted errors.', extra_tags='tenant')
@@ -25882,6 +27234,7 @@ class TruckMasterEditView(View):
                         'page_title': 'Edit Truck',
                         'is_edit': True,
                         'tenant_schema_name': getattr(tenant_registry, 'schema_name', ''),
+                        **truck_return_extras,
                     }
                 )
                 messages.error(request, 'Could not save changes.', extra_tags='tenant')
@@ -25903,13 +27256,19 @@ class TruckMasterEditView(View):
                         'page_title': 'Edit Truck',
                         'is_edit': True,
                         'tenant_schema_name': getattr(tenant_registry, 'schema_name', ''),
+                        **truck_return_extras,
                     }
                 )
                 messages.error(request, 'Could not save changes.', extra_tags='tenant')
                 return render(request, self.template_name, context)
 
             messages.success(request, 'Truck updated successfully.', extra_tags='tenant')
-            redirect_resp = _tenant_redirect(request, 'iroad_tenants:truck_master')
+            redirect_resp = _redirect_after_truck_detail_save(
+                request,
+                truck_id,
+                'overview',
+                lambda req: _tenant_redirect(req, 'iroad_tenants:truck_master'),
+            )
         finally:
             restore_public_schema(request)
 
@@ -26076,6 +27435,83 @@ def _truck_movement_status_display(movement):
     return badge_map.get(status, (status or '—', 'default'))
 
 
+def _truck_movement_list_driver_name(driver):
+    if driver is None:
+        return '—'
+    name = (getattr(driver, 'english_name', None) or '').strip() or (
+        getattr(driver, 'arabic_name', None) or ''
+    ).strip()
+    return name or '—'
+
+
+def _truck_movement_list_truck_display(movement):
+    truck = getattr(movement, 'truck', None)
+    if truck is None:
+        return '—'
+    code = (truck.truck_code or '').strip()
+    truck_type = getattr(truck, 'truck_type', None)
+    type_name = ''
+    if truck_type is not None:
+        type_name = (getattr(truck_type, 'english_label', None) or '').strip() or (
+            getattr(truck_type, 'arabic_label', None) or ''
+        ).strip()
+    if code and type_name:
+        return f'{code} ({type_name})'
+    return code or type_name or '—'
+
+
+def _truck_movement_source_label(movement):
+    raw = (movement.movement_source or '').strip().lower()
+    if raw == 'booking':
+        return 'Booking'
+    if raw in ('shipment', 'loaded'):
+        return 'Shipment'
+    if raw == 'manual':
+        return 'Manual'
+    if movement.shipment_id:
+        return 'Shipment'
+    if movement.booking_id:
+        return 'Booking'
+    if raw:
+        return raw.title()
+    return 'Manual'
+
+
+def _truck_movement_route_display(movement):
+    from_label = ''
+    to_label = ''
+    if movement.from_location_point_id and movement.from_location_point:
+        from_label = (movement.from_location_point.display_label or '').strip()
+    if not from_label:
+        from_label = _truck_movement_shipment_endpoint_label(movement, 'from')
+    if movement.to_location_point_id and movement.to_location_point:
+        to_label = (movement.to_location_point.display_label or '').strip()
+    if not to_label:
+        to_label = _truck_movement_shipment_endpoint_label(movement, 'to')
+    if from_label and to_label:
+        return f'{from_label} - {to_label}'
+    return from_label or to_label or '—'
+
+
+def _truck_movement_list_row(movement):
+    status_label, status_badge = _truck_movement_status_display(movement)
+    return {
+        'obj': movement,
+        'movement_no': movement.movement_no,
+        'movement_date': movement.movement_date,
+        'source_label': _truck_movement_source_label(movement),
+        'shipment_no': movement.shipment.shipment_no if movement.shipment_id else '',
+        'shipment_id': movement.shipment_id,
+        'truck_display': _truck_movement_list_truck_display(movement),
+        'driver_name': _truck_movement_list_driver_name(movement.driver),
+        'route_display': _truck_movement_route_display(movement),
+        'start_time': movement.start_time,
+        'end_time': movement.end_time,
+        'status_label': status_label,
+        'status_badge': status_badge,
+    }
+
+
 def _truck_movement_detail_row(movement):
     from_label = _truck_movement_location_point_label(movement.from_location_point)
     if not from_label:
@@ -26196,6 +27632,9 @@ class TruckMasterDetailView(View):
                     'booking__client_account',
                     'booking__loading_address',
                     'booking__delivery_address',
+                    'booking__route',
+                    'booking__route__origin_point',
+                    'booking__route__destination_point',
                 )
                 .order_by('-shipment_date', '-created_at')[:100]
             )
@@ -26206,19 +27645,22 @@ class TruckMasterDetailView(View):
 
             truck_shipment_rows = []
             for s in truck_shipments:
-                route = (s.route_display or '').strip()
-                if not route:
-                    fl, tl = shipment_route_endpoints(s)
-                    if fl and tl:
-                        route = f'{fl} → {tl}'
-                    elif fl or tl:
-                        route = fl or tl
-                    else:
-                        route = '—'
+                route_chip = _tenant_shipment_route_chip(s, getattr(s, 'booking', None))
+                route_fallback = (s.route_display or '').strip()
+                if route_chip is None:
+                    if not route_fallback:
+                        fl, tl = shipment_route_endpoints(s)
+                        if fl and tl:
+                            route_fallback = f'{fl} → {tl}'
+                        elif fl or tl:
+                            route_fallback = fl or tl
+                        else:
+                            route_fallback = '—'
                 truck_shipment_rows.append(
                     {
                         'shipment': s,
-                        'route': route,
+                        'route_chip': route_chip,
+                        'route_fallback': route_fallback,
                         'client_display': _truck_shipment_client_display(s),
                         'driver_display': _truck_shipment_driver_display(s),
                     }
@@ -26409,11 +27851,7 @@ class DriverMasterListView(View):
         new_status = (request.POST.get('new_status') or '').strip()
         if new_status not in (DriverMaster.Status.ACTIVE, DriverMaster.Status.INACTIVE):
             messages.error(request, 'Invalid status.', extra_tags='tenant')
-            rq = (request.POST.get('redirect_query') or '').strip()
-            base = reverse('iroad_tenants:driver_master')
-            if rq:
-                return redirect(f'{base}?{rq}')
-            return _tenant_redirect(request, 'iroad_tenants:driver_master')
+            return _driver_master_list_status_redirect(request, driver_pk)
 
         tenant_registry = _activate_tenant_workspace_schema(request)
         if tenant_registry is None:
@@ -26437,11 +27875,7 @@ class DriverMasterListView(View):
                             'Cannot activate: Driver Settings requires at least one core document upload.',
                             extra_tags='tenant',
                         )
-                        rq = (request.POST.get('redirect_query') or '').strip()
-                        base = reverse('iroad_tenants:driver_master')
-                        if rq:
-                            return redirect(f'{base}?{rq}')
-                        return _tenant_redirect(request, 'iroad_tenants:driver_master')
+                        return _driver_master_list_status_redirect(request, driver_pk)
                     if (
                         row.driver_status != DriverMaster.Status.ACTIVE
                         and counts_toward_driver_limit(
@@ -26455,11 +27889,7 @@ class DriverMasterListView(View):
                         )
                         if not allowed:
                             messages.error(request, limit_msg, extra_tags='tenant')
-                            rq = (request.POST.get('redirect_query') or '').strip()
-                            base = reverse('iroad_tenants:driver_master')
-                            if rq:
-                                return redirect(f'{base}?{rq}')
-                            return _tenant_redirect(request, 'iroad_tenants:driver_master')
+                            return _driver_master_list_status_redirect(request, driver_pk)
                 # TODO: Check active bookings when built
                 row.driver_status = new_status
                 row.save(update_fields=['driver_status', 'updated_at'])
@@ -26471,11 +27901,7 @@ class DriverMasterListView(View):
         finally:
             restore_public_schema(request)
 
-        rq = (request.POST.get('redirect_query') or '').strip()
-        base = reverse('iroad_tenants:driver_master')
-        if rq:
-            return redirect(f'{base}?{rq}')
-        return _tenant_redirect(request, 'iroad_tenants:driver_master')
+        return _driver_master_list_status_redirect(request, driver_pk)
 
 
 def _assign_default_truck_for_driver(driver, selected_truck):
@@ -26540,6 +27966,43 @@ def _tenant_actor_created_by_label(context):
     if role and name:
         return f'{role} ({name})'[:200]
     return (name or role or '')[:200]
+
+
+def _tenant_created_by_label_display(raw_label):
+    """Human-readable label from stored created_by_label (name or user id)."""
+    raw = (raw_label or '').strip()
+    if not raw:
+        return ''
+    tenant_user = _tenant_operation_action_log_resolve_user(raw)
+    if tenant_user is not None:
+        role = (tenant_user.role_name or '').strip()
+        name = (tenant_user.full_name or tenant_user.username or '').strip()
+        if role and name:
+            return f'{role} ({name})'
+        return name or role or raw
+    return raw
+
+
+def _tenant_record_created_by_label(request, context):
+    """Persistible created-by label for tenant workspace audit fields."""
+    label = _tenant_actor_created_by_label(context or {})
+    if label:
+        return label[:200]
+    actor_id = _current_tenant_actor_id(request)
+    if actor_id:
+        tenant_user = TenantUser.objects.filter(pk=actor_id).first()
+        if tenant_user is not None:
+            role = (tenant_user.role_name or '').strip()
+            name = (tenant_user.full_name or tenant_user.username or '').strip()
+            if role and name:
+                return f'{role} ({name})'[:200]
+            if name:
+                return name[:200]
+    name = ((context or {}).get('display_name') or '').strip()
+    role = ((context or {}).get('display_role') or '').strip()
+    if role and name:
+        return f'{role} ({name})'[:200]
+    return (name or role or 'System')[:200]
 
 
 def _driver_vendor_company_display(driver):
@@ -26803,8 +28266,192 @@ def _driver_attachment_detail_row(att):
 
 
 def _driver_created_by_display(driver):
-    label = (getattr(driver, 'created_by_label', None) or '').strip()
+    raw = (getattr(driver, 'created_by_label', None) or '').strip()
+    if not raw:
+        user = getattr(driver, 'user_account_id', None)
+        if user is not None:
+            raw = (getattr(user, 'created_by_label', None) or '').strip()
+    label = _tenant_created_by_label_display(raw)
     return label or '—'
+
+
+def _driver_form_return_to_details(request):
+    return (request.POST.get('return_to') or request.GET.get('return_to') or '').strip() == 'details'
+
+
+def _driver_detail_tab_from_request(request):
+    tab = (request.GET.get('tab') or request.POST.get('detail_tab') or '').strip()
+    section = (request.GET.get('section') or request.POST.get('section') or '').strip().lower()
+    if tab:
+        return tab
+    if section in ('driving-license', 'licenses', 'licenses-docs'):
+        return 'licenses-docs'
+    if section == 'wallet':
+        return 'wallet'
+    return 'overview'
+
+
+def _driver_details_tab_url(driver_id, tab=''):
+    base = reverse(
+        'iroad_tenants:driver_master_detail',
+        kwargs={'driver_id': driver_id},
+    )
+    tab = (tab or '').strip()
+    if tab and tab != 'overview':
+        return f'{base}?{urlencode({"tab": tab})}'
+    return base
+
+
+def _driver_detail_cancel_url(
+    request,
+    driver_id,
+    tab='overview',
+    list_url_name='iroad_tenants:driver_master',
+):
+    if _driver_form_return_to_details(request) and driver_id:
+        return _driver_details_tab_url(
+            driver_id,
+            _driver_detail_tab_from_request(request) or tab,
+        )
+    return reverse(list_url_name)
+
+
+def _redirect_after_driver_detail_save(request, driver_id, tab, list_redirect):
+    if _driver_form_return_to_details(request) and driver_id:
+        return redirect(
+            _driver_details_tab_url(
+                driver_id,
+                tab or _driver_detail_tab_from_request(request),
+            )
+        )
+    return list_redirect(request)
+
+
+def _driver_id_for_detail_return(request, driver=None, treasury=None):
+    driver_id = (request.GET.get('driver_id') or request.POST.get('driver_id') or '').strip()
+    if driver_id:
+        return driver_id
+    if driver is not None and getattr(driver, 'pk', None):
+        return str(driver.pk)
+    if treasury is not None:
+        drv = getattr(treasury, 'driver', None)
+        if drv is not None and getattr(drv, 'pk', None):
+            return str(drv.pk)
+    return ''
+
+
+def _driver_attachment_form_return_to_detail(request):
+    return (
+        request.POST.get('return_to') or request.GET.get('return_to') or ''
+    ).strip() == 'detail'
+
+
+def _driver_attachment_detail_url(driver_id, attachment_id):
+    return reverse(
+        'iroad_tenants:driver_attachment_detail',
+        kwargs={'driver_id': driver_id, 'attachment_id': attachment_id},
+    )
+
+
+def _driver_attachment_cancel_url(
+    request,
+    driver_id,
+    attachment_id=None,
+    *,
+    tab='licenses-docs',
+    list_url_name='iroad_tenants:driver_attachment_all_list',
+):
+    if _driver_attachment_form_return_to_detail(request) and driver_id and attachment_id:
+        return _driver_attachment_detail_url(driver_id, attachment_id)
+    if _driver_form_return_to_details(request) and driver_id:
+        return _driver_details_tab_url(driver_id, tab)
+    return reverse(list_url_name)
+
+
+def _driver_attachment_form_return_extras(
+    request,
+    driver=None,
+    attachment=None,
+    *,
+    tab='licenses-docs',
+    list_url_name='iroad_tenants:driver_attachment_all_list',
+):
+    driver_pk = (
+        getattr(driver, 'pk', None)
+        if driver is not None
+        else _driver_id_for_detail_return(request)
+    )
+    attachment_pk = getattr(attachment, 'pk', None) if attachment is not None else None
+    return_to = ''
+    if _driver_form_return_to_details(request):
+        return_to = 'details'
+    elif _driver_attachment_form_return_to_detail(request):
+        return_to = 'detail'
+    return {
+        'driver_return_to': return_to,
+        'driver_cancel_url': _driver_attachment_cancel_url(
+            request,
+            driver_pk,
+            attachment_pk,
+            tab=tab,
+            list_url_name=list_url_name,
+        ),
+        'driver_id_for_return': _driver_id_for_detail_return(request, driver=driver),
+    }
+
+
+def _redirect_after_driver_attachment_save(request, driver, attachment, list_redirect):
+    if _driver_attachment_form_return_to_detail(request) and driver and attachment:
+        return redirect(
+            _driver_attachment_detail_url(driver.driver_id, attachment.attachment_id)
+        )
+    driver_id = str(driver.driver_id) if driver else _driver_id_for_detail_return(request)
+    return _redirect_after_driver_detail_save(
+        request,
+        driver_id,
+        'licenses-docs',
+        list_redirect,
+    )
+
+
+def _driver_form_return_extras(
+    request,
+    driver=None,
+    *,
+    treasury=None,
+    tab='overview',
+    list_url_name='iroad_tenants:driver_master',
+):
+    driver_pk = (
+        getattr(driver, 'pk', None)
+        if driver is not None
+        else _driver_id_for_detail_return(request, treasury=treasury)
+    )
+    return {
+        'driver_return_to': 'details' if _driver_form_return_to_details(request) else '',
+        'driver_cancel_url': _driver_detail_cancel_url(
+            request,
+            driver_pk,
+            tab=tab,
+            list_url_name=list_url_name,
+        ),
+        'driver_id_for_return': _driver_id_for_detail_return(
+            request,
+            driver=driver,
+            treasury=treasury,
+        ),
+    }
+
+
+def _driver_master_list_status_redirect(request, driver_pk=''):
+    if _driver_form_return_to_details(request) and driver_pk:
+        tab = (request.POST.get('detail_tab') or '').strip() or 'overview'
+        return redirect(_driver_details_tab_url(driver_pk, tab))
+    rq = (request.POST.get('redirect_query') or '').strip()
+    base = reverse('iroad_tenants:driver_master')
+    if rq:
+        return redirect(f'{base}?{rq}')
+    return _tenant_redirect(request, 'iroad_tenants:driver_master')
 
 
 def _driver_overview_context(driver):
@@ -26897,6 +28544,7 @@ class DriverMasterCreateView(View):
                         RESOURCE_DRIVERS,
                         schema_name=schema_name,
                     ),
+                    'driver_cancel_url': reverse('iroad_tenants:driver_master'),
                 }
             )
             return render(request, self.template_name, context)
@@ -27032,7 +28680,9 @@ class DriverMasterCreateView(View):
                         )
                         raise ValidationError('Mandatory document rule failed.')
 
-                    obj.created_by_label = _tenant_actor_created_by_label(context)
+                    obj.created_by_label = _tenant_record_created_by_label(
+                        request, context
+                    )
                     obj.full_clean()
                     obj.save()
                     _assign_default_truck_for_driver(
@@ -27161,6 +28811,7 @@ class DriverMasterEditView(View):
                     'page_title': 'Edit Driver',
                     'is_edit': True,
                     'tenant_schema_name': getattr(tenant_registry, 'schema_name', ''),
+                    **_driver_form_return_extras(request, driver),
                 }
             )
             return render(request, self.template_name, context)
@@ -27204,6 +28855,7 @@ class DriverMasterEditView(View):
                         'page_title': 'Edit Driver',
                         'is_edit': True,
                         'tenant_schema_name': getattr(tenant_registry, 'schema_name', ''),
+                        **_driver_form_return_extras(request, driver),
                     }
                 )
                 messages.error(request, 'Please fix the highlighted errors.', extra_tags='tenant')
@@ -27266,6 +28918,7 @@ class DriverMasterEditView(View):
                         'page_title': 'Edit Driver',
                         'is_edit': True,
                         'tenant_schema_name': getattr(tenant_registry, 'schema_name', ''),
+                        **_driver_form_return_extras(request, driver),
                     }
                 )
                 messages.error(request, 'Could not save changes.', extra_tags='tenant')
@@ -27291,17 +28944,26 @@ class DriverMasterEditView(View):
                         'page_title': 'Edit Driver',
                         'is_edit': True,
                         'tenant_schema_name': getattr(tenant_registry, 'schema_name', ''),
+                        **_driver_form_return_extras(request, driver),
                     }
                 )
                 messages.error(request, 'Could not save changes.', extra_tags='tenant')
                 return render(request, self.template_name, context)
 
             messages.success(request, 'Driver profile updated successfully.', extra_tags='tenant')
-            redirect_resp = _tenant_redirect(
-                request,
-                'iroad_tenants:driver_master_detail',
-                driver_id=obj.driver_id,
-            )
+            if _driver_form_return_to_details(request):
+                redirect_resp = redirect(
+                    _driver_details_tab_url(
+                        obj.driver_id,
+                        _driver_detail_tab_from_request(request),
+                    )
+                )
+            else:
+                redirect_resp = _tenant_redirect(
+                    request,
+                    'iroad_tenants:driver_master_detail',
+                    driver_id=obj.driver_id,
+                )
         finally:
             restore_public_schema(request)
 
@@ -28125,9 +29787,13 @@ class DriverTreasuryTransactionCreateView(View):
             initial = {
                 'transaction_date': timezone.localtime().strftime('%Y-%m-%dT%H:%M'),
             }
+            treasury = None
             treasury_id = (request.GET.get('treasury_id') or '').strip()
             if treasury_id:
                 initial['driver_treasury'] = treasury_id
+                treasury = DriverTreasury.objects.select_related('driver').filter(
+                    pk=treasury_id,
+                ).first()
             shipment_no = (request.GET.get('shipment_no') or '').strip()
             if shipment_no:
                 ship = TenantShipment.objects.filter(
@@ -28146,6 +29812,12 @@ class DriverTreasuryTransactionCreateView(View):
                     ),
                     'page_title': 'Add Transaction',
                     'tenant_schema_name': getattr(tenant_registry, 'schema_name', ''),
+                    **_driver_form_return_extras(
+                        request,
+                        treasury=treasury,
+                        tab='wallet',
+                        list_url_name='iroad_tenants:driver_transaction_list',
+                    ),
                 }
             )
             return render(request, self.template_name, context)
@@ -28167,6 +29839,12 @@ class DriverTreasuryTransactionCreateView(View):
         try:
             form = DriverTreasuryTransactionForm(request.POST)
             if not form.is_valid():
+                treasury = None
+                treasury_id = (request.POST.get('driver_treasury') or '').strip()
+                if treasury_id:
+                    treasury = DriverTreasury.objects.select_related('driver').filter(
+                        pk=treasury_id,
+                    ).first()
                 context.update(
                     {
                         'form': form,
@@ -28177,6 +29855,12 @@ class DriverTreasuryTransactionCreateView(View):
                         ),
                         'page_title': 'Add Transaction',
                         'tenant_schema_name': getattr(tenant_registry, 'schema_name', ''),
+                        **_driver_form_return_extras(
+                            request,
+                            treasury=treasury,
+                            tab='wallet',
+                            list_url_name='iroad_tenants:driver_transaction_list',
+                        ),
                     }
                 )
                 messages.error(request, 'Please fix the highlighted errors.', extra_tags='tenant')
@@ -28198,7 +29882,16 @@ class DriverTreasuryTransactionCreateView(View):
                 f'Transaction {obj.transaction_no} saved.',
                 extra_tags='tenant',
             )
-            return _tenant_redirect(request, 'iroad_tenants:driver_transaction_list')
+            driver_id = _driver_id_for_detail_return(
+                request,
+                treasury=obj.driver_treasury,
+            )
+            return _redirect_after_driver_detail_save(
+                request,
+                driver_id,
+                'wallet',
+                lambda req: _tenant_redirect(req, 'iroad_tenants:driver_transaction_list'),
+            )
         finally:
             restore_public_schema(request)
 
@@ -28623,6 +30316,12 @@ class DriverAttachmentCreateView(View):
                     'drivers_for_select': drivers_for_select,
                     'selected_driver_id': '',
                     'tenant_schema_name': getattr(tenant_registry, 'schema_name', ''),
+                    **_driver_attachment_form_return_extras(
+                        request,
+                        driver=driver,
+                        tab='licenses-docs',
+                        list_url_name='iroad_tenants:driver_attachment_all_list',
+                    ),
                 }
             )
             return render(request, self.template_name, context)
@@ -28684,6 +30383,12 @@ class DriverAttachmentCreateView(View):
                         'selected_driver_id': selected_driver_id,
                         'driver_error': driver_error,
                         'tenant_schema_name': getattr(tenant_registry, 'schema_name', ''),
+                        **_driver_attachment_form_return_extras(
+                            request,
+                            driver=driver,
+                            tab='licenses-docs',
+                            list_url_name='iroad_tenants:driver_attachment_all_list',
+                        ),
                     }
                 )
                 messages.error(request, 'Please fix the highlighted errors.', extra_tags='tenant')
@@ -28727,12 +30432,23 @@ class DriverAttachmentCreateView(View):
                         'selected_driver_id': selected_driver_id,
                         'driver_error': driver_error,
                         'tenant_schema_name': getattr(tenant_registry, 'schema_name', ''),
+                        **_driver_attachment_form_return_extras(
+                            request,
+                            driver=driver,
+                            tab='licenses-docs',
+                            list_url_name='iroad_tenants:driver_attachment_all_list',
+                        ),
                     }
                 )
                 messages.error(request, 'Please fix the highlighted errors.', extra_tags='tenant')
                 return render(request, self.template_name, context)
             messages.success(request, 'Attachment saved.', extra_tags='tenant')
-            return redirect('iroad_tenants:driver_attachment_all_list')
+            return _redirect_after_driver_attachment_save(
+                request,
+                driver,
+                obj,
+                lambda req: redirect('iroad_tenants:driver_attachment_all_list'),
+            )
         finally:
             restore_public_schema(request)
 
@@ -28775,6 +30491,13 @@ class DriverAttachmentEditView(View):
                     'page_title': 'Edit Attachment',
                     'is_edit': True,
                     'tenant_schema_name': getattr(tenant_registry, 'schema_name', ''),
+                    **_driver_attachment_form_return_extras(
+                        request,
+                        driver=driver,
+                        attachment=attachment,
+                        tab='licenses-docs',
+                        list_url_name='iroad_tenants:driver_attachment_all_list',
+                    ),
                 }
             )
             return render(request, self.template_name, context)
@@ -28827,6 +30550,13 @@ class DriverAttachmentEditView(View):
                         'page_title': 'Edit Attachment',
                         'is_edit': True,
                         'tenant_schema_name': getattr(tenant_registry, 'schema_name', ''),
+                        **_driver_attachment_form_return_extras(
+                            request,
+                            driver=driver,
+                            attachment=attachment,
+                            tab='licenses-docs',
+                            list_url_name='iroad_tenants:driver_attachment_all_list',
+                        ),
                     }
                 )
                 messages.error(
@@ -28859,6 +30589,13 @@ class DriverAttachmentEditView(View):
                         'page_title': 'Edit Attachment',
                         'is_edit': True,
                         'tenant_schema_name': getattr(tenant_registry, 'schema_name', ''),
+                        **_driver_attachment_form_return_extras(
+                            request,
+                            driver=driver,
+                            attachment=attachment,
+                            tab='licenses-docs',
+                            list_url_name='iroad_tenants:driver_attachment_all_list',
+                        ),
                     }
                 )
                 messages.error(
@@ -28881,7 +30618,12 @@ class DriverAttachmentEditView(View):
                 'Attachment updated successfully.',
                 extra_tags='tenant',
             )
-            return redirect('iroad_tenants:driver_attachment_all_list')
+            return _redirect_after_driver_attachment_save(
+                request,
+                driver,
+                obj,
+                lambda req: redirect('iroad_tenants:driver_attachment_all_list'),
+            )
         finally:
             restore_public_schema(request)
 
@@ -29016,7 +30758,12 @@ class DriverAttachmentDeleteView(View):
                 att.delete()
                 messages.success(request, 'Attachment deleted.', extra_tags='tenant')
 
-            return redirect('iroad_tenants:driver_attachment_all_list')
+            return _redirect_after_driver_detail_save(
+                request,
+                str(driver.driver_id),
+                'licenses-docs',
+                lambda req: redirect('iroad_tenants:driver_attachment_all_list'),
+            )
         finally:
             restore_public_schema(request)
 
@@ -29316,6 +31063,12 @@ class TruckAttachmentCreateView(View):
                     'trucks_for_select': trucks_for_select,
                     'selected_truck_id': '',
                     'tenant_schema_name': getattr(tenant_registry, 'schema_name', ''),
+                    **_truck_form_return_extras(
+                        request,
+                        truck,
+                        tab='documents',
+                        list_url_name='iroad_tenants:truck_attachment_all_list',
+                    ),
                 }
             )
             return render(request, self.template_name, context)
@@ -29382,6 +31135,12 @@ class TruckAttachmentCreateView(View):
                         'selected_truck_id': selected_truck_id,
                         'truck_error': truck_error,
                         'tenant_schema_name': getattr(tenant_registry, 'schema_name', ''),
+                        **_truck_form_return_extras(
+                            request,
+                            truck,
+                            tab='documents',
+                            list_url_name='iroad_tenants:truck_attachment_all_list',
+                        ),
                     }
                 )
                 messages.error(request, 'Please fix the highlighted errors.', extra_tags='tenant')
@@ -29400,7 +31159,7 @@ class TruckAttachmentCreateView(View):
                 obj.full_clean()
                 obj.save()
             messages.success(request, 'Attachment saved.', extra_tags='tenant')
-            return redirect('iroad_tenants:truck_attachment_all_list')
+            return _redirect_after_truck_attachment_save(request, truck)
         finally:
             restore_public_schema(request)
 
@@ -29667,6 +31426,13 @@ class TruckAttachmentDeleteView(View):
                 att.save(update_fields=['attachment_file', 'is_deleted', 'is_deleted_by', 'updated_at'])
                 messages.success(request, 'Attachment deleted.', extra_tags='tenant')
 
+            if _truck_form_return_to_details(request):
+                return redirect(
+                    _truck_details_tab_url(
+                        truck_id,
+                        (request.POST.get('detail_tab') or '').strip() or 'documents',
+                    )
+                )
             return redirect('iroad_tenants:truck_attachment_all_list')
         finally:
             restore_public_schema(request)
@@ -30151,6 +31917,7 @@ class TenantAutoNumberConfigurationView(View):
         LOCATION_MASTER_AUTO_FORM_CODE: LOCATION_MASTER_AUTO_FORM_LABEL,
         ROUTE_MASTER_AUTO_FORM_CODE: ROUTE_MASTER_AUTO_FORM_LABEL,
         SERVICE_ITEM_MASTER_AUTO_FORM_CODE: SERVICE_ITEM_MASTER_AUTO_FORM_LABEL,
+        SERVICE_ITEM_CATEGORY_AUTO_FORM_CODE: SERVICE_ITEM_CATEGORY_AUTO_FORM_LABEL,
         PRICE_LIST_MASTER_AUTO_FORM_CODE: PRICE_LIST_MASTER_AUTO_FORM_LABEL,
         SALES_INVOICE_REPORT_AUTO_FORM_CODE: SALES_INVOICE_REPORT_AUTO_FORM_LABEL,
         BOOKING_AUTO_FORM_CODE: BOOKING_AUTO_FORM_LABEL,
@@ -30183,6 +31950,7 @@ class TenantAutoNumberConfigurationView(View):
         LOCATION_MASTER_AUTO_FORM_CODE: LOCATION_MASTER_REF_PREFIX,
         ROUTE_MASTER_AUTO_FORM_CODE: ROUTE_MASTER_REF_PREFIX,
         SERVICE_ITEM_MASTER_AUTO_FORM_CODE: SERVICE_ITEM_MASTER_REF_PREFIX,
+        SERVICE_ITEM_CATEGORY_AUTO_FORM_CODE: SERVICE_ITEM_CATEGORY_REF_PREFIX,
         PRICE_LIST_MASTER_AUTO_FORM_CODE: PRICE_LIST_MASTER_REF_PREFIX,
         SALES_INVOICE_REPORT_AUTO_FORM_CODE: SALES_INVOICE_REPORT_REF_PREFIX,
         BOOKING_AUTO_FORM_CODE: BOOKING_REF_PREFIX,
@@ -30502,6 +32270,7 @@ class TenantOrganizationProfileView(View):
                 # 'org_status_label': _organization_status_from_tenant(context['tenant']),
                 'logo_display_name': _logo_display_name(profile),
                 'tenant_schema_name': tenant_registry.schema_name,
+                **_organization_profile_display_context(profile),
             })
         finally:
             restore_public_schema(request)
@@ -30586,21 +32355,15 @@ class TenantLocationMasterListView(View):
         try:
             qs = TenantLocationMaster.objects.select_related('country')
 
-            status_filter = (request.GET.get('status') or 'all').strip().lower()
-            if status_filter == 'active':
-                qs = qs.filter(status=TenantLocationMaster.Status.ACTIVE)
-            elif status_filter == 'inactive':
-                qs = qs.filter(status=TenantLocationMaster.Status.INACTIVE)
-            else:
-                status_filter = 'all'
-
-            serviceable_filter = (request.GET.get('serviceable') or 'all').strip().lower()
-            if serviceable_filter == 'yes':
+            scope = (request.GET.get('scope') or 'all').strip().lower()
+            if scope not in ('all', 'serviceable', 'non_serviceable', 'inactive'):
+                scope = 'all'
+            if scope == 'serviceable':
                 qs = qs.filter(is_serviceable=True)
-            elif serviceable_filter == 'no':
+            elif scope == 'non_serviceable':
                 qs = qs.filter(is_serviceable=False)
-            else:
-                serviceable_filter = 'all'
+            elif scope == 'inactive':
+                qs = qs.filter(status=TenantLocationMaster.Status.INACTIVE)
 
             stats = {
                 'total': TenantLocationMaster.objects.count(),
@@ -30649,14 +32412,38 @@ class TenantLocationMasterListView(View):
                 search_fields=location_search_fields,
                 column_field_map=location_column_filters,
                 sort_col_field_map=location_sort_cols,
-                default_order=('-created_at',),
+                default_order=('location_code',),
                 column_filter_types=location_column_filter_types,
             )
+            location_list_base = reverse('iroad_tenants:tenant_location_master_list')
             context.update(
                 {
                     'locations_page': page,
-                    'filter_status': status_filter,
-                    'filter_serviceable': serviceable_filter,
+                    'location_scope': scope,
+                    'location_chip_all_url': location_list_base
+                    + copy_eal_list_params(
+                        request,
+                        set_params={'scope': 'all'},
+                        remove=['status', 'serviceable'],
+                    ),
+                    'location_chip_serviceable_url': location_list_base
+                    + copy_eal_list_params(
+                        request,
+                        set_params={'scope': 'serviceable'},
+                        remove=['status', 'serviceable'],
+                    ),
+                    'location_chip_non_serviceable_url': location_list_base
+                    + copy_eal_list_params(
+                        request,
+                        set_params={'scope': 'non_serviceable'},
+                        remove=['status', 'serviceable'],
+                    ),
+                    'location_chip_inactive_url': location_list_base
+                    + copy_eal_list_params(
+                        request,
+                        set_params={'scope': 'inactive'},
+                        remove=['status', 'serviceable'],
+                    ),
                     'location_stats': stats,
                     'tenant_schema_name': getattr(tenant_registry, 'schema_name', ''),
                     **list_ctx,
@@ -30811,10 +32598,16 @@ class TenantRouteMasterListView(View):
         try:
             qs = TenantRouteMaster.objects.select_related('origin_point', 'destination_point')
             route_scope = (request.GET.get('scope') or 'all').strip().lower()
+            if route_scope not in ('all', 'domestic', 'international', 'active', 'inactive'):
+                route_scope = 'all'
             if route_scope == 'domestic':
                 qs = qs.filter(route_type=TenantRouteMaster.RouteType.DOMESTIC)
             elif route_scope == 'international':
                 qs = qs.filter(route_type=TenantRouteMaster.RouteType.INTERNATIONAL)
+            elif route_scope == 'active':
+                qs = qs.filter(status=TenantRouteMaster.Status.ACTIVE)
+            elif route_scope == 'inactive':
+                qs = qs.filter(status=TenantRouteMaster.Status.INACTIVE)
 
             route_column_field_map = {
                 1: 'route_code',
@@ -30837,7 +32630,7 @@ class TenantRouteMasterListView(View):
                 ],
                 column_field_map=route_column_field_map,
                 sort_col_field_map=route_column_field_map,
-                default_order=('-created_at',),
+                default_order=('route_code',),
                 column_filter_types={
                     7: 'number',
                     8: 'number',
@@ -30850,11 +32643,22 @@ class TenantRouteMasterListView(View):
                 'with_customs': stats_qs.filter(has_customs=True).count(),
                 'with_toll_gates': stats_qs.filter(has_toll_gates=True).count(),
             }
+            route_list_base = reverse('iroad_tenants:tenant_route_master_list')
             context.update(
                 {
                     'routes_page': routes_page,
                     'route_scope': route_scope,
                     'route_stats': route_stats,
+                    'route_chip_all_url': route_list_base
+                    + copy_eal_list_params(request, set_params={'scope': 'all'}),
+                    'route_chip_domestic_url': route_list_base
+                    + copy_eal_list_params(request, set_params={'scope': 'domestic'}),
+                    'route_chip_international_url': route_list_base
+                    + copy_eal_list_params(request, set_params={'scope': 'international'}),
+                    'route_chip_active_url': route_list_base
+                    + copy_eal_list_params(request, set_params={'scope': 'active'}),
+                    'route_chip_inactive_url': route_list_base
+                    + copy_eal_list_params(request, set_params={'scope': 'inactive'}),
                     'tenant_schema_name': getattr(tenant_registry, 'schema_name', ''),
                     **route_pagination,
                 }
@@ -30976,7 +32780,7 @@ def _tenant_location_master_activity_entries(location):
 
 
 class TenantLocationMasterDetailView(View):
-    template_name = 'iroad_tenants/Master_Data/location_master/Location-master.html'
+    template_name = 'iroad_tenants/Master_Data/location_master/Location-master-detail.html'
 
     def get(self, request, location_id):
         context = _tenant_context_from_session(request)
@@ -31004,16 +32808,18 @@ class TenantLocationMasterDetailView(View):
             if not location:
                 messages.error(request, 'Location not found.', extra_tags='tenant')
                 return _tenant_redirect(request, 'iroad_tenants:tenant_location_master_list')
+
+            list_url = reverse('iroad_tenants:tenant_location_master_list')
+            edit_url = reverse(
+                'iroad_tenants:tenant_location_master_edit',
+                kwargs={'location_id': location.location_id},
+            )
             context.update(
                 {
-                    'form': TenantLocationMasterForm(
-                        instance=location,
-                        allow_inactive_status=True,
-                    ),
                     'location': location,
-                    'preview_location_code': location.location_code,
-                    'is_edit': True,
-                    'is_view': True,
+                    'activity_log': _tenant_location_master_activity_entries(location),
+                    'back_to_list_url': list_url,
+                    'edit_location_url': edit_url,
                     'tenant_schema_name': getattr(tenant_registry, 'schema_name', ''),
                 }
             )
@@ -31241,7 +33047,7 @@ def _tenant_route_master_activity_entries(route):
 
 
 class TenantRouteMasterDetailView(View):
-    template_name = 'iroad_tenants/Master_Data/location_master/Route-master.html'
+    template_name = 'iroad_tenants/Master_Data/location_master/Route-master-detail.html'
 
     def get(self, request, route_id):
         context = _tenant_context_from_session(request)
@@ -31264,13 +33070,18 @@ class TenantRouteMasterDetailView(View):
             if not route:
                 messages.error(request, 'Route not found.', extra_tags='tenant')
                 return _tenant_redirect(request, 'iroad_tenants:tenant_route_master_list')
+
+            list_url = reverse('iroad_tenants:tenant_route_master_list')
+            edit_url = reverse(
+                'iroad_tenants:tenant_route_master_edit',
+                kwargs={'route_id': route.route_id},
+            )
             context.update(
                 {
-                    'form': TenantRouteMasterForm(instance=route, allow_inactive_status=True),
                     'route': route,
-                    'preview_route_code': route.route_code,
-                    'is_edit': False,
-                    'is_view': True,
+                    'activity_log': _tenant_route_master_activity_entries(route),
+                    'back_to_list_url': list_url,
+                    'edit_route_url': edit_url,
                     'tenant_schema_name': getattr(tenant_registry, 'schema_name', ''),
                 }
             )
@@ -32239,13 +34050,13 @@ def _permissions_payload_from_post(request):
             {
                 'module_name': item['module_name'],
                 'form_name': item['form_name'],
+                'can_access': request.POST.get(f'perm_{idx}_access') == 'on',
+                'can_write': request.POST.get(f'perm_{idx}_write') == 'on',
+                'can_read': request.POST.get(f'perm_{idx}_read') == 'on',
                 'can_view': request.POST.get(f'perm_{idx}_view') == 'on',
-                'can_create': request.POST.get(f'perm_{idx}_create') == 'on',
                 'can_edit': request.POST.get(f'perm_{idx}_edit') == 'on',
-                'can_delete': request.POST.get(f'perm_{idx}_delete') == 'on',
-                'can_post': request.POST.get(f'perm_{idx}_post') == 'on',
-                'can_approve': request.POST.get(f'perm_{idx}_approve') == 'on',
                 'can_export': request.POST.get(f'perm_{idx}_export') == 'on',
+                'can_approve': request.POST.get(f'perm_{idx}_approve') == 'on',
                 'can_print': request.POST.get(f'perm_{idx}_print') == 'on',
             }
         )
@@ -32256,34 +34067,19 @@ def _merge_permission_flags(existing, incoming):
     """Combine permission flags when legacy and canonical rows coexist."""
     return {
         flag: existing.get(flag, False) or incoming.get(flag, False)
-        for flag in (
-            'can_view',
-            'can_create',
-            'can_edit',
-            'can_delete',
-            'can_post',
-            'can_approve',
-            'can_export',
-            'can_print',
-        )
+        for flag in TENANT_PERMISSION_FLAGS
     }
 
 
 def _permissions_by_key(role):
     perms = {}
     for permission in role.permissions.all():
-        form_name = resolve_canonical_form_name(permission.form_name)
-        key = f'{permission.module_name}|{form_name}'
-        incoming = {
-            'can_view': permission.can_view,
-            'can_create': permission.can_create,
-            'can_edit': permission.can_edit,
-            'can_delete': permission.can_delete,
-            'can_post': permission.can_post,
-            'can_approve': permission.can_approve,
-            'can_export': permission.can_export,
-            'can_print': permission.can_print,
-        }
+        module_name, form_name = resolve_canonical_permission_location(
+            permission.module_name,
+            permission.form_name,
+        )
+        key = f'{module_name}|{form_name}'
+        incoming = {flag: getattr(permission, flag) for flag in TENANT_PERMISSION_FLAGS}
         if key in perms:
             perms[key] = _merge_permission_flags(perms[key], incoming)
         else:
@@ -32300,14 +34096,10 @@ def _permission_matrix_with_values(permission_map=None):
             {
                 'module_name': item['module_name'],
                 'form_name': item['form_name'],
-                'can_view': permission_map.get(key, {}).get('can_view', False),
-                'can_create': permission_map.get(key, {}).get('can_create', False),
-                'can_edit': permission_map.get(key, {}).get('can_edit', False),
-                'can_delete': permission_map.get(key, {}).get('can_delete', False),
-                'can_post': permission_map.get(key, {}).get('can_post', False),
-                'can_approve': permission_map.get(key, {}).get('can_approve', False),
-                'can_export': permission_map.get(key, {}).get('can_export', False),
-                'can_print': permission_map.get(key, {}).get('can_print', False),
+                **{
+                    flag: permission_map.get(key, {}).get(flag, False)
+                    for flag in TENANT_PERMISSION_FLAGS
+                },
             }
         )
     return enrich_permission_matrix_rows(matrix_rows)
@@ -32497,13 +34289,13 @@ class TenantRolesPermissionsCreateView(View):
                         role=tenant_role,
                         module_name=item['module_name'],
                         form_name=item['form_name'],
+                        can_access=item['can_access'],
+                        can_write=item['can_write'],
+                        can_read=item['can_read'],
                         can_view=item['can_view'],
-                        can_create=item['can_create'],
                         can_edit=item['can_edit'],
-                        can_delete=item['can_delete'],
-                        can_post=item['can_post'],
-                        can_approve=item['can_approve'],
                         can_export=item['can_export'],
+                        can_approve=item['can_approve'],
                         can_print=item['can_print'],
                     )
                     for item in permissions_payload
@@ -32620,13 +34412,13 @@ class TenantRolesPermissionsEditView(View):
                         role=tenant_role,
                         module_name=item['module_name'],
                         form_name=item['form_name'],
+                        can_access=item['can_access'],
+                        can_write=item['can_write'],
+                        can_read=item['can_read'],
                         can_view=item['can_view'],
-                        can_create=item['can_create'],
                         can_edit=item['can_edit'],
-                        can_delete=item['can_delete'],
-                        can_post=item['can_post'],
-                        can_approve=item['can_approve'],
                         can_export=item['can_export'],
+                        can_approve=item['can_approve'],
                         can_print=item['can_print'],
                     )
                     for item in permissions_payload
@@ -32734,13 +34526,13 @@ def _build_tenant_roles_permissions_csv_response(tenant_roles):
             'Role Name (English)',
             'Module',
             'Form / Submodule',
+            'Access',
+            'Write',
+            'Read',
             'View',
-            'Create',
             'Edit',
-            'Delete',
-            'Post',
-            'Approve',
             'Export',
+            'Approve',
             'Print',
         ]
     )
@@ -32752,13 +34544,13 @@ def _build_tenant_roles_permissions_csv_response(tenant_roles):
                     tenant_role.role_name_en,
                     row['module_name'],
                     row['form_name'],
+                    _tenant_permission_flag_csv(row['can_access']),
+                    _tenant_permission_flag_csv(row['can_write']),
+                    _tenant_permission_flag_csv(row['can_read']),
                     _tenant_permission_flag_csv(row['can_view']),
-                    _tenant_permission_flag_csv(row['can_create']),
                     _tenant_permission_flag_csv(row['can_edit']),
-                    _tenant_permission_flag_csv(row['can_delete']),
-                    _tenant_permission_flag_csv(row['can_post']),
-                    _tenant_permission_flag_csv(row['can_approve']),
                     _tenant_permission_flag_csv(row['can_export']),
+                    _tenant_permission_flag_csv(row['can_approve']),
                     _tenant_permission_flag_csv(row['can_print']),
                 ]
             )
@@ -32798,6 +34590,28 @@ def _active_currency_options():
         .order_by('name_en', 'currency_code')
         .values('currency_code', 'name_en')
     )
+
+
+def _organization_profile_display_context(profile):
+    """Human-readable labels for organization profile view page."""
+    return {
+        'org_language_label': dict(OrganizationProfile.SYSTEM_LANGUAGE_CHOICES).get(
+            profile.system_language,
+            profile.system_language or '-',
+        ),
+        'org_date_format_label': dict(OrganizationProfile.DATE_FORMAT_CHOICES).get(
+            profile.date_format,
+            profile.date_format or '-',
+        ),
+        'org_number_format_label': dict(OrganizationProfile.NUMBER_FORMAT_CHOICES).get(
+            profile.number_format,
+            profile.number_format or '-',
+        ),
+        'org_negative_format_label': dict(OrganizationProfile.NEGATIVE_FORMAT_CHOICES).get(
+            profile.negative_format,
+            profile.negative_format or '-',
+        ),
+    }
 
 
 def _organization_form_context(profile):
@@ -34251,6 +36065,21 @@ def _preview_next_cargo_category_code():
     return _render_tenant_ref_no(next_seq, config, prefix=CARGO_CATEGORY_REF_PREFIX)
 
 
+def _preview_next_service_item_category_code():
+    config, _ = AutoNumberConfiguration.objects.get_or_create(
+        form_code=SERVICE_ITEM_CATEGORY_AUTO_FORM_CODE,
+        defaults={
+            'form_label': SERVICE_ITEM_CATEGORY_AUTO_FORM_LABEL,
+            'number_of_digits': 4,
+            'sequence_format': AutoNumberConfiguration.SequenceFormat.NUMERIC,
+            'is_unique': True,
+        },
+    )
+    sequence = AutoNumberSequence.objects.filter(form_code=SERVICE_ITEM_CATEGORY_AUTO_FORM_CODE).first()
+    next_seq = sequence.next_number if sequence else 1
+    return _render_tenant_ref_no(next_seq, config, prefix=SERVICE_ITEM_CATEGORY_REF_PREFIX)
+
+
 def _preview_next_location_master_code():
     config, _ = AutoNumberConfiguration.objects.get_or_create(
         form_code=LOCATION_MASTER_AUTO_FORM_CODE,
@@ -34448,9 +36277,7 @@ def _apply_organization_profile_post(request, profile):
     profile.negative_format = (post.get('negative_format') or '-100').strip()
 
     new_base_currency = (post.get('base_currency_code') or '').strip().upper()
-    if profile.base_currency_code and new_base_currency and new_base_currency != profile.base_currency_code:
-        raise ValueError('Base Currency is immutable after initial setup.')
-    if not profile.base_currency_code:
+    if new_base_currency:
         profile.base_currency_code = new_base_currency
 
     logo_file = request.FILES.get('logo_file')

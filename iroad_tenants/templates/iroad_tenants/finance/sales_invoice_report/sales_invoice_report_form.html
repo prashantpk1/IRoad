@@ -97,13 +97,13 @@
   <div class="page-header-row">
     <div class="page-header-left">
       <h1 class="page-title">{{ page_title }}</h1>
-      <p class="page-subtitle">
+      <!-- <p class="page-subtitle">
         {% if is_edit %}
         Update {{ report.report_no }} — client, booking period, and worksheet lines.
         {% else %}
         Select client account and booking period to build the billing worksheet.
         {% endif %}
-      </p>
+      </p> -->
     </div>
     <div class="page-header-right">
       <div class="eal-header-actions">
@@ -130,7 +130,6 @@
       <div class="form-card-icon blue"><i class="bi bi-receipt"></i></div>
       <div class="form-card-header-text">
         <h2 class="form-card-title">Job Order Report</h2>
-        <p class="form-card-desc">Header, booking scope, and worksheet controls.</p>
       </div>
     </div>
     <div class="form-card-body">
@@ -196,7 +195,6 @@
       <div class="form-card-icon green"><i class="bi bi-calendar-check"></i></div>
       <div class="form-card-header-text">
         <h2 class="form-card-title">Bookings</h2>
-        <p class="form-card-desc">Executed bookings included in the billing worksheet. Sell price locked from Sales Order snapshot.</p>
       </div>
     </div>
     <div class="form-card-body">
@@ -291,7 +289,6 @@
       <div class="form-card-icon blue"><i class="bi bi-truck"></i></div>
       <div class="form-card-header-text">
         <h2 class="form-card-title">Related Shipments</h2>
-        <p class="form-card-desc">Shipments executed for selected bookings. Customer Ref contains delivery document references.</p>
       </div>
     </div>
     <div class="form-card-body">
@@ -410,7 +407,6 @@
       <div class="form-card-icon amber"><i class="bi bi-plus-circle"></i></div>
       <div class="form-card-header-text">
         <h2 class="form-card-title">Related Surcharges</h2>
-        <p class="form-card-desc">Surcharges linked to selected shipments/bookings. Source: confirmed Sales Surcharge transactions.</p>
       </div>
     </div>
     <div class="form-card-body">
@@ -515,9 +511,9 @@
         <div class="eal-stat-card"><div class="eal-stat-icon amber"><i class="bi bi-tag"></i></div><div><div class="eal-stat-value" id="sirSurchargesCount">{{ surcharge_lines|length }}</div><div class="eal-stat-label">Surcharges count</div></div></div>
       </div>
       <div class="eal-stats-row">
-        <div class="eal-stat-card"><div class="eal-stat-icon green"><i class="bi bi-currency-dollar"></i></div><div><div class="eal-stat-value" id="id_total_freight_amount_display">{{ report_form.total_freight_amount.value|default:"0.00" }}</div><div class="eal-stat-label">Freight amount</div></div></div>
-        <div class="eal-stat-card"><div class="eal-stat-icon amber"><i class="bi bi-cash-stack"></i></div><div><div class="eal-stat-value" id="id_total_surcharge_amount_display">{{ report_form.total_surcharge_amount.value|default:"0.00" }}</div><div class="eal-stat-label">Surcharges amount</div></div></div>
-        <div class="eal-stat-card"><div class="eal-stat-icon purple"><i class="bi bi-wallet2"></i></div><div><div class="eal-stat-value" id="sirCombinedTotal">0.00</div><div class="eal-stat-label">Total</div></div></div>
+        <div class="eal-stat-card"><div class="eal-stat-icon green"><i class="bi bi-currency-dollar"></i></div><div><div class="eal-stat-value jor-summary-currency" id="id_total_freight_amount_display">${{ report_form.total_freight_amount.value|default:"0"|floatformat:2 }}</div><div class="eal-stat-label">Freight amount</div></div></div>
+        <div class="eal-stat-card"><div class="eal-stat-icon amber"><i class="bi bi-cash-stack"></i></div><div><div class="eal-stat-value jor-summary-currency" id="id_total_surcharge_amount_display">${{ report_form.total_surcharge_amount.value|default:"0"|floatformat:2 }}</div><div class="eal-stat-label">Surcharges amount</div></div></div>
+        <div class="eal-stat-card jor-summary-total-card"><div class="eal-stat-icon purple"><i class="bi bi-wallet2"></i></div><div>{% with freight=report_form.total_freight_amount.value|default:0 surcharge=report_form.total_surcharge_amount.value|default:0 %}<div class="eal-stat-value jor-summary-currency" id="sirCombinedTotal">${{ freight|add:surcharge|floatformat:2 }}</div>{% endwith %}<div class="eal-stat-label">Total</div></div></div>
       </div>
     </div>
   </div>
@@ -988,14 +984,25 @@
     ccyEl.value = "SAR";
   }
 
+  function formatMoney(v) {
+    if (v === null || v === undefined || v === "" || v === "—") {
+      return "$0.00";
+    }
+    var n = parseFloat(String(v).replace(/[^0-9.-]/g, ""));
+    if (!Number.isFinite(n)) {
+      return "$0.00";
+    }
+    return "$" + n.toFixed(2);
+  }
+
   function setTotals(f, s, c) {
     if (freightEl) freightEl.value = safeText(f === "—" ? "" : f);
     if (surchargeEl) surchargeEl.value = safeText(s === "—" ? "" : s);
     var freightCard = document.getElementById("id_total_freight_amount_display");
     var surchargeCard = document.getElementById("id_total_surcharge_amount_display");
-    if (freightCard) freightCard.textContent = safeText(f);
-    if (surchargeCard) surchargeCard.textContent = safeText(s);
-    if (combinedTotalEl) combinedTotalEl.textContent = safeText(c);
+    if (freightCard) freightCard.textContent = formatMoney(f);
+    if (surchargeCard) surchargeCard.textContent = formatMoney(s);
+    if (combinedTotalEl) combinedTotalEl.textContent = formatMoney(c);
   }
 
   function resetDynamicTables() {

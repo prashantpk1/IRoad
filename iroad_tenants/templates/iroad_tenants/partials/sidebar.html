@@ -291,7 +291,7 @@
 
           <!-- Services Management -->
           {% if is_tenant_admin %}
-          <li class="nav-item has-submenu{% if request.resolver_match and 'tenant_service_item_' in request.resolver_match.url_name or request.resolver_match and 'tenant_price_list_' in request.resolver_match.url_name %} open{% endif %}">
+          <li class="nav-item has-submenu{% if request.resolver_match and 'tenant_service_item_' in request.resolver_match.url_name or request.resolver_match and 'tenant_price_list_' in request.resolver_match.url_name or request.resolver_match and 'tenant_service_item_category_' in request.resolver_match.url_name %} open{% endif %}">
             <a href="#" class="nav-link" data-tooltip="Services Management">
               <i class="bi bi-gear"></i>
               <span class="nav-text">Services Management</span>
@@ -299,12 +299,17 @@
             </a>
             <ul class="submenu">
               <li class="submenu-item">
-                <a href="{% url 'iroad_tenants:tenant_service_item_master_list' %}" class="submenu-link{% if request.resolver_match and 'tenant_service_item_' in request.resolver_match.url_name %} active{% endif %}">
+                <a href="{% url 'iroad_tenants:tenant_service_item_master_list' %}" class="submenu-link{% if request.resolver_match and 'tenant_service_item_master_' in request.resolver_match.url_name or request.resolver_match and 'tenant_service_item_settings' in request.resolver_match.url_name %} active{% endif %}">
                   <i class="bi bi-tools"></i>
                   <span>Service Item Master</span>
                 </a>
               </li>
-
+              <li class="submenu-item">
+                <a href="{% url 'iroad_tenants:tenant_service_item_category_list' %}" class="submenu-link{% if request.resolver_match and 'tenant_service_item_category_' in request.resolver_match.url_name %} active{% endif %}">
+                  <i class="bi bi-ui-checks-grid"></i>
+                  <span>Service Category Config</span>
+                </a>
+              </li>
               <li class="submenu-item">
                 <a href="{% url 'iroad_tenants:tenant_price_list_master_list' %}" class="submenu-link{% if request.resolver_match and 'tenant_price_list_' in request.resolver_match.url_name %} active{% endif %}">
                   <i class="bi bi-tags"></i>

@@ -30,11 +30,10 @@
       }
       .oal-media-table td[data-col="actions"] {
         text-align: center;
-        width: 110px;
+        width: 56px;
       }
-      .oal-media-table td[data-col="actions"] .btn {
-        white-space: nowrap;
-        min-width: 86px;
+      .oal-media-table td[data-col="actions"] .pod-action-btn {
+        margin: 0 auto;
       }
       .oal-media-sn {
         display: inline-flex;
@@ -55,13 +54,6 @@
       }
       .oal-media-table tbody tr[data-oal-media] {
         border-bottom: 1px solid #e8edf5;
-      }
-      .oal-action-btn {
-        border-color: #d7dcef;
-        color: #49506b;
-      }
-      .oal-delete-btn {
-        min-width: 86px;
       }
 
       .oal-booking-lookup { position: relative; }
@@ -157,12 +149,8 @@
         }
 
         .oal-media-table tbody td[data-col="actions"] {
-          align-items: stretch;
+          align-items: center;
           grid-column: 1 / -1;
-        }
-
-        .oal-media-table tbody td[data-col="actions"] .btn {
-          width: 100%;
         }
       }
 
@@ -170,6 +158,20 @@
         .oal-media-table tbody tr {
           grid-template-columns: 1fr;
         }
+      }
+
+      .oal-form-error-summary ul li {
+        margin-bottom: 4px;
+      }
+
+      .oal-field-error-flag {
+        color: #dc3545;
+        margin-left: 4px;
+        vertical-align: middle;
+      }
+
+      .field.has-field-error .form-label {
+        color: #b42318;
       }
     </style>
 {% endblock %}
@@ -190,17 +192,17 @@
         <div class="page-header-row">
           <div class="page-header-left">
             <h1 class="page-title">{{ action_log_page_title|default:'Action Log' }}</h1>
-            <p class="page-subtitle">
+            <!-- <p class="page-subtitle">
               Record action events (OperationActionLog) and attach multiple
               photos/videos (OperationActionMedia).
-            </p>
+            </p> -->
           </div>
           <div class="page-header-right">
             <div class="eal-header-actions">
               {% if action_log_is_edit and action_log_form.detail_url %}
               <a href="{{ action_log_form.detail_url }}" class="eal-btn eal-btn-outline">
                 <i class="bi bi-arrow-left"></i>
-                <span>Back to Details</span>
+                <span>Back</span>
               </a>
               {% else %}
               <a href="{% url 'iroad_tenants:tenant_operation_action_log_list' %}" class="eal-btn eal-btn-outline">
@@ -217,6 +219,22 @@
         </div>
       </div>
 
+      {% if action_log_error_summary %}
+      <div class="alert alert-danger oal-form-error-summary mb-3" role="alert" id="actionLogErrorSummary">
+        <div class="d-flex align-items-start gap-2">
+          <i class="bi bi-exclamation-triangle-fill flex-shrink-0 mt-1"></i>
+          <div>
+            <strong>Please fix the following {{ action_log_error_summary|length }} error{{ action_log_error_summary|length|pluralize }}:</strong>
+            <ul class="mb-0 mt-2 ps-3">
+              {% for item in action_log_error_summary %}
+              <li><strong>{{ item.field_label }}:</strong> {{ item.message }}</li>
+              {% endfor %}
+            </ul>
+          </div>
+        </div>
+      </div>
+      {% endif %}
+
       <form id="operationActionLogForm" method="post" enctype="multipart/form-data"{% if action_log_form.edit_url %} action="{{ action_log_form.edit_url }}"{% endif %}>
         {% csrf_token %}
         <input type="hidden" name="idempotency_key" value="{{ action_log_form.idempotency_key|default:'' }}" />
@@ -228,8 +246,7 @@
             </div>
             <div class="form-card-header-text">
               <h2 class="form-card-title">Header</h2>
-              <p class="form-card-desc">Primary action log details.</p>
-            </div>
+      </div>
           </div>
           <div class="form-card-body">
             <div class="fields-grid cols-3">
@@ -245,25 +262,26 @@
                   readonly
                 />
               </div>
-              <div class="field">
+              <div class="field{% if action_log_form_errors.log_date %} has-field-error{% endif %}" data-field-key="log_date">
                 <label for="logDate" class="form-label"
-                  >Log Date (Date-Time)</label
+                  >Log Date (Date-Time){% if action_log_form_errors.log_date %}<i class="bi bi-exclamation-circle-fill oal-field-error-flag" title="{{ action_log_form_errors.log_date }}"></i>{% endif %}</label
                 >
                 <input
                   type="datetime-local"
-                  class="form-control"
+                  class="form-control{% if action_log_form_errors.log_date %} is-invalid{% endif %}"
                   id="logDate"
                   name="log_date"
                   value="{{ action_log_form.log_date_input|default:'' }}"
                   required
                 />
+                {% if action_log_form_errors.log_date %}<div class="invalid-feedback d-block">{{ action_log_form_errors.log_date }}</div>{% endif %}
               </div>
-              <div class="field">
-                <label for="actionLookup" class="form-label">Action</label>
-                <select class="form-select{% if action_log_form_errors.operation_action_id %} is-invalid{% endif %}" id="actionLookup" name="operation_action_id" required data-initial-action-id="{{ action_log_form.operation_action_id|default:'' }}">
+              <div class="field{% if action_log_form_errors.operation_action_id %} has-field-error{% endif %}" data-field-key="operation_action_id">
+                <label for="actionLookup" class="form-label">Action{% if action_log_form_errors.operation_action_id %}<i class="bi bi-exclamation-circle-fill oal-field-error-flag" title="{{ action_log_form_errors.operation_action_id }}"></i>{% endif %}</label>
+                <select class="form-select{% if action_log_form_errors.operation_action_id %} is-invalid{% endif %}" id="actionLookup" name="operation_action_id" required data-initial-action-id="{{ action_log_form.operation_action_id|default:'' }}" data-action-log-edit="{% if action_log_is_edit %}1{% else %}0{% endif %}">
                   <option value="" disabled {% if not action_log_form.operation_action_id %}selected{% endif %}>-Select action-</option>
                   {% for action in action_options %}
-                  <option value="{{ action.action_id }}" {% if action_log_form.operation_action_id == action.action_id %}selected{% endif %}>{{ action.english_label|default:action.label }}</option>
+                  <option value="{{ action.action_id }}" {% if action_log_form.operation_action_id == action.action_id %}selected{% endif %}>{{ action.action_code }} - {{ action.english_label|default:action.label }}</option>
                   {% endfor %}
                 </select>
                 <div class="form-text text-muted" id="actionAllowedHint">{{ action_allowed_context_label|default:"Select a booking or shipment to see allowed actions." }}</div>
@@ -285,8 +303,8 @@
                   {% endfor %}
                 </select>
               </div>
-              <div class="field">
-                <label for="userLookup" class="form-label">User</label>
+              <div class="field{% if action_log_form_errors.created_by_id %} has-field-error{% endif %}" data-field-key="created_by_id">
+                <label for="userLookup" class="form-label">User{% if action_log_form_errors.created_by_id %}<i class="bi bi-exclamation-circle-fill oal-field-error-flag" title="{{ action_log_form_errors.created_by_id }}"></i>{% endif %}</label>
                 <select class="form-select{% if action_log_form_errors.created_by_id %} is-invalid{% endif %}" id="userLookup" name="created_by_id">
                   <option value="">-Select user-</option>
                   {% for user in user_options %}
@@ -316,19 +334,18 @@
             </div>
             <div class="form-card-header-text">
               <h2 class="form-card-title">References</h2>
-              <p class="form-card-desc">Link related operation entities.</p>
-            </div>
+      </div>
           </div>
           <div class="form-card-body">
             <div class="fields-grid cols-3">
-              <div class="field">
-                <label for="bookingLookup" class="form-label">Booking</label>
+              <div class="field{% if action_log_form_errors.booking_id %} has-field-error{% endif %}" data-field-key="booking_id">
+                <label for="bookingLookup" class="form-label">Booking{% if action_log_form_errors.booking_id %}<i class="bi bi-exclamation-circle-fill oal-field-error-flag" title="{{ action_log_form_errors.booking_id }}"></i>{% endif %}</label>
                 <div class="input-icon-wrapper oal-booking-lookup">
                   <i class="bi bi-search"></i>
                   <input type="hidden" id="bookingId" name="booking_id" value="{{ action_log_form.booking_id|default:'' }}" />
                   <input
                     type="text"
-                    class="form-control has-icon"
+                    class="form-control has-icon{% if action_log_form_errors.booking_id %} is-invalid{% endif %}"
                     id="bookingLookup"
                     value="{{ action_log_form.booking_no|default:'' }}"
                     placeholder="Search booking no..."
@@ -355,10 +372,11 @@
                     {% endfor %}
                   </div>
                 </div>
+                {% if action_log_form_errors.booking_id %}<div class="invalid-feedback d-block">{{ action_log_form_errors.booking_id }}</div>{% endif %}
               </div>
-              <div class="field">
-                <label for="bookingLineBirthLookup" class="form-label">Booking line (Auto Shipment Post)</label>
-                <select class="form-select" id="bookingLineBirthLookup" name="booking_item_type">
+              <div class="field{% if action_log_form_errors.booking_item_type %} has-field-error{% endif %}" data-field-key="booking_item_type">
+                <label for="bookingLineBirthLookup" class="form-label">Booking line (Auto Shipment Post){% if action_log_form_errors.booking_item_type %}<i class="bi bi-exclamation-circle-fill oal-field-error-flag" title="{{ action_log_form_errors.booking_item_type }}"></i>{% endif %}</label>
+                <select class="form-select{% if action_log_form_errors.booking_item_type %} is-invalid{% endif %}" id="bookingLineBirthLookup" name="booking_item_type">
                   <option value="">-Select line when action has Auto Shipment Post-</option>
                   {% for line in booking_line_birth_options %}
                   <option
@@ -370,9 +388,10 @@
                   {% endfor %}
                 </select>
                 <span class="field-hint">Used when the selected action has Auto Shipment Post enabled in Action Master. One active shipment per line.</span>
+                {% if action_log_form_errors.booking_item_type %}<div class="invalid-feedback d-block">{{ action_log_form_errors.booking_item_type }}</div>{% endif %}
               </div>
-              <div class="field">
-                <label for="bookingItemLookup" class="form-label">Existing shipment line</label>
+              <div class="field{% if action_log_form_errors.shipment_id %} has-field-error{% endif %}" data-field-key="shipment_id">
+                <label for="bookingItemLookup" class="form-label">Existing shipment line{% if action_log_form_errors.shipment_id %}<i class="bi bi-exclamation-circle-fill oal-field-error-flag" title="{{ action_log_form_errors.shipment_id }}"></i>{% endif %}</label>
                 <select class="form-select{% if action_log_form_errors.shipment_id %} is-invalid{% endif %}" id="bookingItemLookup">
                   <option value="">-Select existing shipment-</option>
                   {% for shipment in shipment_options %}
@@ -387,9 +406,10 @@
                   >{{ shipment.booking_item_label }}</option>
                   {% endfor %}
                 </select>
+                {% if action_log_form_errors.shipment_id %}<div class="invalid-feedback d-block">{{ action_log_form_errors.shipment_id }}</div>{% endif %}
               </div>
-              <div class="field">
-                <label for="movementLookup" class="form-label">Movement</label>
+              <div class="field{% if action_log_form_errors.movement_id %} has-field-error{% endif %}" data-field-key="movement_id">
+                <label for="movementLookup" class="form-label">Movement{% if action_log_form_errors.movement_id %}<i class="bi bi-exclamation-circle-fill oal-field-error-flag" title="{{ action_log_form_errors.movement_id }}"></i>{% endif %}</label>
                 <select class="form-select{% if action_log_form_errors.movement_id %} is-invalid{% endif %}" id="movementLookup" name="movement_id">
                   <option value="">-Select movement-</option>
                   {% for movement in movement_options %}
@@ -409,8 +429,8 @@
               </div>
             </div>
             <div class="fields-grid cols-3">
-              <div class="field">
-                <label for="shipmentLookup" class="form-label">Shipment</label>
+              <div class="field{% if action_log_form_errors.shipment_id %} has-field-error{% endif %}" data-field-key="shipment_id">
+                <label for="shipmentLookup" class="form-label">Shipment{% if action_log_form_errors.shipment_id %}<i class="bi bi-exclamation-circle-fill oal-field-error-flag" title="{{ action_log_form_errors.shipment_id }}"></i>{% endif %}</label>
                 <select class="form-select{% if action_log_form_errors.shipment_id %} is-invalid{% endif %}" id="shipmentLookup" name="shipment_id">
                   <option value="">-Select shipment-</option>
                   {% for shipment in shipment_options %}
@@ -425,9 +445,10 @@
                   >{{ shipment.shipment_no }}{% if shipment.booking_no %} - {{ shipment.booking_no }}{% endif %}</option>
                   {% endfor %}
                 </select>
+                {% if action_log_form_errors.shipment_id %}<div class="invalid-feedback d-block">{{ action_log_form_errors.shipment_id }}</div>{% endif %}
               </div>
-              <div class="field">
-                <label for="truckLookup" class="form-label">Truck</label>
+              <div class="field{% if action_log_form_errors.truck_id %} has-field-error{% endif %}" data-field-key="truck_id">
+                <label for="truckLookup" class="form-label">Truck{% if action_log_form_errors.truck_id %}<i class="bi bi-exclamation-circle-fill oal-field-error-flag" title="{{ action_log_form_errors.truck_id }}"></i>{% endif %}</label>
                 <select class="form-select{% if action_log_form_errors.truck_id %} is-invalid{% endif %}" id="truckLookup" name="truck_id">
                   <option value="">-Select truck-</option>
                   {% for truck in truck_options %}
@@ -440,8 +461,8 @@
                 </select>
                 {% if action_log_form_errors.truck_id %}<div class="invalid-feedback d-block">{{ action_log_form_errors.truck_id }}</div>{% endif %}
               </div>
-              <div class="field">
-                <label for="driverLookup" class="form-label">Driver</label>
+              <div class="field{% if action_log_form_errors.driver_id %} has-field-error{% endif %}" data-field-key="driver_id">
+                <label for="driverLookup" class="form-label">Driver{% if action_log_form_errors.driver_id %}<i class="bi bi-exclamation-circle-fill oal-field-error-flag" title="{{ action_log_form_errors.driver_id }}"></i>{% endif %}</label>
                 <select class="form-select{% if action_log_form_errors.driver_id %} is-invalid{% endif %}" id="driverLookup" name="driver_id">
                   <option value="">-Select driver-</option>
                   {% for driver in driver_options %}
@@ -461,8 +482,7 @@
             </div>
             <div class="form-card-header-text">
               <h2 class="form-card-title">Location Details</h2>
-              <p class="form-card-desc">Store geolocation and map reference.</p>
-            </div>
+      </div>
           </div>
           <div class="form-card-body">
             <div class="fields-grid cols-3">
@@ -525,8 +545,7 @@
             </div>
             <div class="form-card-header-text">
               <h2 class="form-card-title">Evidence Attachments</h2>
-              <p class="form-card-desc">Sub-form for media evidence rows.</p>
-            </div>
+      </div>
           </div>
           <div class="form-card-body">
             <div class="table-responsive">
@@ -540,7 +559,7 @@
                     <th style="width: 20%">Timestamp</th>
                     <th style="width: 22%">File</th>
                     <th style="width: 24%">Description</th>
-                    <th style="width: 110px">Actions</th>
+                    <th style="width: 56px">Actions</th>
                   </tr>
                 </thead>
                 <tbody id="oalMediaTbody"></tbody>
@@ -549,10 +568,10 @@
             <template id="oalDeleteButtonTemplate">
               <button
                 type="button"
-                class="btn btn-sm btn-outline-danger oal-delete-row oal-delete-btn"
+                class="pod-action-btn delete oal-delete-row"
+                title="Remove row"
               >
                 <i class="bi bi-trash3"></i>
-                Delete
               </button>
             </template>
             <div class="mt-3">
@@ -599,6 +618,19 @@
             actionLogSubmitBtn.disabled = true;
             actionLogSubmitBtn.innerHTML = '<i class="bi bi-hourglass-split"></i> Saving...';
           });
+        }
+
+        var errorSummary = document.getElementById("actionLogErrorSummary");
+        if (errorSummary) {
+          errorSummary.scrollIntoView({ behavior: "smooth", block: "start" });
+          if (actionLogForm) {
+            var firstInvalid = actionLogForm.querySelector(".has-field-error input, .has-field-error select, .has-field-error textarea, .is-invalid");
+            if (firstInvalid && typeof firstInvalid.focus === "function") {
+              setTimeout(function () {
+                firstInvalid.focus({ preventScroll: true });
+              }, 350);
+            }
+          }
         }
 
         var logDateEl = document.getElementById("logDate");
@@ -722,6 +754,7 @@
           }
           syncTruckAndDriverFromShipment(bookingOption);
           syncBookingItemFromShipment();
+          scheduleRefreshAllowedActions();
         }
 
         function syncShipmentFromBookingItem() {
@@ -818,10 +851,37 @@
         var actionLookup = document.getElementById("actionLookup");
         var actionAllowedHint = document.getElementById("actionAllowedHint");
         var allowedActionsUrl = "{% url 'iroad_tenants:tenant_operation_action_log_allowed_actions' %}";
+        var actionLogIsEdit = actionLookup && actionLookup.getAttribute("data-action-log-edit") === "1";
+        var actionRefreshTimer = null;
+
+        function formatActionOptionLabel(row) {
+          var code = String((row && row.action_code) || "").trim();
+          var label = String((row && (row.english_label || row.label)) || "").trim();
+          if (code && label) return code + " - " + label;
+          return code || label || "";
+        }
+
+        function hasLinkageContext() {
+          return Boolean(
+            (bookingIdInput && bookingIdInput.value) ||
+              (shipmentSelect && shipmentSelect.value) ||
+              (movementSelect && movementSelect.value) ||
+              (bookingLineBirthSelect && bookingLineBirthSelect.value)
+          );
+        }
 
         function rebuildActionOptions(actions, selectedId) {
           if (!actionLookup) return;
-          var keep = selectedId || actionLookup.getAttribute("data-initial-action-id") || "";
+          var actionsList = actions || [];
+          var keep = selectedId || "";
+          if (!keep && actionLogIsEdit) {
+            keep = actionLookup.getAttribute("data-initial-action-id") || "";
+          }
+          if (keep && !actionsList.some(function (row) {
+            return String(row.action_id) === String(keep);
+          })) {
+            keep = "";
+          }
           actionLookup.innerHTML = "";
           var placeholder = document.createElement("option");
           placeholder.value = "";
@@ -829,17 +889,29 @@
           placeholder.disabled = true;
           if (!keep) placeholder.selected = true;
           actionLookup.appendChild(placeholder);
-          (actions || []).forEach(function (row) {
+          actionsList.forEach(function (row) {
             var opt = document.createElement("option");
             opt.value = row.action_id;
-            opt.textContent = row.english_label || row.label || row.action_code || "";
+            opt.textContent = formatActionOptionLabel(row);
             if (keep && String(keep) === String(row.action_id)) opt.selected = true;
             actionLookup.appendChild(opt);
           });
+          if (!keep) actionLookup.value = "";
+        }
+
+        function scheduleRefreshAllowedActions() {
+          if (!actionLookup || !allowedActionsUrl) return;
+          if (document.activeElement === actionLookup) return;
+          if (actionRefreshTimer) window.clearTimeout(actionRefreshTimer);
+          actionRefreshTimer = window.setTimeout(function () {
+            actionRefreshTimer = null;
+            refreshAllowedActions();
+          }, 200);
         }
 
         function refreshAllowedActions() {
           if (!actionLookup || !allowedActionsUrl) return;
+          if (document.activeElement === actionLookup) return;
           var params = new URLSearchParams();
           if (bookingIdInput && bookingIdInput.value) params.set("booking_id", bookingIdInput.value);
           if (shipmentSelect && shipmentSelect.value) params.set("shipment_id", shipmentSelect.value);
@@ -847,7 +919,11 @@
           if (bookingLineBirthSelect && bookingLineBirthSelect.value) {
             params.set("booking_item_type", bookingLineBirthSelect.value);
           }
-          var includeId = actionLookup.value || actionLookup.getAttribute("data-initial-action-id") || "";
+          var currentSelection = actionLookup.value || "";
+          var includeId = "";
+          if (actionLogIsEdit) {
+            includeId = currentSelection || actionLookup.getAttribute("data-initial-action-id") || "";
+          }
           if (includeId) params.set("include_action_id", includeId);
           fetch(allowedActionsUrl + "?" + params.toString(), {
             headers: { Accept: "application/json" },
@@ -858,7 +934,16 @@
             })
             .then(function (data) {
               if (!data || !Array.isArray(data.actions)) return;
-              rebuildActionOptions(data.actions, includeId);
+              if (!data.actions.length && !hasLinkageContext()) {
+                if (actionAllowedHint && data.context_label) {
+                  actionAllowedHint.textContent = data.context_label;
+                }
+                return;
+              }
+              var preserveSelection = actionLogIsEdit
+                ? (currentSelection || actionLookup.getAttribute("data-initial-action-id") || "")
+                : currentSelection;
+              rebuildActionOptions(data.actions, preserveSelection);
               if (actionAllowedHint && data.context_label) {
                 actionAllowedHint.textContent = data.context_label;
               }
@@ -871,28 +956,33 @@
         if (shipmentSelect) {
           shipmentSelect.addEventListener("change", function () {
             syncBookingFromShipment();
-            refreshAllowedActions();
+            scheduleRefreshAllowedActions();
           });
         }
         if (bookingLineBirthSelect) {
           bookingLineBirthSelect.addEventListener("change", function () {
             syncBookingFromBirthLine();
-            refreshAllowedActions();
+            scheduleRefreshAllowedActions();
           });
         }
         if (movementSelect) {
           movementSelect.addEventListener("change", function () {
             applyMovementSelection();
-            refreshAllowedActions();
+            scheduleRefreshAllowedActions();
           });
-        }
-        if (bookingInput) {
-          bookingInput.addEventListener("change", refreshAllowedActions);
         }
         if (bookingItemSelect) {
           bookingItemSelect.addEventListener("change", function () {
             syncShipmentFromBookingItem();
-            refreshAllowedActions();
+            scheduleRefreshAllowedActions();
+          });
+        }
+        if (actionLookup) {
+          actionLookup.addEventListener("change", function () {
+            actionLookup.setAttribute("data-initial-action-id", "");
+          });
+          actionLookup.addEventListener("blur", function () {
+            scheduleRefreshAllowedActions();
           });
         }
         if (truckSelect) {
@@ -903,6 +993,8 @@
             }
           });
         }
+
+        refreshAllowedActions();
 
         var tbody = document.getElementById("oalMediaTbody");
         var addBtn = document.getElementById("addOalMediaBtn");

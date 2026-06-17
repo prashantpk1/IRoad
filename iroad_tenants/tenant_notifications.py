@@ -39,40 +39,52 @@ def resolve_recipient_from_session(*, tenant_id: str, reference_id: str) -> tupl
     return ref, ref
 
 
+def _tenant_user_role_name(tenant_user_id: str | None) -> str:
+    if not tenant_user_id:
+        return ''
+    return (
+        TenantUser.objects.filter(pk=tenant_user_id)
+        .values_list('role_name', flat=True)
+        .first()
+        or ''
+    ).strip().lower()
+
+
+def _matches_system_admin_audience(*, recipient_key: str, role: str) -> bool:
+    if recipient_key == TENANT_OWNER_RECIPIENT_KEY:
+        return True
+    return role in ('administrator', 'admin', 'tenant admin', 'system admin')
+
+
+def _matches_admin_finance_audience(*, recipient_key: str, role: str) -> bool:
+    if recipient_key == TENANT_OWNER_RECIPIENT_KEY:
+        return True
+    return any(
+        token in role
+        for token in ('admin', 'finance', 'administrator')
+    )
+
+
 def recipient_is_contract_admin(
     *,
     settings_obj: TenantClientContractSetting,
     recipient_key: str,
     tenant_user_id: str | None,
 ) -> bool:
-    audience = settings_obj.notification_audience
-    if audience == TenantClientContractSetting.NotificationAudience.ADMIN_FINANCE:
-        if recipient_key == TENANT_OWNER_RECIPIENT_KEY:
-            return True
-        if not tenant_user_id:
-            return False
-        role = (
-            TenantUser.objects.filter(pk=tenant_user_id)
-            .values_list('role_name', flat=True)
-            .first()
-            or ''
-        ).strip().lower()
-        return any(
-            token in role
-            for token in ('admin', 'finance', 'administrator')
+    audiences = settings_obj.get_notification_audience_list()
+    role = _tenant_user_role_name(tenant_user_id)
+    matches = False
+    if TenantClientContractSetting.NotificationAudience.SYSTEM_ADMIN in audiences:
+        matches = matches or _matches_system_admin_audience(
+            recipient_key=recipient_key,
+            role=role,
         )
-    # System Admin (default): tenant owner + administrator roles only.
-    if recipient_key == TENANT_OWNER_RECIPIENT_KEY:
-        return True
-    if not tenant_user_id:
-        return False
-    role = (
-        TenantUser.objects.filter(pk=tenant_user_id)
-        .values_list('role_name', flat=True)
-        .first()
-        or ''
-    ).strip().lower()
-    return role in ('administrator', 'admin', 'tenant admin', 'system admin')
+    if TenantClientContractSetting.NotificationAudience.ADMIN_FINANCE in audiences:
+        matches = matches or _matches_admin_finance_audience(
+            recipient_key=recipient_key,
+            role=role,
+        )
+    return matches
 
 
 def _contract_detail_href(contract_id) -> str:

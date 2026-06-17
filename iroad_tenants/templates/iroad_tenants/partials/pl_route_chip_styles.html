@@ -1,0 +1,55 @@
+<style>
+  .pl-route-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+    padding: 6px 12px;
+    border-radius: 10px;
+    border: 1px solid var(--border-light, #e5e7eb);
+    background: #fff;
+    font-weight: 600;
+    color: #111827;
+    white-space: nowrap;
+  }
+  .pl-route-chip .pl-route-arrow {
+    width: 26px;
+    height: 26px;
+    border-radius: 999px;
+    background: #e8f0fe;
+    color: #2563eb;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+  }
+  .pl-route-chip .pl-route-arrow--outbound {
+    background: #ecfdf5;
+    color: #16a34a;
+  }
+  .pl-route-chip .pl-route-arrow--inbound {
+    background: #fef2f2;
+    color: #dc2626;
+  }
+  .pl-route-chip .pl-route-arrow--round {
+    background: #e8f0fe;
+    color: #2563eb;
+  }
+  .pl-route-chip .pl-route-arrow--stacked {
+    flex-direction: column;
+    gap: 0;
+    line-height: 0.8;
+    font-size: 0.62rem;
+  }
+  .pl-route-chip .pl-route-arrow--stacked .pl-route-arrow-out {
+    color: #16a34a;
+  }
+  .pl-route-chip .pl-route-arrow--stacked .pl-route-arrow-in {
+    color: #dc2626;
+  }
+  .pl-route-chip > span:not(.pl-route-arrow) {
+    max-width: 140px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+</style>

@@ -28,9 +28,9 @@
         <div class="page-header-row">
           <div class="page-header-left">
             <h1 class="page-title">Client Attachments</h1>
-            <p class="page-subtitle">
+            <!-- <p class="page-subtitle">
               Manage and view all client attachment records
-            </p>
+            </p> -->
           </div>
           <div class="page-header-right">
             <div class="eal-header-actions">
@@ -126,19 +126,31 @@
               </button>
             </div>
             <div class="eal-chip-group">
-              <button class="eal-chip active">All</button>
-              <button class="eal-chip">
+              <a
+                href="{{ attachments_chip_all_url }}"
+                class="eal-chip text-decoration-none text-reset{% if attachments_list_chip == 'all' %} active{% endif %}"
+                >All</a>
+              <a
+                href="{{ attachments_chip_active_url }}"
+                class="eal-chip text-decoration-none text-reset{% if attachments_list_chip == 'active' %} active{% endif %}"
+              >
                 <i class="bi bi-check-circle"></i>
                 Active
-              </button>
-              <button class="eal-chip">
+              </a>
+              <a
+                href="{{ attachments_chip_expired_url }}"
+                class="eal-chip text-decoration-none text-reset{% if attachments_list_chip == 'expired' %} active{% endif %}"
+              >
                 <i class="bi bi-x-circle"></i>
                 Expired
-              </button>
-              <button class="eal-chip">
+              </a>
+              <a
+                href="{{ attachments_chip_inactive_url }}"
+                class="eal-chip text-decoration-none text-reset{% if attachments_list_chip == 'inactive' %} active{% endif %}"
+              >
                 <i class="bi bi-clock"></i>
                 Inactive
-              </button>
+              </a>
             </div>
           </div>
         </div>

@@ -2,11 +2,77 @@
 {% load static %}
 {% load i18n %}
 
-{% block title %}{{ cargo.cargo_code }} | {% translate "Cargo Master" %} | iRoad{% endblock %}
+{% block title %}{% translate "Cargo Detail" %} | {{ cargo.cargo_code }} | iRoad{% endblock %}
 {% block breadcrumb %}{% endblock %}
 
+{% block extra_css %}
+<style>
+  .setting-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 24px;
+    padding: 16px 0;
+    border-bottom: 1px solid var(--border-light, #e5e7eb);
+  }
+  .setting-row:last-child { border-bottom: none; }
+  .setting-row-info { flex: 1; min-width: 0; }
+  .setting-row-info .form-label { margin-bottom: 2px; font-weight: 500; }
+  .setting-row-info .field-hint { margin-top: 0; }
+  .setting-toggle {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+    gap: 12px;
+    user-select: none;
+    flex-shrink: 0;
+    pointer-events: none;
+  }
+  .setting-toggle input {
+    opacity: 0;
+    width: 0;
+    height: 0;
+    position: absolute;
+  }
+  .setting-toggle .toggle-track {
+    position: relative;
+    width: 52px;
+    height: 28px;
+    background: #d1d5db;
+    border-radius: 14px;
+    flex-shrink: 0;
+  }
+  .setting-toggle .toggle-track::after {
+    content: "";
+    position: absolute;
+    top: 3px;
+    left: 3px;
+    width: 22px;
+    height: 22px;
+    background: #ffffff;
+    border-radius: 50%;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
+    transition: transform 0.3s ease;
+  }
+  .setting-toggle input:checked + .toggle-track {
+    background: var(--primary-color, #3b82f6);
+  }
+  .setting-toggle input:checked + .toggle-track::after {
+    transform: translateX(24px);
+  }
+  .setting-toggle .toggle-label {
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--text-muted, #6b7280);
+    min-width: 55px;
+  }
+  .setting-toggle input:checked ~ .toggle-label {
+    color: var(--primary-color, #3b82f6);
+  }
+</style>
+{% endblock %}
+
 {% block content %}
-<!-- Page Header -->
 <div class="page-header">
   <nav aria-label="breadcrumb">
     <ol class="breadcrumb">
@@ -15,25 +81,19 @@
       </li>
       <li class="breadcrumb-item">{% translate "Master Data" %}</li>
       <li class="breadcrumb-item">{% translate "Cargo Management" %}</li>
-      <li class="breadcrumb-item">
-        <a href="{{ back_to_list_url }}">{% translate "Cargo Master List" %}</a>
-      </li>
       <li class="breadcrumb-item active" aria-current="page">{% translate "Cargo Detail" %}</li>
     </ol>
   </nav>
   <div class="page-header-row">
     <div class="page-header-left">
-      <h1 class="page-title">
-        {% translate "Cargo Detail" %} &mdash;
-        <span style="color: var(--primary-color)">{{ cargo.cargo_code }}</span>
-      </h1>
-      <p class="page-subtitle">{{ cargo.display_name }}</p>
+      <h1 class="page-title">{% translate "Cargo Detail" %}</h1>
+      <!-- <p class="page-subtitle">{% translate "Manage physical specifications, handling requirements, and essential details of the cargo." %}</p> -->
     </div>
     <div class="page-header-right">
       <div class="eal-header-actions">
         <a href="{{ back_to_list_url }}" class="eal-btn eal-btn-outline">
           <i class="bi bi-arrow-left"></i>
-          <span>{% translate "Back to List" %}</span>
+          <span>{% translate "Back" %}</span>
         </a>
         <a href="{{ edit_cargo_url }}" class="eal-btn eal-btn-primary">
           <i class="bi bi-pencil-square"></i>
@@ -44,323 +104,217 @@
   </div>
 </div>
 
-<!-- Details Content -->
-<div class="row g-4">
-  <!-- Left Column: Main Details -->
-  <div class="col-lg-8">
-    <!-- Basic Information -->
-    <div class="form-card" data-section="1">
-      <div class="form-card-header">
-        <div class="form-card-icon blue">
-          <i class="bi bi-box-seam"></i>
-        </div>
-        <div class="form-card-header-text">
-          <h2 class="form-card-title">{% translate "Basic information" %}</h2>
-          <p class="form-card-desc">{% translate "Client, category, labels and catalog status." %}</p>
-        </div>
-      </div>
-      <div class="form-card-body">
-        <div class="fields-grid cols-2">
-          <div class="field">
-            <label class="form-label">{% translate "Cargo code" %}</label>
-            <p class="detail-view-value">{{ cargo.cargo_code }}</p>
-          </div>
-          <div class="field">
-            <label class="form-label">{% translate "Status" %}</label>
-            <p class="detail-view-value">
-              {% if cargo.status == 'Active' %}
-              <span class="status-badge active">{% translate "Active" %}</span>
-              {% else %}
-              <span class="status-badge inactive">{% translate "Inactive" %}</span>
-              {% endif %}
-            </p>
-          </div>
-        </div>
-        <div class="fields-grid cols-2" style="margin-top: 20px">
-          <div class="field">
-            <label class="form-label">{% translate "Client" %}</label>
-            <p class="detail-view-value">
-              {{ cargo.client_account.account_no }} &mdash; {{ cargo.client_account.display_name }}
-            </p>
-          </div>
-          <div class="field">
-            <label class="form-label">{% translate "Category" %}</label>
-            <p class="detail-view-value">
-              <span class="eal-type-badge org">{{ cargo.cargo_category.name_english }}</span>
-            </p>
-          </div>
-        </div>
-        <div class="fields-grid cols-3" style="margin-top: 20px">
-          <div class="field">
-            <label class="form-label">{% translate "Display name" %}</label>
-            <p class="detail-view-value">{{ cargo.display_name }}</p>
-          </div>
-          <div class="field">
-            <label class="form-label">{% translate "English label" %}</label>
-            <p class="detail-view-value">{{ cargo.english_label|default:"—" }}</p>
-          </div>
-          <div class="field">
-            <label class="form-label">{% translate "Arabic label" %}</label>
-            <p class="detail-view-value eal-arabic" lang="ar" dir="rtl">{{ cargo.arabic_label|default:"—" }}</p>
-          </div>
-        </div>
-        <div class="fields-grid cols-1" style="margin-top: 20px">
-          <div class="field">
-            <label class="form-label">{% translate "Client SKU / External ref" %}</label>
-            <p class="detail-view-value">{{ cargo.client_sku_external_ref|default:"—" }}</p>
-          </div>
-        </div>
-      </div>
-    </div>
-
-    <!-- Physical Specifications -->
-    <div class="form-card" data-section="2">
-      <div class="form-card-header">
-        <div class="form-card-icon green">
-          <i class="bi bi-rulers"></i>
-        </div>
-        <div class="form-card-header-text">
-          <h2 class="form-card-title">{% translate "Physical specifications" %}</h2>
-          <p class="form-card-desc">{% translate "Unit of measure, weight, volume and dimensions." %}</p>
-        </div>
-      </div>
-      <div class="form-card-body">
-        <div class="fields-grid cols-2">
-          <div class="field">
-            <label class="form-label">{% translate "UOM" %}</label>
-            <p class="detail-view-value">{{ cargo.uom|default:"—" }}</p>
-          </div>
-          <div class="field">
-            <label class="form-label">{% translate "Weight per unit" %}</label>
-            <p class="detail-view-value">
-              {% if cargo.weight_per_unit is not None %}{{ cargo.weight_per_unit }}{% else %}—{% endif %}
-            </p>
-          </div>
-        </div>
-        <div class="fields-grid cols-2" style="margin-top: 20px">
-          <div class="field">
-            <label class="form-label">{% translate "Volume per unit (m³)" %}</label>
-            <p class="detail-view-value">
-              {% if cargo.volume_per_unit is not None %}{{ cargo.volume_per_unit }}{% else %}—{% endif %}
-            </p>
-          </div>
-          <div class="field">
-            <label class="form-label">{% translate "Dimensions (m)" %}</label>
-            <p class="detail-view-value">
-              {% if cargo.length is not None or cargo.width is not None or cargo.height is not None %}
-              L {{ cargo.length|default:"—" }} &times; W {{ cargo.width|default:"—" }} &times; H {{ cargo.height|default:"—" }}
-              {% else %}—{% endif %}
-            </p>
-          </div>
-        </div>
-      </div>
-    </div>
-
-    <!-- Handling -->
-    <div class="form-card" data-section="3">
-      <div class="form-card-header">
-        <div class="form-card-icon amber">
-          <i class="bi bi-shield-check"></i>
-        </div>
-        <div class="form-card-header-text">
-          <h2 class="form-card-title">{% translate "Handling" %}</h2>
-          <p class="form-card-desc">{% translate "Temperature control and hazardous material flags." %}</p>
-        </div>
-      </div>
-      <div class="form-card-body">
-        <div class="pod-status-grid">
-          <div class="pod-status-tile">
-            <label class="form-label">{% translate "Refrigerated goods" %}</label>
-            <p class="detail-view-value">
-              {% if cargo.refrigerated_goods %}
-              <span class="status-badge in-transit"><i class="bi bi-snow"></i> {% translate "Yes" %}</span>
-              {% else %}
-              <span class="status-badge pending">{% translate "No" %}</span>
-              {% endif %}
-            </p>
-          </div>
-          <div class="pod-status-tile">
-            <label class="form-label">{% translate "Dangerous goods" %}</label>
-            <p class="detail-view-value">
-              {% if cargo.dangerous_goods %}
-              <span class="status-badge inactive"><i class="bi bi-exclamation-triangle"></i> {% translate "Yes" %}</span>
-              {% else %}
-              <span class="status-badge active">{% translate "No" %}</span>
-              {% endif %}
-            </p>
-          </div>
-          {% if cargo.refrigerated_goods %}
-          <div class="pod-status-tile">
-            <label class="form-label">{% translate "Min / Max temp" %}</label>
-            <p class="detail-view-value">{{ cargo.min_temp|default:"—" }} / {{ cargo.max_temp|default:"—" }}</p>
-          </div>
-          {% endif %}
-        </div>
-      </div>
-    </div>
-
-    <!-- Additional Information -->
-    <div class="form-card" data-section="4">
-      <div class="form-card-header">
-        <div class="form-card-icon blue">
-          <i class="bi bi-sticky"></i>
-        </div>
-        <div class="form-card-header-text">
-          <h2 class="form-card-title">{% translate "Additional information" %}</h2>
-          <p class="form-card-desc">{% translate "Internal notes for this cargo record." %}</p>
-        </div>
-      </div>
-      <div class="form-card-body">
-        <div class="field mb-0">
-          <label class="form-label">{% translate "Notes" %}</label>
-          <p class="detail-view-value text-break" style="white-space: pre-line">{{ cargo.notes|default:"—" }}</p>
-        </div>
-      </div>
-    </div>
-  </div>
-
-  <!-- Right Column: Summary Sidebar -->
-  <div class="col-lg-4">
-    <!-- Quick Summary -->
-    <div class="form-card">
-      <div class="form-card-header">
-        <div class="form-card-icon blue">
-          <i class="bi bi-info-circle"></i>
-        </div>
-        <div class="form-card-header-text">
-          <h2 class="form-card-title">{% translate "Quick Summary" %}</h2>
-        </div>
-      </div>
-      <div class="form-card-body">
-        <div class="detail-field" style="padding: 10px 0; border-bottom: 1px solid #eee">
-          <span class="detail-field-label">{% translate "Cargo code" %}</span>
-          <span class="detail-field-value" style="font-weight: 600; color: var(--primary-color)">{{ cargo.cargo_code }}</span>
-        </div>
-        <div class="detail-field" style="padding: 10px 0; border-bottom: 1px solid #eee">
-          <span class="detail-field-label">{% translate "Display name" %}</span>
-          <span class="detail-field-value">{{ cargo.display_name }}</span>
-        </div>
-        <div class="detail-field" style="padding: 10px 0; border-bottom: 1px solid #eee">
-          <span class="detail-field-label">{% translate "Client" %}</span>
-          <span class="detail-field-value">{{ cargo.client_account.display_name }}</span>
-        </div>
-        <div class="detail-field" style="padding: 10px 0; border-bottom: 1px solid #eee">
-          <span class="detail-field-label">{% translate "Category" %}</span>
-          <span class="detail-field-value">{{ cargo.cargo_category.name_english }}</span>
-        </div>
-        <div class="detail-field" style="padding: 10px 0; border-bottom: 1px solid #eee">
-          <span class="detail-field-label">{% translate "Status" %}</span>
-          <span class="detail-field-value">
-            {% if cargo.status == 'Active' %}
-            <span class="status-badge active">{% translate "Active" %}</span>
-            {% else %}
-            <span class="status-badge inactive">{% translate "Inactive" %}</span>
-            {% endif %}
-          </span>
-        </div>
-        <div class="detail-field" style="padding: 10px 0; border-bottom: 1px solid #eee">
-          <span class="detail-field-label">{% translate "Refrigerated" %}</span>
-          <span class="detail-field-value">
-            {% if cargo.refrigerated_goods %}
-            <span class="status-badge in-transit"><i class="bi bi-snow"></i> {% translate "Yes" %}</span>
-            {% else %}
-            <span class="status-badge pending">{% translate "No" %}</span>
-            {% endif %}
-          </span>
-        </div>
-        <div class="detail-field" style="padding: 10px 0">
-          <span class="detail-field-label">{% translate "Dangerous goods" %}</span>
-          <span class="detail-field-value">
-            {% if cargo.dangerous_goods %}
-            <span class="status-badge inactive"><i class="bi bi-exclamation-triangle"></i> {% translate "Yes" %}</span>
-            {% else %}
-            <span class="status-badge active">{% translate "No" %}</span>
-            {% endif %}
-          </span>
-        </div>
-      </div>
-    </div>
-
-    <!-- Activity Log -->
-    <div class="form-card">
-      <div class="form-card-header">
-        <div class="form-card-icon amber">
-          <i class="bi bi-clock-history"></i>
-        </div>
-        <div class="form-card-header-text">
-          <h2 class="form-card-title">{% translate "Activity Log" %}</h2>
-        </div>
-      </div>
-      <div class="form-card-body">
-        <div style="display: flex; flex-direction: column; gap: 16px">
-          {% for item in activity_log %}
-          <div style="display: flex; gap: 12px; align-items: flex-start">
-            <div
-              style="
-                width: 8px;
-                height: 8px;
-                border-radius: 50%;
-                background: {{ item.color }};
-                margin-top: 6px;
-                flex-shrink: 0;
-              "
-            ></div>
-            <div>
-              <div style="font-size: 13px; font-weight: 600; color: #333">{{ item.title }}</div>
-              <div style="font-size: 12px; color: #888">
-                {{ item.timestamp|date:"d M Y, g:i A" }} &mdash; {{ item.actor|default:"System" }}
-              </div>
-            </div>
-          </div>
-          {% empty %}
-          <div class="text-muted">{% translate "No activity available." %}</div>
-          {% endfor %}
-        </div>
-      </div>
-    </div>
-  </div>
-</div>
-
-{% if attachments %}
-<!-- Attachments -->
-<div class="form-card mt-4" data-section="5">
+<!-- Basic Information -->
+<div class="form-card mb-3" data-section="1">
   <div class="form-card-header">
-    <div class="form-card-icon blue">
-      <i class="bi bi-paperclip"></i>
-    </div>
+    <div class="form-card-icon blue"><i class="bi bi-box-seam"></i></div>
     <div class="form-card-header-text">
-      <h2 class="form-card-title">{% translate "Attachments" %}</h2>
-      <p class="form-card-desc">{% translate "Files linked to this cargo master record." %}</p>
-    </div>
+      <h2 class="form-card-title">{% translate "Basic Information" %}</h2>
+      </div>
   </div>
-  <div class="form-card-body" style="padding: 0">
-    <div class="eal-table-wrap">
-      <table class="eal-table">
-        <thead>
-          <tr>
-            <th>{% translate "SN" %}</th>
-            <th>{% translate "File" %}</th>
-            <th>{% translate "Uploaded" %}</th>
-            <th>{% translate "Action" %}</th>
-          </tr>
-        </thead>
-        <tbody>
-          {% for a in attachments %}
-          <tr>
-            <td>{{ forloop.counter }}</td>
-            <td class="text-break">{{ a.file.name|default:a.attachment_id }}</td>
-            <td>{{ a.created_at|date:"d M Y, g:i A" }}</td>
-            <td>
-              <a href="{{ a.file.url }}" class="eal-row-btn" title="{% translate 'Download' %}" target="_blank" rel="noopener">
-                <i class="bi bi-download"></i>
-              </a>
-            </td>
-          </tr>
-          {% endfor %}
-        </tbody>
-      </table>
+  <div class="form-card-body">
+    <div class="fields-grid cols-2">
+      <div class="field">
+        <label class="form-label">{% translate "Cargo Code" %}</label>
+        <p class="detail-view-value"><span class="eal-entity-id">{{ cargo.cargo_code }}</span></p>
+      </div>
+      <div class="field">
+        <label class="form-label">{% translate "Client Account" %}</label>
+        <p class="detail-view-value">
+          {{ cargo.client_account.account_no }} &mdash; {{ cargo.client_account.display_name }}
+        </p>
+      </div>
+    </div>
+    <div class="fields-grid cols-2" style="margin-top: 20px">
+      <div class="field">
+        <label class="form-label">{% translate "Display Name" %}</label>
+        <p class="detail-view-value">{{ cargo.display_name }}</p>
+      </div>
+      <div class="field">
+        <label class="form-label">{% translate "Cargo Category" %}</label>
+        <p class="detail-view-value">
+          {{ cargo.cargo_category.category_code }} &mdash; {{ cargo.cargo_category.name_english }}
+        </p>
+      </div>
+    </div>
+    <div class="fields-grid cols-2" style="margin-top: 20px">
+      <div class="field">
+        <label class="form-label">{% translate "Arabic label" %}</label>
+        <p class="detail-view-value eal-arabic" lang="ar" dir="rtl">{{ cargo.arabic_label|default:"—" }}</p>
+      </div>
+      <div class="field">
+        <label class="form-label">{% translate "English label" %}</label>
+        <p class="detail-view-value">{{ cargo.english_label|default:"—" }}</p>
+      </div>
+    </div>
+    <div class="fields-grid cols-2" style="margin-top: 20px">
+      <div class="field">
+        <label class="form-label">{% translate "Client sku external ref" %}</label>
+        <p class="detail-view-value">{{ cargo.client_sku_external_ref|default:"—" }}</p>
+      </div>
+      <div class="field">
+        <label class="form-label">{% translate "Status" %}</label>
+        <p class="detail-view-value">
+          {% if cargo.status == 'Active' %}
+          <span class="status-badge active">{% translate "Active" %}</span>
+          {% else %}
+          <span class="status-badge inactive">{% translate "Inactive" %}</span>
+          {% endif %}
+        </p>
+      </div>
     </div>
   </div>
 </div>
-{% endif %}
+
+<!-- Physical Specifications -->
+<div class="form-card mb-3" data-section="2">
+  <div class="form-card-header">
+    <div class="form-card-icon green"><i class="bi bi-rulers"></i></div>
+    <div class="form-card-header-text">
+      <h2 class="form-card-title">{% translate "Physical Specifications" %}</h2>
+      </div>
+  </div>
+  <div class="form-card-body">
+    <div class="fields-grid cols-2">
+      <div class="field">
+        <label class="form-label">{% translate "UOM (Unit of Measure)" %}</label>
+        <p class="detail-view-value">{{ cargo.uom|default:"—" }}</p>
+      </div>
+      <div class="field">
+        <label class="form-label">{% translate "Weight per Unit (kg)" %}</label>
+        <p class="detail-view-value">
+          {% if cargo.weight_per_unit is not None %}{{ cargo.weight_per_unit }}{% else %}—{% endif %}
+        </p>
+      </div>
+    </div>
+    <div class="fields-grid cols-2" style="margin-top: 20px">
+      <div class="field">
+        <label class="form-label">{% translate "Volume per Unit (m³)" %}</label>
+        <p class="detail-view-value">
+          {% if cargo.volume_per_unit is not None %}{{ cargo.volume_per_unit }}{% else %}—{% endif %}
+        </p>
+      </div>
+    </div>
+    <h4 class="field-group-title mt-4">
+      <i class="bi bi-bounding-box"></i> {% translate "DIMENSIONS (METERS)" %}
+    </h4>
+    <div class="fields-grid cols-3 gap-3">
+      <div class="field">
+        <label class="form-label">{% translate "Length (m)" %}</label>
+        <p class="detail-view-value">
+          {% if cargo.length is not None %}{{ cargo.length }}{% else %}—{% endif %}
+        </p>
+      </div>
+      <div class="field">
+        <label class="form-label">{% translate "Width (m)" %}</label>
+        <p class="detail-view-value">
+          {% if cargo.width is not None %}{{ cargo.width }}{% else %}—{% endif %}
+        </p>
+      </div>
+      <div class="field">
+        <label class="form-label">{% translate "Height (m)" %}</label>
+        <p class="detail-view-value">
+          {% if cargo.height is not None %}{{ cargo.height }}{% else %}—{% endif %}
+        </p>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Handling Requirements -->
+<div class="form-card mb-3" data-section="3">
+  <div class="form-card-header">
+    <div class="form-card-icon amber"><i class="bi bi-exclamation-triangle"></i></div>
+    <div class="form-card-header-text">
+      <h2 class="form-card-title">{% translate "Handling Requirements" %}</h2>
+      </div>
+  </div>
+  <div class="form-card-body">
+    <div class="setting-row">
+      <div class="setting-row-info">
+        <label class="form-label">{% translate "Refrigerated Goods" %}</label>
+        <span class="field-hint">{% translate "Indicate if the cargo requires temperature control." %}</span>
+      </div>
+      <label class="setting-toggle">
+        <input type="checkbox" disabled{% if cargo.refrigerated_goods %} checked{% endif %} />
+        <span class="toggle-track"></span>
+        <span class="toggle-label">
+          {% if cargo.refrigerated_goods %}{% translate "Enabled" %}{% else %}{% translate "Disabled" %}{% endif %}
+        </span>
+      </label>
+    </div>
+    {% if cargo.refrigerated_goods %}
+    <div class="fields-grid cols-2 mt-3">
+      <div class="field">
+        <label class="form-label">{% translate "Min Temp (°C)" %}</label>
+        <p class="detail-view-value">{{ cargo.min_temp|default:"—" }}</p>
+      </div>
+      <div class="field">
+        <label class="form-label">{% translate "Max Temp (°C)" %}</label>
+        <p class="detail-view-value">{{ cargo.max_temp|default:"—" }}</p>
+      </div>
+    </div>
+    {% endif %}
+    <div class="setting-row mt-2">
+      <div class="setting-row-info">
+        <label class="form-label">{% translate "Dangerous Goods" %}</label>
+        <span class="field-hint">{% translate "Identify if the cargo includes hazardous materials or fragile items." %}</span>
+      </div>
+      <label class="setting-toggle">
+        <input type="checkbox" disabled{% if cargo.dangerous_goods %} checked{% endif %} />
+        <span class="toggle-track"></span>
+        <span class="toggle-label">
+          {% if cargo.dangerous_goods %}{% translate "Enabled" %}{% else %}{% translate "Disabled" %}{% endif %}
+        </span>
+      </label>
+    </div>
+  </div>
+</div>
+
+<!-- Additional Information -->
+<div class="form-card mb-3" data-section="4">
+  <div class="form-card-header">
+    <div class="form-card-icon green"><i class="bi bi-journal-text"></i></div>
+    <div class="form-card-header-text">
+      <h2 class="form-card-title">{% translate "Additional Information" %}</h2>
+      </div>
+  </div>
+  <div class="form-card-body">
+    <div class="field">
+      <label class="form-label">{% translate "Notes" %}</label>
+      <p class="detail-view-value text-break" style="white-space: pre-line">{{ cargo.notes|default:"—" }}</p>
+    </div>
+    {% if attachments %}
+    <div class="field-group mt-4">
+      <h3 class="field-group-title"><i class="bi bi-paperclip"></i> {% translate "Attachments" %}</h3>
+      <div class="eal-table-wrap">
+        <table class="eal-table">
+          <thead>
+            <tr>
+              <th>{% translate "SN" %}</th>
+              <th>{% translate "File" %}</th>
+              <th>{% translate "Uploaded" %}</th>
+              <th>{% translate "Action" %}</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for a in attachments %}
+            <tr>
+              <td>{{ forloop.counter }}</td>
+              <td class="text-break">{{ a.file.name|default:a.attachment_id }}</td>
+              <td>{{ a.created_at|date:"d M Y, g:i A" }}</td>
+              <td>
+                <a href="{{ a.file.url }}" class="eal-row-btn" title="{% translate 'Download' %}" target="_blank" rel="noopener">
+                  <i class="bi bi-download"></i>
+                </a>
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+    {% endif %}
+  </div>
+</div>
 {% endblock %}

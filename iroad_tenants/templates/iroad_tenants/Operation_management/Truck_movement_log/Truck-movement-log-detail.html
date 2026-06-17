@@ -19,13 +19,13 @@
         Truck Movement Log &mdash;
         <span style="color: var(--primary-color)">{{ movement.movement_no }}</span>
       </h1>
-      <p class="page-subtitle">Full details for this truck movement log entry.</p>
+      <!-- <p class="page-subtitle">Full details for this truck movement log entry.</p> -->
     </div>
     <div class="page-header-right">
       <div class="eal-header-actions">
         <a href="{% url 'iroad_tenants:tenant_operation_truck_movement_log_list' %}" class="eal-btn eal-btn-outline">
           <i class="bi bi-arrow-left"></i>
-          <span>Back to List</span>
+          <span>Back</span>
         </a>
         <a href="{% url 'iroad_tenants:tenant_operation_truck_movement_log_edit' movement.movement_id %}" class="eal-btn eal-btn-primary">
           <i class="bi bi-pencil-square"></i>
@@ -43,8 +43,7 @@
         <div class="form-card-icon blue"><i class="bi bi-truck"></i></div>
         <div class="form-card-header-text">
           <h2 class="form-card-title">Header</h2>
-          <p class="form-card-desc">Core movement header information.</p>
-        </div>
+      </div>
       </div>
       <div class="form-card-body">
         <div class="fields-grid cols-3">
@@ -85,8 +84,7 @@
         <div class="form-card-icon amber"><i class="bi bi-link-45deg"></i></div>
         <div class="form-card-header-text">
           <h2 class="form-card-title">Shipment Linkage</h2>
-          <p class="form-card-desc">Linked booking, shipment, truck, and driver.</p>
-        </div>
+      </div>
       </div>
       <div class="form-card-body">
         <div class="fields-grid cols-3">
@@ -127,8 +125,7 @@
         <div class="form-card-icon green"><i class="bi bi-geo-alt"></i></div>
         <div class="form-card-header-text">
           <h2 class="form-card-title">Movement Details</h2>
-          <p class="form-card-desc">Route, time, and distance for this movement.</p>
-        </div>
+      </div>
       </div>
       <div class="form-card-body">
         <div class="fields-grid cols-3">

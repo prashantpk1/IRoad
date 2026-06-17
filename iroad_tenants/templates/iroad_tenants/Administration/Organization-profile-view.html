@@ -22,10 +22,10 @@
   <div class="page-header-row">
     <div class="page-header-left">
       <h1 class="page-title">Edit Organization Profile</h1>
-      <p class="page-subtitle">
+      <!-- <p class="page-subtitle">
         Manage your organization's identity, address, contact details, and
         system settings.
-      </p>
+      </p> -->
     </div>
     <div class="page-header-right">
       <a href="{% url 'iroad_tenants:tenant_organization_profile' %}" class="eal-btn eal-btn-outline">
@@ -47,9 +47,7 @@
       </div>
       <div class="form-card-header-text">
         <h2 class="form-card-title">Organization Identity</h2>
-        <p class="form-card-desc">
-          Basic information and identification of the organization.
-        </p>
+
       </div>
     </div>
     <div class="form-card-body">
@@ -183,9 +181,7 @@
       </div>
       <div class="form-card-header-text">
         <h2 class="form-card-title">Address Information</h2>
-        <p class="form-card-desc">
-          Location and address details for the organization.
-        </p>
+      
       </div>
     </div>
     <div class="form-card-body">
@@ -302,9 +298,6 @@
       </div>
       <div class="form-card-header-text">
         <h2 class="form-card-title">Contact Details</h2>
-        <p class="form-card-desc">
-          Official contact information for the organization.
-        </p>
       </div>
     </div>
     <div class="form-card-body">
@@ -364,7 +357,7 @@
       </div>
       <div class="form-card-header-text">
         <h2 class="form-card-title">System Configuration</h2>
-        <p class="form-card-desc">Default system settings and formats.</p>
+       
       </div>
     </div>
     <div class="form-card-body">
@@ -378,14 +371,12 @@
             <label for="baseCurrency" class="form-label"
               >System Currency</label
             >
-            <input
-              type="text"
-              class="form-control"
-              id="baseCurrency"
-              name="base_currency_code"
-              value="{{ org.base_currency_code }}"
-              readonly
-            />
+            <select class="form-select" id="baseCurrency" name="base_currency_code" required>
+              <option value="">Select system currency</option>
+              {% for currency in currencies %}
+              <option value="{{ currency.currency_code }}" {% if org.base_currency_code == currency.currency_code %}selected{% endif %}>{{ currency.currency_code }} – {{ currency.name_en }}</option>
+              {% endfor %}
+            </select>
           </div>
           <!--<div class="field">
             <label for="secondaryCurrency" class="form-label"
@@ -466,9 +457,7 @@
       </div>
       <div class="form-card-header-text">
         <h2 class="form-card-title">Support & Instructions</h2>
-        <p class="form-card-desc">
-          Contact information for support and specific instructions for drivers.
-        </p>
+       
       </div>
     </div>
     <div class="form-card-body">

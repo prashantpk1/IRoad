@@ -151,7 +151,7 @@
   <div class="page-header-row">
     <div class="page-header-left">
       <h1 class="page-title">Attachment Detail</h1>
-      <p class="page-subtitle">Review attachment metadata and document status.</p>
+      <!-- <p class="page-subtitle">Review attachment metadata and document status.</p> -->
     </div>
     <div class="page-header-right">
       <div class="eal-header-actions">
@@ -165,7 +165,7 @@
           <span>Open file</span>
         </a>
         {% endif %}
-        <a href="{{ edit_attachment_url }}" class="eal-btn eal-btn-primary">
+        <a href="{{ edit_attachment_url }}?return_to=detail" class="eal-btn eal-btn-primary">
           <i class="bi bi-pencil-square"></i>
           <span>Edit</span>
         </a>
@@ -191,7 +191,6 @@
       </div>
       <div class="form-card-header-text">
         <h2 class="form-card-title">Linked driver</h2>
-        <p class="form-card-desc">Driver this attachment belongs to.</p>
       </div>
     </div>
     <div class="form-card-body">
@@ -243,7 +242,6 @@
       </div>
       <div class="form-card-header-text">
         <h2 class="form-card-title">Attachment details</h2>
-        <p class="form-card-desc">Identification, dates, expiry, and record status.</p>
       </div>
     </div>
     <div class="form-card-body">
@@ -377,7 +375,6 @@
       </div>
       <div class="form-card-header-text">
         <h2 class="form-card-title">Attachment file</h2>
-        <p class="form-card-desc">Open or download the uploaded file.</p>
       </div>
     </div>
     <div class="form-card-body">
@@ -425,7 +422,7 @@
           <div class="small">
             The stored file could not be found. Edit this attachment and upload the file again.
           </div>
-          <a href="{{ edit_attachment_url }}" class="btn btn-sm btn-warning mt-2">
+          <a href="{{ edit_attachment_url }}?return_to=detail" class="btn btn-sm btn-warning mt-2">
             <i class="bi bi-upload"></i> Re-upload file
           </a>
         </div>

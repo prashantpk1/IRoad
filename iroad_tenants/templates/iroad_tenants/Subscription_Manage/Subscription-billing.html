@@ -1,4 +1,5 @@
 {% extends 'iroad_tenants/base.html' %}
+{% load tenant_format %}
 
 {% block title %}Subscription Billing | iRoad Admin{% endblock %}
 
@@ -77,9 +78,9 @@
         <div class="page-header-row">
           <div class="page-header-left">
             <h1 class="page-title">Subscription Billing</h1>
-            <p class="sub-page-subtitle">
+            <!-- <p class="sub-page-subtitle">
               Manage your billing, invoices and payment methods
-            </p>
+            </p> -->
           </div>
           <div class="page-header-right">
             <a href="{% url 'iroad_tenants:tenant_subscription_plan' %}" class="eal-btn eal-btn-outline">
@@ -114,16 +115,14 @@
           <div class="bill-overview-info">
             <span class="bill-overview-label">Next Payment</span>
             <span class="bill-overview-value">
-              {{ next_payment_display.primary_currency }}
-              {{ next_payment_display.primary_amount|floatformat:2 }}
+              {% tenant_currency next_payment_display.primary_amount next_payment_display.primary_currency %}
             </span>
             {% if next_payment_display.show_secondary %}
             <span class="bill-overview-alt-currency">
-              {{ next_payment_display.secondary_currency }}
-              {{ next_payment_display.secondary_amount|floatformat:2 }}
+              {% tenant_currency next_payment_display.secondary_amount next_payment_display.secondary_currency %}
             </span>
             {% endif %}
-            <span class="bill-overview-sub">Due on {% if next_payment_due %}{{ next_payment_due|date:"M j, Y" }}{% else %}--{% endif %}</span>
+            <span class="bill-overview-sub">Due on {% if next_payment_due %}{% tenant_date next_payment_due %}{% else %}--{% endif %}</span>
           </div>
         </div>
 
@@ -147,13 +146,11 @@
           <div class="bill-overview-info">
             <span class="bill-overview-label">Total Spent (YTD)</span>
             <span class="bill-overview-value">
-              {{ total_spent_display.primary_currency }}
-              {{ total_spent_display.primary_amount|floatformat:2 }}
+              {% tenant_currency total_spent_display.primary_amount total_spent_display.primary_currency %}
             </span>
             {% if total_spent_display.show_secondary %}
             <span class="bill-overview-alt-currency">
-              {{ total_spent_display.secondary_currency }}
-              {{ total_spent_display.secondary_amount|floatformat:2 }}
+              {% tenant_currency total_spent_display.secondary_amount total_spent_display.secondary_currency %}
             </span>
             {% endif %}
             <span class="bill-overview-sub">{{ invoices|length }} invoices</span>
@@ -231,17 +228,15 @@
                 {% for invoice in invoices %}
                 <tr>
                   <td class="bill-invoice-id">#{{ invoice.invoice_number }}</td>
-                  <td>{{ invoice.issue_date|date:"M j, Y" }}</td>
+                  <td>{% tenant_date invoice.issue_date %}</td>
                   <td>{% if invoice.order.projected_plan %}{{ invoice.order.projected_plan.plan_name_en }}{% elif current_plan %}{{ current_plan.plan_name_en }}{% else %}--{% endif %}</td>
                   <td class="bill-amount">
                     <span class="bill-amount-primary">
-                      {{ invoice.billing_display.primary_currency }}
-                      {{ invoice.billing_display.primary_amount|floatformat:2 }}
+                      {% tenant_currency invoice.billing_display.primary_amount invoice.billing_display.primary_currency %}
                     </span>
                     {% if invoice.billing_display.show_secondary %}
                     <span class="bill-amount-secondary">
-                      {{ invoice.billing_display.secondary_currency }}
-                      {{ invoice.billing_display.secondary_amount|floatformat:2 }}
+                      {% tenant_currency invoice.billing_display.secondary_amount invoice.billing_display.secondary_currency %}
                     </span>
                     {% endif %}
                   </td>

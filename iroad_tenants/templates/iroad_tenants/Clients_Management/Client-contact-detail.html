@@ -1,40 +1,19 @@
 {% extends 'iroad_tenants/base.html' %}
 {% load static %}
 
-{% block title %}View Client Contact | iRoad Admin{% endblock %}
+{% block title %}{{ contact.name }} | View Client Contact | iRoad Admin{% endblock %}
 
 {% block extra_css %}
 <style>
-  #clientContactDetailView .field {
-    display: flex;
-    flex-direction: column;
-    gap: 6px;
+  .client-contact-detail-sidebar {
+    position: sticky;
+    top: 20px;
+    align-self: flex-start;
   }
-  #clientContactDetailView .form-label {
-    font-size: 13px;
-    font-weight: 600;
-    color: var(--text-muted);
-    margin-bottom: 0;
-  }
-  .view-field-box {
-    display: block;
-    min-height: 44px;
-    padding: 10px 14px;
-    background: var(--bg-light);
-    border: 1px solid var(--border-light);
-    border-radius: var(--radius-md);
-    font-size: 14px;
-    color: var(--text-dark);
-    line-height: 1.5;
-  }
-  .view-field-box .view-value {
-    margin: 0;
-    font-size: inherit;
-    color: inherit;
-    min-height: auto;
-  }
-  .view-value.empty {
-    color: var(--text-light);
+  @media (max-width: 991.98px) {
+    .client-contact-detail-sidebar {
+      position: static;
+    }
   }
 </style>
 {% endblock %}
@@ -59,16 +38,22 @@
 
   <div class="page-header-row">
     <div class="page-header-left">
-      <h1 class="page-title">View Client Contact</h1>
-      <p class="page-subtitle">
-        Review contact details for this client account.
-      </p>
+      <h1 class="page-title">
+        View Client Contact &mdash;
+        <span style="color: var(--primary-color)">{{ contact.name }}</span>
+      </h1>
+      <!-- <p class="page-subtitle">
+        {{ contact.client_account.account_no }}
+        {% if contact.client_account.display_name or contact.client_account.name_english %}
+        &mdash; {{ contact.client_account.display_name|default:contact.client_account.name_english }}
+        {% endif %}
+      </p> -->
     </div>
     <div class="page-header-right">
       <div class="eal-header-actions">
         <a href="{{ back_to_list_url }}" class="eal-btn eal-btn-outline">
           <i class="bi bi-arrow-left"></i>
-          <span>Back</span>
+          <span>Back to List</span>
         </a>
         <a href="{{ edit_contact_url }}" class="eal-btn eal-btn-primary">
           <i class="bi bi-pencil-square"></i>
@@ -79,101 +64,151 @@
   </div>
 </div>
 
-<div id="clientContactDetailView">
-  <div class="form-card" data-section="1">
-    <div class="form-card-header">
-      <div class="form-card-icon blue">
-        <i class="bi bi-person-rolodex"></i>
+<div class="row g-4">
+  <div class="col-lg-8">
+    <div class="form-card" data-section="1">
+      <div class="form-card-header">
+        <div class="form-card-icon blue">
+          <i class="bi bi-person-rolodex"></i>
+        </div>
+        <div class="form-card-header-text">
+          <h2 class="form-card-title">Contact Details</h2>
       </div>
-      <div class="form-card-header-text">
-        <h2 class="form-card-title">Contact Details</h2>
-        <p class="form-card-desc">
-          Account link, identity, and primary flag for this contact.
+      </div>
+      <div class="form-card-body">
+        <p class="small text-uppercase fw-semibold text-secondary mb-3" style="letter-spacing: 0.06em">
+          Account &amp; Identity
         </p>
-      </div>
-    </div>
-    <div class="form-card-body">
-      <div class="field-group">
-        <h3 class="field-group-title">
-          <i class="bi bi-building"></i>
-          Account &amp; identity
-        </h3>
-        <div class="fields-grid cols-2">
+        <div class="fields-grid cols-3">
           <div class="field">
             <label class="form-label">Client Account</label>
-            <div class="view-field-box">
-              <p class="view-value">
-                {{ contact.client_account.account_no }}{% if contact.client_account.display_name or contact.client_account.name_english %}
-                — {{ contact.client_account.display_name|default:contact.client_account.name_english }}
-                {% endif %}
-              </p>
-            </div>
+            <p class="detail-view-value">
+              <span class="eal-entity-id">{{ contact.client_account.account_no }}</span>
+              {% if contact.client_account.display_name or contact.client_account.name_english %}
+              &mdash; {{ contact.client_account.display_name|default:contact.client_account.name_english }}
+              {% endif %}
+            </p>
           </div>
           <div class="field">
-            <label class="form-label">Name</label>
-            <div class="view-field-box">
-              <p class="view-value">{{ contact.name }}</p>
-            </div>
+            <label class="form-label">Contact Name</label>
+            <p class="detail-view-value">{{ contact.name }}</p>
           </div>
           <div class="field">
-            <label class="form-label">Primary</label>
-            <div class="view-field-box">
+            <label class="form-label">Contact Role</label>
+            <p class="detail-view-value">
               {% if contact.is_primary %}
               <span class="status-badge active">Primary</span>
               {% else %}
               <span class="status-badge inactive">Secondary</span>
               {% endif %}
-            </div>
+            </p>
           </div>
         </div>
-      </div>
 
-      <div class="field-group mt-4">
-        <h3 class="field-group-title">
-          <i class="bi bi-telephone"></i>
-          Contact information
-        </h3>
+        <p class="small text-uppercase fw-semibold text-secondary mb-3 mt-4" style="letter-spacing: 0.06em">
+          Contact Information
+        </p>
         <div class="fields-grid cols-3">
           <div class="field">
             <label class="form-label">Email</label>
-            <div class="view-field-box">
-              <p class="view-value {% if not contact.email %}empty{% endif %}">
-                {{ contact.email|default:"—" }}
-              </p>
-            </div>
+            <p class="detail-view-value">
+              {% if contact.email %}
+              <a href="mailto:{{ contact.email }}">{{ contact.email }}</a>
+              {% else %}
+              —
+              {% endif %}
+            </p>
           </div>
           <div class="field">
             <label class="form-label">Mobile Number</label>
-            <div class="view-field-box">
-              <p class="view-value {% if not contact.mobile_number %}empty{% endif %}">
-                {{ contact_mobile_display|default:contact.mobile_number|default:"—" }}
-              </p>
-            </div>
+            <p class="detail-view-value">
+              {{ contact_mobile_display|default:contact.mobile_number|default:"—" }}
+            </p>
           </div>
           <div class="field">
             <label class="form-label">Telephone Number</label>
-            <div class="view-field-box">
-              <p class="view-value {% if not contact.telephone_number %}empty{% endif %}">
-                {{ contact_telephone_display|default:contact.telephone_number|default:"—" }}
-              </p>
-            </div>
+            <p class="detail-view-value">
+              {{ contact_telephone_display|default:contact.telephone_number|default:"—" }}
+            </p>
           </div>
+        </div>
+        <div class="fields-grid cols-2">
           <div class="field">
             <label class="form-label">Extension</label>
-            <div class="view-field-box">
-              <p class="view-value {% if not contact.extension %}empty{% endif %}">
-                {{ contact.extension|default:"—" }}
-              </p>
-            </div>
+            <p class="detail-view-value">{{ contact.extension|default:"—" }}</p>
           </div>
           <div class="field">
             <label class="form-label">Position</label>
-            <div class="view-field-box">
-              <p class="view-value {% if not contact.position %}empty{% endif %}">
-                {{ contact.position|default:"—" }}
-              </p>
-            </div>
+            <p class="detail-view-value">{{ contact.position|default:"—" }}</p>
           </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="col-lg-4 client-contact-detail-sidebar">
+    <div class="form-card">
+      <div class="form-card-header">
+        <div class="form-card-icon blue">
+          <i class="bi bi-info-circle"></i>
+        </div>
+        <div class="form-card-header-text">
+          <h2 class="form-card-title">Quick Summary</h2>
+        </div>
+      </div>
+      <div class="form-card-body">
+        <div class="detail-field" style="padding: 10px 0; border-bottom: 1px solid #eee">
+          <span class="detail-field-label">Contact Name</span>
+          <span class="detail-field-value" style="font-weight: 600; color: var(--primary-color)">
+            {{ contact.name }}
+          </span>
+        </div>
+        <div class="detail-field" style="padding: 10px 0; border-bottom: 1px solid #eee">
+          <span class="detail-field-label">Client Account</span>
+          <span class="detail-field-value">
+            {{ contact.client_account.account_no }}
+            {% if contact.client_account.display_name or contact.client_account.name_english %}
+            &mdash; {{ contact.client_account.display_name|default:contact.client_account.name_english }}
+            {% endif %}
+          </span>
+        </div>
+        <div class="detail-field" style="padding: 10px 0; border-bottom: 1px solid #eee">
+          <span class="detail-field-label">Contact Role</span>
+          <span class="detail-field-value">
+            {% if contact.is_primary %}
+            <span class="status-badge active">Primary</span>
+            {% else %}
+            <span class="status-badge inactive">Secondary</span>
+            {% endif %}
+          </span>
+        </div>
+        <div class="detail-field" style="padding: 10px 0; border-bottom: 1px solid #eee">
+          <span class="detail-field-label">Email</span>
+          <span class="detail-field-value">{{ contact.email|default:"—" }}</span>
+        </div>
+        <div class="detail-field" style="padding: 10px 0; border-bottom: 1px solid #eee">
+          <span class="detail-field-label">Mobile</span>
+          <span class="detail-field-value">
+            {{ contact_mobile_display|default:contact.mobile_number|default:"—" }}
+          </span>
+        </div>
+        <div class="detail-field" style="padding: 10px 0; border-bottom: 1px solid #eee">
+          <span class="detail-field-label">Position</span>
+          <span class="detail-field-value">{{ contact.position|default:"—" }}</span>
+        </div>
+        {% if contact.created_by_label %}
+        <div class="detail-field" style="padding: 10px 0; border-bottom: 1px solid #eee">
+          <span class="detail-field-label">Created By</span>
+          <span class="detail-field-value">{{ contact.created_by_label }}</span>
+        </div>
+        {% endif %}
+        <div class="detail-field" style="padding: 10px 0; border-bottom: 1px solid #eee">
+          <span class="detail-field-label">Created</span>
+          <span class="detail-field-value">{{ contact.created_at|date:"d M Y, g:i A" }}</span>
+        </div>
+        <div class="detail-field" style="padding: 10px 0">
+          <span class="detail-field-label">Last Updated</span>
+          <span class="detail-field-value">{{ contact.updated_at|date:"d M Y, g:i A" }}</span>
         </div>
       </div>
     </div>

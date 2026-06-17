@@ -1183,6 +1183,69 @@
     }
   }
 
+  function findExportableTable(exportLink) {
+    var selector = exportLink.getAttribute("data-eal-export-table");
+    if (selector) {
+      var explicit = document.querySelector(selector);
+      if (explicit) return explicit;
+    }
+    var cards = document.querySelectorAll(".eal-table-card");
+    for (var i = 0; i < cards.length; i++) {
+      var selectAll = cards[i].querySelector(
+        "thead .eal-col-check .eal-custom-check:not([disabled])"
+      );
+      if (selectAll) return cards[i];
+    }
+    return null;
+  }
+
+  function collectSelectedExportIds(tableRoot) {
+    var ids = [];
+    var tbody = tableRoot.querySelector("tbody");
+    if (!tbody) return ids;
+
+    Array.prototype.forEach.call(tbody.querySelectorAll("tr"), function (row) {
+      if (row.classList.contains("eal-table-empty-row")) return;
+      if (row.style.display === "none") return;
+      var checkbox = row.querySelector(".eal-col-check .eal-custom-check");
+      if (!checkbox || checkbox.disabled || !checkbox.checked) return;
+
+      var exportId = (row.getAttribute("data-eal-export-id") || "").trim();
+      if (!exportId) {
+        var entityEl = row.querySelector(".eal-entity-id");
+        exportId = entityEl ? entityEl.textContent.trim() : "";
+      }
+      if (exportId) ids.push(exportId);
+    });
+    return ids;
+  }
+
+  function initExportSelectionLinks() {
+    Array.prototype.forEach.call(
+      document.querySelectorAll("a.eal-export-link"),
+      function (link) {
+        if (link.getAttribute("data-eal-export-wired") === "1") return;
+        link.setAttribute("data-eal-export-wired", "1");
+        link.addEventListener("click", function (event) {
+          var tableRoot = findExportableTable(link);
+          if (!tableRoot) return;
+          var selectedIds = collectSelectedExportIds(tableRoot);
+          if (!selectedIds.length) return;
+
+          event.preventDefault();
+          var url;
+          try {
+            url = new URL(link.href, window.location.origin);
+          } catch (err) {
+            return;
+          }
+          url.searchParams.set("selected", selectedIds.join(","));
+          window.location.href = url.toString();
+        });
+      }
+    );
+  }
+
   function autoInit() {
     discoverFilterableRoots().forEach(function (root) {
       if (root.getAttribute("data-eal-filter-initialized") === "1") return;
@@ -1190,6 +1253,7 @@
       initFilterableTable(root);
     });
     initFloatingActionDropdowns(document);
+    initExportSelectionLinks();
   }
 
   global.EalDataTableFilters = {
@@ -1197,6 +1261,7 @@
     autoInit: autoInit,
     initActionDropdowns: initFloatingActionDropdowns,
     ensureFilterHeaders: ensureFilterHeaders,
+    initExportSelectionLinks: initExportSelectionLinks,
   };
 
   if (document.readyState === "loading") {

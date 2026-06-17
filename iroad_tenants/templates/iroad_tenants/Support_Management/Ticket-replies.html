@@ -145,6 +145,7 @@
             novalidate
           >
             {% csrf_token %}
+            <input type="hidden" name="remove_pending_attachment" id="removePendingAttachment" value="0" />
             <div class="ticket-reply-heading">
               <span class="ticket-reply-dot"></span>
               <span>ADD YOUR REPLY</span>
@@ -172,7 +173,12 @@
                   <i class="bi bi-camera"></i>
                   ATTACH EVIDENCE (PDF/IMAGE)
                 </button>
-                <span class="ticket-attach-filename" id="attachmentFilename"></span>
+                <span class="ticket-attach-filename" id="attachmentFilename">{% if pending_attachment_name %}{{ pending_attachment_name }}{% endif %}</span>
+                {% if pending_attachment_name %}
+                <button type="button" class="ticket-attach-remove-btn" id="removePendingAttachmentBtn" title="Remove attachment">
+                  <i class="bi bi-x-circle"></i>
+                </button>
+                {% endif %}
               </div>
               <button type="submit" class="btn btn-primary ticket-send-reply-btn">
                 Send Reply
@@ -457,6 +463,16 @@
     color: #64748b;
     margin-left: 8px;
   }
+  .ticket-attach-remove-btn {
+    background: none;
+    border: none;
+    color: #94a3b8;
+    padding: 0 0 0 6px;
+    line-height: 1;
+  }
+  .ticket-attach-remove-btn:hover {
+    color: #ef4444;
+  }
   .ticket-send-reply-btn {
     background: #3b82f6;
     border-color: #3b82f6;
@@ -497,6 +513,26 @@
   var attachBtn = document.getElementById("attachEvidenceBtn");
   var attachmentInput = document.getElementById("attachment");
   var attachmentFilename = document.getElementById("attachmentFilename");
+  var removePendingAttachment = document.getElementById("removePendingAttachment");
+  var removePendingAttachmentBtn = document.getElementById("removePendingAttachmentBtn");
+  var replyForm = document.getElementById("reply-section");
+  var messageBody = document.getElementById("message_body");
+
+  function setPendingAttachmentRemoved(removed) {
+    if (removePendingAttachment) {
+      removePendingAttachment.value = removed ? "1" : "0";
+    }
+    if (removed && attachmentFilename) {
+      attachmentFilename.textContent = "";
+    }
+    if (removed && attachmentInput) {
+      attachmentInput.value = "";
+    }
+    if (removePendingAttachmentBtn) {
+      removePendingAttachmentBtn.hidden = removed;
+    }
+  }
+
   if (attachBtn && attachmentInput) {
     attachBtn.addEventListener("click", function () {
       attachmentInput.click();
@@ -505,6 +541,30 @@
       if (!attachmentFilename) return;
       var file = attachmentInput.files && attachmentInput.files[0];
       attachmentFilename.textContent = file ? file.name : "";
+      if (file) {
+        setPendingAttachmentRemoved(false);
+      }
+    });
+  }
+
+  if (removePendingAttachmentBtn) {
+    removePendingAttachmentBtn.addEventListener("click", function () {
+      setPendingAttachmentRemoved(true);
+    });
+  }
+
+  if (replyForm && messageBody) {
+    replyForm.addEventListener("submit", function (event) {
+      if (!(messageBody.value || "").trim()) {
+        event.preventDefault();
+        messageBody.classList.add("is-invalid");
+        messageBody.focus();
+      }
+    });
+    messageBody.addEventListener("input", function () {
+      if ((messageBody.value || "").trim()) {
+        messageBody.classList.remove("is-invalid");
+      }
     });
   }
 

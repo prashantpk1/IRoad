@@ -86,7 +86,7 @@
         {% translate "Price List Detail" %} &mdash;
         <span style="color: var(--primary-color)">{{ price_list.price_list_code }}</span>
       </h1>
-      <p class="page-subtitle">{{ price_list.price_list_name }}</p>
+      <!-- <p class="page-subtitle">{{ price_list.price_list_name }}</p> -->
     </div>
     <div class="page-header-right">
       <div class="eal-header-actions">
@@ -115,10 +115,7 @@
         </div>
         <div class="form-card-header-text">
           <h2 class="form-card-title">{% translate "Header" %}</h2>
-          <p class="form-card-desc">
-            {% translate "Price list identity, target, status, currency, and validity." %}
-          </p>
-        </div>
+      </div>
       </div>
       <div class="form-card-body">
         <p class="small text-uppercase fw-semibold text-secondary mb-3" style="letter-spacing: 0.06em">
@@ -200,10 +197,7 @@
         </div>
         <div class="form-card-header-text">
           <h2 class="form-card-title">{% translate "Item Lines" %}</h2>
-          <p class="form-card-desc">
-            {% translate "Trip lines display route and inbound/outbound prices; service lines show sell price overrides." %}
-          </p>
-        </div>
+      </div>
       </div>
       <div class="form-card-body">
         <div class="eal-table-wrap" style="box-shadow: none; border-radius: 0">

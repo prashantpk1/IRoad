@@ -4,6 +4,7 @@
 {% block breadcrumb %}{% endblock %}
 
 {% block extra_css %}
+{% include 'iroad_tenants/partials/pl_route_chip_styles.html' %}
 <style>
   .shipment-detail-sidebar {
     position: sticky;
@@ -38,13 +39,13 @@
         Shipment Detail &mdash;
         <span style="color: var(--primary-color)">{{ shipment.shipment_no }}</span>
       </h1>
-      <p class="page-subtitle">Read-only shipment review.</p>
+      <!-- <p class="page-subtitle">Read-only shipment review.</p> -->
     </div>
     <div class="page-header-right">
       <div class="eal-header-actions">
         <a href="{{ back_to_list_url }}" class="eal-btn eal-btn-outline">
           <i class="bi bi-arrow-left"></i>
-          <span>Back to List</span>
+          <span>Back</span>
         </a>
         <a href="{{ print_shipment_url }}" target="_blank" rel="noopener" class="eal-btn eal-btn-outline">
           <i class="bi bi-printer"></i>
@@ -74,8 +75,7 @@
         </div>
         <div class="form-card-header-text">
           <h2 class="form-card-title">Shipment Info</h2>
-          <p class="form-card-desc">Primary shipment details and status information.</p>
-        </div>
+      </div>
       </div>
       <div class="form-card-body">
         <p class="small text-uppercase fw-semibold text-secondary mb-3" style="letter-spacing: 0.06em">
@@ -116,10 +116,12 @@
           <div class="field">
             <label class="form-label">Collection Status</label>
             <p class="detail-view-value">
-              {% if shipment.collection_status == 'Collected' %}
-              <span class="status-badge active">{{ shipment.collection_status }}</span>
+              {% if shipment.cod_payment_status == 'Collected' %}
+              <span class="status-badge active">{{ shipment.cod_payment_status }}</span>
+              {% elif shipment.cod_payment_status == 'Cancelled' %}
+              <span class="status-badge inactive">{{ shipment.cod_payment_status }}</span>
               {% else %}
-              <span class="status-badge pending">{{ shipment.collection_status|default:"—" }}</span>
+              <span class="status-badge pending">{{ shipment.cod_payment_status|default:"—" }}</span>
               {% endif %}
             </p>
           </div>
@@ -139,8 +141,7 @@
         </div>
         <div class="form-card-header-text">
           <h2 class="form-card-title">Booking Info</h2>
-          <p class="form-card-desc">Booking reference and auto-updated booking attributes.</p>
-        </div>
+      </div>
       </div>
       <div class="form-card-body">
         <div class="fields-grid cols-3">
@@ -190,14 +191,15 @@
         </div>
         <div class="form-card-header-text">
           <h2 class="form-card-title">Route &amp; Addresses</h2>
-          <p class="form-card-desc">Route display and loading/delivery locations.</p>
-        </div>
+      </div>
       </div>
       <div class="form-card-body">
         <div class="fields-grid cols-3">
           <div class="field">
             <label class="form-label">Route</label>
-            <p class="detail-view-value">{{ shipment.route_display|default:"—" }}</p>
+            <p class="detail-view-value mb-0">
+              {% include 'iroad_tenants/partials/pl_route_chip.html' with route_chip=shipment_route_chip route_fallback=shipment.route_display %}
+            </p>
           </div>
           <div class="field">
             <label class="form-label">Loading Address</label>
@@ -231,8 +233,7 @@
         </div>
         <div class="form-card-header-text">
           <h2 class="form-card-title">POD &amp; COD</h2>
-          <p class="form-card-desc">Proof of delivery and cash-on-delivery details.</p>
-        </div>
+      </div>
       </div>
       <div class="form-card-body">
         <div class="fields-grid cols-3">
@@ -280,8 +281,7 @@
         </div>
         <div class="form-card-header-text">
           <h2 class="form-card-title">Sales &amp; Billing</h2>
-          <p class="form-card-desc">Sales order and invoice references.</p>
-        </div>
+      </div>
       </div>
       <div class="form-card-body">
         <div class="fields-grid cols-3">
@@ -315,8 +315,7 @@
         </div>
         <div class="form-card-header-text">
           <h2 class="form-card-title">Truck &amp; Driver</h2>
-          <p class="form-card-desc">Assigned truck and driver for this shipment.</p>
-        </div>
+      </div>
       </div>
       <div class="form-card-body">
         <div class="fields-grid cols-2">
@@ -384,7 +383,9 @@
         </div>
         <div class="detail-field" style="padding: 10px 0; border-bottom: 1px solid #eee">
           <span class="detail-field-label">Route</span>
-          <span class="detail-field-value">{{ shipment.route_display|default:"—" }}</span>
+          <span class="detail-field-value">
+            {% include 'iroad_tenants/partials/pl_route_chip.html' with route_chip=shipment_route_chip route_fallback=shipment.route_display %}
+          </span>
         </div>
         <div class="detail-field" style="padding: 10px 0; border-bottom: 1px solid #eee">
           <span class="detail-field-label">Truck</span>
@@ -456,8 +457,7 @@
         </div>
         <div class="form-card-header-text">
           <h2 class="form-card-title">Cargo Information</h2>
-          <p class="form-card-desc">Cargo item, weight, quantity, and totals from linked booking.</p>
-        </div>
+      </div>
       </div>
       <div class="form-card-body">
         <div class="eal-table-wrap" style="box-shadow: none; border-radius: 0">

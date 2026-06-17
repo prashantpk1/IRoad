@@ -108,13 +108,21 @@
               {% endif %}
             </td>
             <td>
-              {% if ticket.assigned_to %}
+              {% if ticket.assigned_to_display and ticket.assigned_to_display != "-" %}
+                {{ ticket.assigned_to_display }}
+              {% elif ticket.assigned_to %}
                 {{ ticket.assigned_to.first_name }} {{ ticket.assigned_to.last_name }}
               {% else %}
                 &mdash;
               {% endif %}
             </td>
-            <td>{{ ticket.created_by_display }}</td>
+            <td>
+              {% if ticket.created_by_display %}
+                {{ ticket.created_by_display }}
+              {% else %}
+                &mdash;
+              {% endif %}
+            </td>
             <td>
               {% if ticket.status == 'New' %}
                 <span class="status-badge active">{% translate "Open" %}</span>

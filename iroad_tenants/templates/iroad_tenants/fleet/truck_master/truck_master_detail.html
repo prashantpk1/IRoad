@@ -18,7 +18,7 @@
   <div class="page-header-row">
     <div class="page-header-left">
       <h1 class="page-title">Truck Details</h1>
-      <p class="page-subtitle">View operational and financial details of the truck.</p>
+      <!-- <p class="page-subtitle">View operational and financial details of the truck.</p> -->
     </div>
     <div class="page-header-right">
       <div class="eal-header-actions">
@@ -79,8 +79,8 @@
 </div>
 
 <div class="ch-actions">
-  <a href="{% url 'iroad_tenants:truck_master_edit' truck.truck_id %}" class="ch-action-btn"><i class="bi bi-pencil"></i> Edit</a>
-  <a href="{% url 'iroad_tenants:truck_attachment_create' truck.truck_id %}" class="ch-action-btn"><i class="bi bi-folder-symlink"></i> Update Documents</a>
+  <a href="{% url 'iroad_tenants:truck_master_edit' truck.truck_id %}?return_to=details" class="ch-action-btn"><i class="bi bi-pencil"></i> Edit</a>
+  <a href="{% url 'iroad_tenants:truck_attachment_create' truck.truck_id %}?return_to=details&amp;tab=documents" class="ch-action-btn"><i class="bi bi-folder-symlink"></i> Update Documents</a>
   <a href="{% url 'iroad_tenants:tenant_operation_truck_movement_log_create' %}" class="ch-action-btn"><i class="bi bi-geo-alt"></i> Create Movement</a>
   {% if truck.status == 'Active' %}
   <button type="button" class="ch-action-btn text-danger border-danger tm-detail-status-trigger" data-truck-id="{{ truck.truck_id }}" data-new-status="Inactive">
@@ -91,7 +91,7 @@
     <i class="bi bi-arrow-counterclockwise"></i> Activate Truck
   </button>
   {% endif %}
-  <a href="{% url 'iroad_tenants:truck_attachment_create' truck.truck_id %}" class="ch-action-btn"><i class="bi bi-file-earmark-plus"></i> Add Document</a>
+  <a href="{% url 'iroad_tenants:truck_attachment_create' truck.truck_id %}?return_to=details&amp;tab=documents" class="ch-action-btn"><i class="bi bi-file-earmark-plus"></i> Add Document</a>
 </div>
 
 <div class="cd-main-card">
@@ -307,7 +307,7 @@
       <div class="cd-details-section cd-details-section--table mb-0">
         <div class="cd-details-header d-flex flex-wrap justify-content-between align-items-center gap-2">
           <span>Truck Documents</span>
-          <a href="{% url 'iroad_tenants:truck_attachment_create' truck.truck_id %}" class="btn btn-primary btn-sm tm-doc-upload-btn">
+          <a href="{% url 'iroad_tenants:truck_attachment_create' truck.truck_id %}?return_to=details&amp;tab=documents" class="btn btn-primary btn-sm tm-doc-upload-btn">
             <i class="bi bi-upload"></i> Upload Document
           </a>
         </div>
@@ -470,7 +470,9 @@
                 <tr>
                   <td><span class="eal-entity-id">{{ s.shipment_no }}</span></td>
                   <td>{{ s.shipment_date|date:"d M Y" }}</td>
-                  <td>{{ row.route }}</td>
+                  <td>
+                    {% include 'iroad_tenants/partials/pl_route_chip.html' with route_chip=row.route_chip route_fallback=row.route_fallback %}
+                  </td>
                   <td>{{ row.client_display|default:"—" }}</td>
                   <td>{{ row.driver_display|default:"—" }}</td>
                   <td>{{ s.booking_item_type|default:"—" }}</td>
@@ -584,6 +586,8 @@
     <div class="modal-content">
       <form method="post" action="" id="truckDetailDocDeleteForm">
         {% csrf_token %}
+        <input type="hidden" name="return_to" value="details" />
+        <input type="hidden" name="detail_tab" value="documents" />
         <div class="modal-header">
           <h5 class="modal-title" id="truckDetailDocDeleteTitle">Delete document</h5>
           <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
@@ -606,6 +610,8 @@
       <form method="post" action="{% url 'iroad_tenants:truck_master' %}">
         {% csrf_token %}
         <input type="hidden" name="action" value="set_status" />
+        <input type="hidden" name="return_to" value="details" />
+        <input type="hidden" name="detail_tab" value="overview" />
         <input type="hidden" name="truck_id" id="tmDetailConfirmId" value="" />
         <input type="hidden" name="new_status" id="tmDetailConfirmStatus" value="" />
         <input type="hidden" name="redirect_query" value="" />
@@ -1044,6 +1050,10 @@
 </style>
 {% endblock %}
 
+{% block extra_css %}
+{% include 'iroad_tenants/partials/pl_route_chip_styles.html' %}
+{% endblock %}
+
 {% block extra_js %}
 {{ block.super }}
 <script>
@@ -1090,6 +1100,26 @@
       });
     });
   }
+
+  (function activateTabFromQuery() {
+    var params = new URLSearchParams(window.location.search);
+    var tabKey = (params.get("tab") || "").trim().toLowerCase();
+    var tabMap = {
+      overview: "#pane-overview",
+      documents: "#pane-documents",
+      "assigned-drivers": "#pane-assigned-drivers",
+      shipments: "#pane-shipments",
+      movements: "#pane-movements",
+      "movements-log": "#pane-movements",
+    };
+    var target = tabMap[tabKey];
+    if (!target) return;
+    var tabBtn = document.querySelector(
+      '.cd-tab[data-bs-target="' + target + '"]',
+    );
+    if (!tabBtn || !window.bootstrap || !bootstrap.Tab) return;
+    bootstrap.Tab.getOrCreateInstance(tabBtn).show();
+  })();
 })();
 </script>
 {% endblock %}

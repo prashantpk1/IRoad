@@ -22,11 +22,11 @@
   <div class="page-header-row">
     <div class="page-header-left">
       <h1 class="page-title">{% if is_edit %}Edit Transaction{% else %}Add Transaction{% endif %}</h1>
-      <p class="page-subtitle">Create or update treasury transaction entries.</p>
+      <!-- <p class="page-subtitle">Create or update treasury transaction entries.</p> -->
     </div>
     <div class="page-header-right">
       <div class="eal-header-actions">
-        <a href="{% url 'iroad_tenants:driver_transaction_list' %}" class="eal-btn eal-btn-outline">
+        <a href="{% if driver_cancel_url %}{{ driver_cancel_url }}{% else %}{% url 'iroad_tenants:driver_transaction_list' %}{% endif %}" class="eal-btn eal-btn-outline">
           <i class="bi bi-arrow-left"></i><span>Back</span>
         </a>
       </div>
@@ -36,6 +36,12 @@
 
 <form method="post" novalidate>
   {% csrf_token %}
+  {% if driver_return_to %}
+  <input type="hidden" name="return_to" value="{{ driver_return_to }}" />
+  {% endif %}
+  {% if driver_id_for_return %}
+  <input type="hidden" name="driver_id" value="{{ driver_id_for_return }}" />
+  {% endif %}
 
   {% if form.non_field_errors %}
   <div class="alert alert-danger" role="alert">{{ form.non_field_errors }}</div>

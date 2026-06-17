@@ -19,15 +19,15 @@
     <div class="page-header-left">
       {% if is_edit %}
       <h1 class="page-title">Edit Attachment</h1>
-      <p class="page-subtitle">{% if driver %}Update attachment for {{ driver.driver_code }}{% endif %}</p>
+      <!-- <p class="page-subtitle">{% if driver %}Update attachment for {{ driver.driver_code }}{% endif %}</p> -->
       {% else %}
       <h1 class="page-title">Add Attachment</h1>
-      <p class="page-subtitle">{% if driver %}New attachment for {{ driver.driver_code }}{% else %}Select a driver and upload a document{% endif %}</p>
+      <!-- <p class="page-subtitle">{% if driver %}New attachment for {{ driver.driver_code }}{% else %}Select a driver and upload a document{% endif %}</p> -->
       {% endif %}
     </div>
     <div class="page-header-right ms-auto">
-      <a href="{% url 'iroad_tenants:driver_attachment_all_list' %}" class="btn btn-outline-secondary">
-        <i class="bi bi-arrow-left me-1"></i> Back to all attachments
+      <a href="{% if driver_cancel_url %}{{ driver_cancel_url }}{% else %}{% url 'iroad_tenants:driver_attachment_all_list' %}{% endif %}" class="btn btn-outline-secondary">
+        <i class="bi bi-arrow-left me-1"></i> Back
       </a>
     </div>
   </div>
@@ -69,6 +69,12 @@
   {% endif %}
   class="needs-validation" novalidate>
   {% csrf_token %}
+  {% if driver_return_to %}
+  <input type="hidden" name="return_to" value="{{ driver_return_to }}" />
+  {% endif %}
+  {% if driver_id_for_return %}
+  <input type="hidden" name="driver_id" value="{{ driver_id_for_return }}" />
+  {% endif %}
   {% if form.non_field_errors %}
   <div class="alert alert-danger" role="alert">{{ form.non_field_errors }}</div>
   {% endif %}
@@ -80,7 +86,6 @@
       </div>
       <div class="form-card-header-text">
         <h2 class="form-card-title">Attachment Details</h2>
-        <p class="form-card-desc">Document date and whether an expiry applies.</p>
       </div>
     </div>
     <div class="form-card-body">
@@ -214,7 +219,6 @@
       </div>
       <div class="form-card-header-text">
         <h2 class="form-card-title">File &amp; Notes</h2>
-        <p class="form-card-desc">Upload the file and describe it.</p>
       </div>
     </div>
     <div class="form-card-body">
@@ -260,17 +264,10 @@
 
   <div class="form-actions-bar">
     <div class="form-actions-left">
-      {% if driver %}
-      <a href="{% url 'iroad_tenants:driver_master_detail' driver.driver_id %}" class="btn btn-outline-secondary">
+      <a href="{% if driver_cancel_url %}{{ driver_cancel_url }}{% elif driver %}{% url 'iroad_tenants:driver_master_detail' driver.driver_id %}{% else %}{% url 'iroad_tenants:driver_attachment_all_list' %}{% endif %}" class="btn btn-outline-secondary">
         <i class="bi bi-x-lg"></i>
         Cancel
       </a>
-      {% else %}
-      <a href="{% url 'iroad_tenants:driver_attachment_all_list' %}" class="btn btn-outline-secondary">
-        <i class="bi bi-x-lg"></i>
-        Cancel
-      </a>
-      {% endif %}
     </div>
     <div class="form-actions-right">
       <button type="submit" class="btn btn-primary">

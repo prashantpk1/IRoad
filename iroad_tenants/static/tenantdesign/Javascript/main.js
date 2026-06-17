@@ -739,6 +739,33 @@ function initShipmentDocumentLines() {
     field.value = safeValue;
   }
 
+  function applyRowFieldErrors(tr, fieldErrors) {
+    if (!fieldErrors || typeof fieldErrors !== "object") return;
+    const selectorMap = {
+      page_no: '[data-field="pageNo"]',
+      physical_location: '[data-field="physicalLocation"]',
+      status: '[data-field="status"]',
+      attachment: '[data-field="attachment"]',
+      extra_ref: '[data-field="extraRef"]',
+    };
+    Object.keys(fieldErrors).forEach(function (fieldName) {
+      const selector = selectorMap[fieldName];
+      const message = fieldErrors[fieldName];
+      if (!selector || !message) return;
+      const field = tr.querySelector(selector);
+      if (field) {
+        field.classList.add("is-invalid");
+      }
+      const hostCell = field ? field.closest("td") : null;
+      if (!hostCell || hostCell.querySelector("[data-sd-line-error]")) return;
+      const feedback = document.createElement("div");
+      feedback.className = "invalid-feedback d-block";
+      feedback.setAttribute("data-sd-line-error", fieldName);
+      feedback.textContent = String(message);
+      hostCell.appendChild(feedback);
+    });
+  }
+
   function createLineRow(lineData) {
     const data = lineData || {};
     if (!data.physical_location) {
@@ -819,6 +846,7 @@ function initShipmentDocumentLines() {
     if (attachmentInput && !data.attachment_label) {
       attachmentInput.required = true;
     }
+    applyRowFieldErrors(tr, data._field_errors || data.field_errors || null);
     attachRowEvents(tr);
     updateSN();
   }
@@ -926,7 +954,10 @@ function initDocumentHandoverVerificationLines() {
   const tbody = document.getElementById("dhLinesTbody");
   const addBtn = document.getElementById("addDhLineBtn");
 
-  // Only run on Document-handover.html (or pages with same markup)
+  // Tenant portal form ships its own inline line-table logic.
+  if (document.getElementById("documentHandoverForm")) return;
+
+  // Only run on designer/static Document-handover.html (or pages with same markup)
   if (!tbody || !addBtn) return;
 
   function getRows() {
@@ -1322,24 +1353,32 @@ function initHeaderDateTime() {
 
   if (!dateElement || !timeElement) return;
 
+  const configEl = document.getElementById("tenant-system-config");
+  const cfg = configEl
+    ? JSON.parse(configEl.textContent || "{}")
+    : {};
+  const locale = cfg.js_locale || "en-US";
+  const timeZone = cfg.timezone || undefined;
+
   function updateDateTime() {
     const now = new Date();
 
-    // Format date: Tuesday, 28 January 2026
-    const options = {
+    const dateOptions = {
       weekday: "long",
       day: "numeric",
       month: "long",
       year: "numeric",
+      timeZone: timeZone,
     };
-    const formattedDate = now.toLocaleDateString("en-US", options);
+    const timeOptions = {
+      hour: "numeric",
+      minute: "2-digit",
+      hour12: true,
+      timeZone: timeZone,
+    };
 
-    // Format time: 3:52 PM
-    const timeOptions = { hour: "numeric", minute: "2-digit", hour12: true };
-    const formattedTime = now.toLocaleTimeString("en-US", timeOptions);
-
-    dateElement.textContent = formattedDate;
-    timeElement.textContent = formattedTime;
+    dateElement.textContent = now.toLocaleDateString(locale, dateOptions);
+    timeElement.textContent = now.toLocaleTimeString(locale, timeOptions);
   }
 
   // Update immediately and then every minute

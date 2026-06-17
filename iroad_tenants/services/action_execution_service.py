@@ -213,33 +213,34 @@ class ActionExecutionService:
             action_log._mobile_cod_amount = mobile_cod_amount
 
         try:
-            action_log.save()
-            cls.apply_execution_side_effects(
-                action_log,
-                created_by_label=created_by_label,
-            )
-            if sync_shipment_after and action_log.shipment_id:
-                shipment_after = action_log.shipment
+            with transaction.atomic():
+                action_log.save()
+                cls.apply_execution_side_effects(
+                    action_log,
+                    created_by_label=created_by_label,
+                )
+                if sync_shipment_after and action_log.shipment_id:
+                    shipment_after = action_log.shipment
 
-                status_before_sync = shipment_after.shipment_status
+                    status_before_sync = shipment_after.shipment_status
 
-                sync_shipment_status_from_action_log(shipment_after)
+                    sync_shipment_status_from_action_log(shipment_after)
 
-                shipment_after.refresh_from_db()
-                status_after_sync = shipment_after.shipment_status
+                    shipment_after.refresh_from_db()
+                    status_after_sync = shipment_after.shipment_status
 
-                if (
-                    status_before_sync == TenantShipment.ShipmentStatus.DELIVERED
-                    and status_after_sync
-                    == TenantShipment.ShipmentStatus.POD_SUBMITTED
-                    and (shipment_after.order_type or '').upper() != 'COD'
-                ):
-                    shipment_after.shipment_status = (
-                        TenantShipment.ShipmentStatus.DELIVERED
-                    )
-                    shipment_after.save(
-                        update_fields=['shipment_status', 'updated_at']
-                    )
+                    if (
+                        status_before_sync == TenantShipment.ShipmentStatus.DELIVERED
+                        and status_after_sync
+                        == TenantShipment.ShipmentStatus.POD_SUBMITTED
+                        and (shipment_after.order_type or '').upper() != 'COD'
+                    ):
+                        shipment_after.shipment_status = (
+                            TenantShipment.ShipmentStatus.DELIVERED
+                        )
+                        shipment_after.save(
+                            update_fields=['shipment_status', 'updated_at']
+                        )
         except IntegrityError:
             existing = cls._find_idempotent_existing(
                 idempotency_key=normalized_key,

@@ -5,6 +5,10 @@
 {% block title %}{% translate "Address Master List" %} | iRoad{% endblock %}
 {% block breadcrumb %}{% endblock %}
 
+{% block extra_css %}
+{% include 'iroad_tenants/partials/eal_list_live_search_css.html' %}
+{% endblock %}
+
 {% block content %}
 <div class="page-header">
   <nav aria-label="breadcrumb">
@@ -48,30 +52,30 @@
     </div>
   </div>
   <div class="eal-stat-card">
-    <div class="eal-stat-icon blue">
-      <i class="bi bi-box-arrow-up"></i>
-    </div>
-    <div>
-      <div class="eal-stat-value">{{ stats.pickup_only }}</div>
-      <div class="eal-stat-label">{% translate "Pickup Only" %}</div>
-    </div>
-  </div>
-  <div class="eal-stat-card">
     <div class="eal-stat-icon green">
-      <i class="bi bi-box-arrow-down"></i>
+      <i class="bi bi-check-circle"></i>
     </div>
     <div>
-      <div class="eal-stat-value">{{ stats.delivery_only }}</div>
-      <div class="eal-stat-label">{% translate "Delivery Only" %}</div>
+      <div class="eal-stat-value">{{ stats.active }}</div>
+      <div class="eal-stat-label">{% translate "Active Addresses" %}</div>
     </div>
   </div>
   <div class="eal-stat-card">
     <div class="eal-stat-icon amber">
-      <i class="bi bi-arrow-left-right"></i>
+      <i class="bi bi-house-up"></i>
     </div>
     <div>
-      <div class="eal-stat-value">{{ stats.both }}</div>
-      <div class="eal-stat-label">{% translate "Both" %}</div>
+      <div class="eal-stat-value">{{ stats.pickup }}</div>
+      <div class="eal-stat-label">{% translate "Pickup Addresses" %}</div>
+    </div>
+  </div>
+  <div class="eal-stat-card">
+    <div class="eal-stat-icon red">
+      <i class="bi bi-house-down"></i>
+    </div>
+    <div>
+      <div class="eal-stat-value">{{ stats.delivery }}</div>
+      <div class="eal-stat-label">{% translate "Delivery Addresses" %}</div>
     </div>
   </div>
 </div>
@@ -80,9 +84,9 @@
   class="eal-table-card"
   data-eal-filterable-table
   data-eal-server-paginated="1"
-  data-eal-empty-colspan="9"
+  data-eal-empty-colspan="10"
   data-eal-empty-filter-message="{% translate 'No addresses match the selected search/filter criteria.' %}"
-  data-eal-global-search-columns="1,2,3,4,5,6,7"
+  data-eal-global-search-columns="1,2,3,4,5,6,7,8"
 >
   <div class="eal-toolbar eal-toolbar--inline-filters">
     <div class="eal-toolbar-left w-100">
@@ -95,7 +99,7 @@
             data-eal-global-search
             value="{{ search_q|default:'' }}"
             autocomplete="off"
-            placeholder="{% translate 'Search addresses...' %}"
+            placeholder="{% translate 'Search by Address Code, Name, City' %}"
             aria-label="{% translate 'Search addresses' %}"
           />
           <button
@@ -124,7 +128,7 @@
           <select id="addrListClient" data-query-param="client" class="form-select form-select-sm">
             <option value="">{% translate "All clients" %}</option>
             {% for ca in client_filter_choices %}
-            <option value="{{ ca.account_no }}" {% if filter_client_value and ca.account_no == filter_client_value %}selected{% endif %}>
+            <option value="{{ ca.account_id }}" {% if filter_client_value and ca.account_id|stringformat:'s' == filter_client_value %}selected{% endif %}>
               {{ ca.display_name }} ({{ ca.account_no }})
             </option>
             {% endfor %}
@@ -139,15 +143,21 @@
       <thead>
         <tr>
           <th class="eal-col-check">
-            <input type="checkbox" class="eal-custom-check" id="ealSelectAll" disabled title="{% translate 'Bulk actions coming soon' %}" />
+            <input
+              type="checkbox"
+              class="eal-custom-check"
+              id="ealSelectAll"
+              aria-label="{% translate 'Select all addresses on this page' %}"
+            />
           </th>
           {% include 'iroad_tenants/partials/eal_column_filter_th.html' with col_index=1 title=_("Address Code") filter_placeholder=_("Filter by code") %}
           {% include 'iroad_tenants/partials/eal_column_filter_th.html' with col_index=2 title=_("Client Account") filter_placeholder=_("Filter by client") %}
           {% include 'iroad_tenants/partials/eal_column_filter_th.html' with col_index=3 title=_("Display Name") filter_placeholder=_("Filter by name") %}
           {% include 'iroad_tenants/partials/eal_column_filter_th.html' with col_index=4 title=_("Address Category") filter_placeholder=_("Filter by category") hide_sort=1 %}
-          {% include 'iroad_tenants/partials/eal_column_filter_th.html' with col_index=5 title=_("City / Country") filter_placeholder=_("Filter by city or country") %}
-          {% include 'iroad_tenants/partials/eal_column_filter_th.html' with col_index=6 title=_("Contact Name") filter_placeholder=_("Filter by contact") %}
-          {% include 'iroad_tenants/partials/eal_column_filter_th.html' with col_index=7 title=_("Phone No.") filter_placeholder=_("Filter by phone") %}
+          {% include 'iroad_tenants/partials/eal_column_filter_th.html' with col_index=5 title=_("Default Pickup") filter_placeholder=_("Filter by default pickup") hide_sort=1 %}
+          {% include 'iroad_tenants/partials/eal_column_filter_th.html' with col_index=6 title=_("Default Delivery") filter_placeholder=_("Filter by default delivery") hide_sort=1 %}
+          {% include 'iroad_tenants/partials/eal_column_filter_th.html' with col_index=7 title=_("Status") filter_placeholder=_("Filter by status") hide_sort=1 %}
+          {% include 'iroad_tenants/partials/eal_column_filter_th.html' with col_index=8 title=_("City") filter_placeholder=_("Filter by city") %}
           <th>{% translate "Actions" %}</th>
         </tr>
       </thead>
@@ -158,54 +168,59 @@
           data-edit-url="{% url 'iroad_tenants:tenant_address_master_edit' row.address_code %}"
           data-detail-url="{% url 'iroad_tenants:tenant_address_master_detail' row.address_code %}"
           data-address-code="{{ row.address_code|escape }}"
-          data-client-account="{{ row.client_account.account_no|escape }}"
+          data-client-account="{{ row.client_account.account_no|escape }} — {{ row.client_account.display_name|escape }}"
           data-display-name="{{ row.display_name|escape }}"
           data-english-label="{{ row.english_label|default:''|escape }}"
           data-arabic-label="{{ row.arabic_label|default:''|escape }}"
           data-address-category="{{ row.address_category|escape }}"
-          data-city-country="{{ row.city_country_cell|escape }}"
-          data-contact-name="{{ row.contact_name|default:''|escape }}"
-          data-phone="{{ row.phone_display_cell|escape }}"
           data-def-loading="{% if row.default_pickup_address %}{% translate 'Yes' %}{% else %}{% translate 'No' %}{% endif %}"
           data-def-unloading="{% if row.default_delivery_address %}{% translate 'Yes' %}{% else %}{% translate 'No' %}{% endif %}"
+          data-status="{{ row.status|escape }}"
+          data-city="{{ row.city|default:''|escape }}"
         >
           <td class="eal-col-check">
-            <input type="checkbox" class="eal-custom-check" disabled />
+            <input
+              type="checkbox"
+              class="eal-custom-check eal-row-check"
+              aria-label="{% translate 'Select row' %}"
+            />
           </td>
           <td>
             <span class="eal-entity-id">{{ row.address_code }}</span>
           </td>
           <td>
-            <span class="eal-pi-number">{{ row.client_account.account_no }}</span>
+            <div class="eal-name-cell">
+              <span class="eal-name-text">{{ row.client_account.account_no }} — {{ row.client_account.display_name }}</span>
+            </div>
           </td>
           <td>
             <div class="eal-name-cell">
               <span class="eal-name-text">{{ row.display_name }}</span>
             </div>
           </td>
+          <td>{{ row.get_address_category_display }}</td>
           <td>
-            {% if row.address_category == 'Pickup Address' %}
-            <span class="status-badge mode-pickup">
-              <i class="bi bi-box-arrow-up"></i>
-              {% translate "Pickup" %}
-            </span>
-            {% elif row.address_category == 'Delivery Address' %}
-            <span class="status-badge mode-delivery">
-              <i class="bi bi-box-arrow-down"></i>
-              {% translate "Delivery" %}
-            </span>
+            {% if row.default_pickup_address %}
+            <span class="status-badge active">{% translate "Yes" %}</span>
             {% else %}
-            <span class="status-badge mode-both">
-              <i class="bi bi-arrow-left-right"></i>
-              {% translate "Both" %}
-            </span>
+            <span class="status-badge pending">{% translate "No" %}</span>
             {% endif %}
           </td>
-          <td>{{ row.city_country_cell }}</td>
-          <td>{{ row.contact_name|default:"—" }}</td>
           <td>
-            <span class="eal-pi-number">{{ row.phone_display_cell }}</span>
+            {% if row.default_delivery_address %}
+            <span class="status-badge active">{% translate "Yes" %}</span>
+            {% else %}
+            <span class="status-badge pending">{% translate "No" %}</span>
+            {% endif %}
           </td>
+          <td>
+            {% if row.status == 'Active' %}
+            <span class="status-badge active">{% translate "Active" %}</span>
+            {% else %}
+            <span class="status-badge inactive">{% translate "Inactive" %}</span>
+            {% endif %}
+          </td>
+          <td>{{ row.city|default:"—" }}</td>
           <td>
             <div class="dropdown eal-actions-cell" data-bs-display="static" onclick="event.stopPropagation();">
               <button
@@ -256,7 +271,7 @@
         </tr>
         {% empty %}
         <tr>
-          <td colspan="9" class="text-center text-muted py-5">{% translate "No addresses found." %}</td>
+          <td colspan="10" class="text-center text-muted py-5">{% translate "No addresses found." %}</td>
         </tr>
         {% endfor %}
       </tbody>
@@ -340,6 +355,8 @@
 
 {% block extra_js %}
 {{ block.super }}
+{% url 'iroad_tenants:tenant_address_master' as address_list_url %}
+{% include 'iroad_tenants/partials/eal_list_live_search_js.html' with list_url=address_list_url search_input_id='addressMasterSearch' clear_btn_id='addressMasterSearchClear' filter_select_ids='addrListStatus,addrListClient' %}
 <script>
 (function () {
   const statusModalEl = document.getElementById("addressStatusConfirmModal");

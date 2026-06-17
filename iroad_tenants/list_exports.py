@@ -10,6 +10,7 @@ from django.shortcuts import redirect
 from django.views import View
 
 from iroad_tenants.list_table_utils import (
+    apply_list_export_selection,
     build_csv_http_response,
     build_eal_list_queryset,
     get_list_search_q,
@@ -20,6 +21,7 @@ from tenant_workspace.models import (
     TenantAddressMaster,
     TenantBooking,
     TenantCargoCategory,
+    TenantServiceItemCategory,
     TenantCargoMaster,
     TenantClientAccount,
     TenantClientContact,
@@ -70,6 +72,7 @@ class TenantWorkspaceExportView(View):
 
     filename = 'export.csv'
     headers: list[str] = []
+    export_selection_field: str | None = None
 
     def check_access(self, request, context):
         return None
@@ -79,6 +82,12 @@ class TenantWorkspaceExportView(View):
 
     def iter_rows(self, request, records):
         raise NotImplementedError
+
+    def apply_export_selection(self, request, queryset):
+        field = self.export_selection_field
+        if not field:
+            return queryset
+        return apply_list_export_selection(queryset, request, field)
 
     def get(self, request):
         from iroad_tenants.views import (
@@ -102,7 +111,8 @@ class TenantWorkspaceExportView(View):
             clear_tenant_portal_cookie(response, request=request)
             return response
         try:
-            records = list(self.get_queryset(request))
+            qs = self.apply_export_selection(request, self.get_queryset(request))
+            records = list(qs)
             return build_csv_http_response(
                 self.filename,
                 self.headers,
@@ -135,18 +145,17 @@ def _address_master_base_qs(request):
         try:
             qs = qs.filter(client_account_id=uuid.UUID(cid))
         except ValueError:
-            client_row = TenantClientAccount.objects.filter(account_no__iexact=cid).first()
-            if client_row:
-                qs = qs.filter(client_account_id=client_row.account_id)
+            qs = qs.filter(client_account__account_no__iexact=cid)
 
     column_field_map = {
         1: 'address_code',
         2: 'client_account__account_no',
         3: 'display_name',
         4: 'address_category',
-        5: 'city',
-        6: 'contact_name',
-        7: 'phone_no',
+        5: 'default_pickup_address',
+        6: 'default_delivery_address',
+        7: 'status',
+        8: 'city',
     }
     sort_col_field_map = dict(column_field_map)
     search_fields = [
@@ -155,8 +164,6 @@ def _address_master_base_qs(request):
         'city',
         'client_account__display_name',
         'client_account__account_no',
-        'contact_name',
-        'phone_no',
     ]
     return build_eal_list_queryset(
         request,
@@ -170,16 +177,16 @@ def _address_master_base_qs(request):
 
 class TenantAddressMasterExportView(TenantWorkspaceExportView):
     filename = 'address_master_export.csv'
+    export_selection_field = 'address_code'
     headers = [
         'Address Code',
         'Client Account',
         'Display Name',
         'Address Category',
-        'City',
-        'Country',
-        'Contact Name',
-        'Phone No.',
+        'Default Pickup',
+        'Default Delivery',
         'Status',
+        'City',
     ]
 
     def check_access(self, request, context):
@@ -197,11 +204,10 @@ class TenantAddressMasterExportView(TenantWorkspaceExportView):
                 row.client_account.account_no if row.client_account_id else '',
                 row.display_name,
                 row.address_category,
-                row.city or '',
-                row.country_id or '',
-                row.contact_name or '',
-                row.phone_no or '',
+                'Yes' if row.default_pickup_address else 'No',
+                'Yes' if row.default_delivery_address else 'No',
                 row.status,
+                row.city or '',
             ]
 
 
@@ -252,6 +258,7 @@ def _client_contacts_base_qs(request):
 
 class TenantClientContactsExportView(TenantWorkspaceExportView):
     filename = 'client_contacts_export.csv'
+    export_selection_field = 'contact_id'
     headers = [
         'Client Account',
         'Name',
@@ -282,6 +289,7 @@ class TenantClientContactsExportView(TenantWorkspaceExportView):
 
 class TenantClientContractExportView(TenantWorkspaceExportView):
     filename = 'client_contracts_export.csv'
+    export_selection_field = 'contract_no'
     headers = [
         'Contract No.',
         'Client Account',
@@ -347,18 +355,17 @@ def _cargo_master_base_qs(request):
     elif status_raw == 'inactive':
         qs = qs.filter(status=TenantCargoMaster.Status.INACTIVE)
 
-    cid = (request.GET.get('client') or '').strip()
-    if cid:
+    category_chip = (request.GET.get('category') or 'all').strip()
+    if category_chip and category_chip.lower() != 'all':
         try:
-            qs = qs.filter(client_account_id=uuid.UUID(cid))
+            qs = qs.filter(cargo_category_id=uuid.UUID(category_chip))
         except ValueError:
-            qs = qs.filter(client_account__account_no__iexact=cid)
+            qs = qs.filter(cargo_category__name_english__iexact=category_chip)
 
     column_field_map = {
-        0: 'cargo_code',
-        1: 'client_account__display_name',
-        2: 'cargo_category__name_english',
-        3: 'display_name',
+        1: 'cargo_code',
+        2: 'client_account__display_name',
+        3: 'cargo_category__name_english',
         4: 'english_label',
         5: 'arabic_label',
         6: 'client_sku_external_ref',
@@ -387,6 +394,7 @@ def _cargo_master_base_qs(request):
 
 class TenantCargoMasterExportView(TenantWorkspaceExportView):
     filename = 'cargo_master_export.csv'
+    export_selection_field = 'cargo_code'
     headers = [
         'Cargo Code',
         'Client',
@@ -420,8 +428,43 @@ class TenantCargoMasterExportView(TenantWorkspaceExportView):
             ]
 
 
+class TenantServiceItemCategoryExportView(TenantWorkspaceExportView):
+    filename = 'service_categories_export.csv'
+    export_selection_field = 'category_code'
+    headers = ['Category Code', 'English Name', 'Arabic Name', 'Status']
+
+    def check_access(self, request, context):
+        from iroad_tenants.views import _tenant_service_management_access_guard
+
+        return _tenant_service_management_access_guard(request, context)
+
+    def get_queryset(self, request):
+        scope = (request.GET.get('scope') or 'all').strip().lower()
+        qs = TenantServiceItemCategory.objects.all()
+        if scope == 'active':
+            qs = qs.filter(status=TenantServiceItemCategory.Status.ACTIVE)
+        elif scope == 'inactive':
+            qs = qs.filter(status=TenantServiceItemCategory.Status.INACTIVE)
+        return build_eal_list_queryset(
+            request,
+            qs,
+            search_fields=['name_english', 'name_arabic', 'category_code'],
+            default_order=('category_code',),
+        )
+
+    def iter_rows(self, request, records):
+        for row in records:
+            yield [
+                row.category_code,
+                row.name_english,
+                row.name_arabic,
+                row.status,
+            ]
+
+
 class TenantCargoCategoryExportView(TenantWorkspaceExportView):
     filename = 'cargo_categories_export.csv'
+    export_selection_field = 'category_code'
     headers = ['Category Code', 'English Name', 'Arabic Name', 'Status']
 
     def check_access(self, request, context):
@@ -440,7 +483,7 @@ class TenantCargoCategoryExportView(TenantWorkspaceExportView):
             request,
             qs,
             search_fields=['name_english', 'name_arabic', 'category_code'],
-            default_order=('-created_at',),
+            default_order=('category_code',),
         )
 
     def iter_rows(self, request, records):
@@ -455,17 +498,15 @@ class TenantCargoCategoryExportView(TenantWorkspaceExportView):
 
 def _location_master_base_qs(request):
     qs = TenantLocationMaster.objects.select_related('country')
-    status_filter = (request.GET.get('status') or 'all').strip().lower()
-    if status_filter == 'active':
-        qs = qs.filter(status=TenantLocationMaster.Status.ACTIVE)
-    elif status_filter == 'inactive':
-        qs = qs.filter(status=TenantLocationMaster.Status.INACTIVE)
-
-    serviceable_filter = (request.GET.get('serviceable') or 'all').strip().lower()
-    if serviceable_filter == 'yes':
+    scope = (request.GET.get('scope') or 'all').strip().lower()
+    if scope not in ('all', 'serviceable', 'non_serviceable', 'inactive'):
+        scope = 'all'
+    if scope == 'serviceable':
         qs = qs.filter(is_serviceable=True)
-    elif serviceable_filter == 'no':
+    elif scope == 'non_serviceable':
         qs = qs.filter(is_serviceable=False)
+    elif scope == 'inactive':
+        qs = qs.filter(status=TenantLocationMaster.Status.INACTIVE)
 
     column_field_map = {
         1: 'location_code',
@@ -492,13 +533,14 @@ def _location_master_base_qs(request):
         search_fields=search_fields,
         column_field_map=column_field_map,
         sort_col_field_map=column_field_map,
-        default_order=('-created_at',),
+        default_order=('location_code',),
         column_filter_types={9: 'boolean'},
     )
 
 
 class TenantLocationMasterExportView(TenantWorkspaceExportView):
     filename = 'location_master_export.csv'
+    export_selection_field = 'location_code'
     headers = [
         'Location Code',
         'Country',
@@ -532,10 +574,16 @@ class TenantLocationMasterExportView(TenantWorkspaceExportView):
 def _route_master_base_qs(request):
     qs = TenantRouteMaster.objects.select_related('origin_point', 'destination_point')
     route_scope = (request.GET.get('scope') or 'all').strip().lower()
+    if route_scope not in ('all', 'domestic', 'international', 'active', 'inactive'):
+        route_scope = 'all'
     if route_scope == 'domestic':
         qs = qs.filter(route_type=TenantRouteMaster.RouteType.DOMESTIC)
     elif route_scope == 'international':
         qs = qs.filter(route_type=TenantRouteMaster.RouteType.INTERNATIONAL)
+    elif route_scope == 'active':
+        qs = qs.filter(status=TenantRouteMaster.Status.ACTIVE)
+    elif route_scope == 'inactive':
+        qs = qs.filter(status=TenantRouteMaster.Status.INACTIVE)
 
     column_field_map = {
         1: 'route_code',
@@ -558,13 +606,14 @@ def _route_master_base_qs(request):
         ],
         column_field_map=column_field_map,
         sort_col_field_map=column_field_map,
-        default_order=('-created_at',),
+        default_order=('route_code',),
         column_filter_types={7: 'number', 8: 'number'},
     )
 
 
 class TenantRouteMasterExportView(TenantWorkspaceExportView):
     filename = 'route_master_export.csv'
+    export_selection_field = 'route_code'
     headers = [
         'Route Code',
         'Route Label',
@@ -601,8 +650,55 @@ class TenantRouteMasterExportView(TenantWorkspaceExportView):
             ]
 
 
+def _service_item_master_base_qs(request):
+    qs = TenantServiceItemMaster.objects.select_related(
+        'route',
+        'route__origin_point',
+        'route__destination_point',
+    )
+    scope = (request.GET.get('scope') or 'all').strip().lower()
+    if scope not in ('all', 'service', 'trip', 'active', 'inactive'):
+        scope = 'all'
+    if scope == 'service':
+        qs = qs.filter(service_type=TenantServiceItemMaster.ServiceType.SERVICE)
+    elif scope == 'trip':
+        qs = qs.filter(service_type=TenantServiceItemMaster.ServiceType.TRIP)
+    elif scope == 'active':
+        qs = qs.filter(status=TenantServiceItemMaster.Status.ACTIVE)
+    elif scope == 'inactive':
+        qs = qs.filter(status=TenantServiceItemMaster.Status.INACTIVE)
+
+    column_field_map = {
+        1: 'service_code',
+        2: 'english_name',
+        3: 'arabic_name',
+        4: 'service_type',
+        5: 'status',
+        6: 'sell_price',
+    }
+    return build_eal_list_queryset(
+        request,
+        qs,
+        search_fields=[
+            'service_code',
+            'english_name',
+            'arabic_name',
+            'service_type',
+            'category_name',
+            'route__route_label',
+            'route__origin_point__display_label',
+            'route__destination_point__display_label',
+        ],
+        column_field_map=column_field_map,
+        sort_col_field_map=column_field_map,
+        default_order=('service_code',),
+        column_filter_types={6: 'number'},
+    )
+
+
 class TenantServiceItemMasterExportView(TenantWorkspaceExportView):
     filename = 'service_items_export.csv'
+    export_selection_field = 'service_code'
     headers = [
         'Service Item Code',
         'English Label',
@@ -612,27 +708,7 @@ class TenantServiceItemMasterExportView(TenantWorkspaceExportView):
     ]
 
     def get_queryset(self, request):
-        column_field_map = {
-            1: 'service_code',
-            2: 'english_name',
-            3: 'arabic_name',
-            4: 'service_type',
-            5: 'status',
-        }
-        return build_eal_list_queryset(
-            request,
-            TenantServiceItemMaster.objects.all(),
-            search_fields=[
-                'service_code',
-                'english_name',
-                'arabic_name',
-                'service_type',
-                'category_name',
-            ],
-            column_field_map=column_field_map,
-            sort_col_field_map=column_field_map,
-            default_order=('-created_at',),
-        )
+        return _service_item_master_base_qs(request)
 
     def iter_rows(self, request, records):
         for row in records:
@@ -712,6 +788,7 @@ def _price_list_base_qs(request):
 
 class TenantPriceListMasterExportView(TenantWorkspaceExportView):
     filename = 'price_lists_export.csv'
+    export_selection_field = 'price_list_code'
     headers = [
         'Price List Code',
         'Price List Name',
@@ -788,6 +865,7 @@ def _truck_master_base_qs(request):
 
 class TruckMasterExportView(TenantWorkspaceExportView):
     filename = 'truck_master_export.csv'
+    export_selection_field = 'truck_code'
     headers = [
         'Truck Code',
         'Owner',
@@ -853,6 +931,7 @@ def _truck_type_base_qs(request):
 
 class TruckTypeMasterExportView(TenantWorkspaceExportView):
     filename = 'truck_types_export.csv'
+    export_selection_field = 'truck_type_code'
     headers = ['Truck Type Code', 'English Label', 'Arabic Label', 'Status']
 
     def check_access(self, request, context):
@@ -921,6 +1000,7 @@ def _driver_master_base_qs(request):
 
 class DriverMasterExportView(TenantWorkspaceExportView):
     filename = 'drivers_export.csv'
+    export_selection_field = 'driver_code'
     headers = [
         'Driver Code',
         'English Name',
@@ -996,6 +1076,7 @@ def _truck_attachments_filtered(request):
 
 class TruckAttachmentAllExportView(TenantWorkspaceExportView):
     filename = 'truck_attachments_export.csv'
+    export_selection_field = 'attachment_no'
     headers = [
         'Attachment No',
         'Date',
@@ -1056,6 +1137,7 @@ def _driver_attachments_filtered(request):
 
 class DriverAttachmentAllExportView(TenantWorkspaceExportView):
     filename = 'driver_attachments_export.csv'
+    export_selection_field = 'attachment_no'
     headers = [
         'Attachment No',
         'Date',
@@ -1111,6 +1193,7 @@ def _booking_filtered_qs(request):
 
 class TenantOperationBookingExportView(TenantWorkspaceExportView):
     filename = 'bookings_export.csv'
+    export_selection_field = 'booking_no'
     headers = [
         'Booking No',
         'Booking Date',
@@ -1169,6 +1252,7 @@ def _shipment_filtered_qs(request):
 
 class TenantOperationShipmentExportView(TenantWorkspaceExportView):
     filename = 'shipments_export.csv'
+    export_selection_field = 'shipment_no'
     headers = [
         'Shipment No',
         'Date',
@@ -1197,6 +1281,7 @@ class TenantOperationShipmentExportView(TenantWorkspaceExportView):
 
 class TenantOperationTruckMovementLogExportView(TenantWorkspaceExportView):
     filename = 'truck_movement_logs_export.csv'
+    export_selection_field = 'movement_no'
     headers = [
         'Movement No',
         'Truck',
@@ -1209,7 +1294,6 @@ class TenantOperationTruckMovementLogExportView(TenantWorkspaceExportView):
     ]
 
     def get_queryset(self, request):
-        search_q = get_list_search_q(request)
         qs = TenantTruckMovementLog.objects.select_related(
             'booking',
             'shipment',
@@ -1217,19 +1301,46 @@ class TenantOperationTruckMovementLogExportView(TenantWorkspaceExportView):
             'driver',
             'from_location_point',
             'to_location_point',
-        ).order_by('-created_at')
-        if search_q:
-            qs = qs.filter(
-                Q(movement_no__icontains=search_q)
-                | Q(truck__truck_code__icontains=search_q)
-                | Q(driver__driver_code__icontains=search_q)
-                | Q(booking__booking_no__icontains=search_q)
-                | Q(shipment__shipment_no__icontains=search_q)
-                | Q(from_location_point__display_label__icontains=search_q)
-                | Q(to_location_point__display_label__icontains=search_q)
-                | Q(status__icontains=search_q)
-            )
-        return qs
+        )
+        column_field_map = {
+            0: 'movement_no',
+            1: 'movement_date',
+            2: 'movement_source',
+            3: 'shipment__shipment_no',
+            4: 'truck__truck_code',
+            5: 'driver__english_name',
+            6: 'from_location_point__display_label',
+            7: 'start_time',
+            8: 'end_time',
+            9: 'status',
+        }
+        column_filter_types = {
+            1: 'date',
+            7: 'datetime',
+            8: 'datetime',
+        }
+        search_fields = [
+            'movement_no',
+            'movement_source',
+            'truck__truck_code',
+            'driver__driver_code',
+            'driver__english_name',
+            'driver__arabic_name',
+            'booking__booking_no',
+            'shipment__shipment_no',
+            'from_location_point__display_label',
+            'to_location_point__display_label',
+            'status',
+        ]
+        return build_eal_list_queryset(
+            request,
+            qs,
+            search_fields=search_fields,
+            column_field_map=column_field_map,
+            sort_col_field_map=dict(column_field_map),
+            default_order=('-created_at',),
+            column_filter_types=column_filter_types,
+        )
 
     def iter_rows(self, request, records):
         for row in records:
@@ -1247,6 +1358,7 @@ class TenantOperationTruckMovementLogExportView(TenantWorkspaceExportView):
 
 class TenantOperationDocumentHandoverExportView(TenantWorkspaceExportView):
     filename = 'document_handovers_export.csv'
+    export_selection_field = 'handover_no'
     headers = [
         'Handover No',
         'Booking No',
@@ -1286,6 +1398,7 @@ class TenantOperationDocumentHandoverExportView(TenantWorkspaceExportView):
 
 class TenantOperationSurchargeSalesExportView(TenantWorkspaceExportView):
     filename = 'surcharge_transactions_export.csv'
+    export_selection_field = 'transaction_no'
     headers = [
         'Transaction No',
         'Shipment No',
@@ -1335,6 +1448,7 @@ class TenantOperationSurchargeSalesExportView(TenantWorkspaceExportView):
 
 class TenantOperationShipmentPodExportView(TenantWorkspaceExportView):
     filename = 'shipment_pod_export.csv'
+    export_selection_field = 'record_no'
     headers = [
         'Record No',
         'Record Date',
@@ -1387,6 +1501,7 @@ class TenantOperationShipmentPodExportView(TenantWorkspaceExportView):
 
 class TenantOperationShipmentDocumentsExportView(TenantWorkspaceExportView):
     filename = 'shipment_documents_export.csv'
+    export_selection_field = 'record_no'
     headers = [
         'Record No',
         'Record Date',
@@ -1401,8 +1516,10 @@ class TenantOperationShipmentDocumentsExportView(TenantWorkspaceExportView):
     ]
 
     def get_queryset(self, request):
+        from iroad_tenants.views import _tenant_shipment_documents_list_queryset
+
         search_q = get_list_search_q(request)
-        qs = TenantShipmentDocument.objects.select_related(
+        qs = _tenant_shipment_documents_list_queryset().select_related(
             'booking',
             'shipment',
         ).order_by('-created_at')

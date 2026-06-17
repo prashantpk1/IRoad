@@ -1,5 +1,6 @@
 {% extends 'iroad_tenants/base.html' %}
 {% load static %}
+{% load i18n %}
 
 {% block title %}Service Item Master | iRoad Admin{% endblock %}
 {% block breadcrumb %}{% endblock %}
@@ -20,13 +21,17 @@
             </li>
           </ol>
         </nav>
-        <div class="page-header-row">
+        <div class="page-header-row align-items-start">
           <div class="page-header-left">
             <h1 class="page-title">{{ page_title|default:'Create Service Item' }}</h1>
-            <p class="page-subtitle">
-              Define service or trip items with identity, pricing, and status
-              (SV-001).
-            </p>
+            <!-- <p class="page-subtitle">
+              {% translate "Define service or trip items with identity, pricing, and status (SV-001)." %}
+            </p> -->
+          </div>
+          <div class="page-header-right ms-auto">
+            <a href="{% url 'iroad_tenants:tenant_service_item_master_list' %}" class="btn btn-outline-secondary">
+              <i class="bi bi-arrow-left me-1"></i>{% translate "Back" %}
+            </a>
           </div>
         </div>
       </div>
@@ -49,11 +54,7 @@
             </div>
             <div class="form-card-header-text">
               <h2 class="form-card-title">Basic Information</h2>
-              <p class="form-card-desc">
-                Primary details, identity, and classification of the service
-                item.
-              </p>
-            </div>
+      </div>
           </div>
           <div class="form-card-body">
             <!-- Identity -->
@@ -153,12 +154,30 @@
                     dir="rtl" {% if is_view_mode %}readonly{% endif %}
                   />
                 </div>
-                <input
-                  type="hidden"
-                  id="category"
-                  name="category_name"
-                  value="{{ form_data.category_name|default:service_item_category_options.0 }}"
-                />
+                <div class="field">
+                  <label for="category" class="form-label"
+                    >Category
+                    <span class="required">*</span>
+                  </label>
+                  <select
+                    class="form-select{% if field_errors.service_category_id %} is-invalid{% endif %}"
+                    id="category"
+                    name="service_category_id"
+                    {% if is_view_mode %}disabled{% endif %}
+                  >
+                    <option value="" disabled {% if not form_data.service_category_id %}selected{% endif %}>-Select category-</option>
+                    {% for cat in service_item_categories %}
+                    <option
+                      value="{{ cat.category_id }}"
+                      {% if form_data.service_category_id == cat.category_id|stringformat:'s' %}selected{% endif %}
+                    >
+                      {{ cat.name_english }}
+                    </option>
+                    {% endfor %}
+                  </select>
+                  {% if field_errors.service_category_id %}<div class="invalid-feedback d-block">{{ field_errors.service_category_id }}</div>{% endif %}
+                  <span class="field-hint">Must reference an active service category.</span>
+                </div>
               </div>
             </div>
 
@@ -174,11 +193,7 @@
             </div>
             <div class="form-card-header-text">
               <h2 class="form-card-title">Pricing & Route</h2>
-              <p class="form-card-desc">
-                Pricing details based on service type. All amounts in tenant
-                base currency.
-              </p>
-            </div>
+      </div>
           </div>
           <div class="form-card-body">
             <!-- Route (Trip only) -->

@@ -130,9 +130,49 @@ def _sync_pod_status_from_mobile_logs(shipment) -> None:
             shipment.pod_status = TenantShipment.PodStatus.HARD_COPY_RECEIVED
             shipment.save(update_fields=['pod_status', 'updated_at'])
         return
-    if evidence.get('pod_uploaded'):
+    if evidence.get('pod_uploaded') or evidence.get('delivered_log'):
         shipment.pod_status = TenantShipment.PodStatus.COMPLIANT
         shipment.save(update_fields=['pod_status', 'updated_at'])
+
+
+def derive_pod_status_from_shipment_rows(statuses: list[str]) -> str:
+    """Aggregate shipment pod_status values for booking-level display."""
+    normalized = [(status or '').strip() for status in statuses if (status or '').strip()]
+    if not normalized:
+        return TenantShipment.PodStatus.PENDING
+    if TenantShipment.PodStatus.NOT_COMPLIANT in normalized:
+        return TenantShipment.PodStatus.NOT_COMPLIANT
+    if all(status == TenantShipment.PodStatus.COMPLIANT for status in normalized):
+        return TenantShipment.PodStatus.COMPLIANT
+    if TenantShipment.PodStatus.HARD_COPY_RECEIVED in normalized:
+        return TenantShipment.PodStatus.HARD_COPY_RECEIVED
+    return TenantShipment.PodStatus.PENDING
+
+
+def sync_booking_pod_status_from_shipments(booking) -> None:
+    """Persist booking.pod_status from linked shipment POD columns after job completion."""
+    if booking is None:
+        return
+    from tenant_workspace.models import TenantBooking
+
+    booking_id = getattr(booking, 'booking_id', None) or getattr(booking, 'pk', None)
+    if not booking_id:
+        return
+    statuses = list(
+        TenantShipment.objects.filter(booking_id=booking_id)
+        .exclude(shipment_status=TenantShipment.ShipmentStatus.CANCELLED)
+        .values_list('pod_status', flat=True),
+    )
+    if not statuses:
+        return
+    new_status = derive_pod_status_from_shipment_rows(statuses)
+    if (getattr(booking, 'pod_status', None) or '').strip() == new_status:
+        return
+    TenantBooking.objects.filter(pk=booking_id).update(
+        pod_status=new_status,
+        updated_at=timezone.now(),
+    )
+    booking.pod_status = new_status
 
 
 def _should_auto_mark_delivered_for_cod(action, shipment) -> bool:

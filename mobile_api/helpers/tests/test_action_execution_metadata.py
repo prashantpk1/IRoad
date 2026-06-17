@@ -67,3 +67,27 @@ class ActionExecutionMetadataTests(TestCase):
         self.assertFalse(row['requires_photo'])
         self.assertNotIn('capture_ui', row)
         self.assertEqual(row['execution_requirements']['photo'], False)
+
+    def test_a10_job_closed_has_no_capture_requirements(self):
+        action = _action(
+            action_code='A10',
+            english_label='Job Closed',
+            booking_status_impact='Executed',
+            shipment_status_impact='Closed',
+            sequence_number=10,
+        )
+        req = build_execution_requirements(action)
+        self.assertFalse(req['gps'])
+        self.assertFalse(req['photo'])
+        self.assertFalse(req['video'])
+        self.assertFalse(req['note'])
+        self.assertEqual(req['photo_min_count'], 0)
+        self.assertEqual(req['shipment_status_impact'], 'Closed')
+
+        row = project_allowed_action_row(action)
+        self.assertFalse(row['requires_gps'])
+        self.assertFalse(row['requires_photo'])
+        self.assertFalse(row['requires_video'])
+        self.assertFalse(row['requires_note'])
+        self.assertFalse(row['execution_requirements']['gps'])
+        self.assertFalse(row['execution_requirements']['note'])

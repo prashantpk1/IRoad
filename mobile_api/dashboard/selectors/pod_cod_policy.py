@@ -157,6 +157,10 @@ def derive_hard_pod_pending(
 def derive_cod_pending(shipment: Any | None) -> bool:
     if shipment is None or not is_cod_shipment(shipment):
         return False
+    if getattr(shipment, 'shipment_status', None) == TenantShipment.ShipmentStatus.CANCELLED:
+        return False
+    if getattr(shipment, 'collection_status', None) == TenantShipment.CollectionStatus.CANCELLED:
+        return False
     return (
         getattr(shipment, 'collection_status', None)
         != TenantShipment.CollectionStatus.COLLECTED

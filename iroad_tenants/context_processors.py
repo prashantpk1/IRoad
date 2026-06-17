@@ -11,6 +11,26 @@ from iroad_tenants.tenant_notifications import (
     unread_count_for_recipient,
 )
 from superadmin.models import SystemBanner
+from iroad_tenants.tenant_system_config import (
+    resolve_tenant_system_config,
+    tenant_system_config_for_js,
+)
+
+
+def tenant_system_configuration(request):
+    """Expose organization system configuration to tenant portal templates."""
+    path = (getattr(request, 'path', '') or '').lower()
+    if not path.startswith('/tenant/'):
+        return {
+            'tenant_system_config': {},
+            'tenant_system_config_js': {},
+        }
+
+    config = resolve_tenant_system_config(request)
+    return {
+        'tenant_system_config': config,
+        'tenant_system_config_js': tenant_system_config_for_js(config),
+    }
 
 
 def tenant_system_banners(request):

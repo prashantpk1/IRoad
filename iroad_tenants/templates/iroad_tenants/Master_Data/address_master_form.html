@@ -266,7 +266,7 @@
           {{ form.position }}
         </div>
       </div>
-      <div class="fields-grid cols-2 mb-3">
+      <div class="fields-grid cols-3 mb-3">
         <div class="field">
           <label class="form-label" for="{{ form.mobile_no_1.id_for_label }}">
             {{ form.mobile_no_1.label }} <span class="required">*</span>
@@ -303,8 +303,6 @@
           </div>
           {% if form.mobile_no_2.errors %}<div class="text-danger small">{{ form.mobile_no_2.errors }}</div>{% endif %}
         </div>
-      </div>
-      <div class="fields-grid cols-2 mb-3">
         <div class="field">
           <label class="form-label" for="{{ form.whatsapp_no.id_for_label }}">{{ form.whatsapp_no.label }}</label>
           <div class="phone-input-group">
@@ -322,6 +320,8 @@
           </div>
           {% if form.whatsapp_no.errors %}<div class="text-danger small">{{ form.whatsapp_no.errors }}</div>{% endif %}
         </div>
+      </div>
+      <div class="fields-grid cols-3">
         <div class="field">
           <label class="form-label" for="{{ form.phone_no.id_for_label }}">{{ form.phone_no.label }}</label>
           <div class="phone-input-group">
@@ -339,11 +339,17 @@
           </div>
           {% if form.phone_no.errors %}<div class="text-danger small">{{ form.phone_no.errors }}</div>{% endif %}
         </div>
-      </div>
-      <div class="field">
-        <label class="form-label" for="{{ form.email.id_for_label }}">{{ form.email.label }}</label>
-        {{ form.email }}
-        {% if form.email.errors %}<div class="text-danger small">{{ form.email.errors }}</div>{% endif %}
+        <div class="field">
+          <label class="form-label" for="{{ form.extension.id_for_label }}">{{ form.extension.label }}</label>
+          {{ form.extension }}
+          {% if form.extension.errors %}<div class="text-danger small">{{ form.extension.errors }}</div>{% endif %}
+        </div>
+        <div class="field">
+          <label class="form-label" for="{{ form.email.id_for_label }}">{{ form.email.label }}</label>
+          {{ form.email }}
+          <span class="field-hint d-block small text-muted">{% translate "Valid email format if provided." %}</span>
+          {% if form.email.errors %}<div class="text-danger small">{{ form.email.errors }}</div>{% endif %}
+        </div>
       </div>
     </div>
   </div>

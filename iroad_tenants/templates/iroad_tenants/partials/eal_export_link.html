@@ -1,6 +1,6 @@
 {% load i18n %}
 <a
-  class="eal-btn eal-btn-outline"
+  class="eal-btn eal-btn-outline eal-export-link"
   href="{% url export_url_name %}{% if request.GET %}?{{ request.GET.urlencode }}{% endif %}"
   {% if export_filename %}download="{{ export_filename }}"{% endif %}
 >

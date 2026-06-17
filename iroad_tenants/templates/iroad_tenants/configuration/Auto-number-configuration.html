@@ -15,9 +15,9 @@
   <div class="page-header-row">
     <div class="page-header-left">
       <h1 class="page-title">Auto Number Configuration</h1>
-      <p class="page-subtitle">
+      <!-- <p class="page-subtitle">
         Manage automatic number generation rules for all document types.
-      </p>
+      </p> -->
     </div>
   </div>
 </div>
@@ -71,6 +71,9 @@
       </li>
       <li class="form-list-item {% if auto_number_form_code == 'service-item-master' %}active{% endif %}" data-form="service-item-master">
         Service Item Master
+      </li>
+      <li class="form-list-item {% if auto_number_form_code == 'service-item-category' %}active{% endif %}" data-form="service-item-category">
+        Service Category
       </li>
       <li class="form-list-item {% if auto_number_form_code == 'price-list-master' %}active{% endif %}" data-form="price-list-master">
         Price List Master
@@ -221,10 +224,7 @@
           <h2 class="form-card-title" id="autoNumberFormTitle">
             {{ auto_number_form_label|default:'Organization Profile' }} Auto Numbering
           </h2>
-          <p class="form-card-desc" id="autoNumberFormDesc">
-            Manage auto numbering settings and formats.
-          </p>
-        </div>
+      </div>
       </div>
       <div class="auto-number-content-body form-card-body">
         <form
@@ -377,7 +377,6 @@
       : document.querySelectorAll("#formNameList .form-list-item");
     const searchInput = document.getElementById("formSearchInput");
     const titleEl = document.getElementById("autoNumberFormTitle");
-    const descEl = document.getElementById("autoNumberFormDesc");
     const selectedFormCodeEl = document.getElementById("selectedFormCode");
     const formEl = document.getElementById("autoNumberConfigForm");
     const numberOfDigitsEl = document.getElementById("numberOfDigits");
@@ -489,7 +488,6 @@
         var name = item.textContent.trim();
         selectedFormCodeEl.value = selectedCode;
         titleEl.textContent = name + " Auto Numbering";
-        descEl.textContent = "Backend save is not enabled for this form yet.";
       });
     });
 

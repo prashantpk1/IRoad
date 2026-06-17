@@ -10705,9 +10705,27 @@ class TicketListView(LoginRequiredMixin, View):
         paginator = Paginator(tickets_qs, 10)
         tickets = paginator.get_page(request.GET.get('page'))
         start_index = tickets.start_index()
-        for offset, ticket in enumerate(tickets.object_list):
+        tickets_list = list(tickets.object_list)
+        from superadmin.support_ticket_display import (
+            support_ticket_assignee_display,
+            support_ticket_created_by_display_map,
+        )
+
+        created_by_map = support_ticket_created_by_display_map(tickets_list)
+        for offset, ticket in enumerate(tickets_list):
             # Show descending list ID so top rows have higher numbers.
             ticket.list_rank = total_count - (start_index + offset) + 1
+            created_parts = created_by_map.get(
+                ticket.pk,
+                {'username': '-', 'role': '-'},
+            )
+            username = created_parts.get('username') or '-'
+            role = created_parts.get('role') or '-'
+            if role and role != '-':
+                ticket.created_by_display = f'{username} · {role}'
+            else:
+                ticket.created_by_display = username
+            ticket.assigned_to_display = support_ticket_assignee_display(ticket)
 
         context = {
             'tickets': tickets,
@@ -10757,9 +10775,7 @@ class TicketCreateView(LoginRequiredMixin, View):
         ticket = form.save(commit=False)
         ticket.ticket_no = SupportTicket.generate_ticket_no()
         ticket.status = 'New'
-        ticket.created_by = str(
-            getattr(request.user, 'admin_id', getattr(request.user, 'id', ''))
-        )
+        ticket.created_by = str(request.user.pk)
         ticket.save()
 
         TicketReply.objects.create(

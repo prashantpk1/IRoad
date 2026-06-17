@@ -1,0 +1,117 @@
+{% extends 'iroad_tenants/base.html' %}
+{% load static %}
+{% load i18n %}
+
+{% block title %}{% if is_view %}{% translate "Service Category Detail" %}{% else %}{% translate "Service Category Config" %}{% endif %} | iRoad{% endblock %}
+{% block breadcrumb %}{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <nav aria-label="breadcrumb">
+    <ol class="breadcrumb">
+      <li class="breadcrumb-item">
+        <a href="{% url 'iroad_tenants:tenant_dashboard' %}">{% translate "Dashboard" %}</a>
+      </li>
+      <li class="breadcrumb-item">{% translate "Master Data" %}</li>
+      <li class="breadcrumb-item">{% translate "Services Management" %}</li>
+      <li class="breadcrumb-item active" aria-current="page">
+        {% if is_view %}{% translate "Service Category Detail" %}{% elif is_edit %}{% translate "Edit category" %}{% else %}{% translate "Service Category Config" %}{% endif %}
+      </li>
+    </ol>
+  </nav>
+  <div class="page-header-row align-items-start">
+    <div class="page-header-left">
+      <h1 class="page-title">{% if is_view %}{% translate "Service Category Detail" %}{% elif is_edit %}{% translate "Edit category" %}{% else %}{% translate "Service Category Config" %}{% endif %}</h1>
+      <!-- <p class="page-subtitle">{% if is_view %}{% translate "Read-only category details." %}{% elif is_edit %}{% translate "Update this service category." %}{% else %}{% translate "Manage category classifications for cargo modules." %}{% endif %}</p> -->
+    </div>
+    <div class="page-header-right ms-auto">
+      <a href="{{ back_to_list_url|default_if_none:'' }}{% if not back_to_list_url %}{% url 'iroad_tenants:tenant_service_item_category_list' %}{% endif %}" class="btn btn-outline-secondary">
+        <i class="bi bi-arrow-left me-1"></i>{% translate "Back" %}
+      </a>
+      {% if is_view and edit_category_url %}
+      <a href="{{ edit_category_url }}" class="btn btn-primary ms-2">
+        <i class="bi bi-pencil me-1"></i>{% translate "Edit" %}
+      </a>
+      {% endif %}
+    </div>
+  </div>
+</div>
+
+<form method="post" id="serviceCategoryConfigForm">
+  {% csrf_token %}
+  
+
+  {% if form.non_field_errors %}
+  <div class="alert alert-danger" role="alert">{{ form.non_field_errors }}</div>
+  {% endif %}
+
+  <div class="form-card mb-3" data-section="1">
+    <div class="form-card-header">
+      <div class="form-card-icon blue"><i class="bi bi-tags"></i></div>
+      <div class="form-card-header-text">
+        <h2 class="form-card-title">{% translate "Category Details" %}</h2>
+      </div>
+    </div>
+    <div class="form-card-body">
+      <div class="field-group">
+        <h3 class="field-group-title"><i class="bi bi-info-circle"></i> {% translate "Category Information" %}</h3>
+        <div class="fields-grid cols-2">
+          <div class="field">
+            <label class="form-label" for="{% if is_edit %}{{ form.category_code_preview.id_for_label }}{% else %}categoryCodePreview{% endif %}">{% translate "Category Code" %} <span class="required">*</span></label>
+            {% if is_edit %}
+              {{ form.category_code_preview }}
+            {% else %}
+              <input type="text" class="form-control" id="categoryCodePreview" readonly value="{{ preview_category_code|default:'' }}" placeholder="{% translate 'Auto generated' %}" />
+            {% endif %}
+          </div>
+          <div class="field">
+            <label class="form-label" for="{{ form.status.id_for_label }}">{{ form.status.label }} <span class="required">*</span></label>
+            {{ form.status }}
+            {% if form.status.errors %}<div class="text-danger small">{{ form.status.errors }}</div>{% endif %}
+          </div>
+        </div>
+        <div class="fields-grid cols-2">
+          <div class="field">
+            <label class="form-label" for="{{ form.name_english.id_for_label }}">{{ form.name_english.label }} <span class="required">*</span></label>
+            {{ form.name_english }}
+            {% if form.name_english.errors %}<div class="text-danger small">{{ form.name_english.errors }}</div>{% endif %}
+          </div>
+          <div class="field">
+            <label class="form-label" for="{{ form.name_arabic.id_for_label }}">{{ form.name_arabic.label }} <span class="required">*</span></label>
+            {{ form.name_arabic }}
+            {% if form.name_arabic.errors %}<div class="text-danger small">{{ form.name_arabic.errors }}</div>{% endif %}
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="form-actions-bar">
+    <div class="form-actions-left">
+      {% if not is_view %}
+      <button type="reset" class="btn btn-outline-secondary" id="serviceCategoryFormReset">
+        <i class="bi bi-arrow-counterclockwise"></i>
+        {% translate "Reset" %}
+      </button>
+      {% endif %}
+    </div>
+    <div class="form-actions-right">
+      {% if not is_view %}
+      <button type="submit" class="btn btn-primary"><i class="bi bi-check-circle"></i> {% translate "Save Category" %}</button>
+      {% endif %}
+    </div>
+  </div>
+</form>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+  const isViewMode = "{{ is_view|yesno:'1,0' }}" === "1";
+  if (isViewMode) {
+    document.querySelectorAll("#serviceCategoryConfigForm input, #serviceCategoryConfigForm select, #serviceCategoryConfigForm textarea, #serviceCategoryConfigForm button[type='reset']").forEach((el) => {
+      el.readOnly = true;
+      el.disabled = true;
+    });
+  }
+</script>
+{% endblock %}

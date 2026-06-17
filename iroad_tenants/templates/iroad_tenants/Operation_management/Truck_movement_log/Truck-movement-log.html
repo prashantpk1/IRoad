@@ -99,9 +99,20 @@
               <span style="color: var(--primary-color)">{{ movement_record.movement_no }}</span>
               {% endif %}
             </h1>
-            <p class="page-subtitle">
+            <!-- <p class="page-subtitle">
               {% if movement_is_edit %}Update truck movement details between locations.{% else %}Record and manage truck movement details between locations.{% endif %}
-            </p>
+            </p> -->
+          </div>
+          <div class="page-header-right">
+            <div class="eal-header-actions">
+              <a
+                href="{% url 'iroad_tenants:tenant_operation_truck_movement_log_list' %}"
+                class="eal-btn eal-btn-outline"
+              >
+                <i class="bi bi-arrow-left"></i>
+                <span>Back</span>
+              </a>
+            </div>
           </div>
         </div>
       </div>
@@ -117,10 +128,7 @@
             </div>
             <div class="form-card-header-text">
               <h2 class="form-card-title">Header</h2>
-              <p class="form-card-desc">
-                Core movement header information.
-              </p>
-            </div>
+      </div>
           </div>
           <div class="form-card-body">
             <div class="field-group">
@@ -228,10 +236,7 @@
             </div>
             <div class="form-card-header-text">
               <h2 class="form-card-title">Shipment Info</h2>
-              <p class="form-card-desc">
-                Linked booking, shipment, truck and driver details.
-              </p>
-            </div>
+      </div>
           </div>
           <div class="form-card-body">
             <div class="field-group">
@@ -344,10 +349,7 @@
             </div>
             <div class="form-card-header-text">
               <h2 class="form-card-title">Movement Details</h2>
-              <p class="form-card-desc">
-                Route, timing and distance for this movement.
-              </p>
-            </div>
+      </div>
           </div>
           <div class="form-card-body">
             <div class="field-group">

@@ -47,6 +47,22 @@ def after_shipment_status_side_effects(shipment) -> None:
     from iroad_tenants.views import _tenant_shipment_document_refresh_shipment_pod
 
     _tenant_shipment_document_refresh_shipment_pod(shipment)
+    if shipment.shipment_status in {
+        TenantShipment.ShipmentStatus.DELIVERED,
+        TenantShipment.ShipmentStatus.CLOSED,
+    }:
+        from iroad_tenants.operation_runtime.side_effects import (
+            _sync_pod_status_from_mobile_logs,
+            sync_booking_pod_status_from_shipments,
+        )
+
+        _sync_pod_status_from_mobile_logs(shipment)
+        booking = getattr(shipment, 'booking', None)
+        if booking is None and shipment.booking_id:
+            from tenant_workspace.models import TenantBooking
+
+            booking = TenantBooking.objects.filter(pk=shipment.booking_id).first()
+        sync_booking_pod_status_from_shipments(booking)
 
 
 def derive_latest_action_status(shipment):

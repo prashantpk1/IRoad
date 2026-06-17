@@ -1,5 +1,6 @@
 {% extends 'iroad_tenants/base.html' %}
 {% load static %}
+{% load tz %}
 
 {% block title %}{{ page_title }} | iRoad{% endblock %}
 {% block breadcrumb %}{% endblock %}
@@ -22,13 +23,18 @@
   <div class="page-header-row">
     <div class="page-header-left">
       <h1 class="page-title">{{ page_title }}</h1>
-      <p class="page-subtitle">
+      <!-- <p class="page-subtitle">
         {% if is_edit %}
           Update driver details, documents, and contact information.
         {% else %}
           Fill in the details below to register a new driver.
         {% endif %}
-      </p>
+      </p> -->
+    </div>
+    <div class="page-header-right ms-auto">
+      <a href="{% if driver_cancel_url %}{{ driver_cancel_url }}{% else %}{% url 'iroad_tenants:driver_master' %}{% endif %}" class="btn btn-outline-secondary">
+        <i class="bi bi-arrow-left me-1"></i>Back
+      </a>
     </div>
   </div>
 </div>
@@ -39,6 +45,15 @@
 
 <form id="driverMasterForm" method="post" enctype="multipart/form-data" novalidate>
   {% csrf_token %}
+  {% if driver_return_to %}
+  <input type="hidden" name="return_to" value="{{ driver_return_to }}" />
+  {% endif %}
+  {% if driver_id_for_return %}
+  <input type="hidden" name="driver_id" value="{{ driver_id_for_return }}" />
+  {% endif %}
+  {% if driver_return_to and request.GET.section %}
+  <input type="hidden" name="section" value="{{ request.GET.section }}" />
+  {% endif %}
   {{ form.vendor_account_id }}
 
   {% if not is_edit %}
@@ -64,7 +79,6 @@
       </div>
       <div class="form-card-header-text">
         <h2 class="form-card-title">Basic Information</h2>
-        <p class="form-card-desc">Driver source and operational status.</p>
       </div>
     </div>
     <div class="form-card-body">
@@ -117,7 +131,6 @@
       </div>
       <div class="form-card-header-text">
         <h2 class="form-card-title">Driver Information</h2>
-        <p class="form-card-desc">Names, nationality, and date of birth.</p>
       </div>
     </div>
     <div class="form-card-body">
@@ -154,7 +167,6 @@
       </div>
       <div class="form-card-header-text">
         <h2 class="form-card-title">ID / IQAMA</h2>
-        <p class="form-card-desc">National ID / Iqama and derived validity (preview).</p>
       </div>
     </div>
     <div class="form-card-body">
@@ -176,14 +188,14 @@
           </div>
           <small class="text-muted">Derived on save; shown as preview while editing.</small>
         </div>
-        <div class="field">
+        <!-- <div class="field">
           <label class="form-label" for="{{ form.id_image.id_for_label }}">{{ form.id_image.label }}</label>
           <input type="file" name="{{ form.id_image.html_name }}" id="{{ form.id_image.id_for_label }}" class="form-control" accept="image/*,.pdf" />
           {% if form.id_image.errors %}<div class="text-danger small">{{ form.id_image.errors }}</div>{% endif %}
           {% if is_edit and driver.id_image %}
           <small class="text-muted d-block mt-1">Current: <a href="{{ driver.id_image.url }}" target="_blank" rel="noopener">View file</a></small>
           {% endif %}
-        </div>
+        </div> -->
       </div>
     </div>
   </div>
@@ -196,7 +208,6 @@
       </div>
       <div class="form-card-header-text">
         <h2 class="form-card-title">Passport</h2>
-        <p class="form-card-desc">Passport number, expiry, and scan.</p>
       </div>
     </div>
     <div class="form-card-body">
@@ -215,14 +226,14 @@
           <span class="form-label d-block">Passport Status</span>
           <span id="dmBadgePassport" class="status-badge dm-doc-none" data-role="doc-badge">{% if is_edit %}{{ driver.passport_status }}{% else %}Not Provided{% endif %}</span>
         </div>
-        <div class="field">
+        <!-- <div class="field">
           <label class="form-label" for="{{ form.passport_image.id_for_label }}">{{ form.passport_image.label }}</label>
           <input type="file" name="{{ form.passport_image.html_name }}" id="{{ form.passport_image.id_for_label }}" class="form-control" accept="image/*,.pdf" />
           {% if form.passport_image.errors %}<div class="text-danger small">{{ form.passport_image.errors }}</div>{% endif %}
           {% if is_edit and driver.passport_image %}
           <small class="text-muted d-block mt-1">Current: <a href="{{ driver.passport_image.url }}" target="_blank" rel="noopener">View file</a></small>
           {% endif %}
-        </div>
+        </div> -->
       </div>
     </div>
   </div>
@@ -235,7 +246,6 @@
       </div>
       <div class="form-card-header-text">
         <h2 class="form-card-title">Driving License</h2>
-        <p class="form-card-desc">License number, expiry, and image.</p>
       </div>
     </div>
     <div class="form-card-body">
@@ -254,14 +264,14 @@
           <span class="form-label d-block">DL Status</span>
           <span id="dmBadgeDl" class="status-badge dm-doc-none" data-role="doc-badge">{% if is_edit %}{{ driver.dl_status }}{% else %}Not Provided{% endif %}</span>
         </div>
-        <div class="field">
+        <!-- <div class="field">
           <label class="form-label" for="{{ form.dl_image.id_for_label }}">{{ form.dl_image.label }}</label>
           <input type="file" name="{{ form.dl_image.html_name }}" id="{{ form.dl_image.id_for_label }}" class="form-control" accept="image/*,.pdf" />
           {% if form.dl_image.errors %}<div class="text-danger small">{{ form.dl_image.errors }}</div>{% endif %}
           {% if is_edit and driver.dl_image %}
           <small class="text-muted d-block mt-1">Current: <a href="{{ driver.dl_image.url }}" target="_blank" rel="noopener">View file</a></small>
           {% endif %}
-        </div>
+        </div> -->
       </div>
     </div>
   </div>
@@ -274,7 +284,6 @@
       </div>
       <div class="form-card-header-text">
         <h2 class="form-card-title">Driver Card</h2>
-        <p class="form-card-desc">Card number, expiry, and image.</p>
       </div>
     </div>
     <div class="form-card-body">
@@ -293,14 +302,14 @@
           <span class="form-label d-block">Card Status</span>
           <span id="dmBadgeCard" class="status-badge dm-doc-none" data-role="doc-badge">{% if is_edit %}{{ driver.card_status }}{% else %}Not Provided{% endif %}</span>
         </div>
-        <div class="field">
+        <!-- <div class="field">
           <label class="form-label" for="{{ form.card_image.id_for_label }}">{{ form.card_image.label }}</label>
           <input type="file" name="{{ form.card_image.html_name }}" id="{{ form.card_image.id_for_label }}" class="form-control" accept="image/*,.pdf" />
           {% if form.card_image.errors %}<div class="text-danger small">{{ form.card_image.errors }}</div>{% endif %}
           {% if is_edit and driver.card_image %}
           <small class="text-muted d-block mt-1">Current: <a href="{{ driver.card_image.url }}" target="_blank" rel="noopener">View file</a></small>
           {% endif %}
-        </div>
+        </div> -->
       </div>
     </div>
   </div>
@@ -313,7 +322,6 @@
       </div>
       <div class="form-card-header-text">
         <h2 class="form-card-title">Contact</h2>
-        <p class="form-card-desc">Mobile and WhatsApp.</p>
       </div>
     </div>
     <div class="form-card-body">
@@ -349,7 +357,6 @@
       </div>
       <div class="form-card-header-text">
         <h2 class="form-card-title">Truck Details</h2>
-        <p class="form-card-desc">Assign default truck directly during driver create/edit.</p>
       </div>
     </div>
     <div class="form-card-body">
@@ -369,7 +376,7 @@
             id="dmAssignedTruckDate"
             class="form-control"
             readonly
-            value="{% if assigned_truck_date %}{{ assigned_truck_date|date:'Y-m-d H:i' }}{% else %}Will be set on save{% endif %}"
+            value="{% if assigned_truck_date %}{{ assigned_truck_date|localtime|date:'m/d/Y h:i A' }}{% else %}{% now 'm/d/Y h:i A' %}{% endif %}"
             aria-readonly="true"
           />
         </div>
@@ -379,7 +386,7 @@
 
   <div class="form-actions-bar">
     <div class="form-actions-left">
-      <a href="{% url 'iroad_tenants:driver_master' %}" class="btn btn-outline-secondary">
+      <a href="{% if driver_cancel_url %}{{ driver_cancel_url }}{% else %}{% url 'iroad_tenants:driver_master' %}{% endif %}" class="btn btn-outline-secondary">
         <i class="bi bi-x-lg"></i>
         Cancel
       </a>
@@ -469,6 +476,55 @@
   if (mobileEl) mobileEl.addEventListener("input", function () { if (sameEl && sameEl.checked) syncWhatsApp(); });
 
   syncWhatsApp();
+
+  function wireNumericOnly(inputId, maxLen) {
+    var el = document.getElementById(inputId);
+    if (!el) return;
+    el.addEventListener("input", function () {
+      var digits = (el.value || "").replace(/\D/g, "");
+      if (maxLen && digits.length > maxLen) digits = digits.slice(0, maxLen);
+      if (el.value !== digits) el.value = digits;
+    });
+  }
+
+  wireNumericOnly("{{ form.id_number.id_for_label }}", 10);
+
+  var nationalityEl = document.getElementById("{{ form.nationality_country.id_for_label }}");
+  var passportEl = document.getElementById("{{ form.passport_number.id_for_label }}");
+  var SAUDI_CODE = "SA";
+  var SAUDI_DOC_MAX = 10;
+  var OTHER_PASSPORT_MAX = 15;
+
+  function passportMaxLen() {
+    var code = (nationalityEl && nationalityEl.value || "").trim().toUpperCase();
+    return code === SAUDI_CODE ? SAUDI_DOC_MAX : OTHER_PASSPORT_MAX;
+  }
+
+  function syncPassportInputLimit() {
+    if (!passportEl) return;
+    var maxLen = passportMaxLen();
+    passportEl.setAttribute("maxlength", String(maxLen));
+    var digits = (passportEl.value || "").replace(/\D/g, "");
+    if (digits.length > maxLen) passportEl.value = digits.slice(0, maxLen);
+  }
+
+  if (passportEl) {
+    passportEl.addEventListener("input", function () {
+      var maxLen = passportMaxLen();
+      var digits = (passportEl.value || "").replace(/\D/g, "");
+      if (digits.length > maxLen) digits = digits.slice(0, maxLen);
+      if (passportEl.value !== digits) passportEl.value = digits;
+    });
+    syncPassportInputLimit();
+  }
+  if (nationalityEl) nationalityEl.addEventListener("change", syncPassportInputLimit);
+
+  [
+    "{{ form.dl_number.id_for_label }}",
+    "{{ form.card_number.id_for_label }}",
+    "{{ form.mobile_number.id_for_label }}",
+    "{{ form.whatsapp_number.id_for_label }}",
+  ].forEach(function (inputId) { wireNumericOnly(inputId); });
 
   wireDocPreview("{{ form.id_number.id_for_label }}", "{{ form.id_expiry_date.id_for_label }}", "dmBadgeId");
   wireDocPreview("{{ form.passport_number.id_for_label }}", "{{ form.passport_expiry_date.id_for_label }}", "dmBadgePassport");

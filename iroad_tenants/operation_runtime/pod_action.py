@@ -6,7 +6,7 @@ import os
 from typing import Any
 
 from django.core.exceptions import ValidationError
-from django.db import connection
+from django.db import IntegrityError, connection
 from django.utils import timezone
 from django_tenants.utils import get_public_schema_name, schema_context
 
@@ -46,6 +46,43 @@ def _shipment_requires_hard_pod_mode(shipment) -> bool:
     if _pending_hard_pod_custody_exists(shipment):
         return True
     return False
+
+
+def _find_existing_pod_for_source(*, shipment, source_document):
+    """Return an existing POD child for this delivery-note / shipment, if any."""
+    if source_document is not None:
+        existing = TenantShipmentDocument.objects.filter(
+            source_document_id=source_document.pk,
+        ).first()
+        if existing is not None:
+            return existing
+    if shipment is not None:
+        return (
+            TenantShipmentDocument.objects.filter(
+                shipment=shipment,
+                document_type='pod',
+            )
+            .order_by('-created_at')
+            .first()
+        )
+    return None
+
+
+def _allocate_unique_pod_record_no() -> tuple[str, int]:
+    """Allocate POD record_no; retry when auto-number sequence lags existing rows."""
+    from iroad_tenants.views import _next_auto_number_for_form
+
+    for _ in range(10):
+        record_no, record_sequence = _next_auto_number_for_form(
+            form_code=SHIPMENT_POD_AUTO_FORM_CODE,
+            form_label=SHIPMENT_POD_AUTO_FORM_LABEL,
+            prefix=SHIPMENT_POD_REF_PREFIX,
+        )
+        if not TenantShipmentDocument.objects.filter(record_no=record_no).exists():
+            return record_no, record_sequence
+    raise ValidationError(
+        'Unable to allocate a unique POD Record No. Please check Auto Number Configuration.'
+    )
 
 
 def apply_a7_shipment_pod_type_classification(shipment) -> None:
@@ -101,25 +138,35 @@ def birth_pod_from_action_log(action_log, *, created_by_label=''):
             raise ValidationError(
                 'Auto POD Post requires at least one delivery-note document on the shipment.'
             )
-    existing_pod = TenantShipmentDocument.objects.filter(
-        source_document_id=source_document.pk,
-    ).first()
+    existing_pod = _find_existing_pod_for_source(
+        shipment=shipment,
+        source_document=source_document,
+    )
     if existing_pod is not None:
         return existing_pod
 
     from iroad_tenants.views import (
-        _next_auto_number_for_form,
         _tenant_shipment_document_apply_foreign_keys,
         _tenant_shipment_pod_build_line_rows_from_source,
         _tenant_shipment_pod_page_label,
         _tenant_shipment_pod_resolve_line_source_page,
     )
 
-    record_no, record_sequence = _next_auto_number_for_form(
-        form_code=SHIPMENT_POD_AUTO_FORM_CODE,
-        form_label=SHIPMENT_POD_AUTO_FORM_LABEL,
-        prefix=SHIPMENT_POD_REF_PREFIX,
-    )
+    record_no, record_sequence = _allocate_unique_pod_record_no()
+    pod_user = getattr(action_log, 'created_by', None)
+    pod_user_label = (created_by_label or '')[:200]
+    if pod_user is not None:
+        pod_user_label = (
+            pod_user.username or pod_user.full_name or pod_user_label
+        )[:200]
+    else:
+        from iroad_tenants.views import _tenant_operation_action_log_resolve_user
+
+        resolved_user = _tenant_operation_action_log_resolve_user(created_by_label)
+        if resolved_user is not None:
+            pod_user_label = (
+                resolved_user.username or resolved_user.full_name or pod_user_label
+            )[:200]
     document = TenantShipmentDocument(
         record_no=record_no,
         record_sequence=record_sequence,
@@ -131,14 +178,28 @@ def birth_pod_from_action_log(action_log, *, created_by_label=''):
         page_count=source_document.page_count or 1,
         status=TenantShipmentDocument.Status.DRAFT,
         source_document=source_document,
-        created_by_label=(created_by_label or '')[:200],
+        receiver_user=pod_user,
+        created_by_label=pod_user_label,
     )
     _tenant_shipment_document_apply_foreign_keys(
         document,
         booking=shipment.booking if shipment.booking_id else None,
         shipment=shipment,
     )
-    document.save()
+    try:
+        document.save()
+    except IntegrityError:
+        existing_pod = _find_existing_pod_for_source(
+            shipment=shipment,
+            source_document=source_document,
+        )
+        if existing_pod is None:
+            existing_pod = TenantShipmentDocument.objects.filter(
+                record_no=record_no,
+            ).first()
+        if existing_pod is not None:
+            return existing_pod
+        raise
 
     line_payload = _tenant_shipment_pod_build_line_rows_from_source(source_document)
     TenantShipmentPodPage.objects.filter(document=document).delete()
@@ -260,8 +321,6 @@ def _apply_a7_hard_pod_digital_posting(
             completion_status=TenantShipmentDocumentPage.CompletionStatus.COMPLETED,
             updated_at=now,
         )
-        source_document.refresh_from_db()
-        source_document.sync_pod_pages_from_document_pages()
 
     if shipment is not None:
         _tenant_shipment_document_refresh_shipment_pod(shipment)
@@ -274,18 +333,13 @@ def _action_log_media_storage_path(media_row: Any) -> str:
     return ''
 
 
-def _sync_a7_action_log_media_to_delivery_note(
+def _sync_a7_action_log_media_to_pod_pages(
     *,
     action_log,
-    source_document,
-    pod_document=None,
+    pod_document,
 ) -> None:
-    """
-    Mirror promoted A7 evidence (photo / video) onto shipment document subform lines.
-
-    Soft / digital POD: portal Shipment Document detail shows attachments on DN pages.
-    """
-    if action_log is None or source_document is None:
+    """Promote A7 evidence (photo / video) onto POD page rows only — not delivery notes."""
+    if action_log is None or pod_document is None:
         return
     media_manager = getattr(action_log, 'media_rows', None)
     if media_manager is None:
@@ -294,18 +348,9 @@ def _sync_a7_action_log_media_to_delivery_note(
     if not media_rows:
         return
 
-    pages = list(
-        TenantShipmentDocumentPage.objects.filter(document=source_document).order_by(
-            'line_no',
-            'created_at',
-        )
-    )
-    if not pages:
-        return
-
     photo_types = {'photo', 'signature', 'document'}
     video_types = {'video'}
-    page_idx = 0
+    evidence_rows: list[tuple[str, str]] = []
     for media_row in media_rows:
         storage_path = _action_log_media_storage_path(media_row)
         if not storage_path:
@@ -313,43 +358,50 @@ def _sync_a7_action_log_media_to_delivery_note(
         media_type = (getattr(media_row, 'media_type', None) or '').strip().casefold()
         if media_type not in photo_types | video_types:
             continue
-        target_page = pages[min(page_idx, len(pages) - 1)]
         label = os.path.basename(storage_path) or (
             getattr(media_row, 'description', None) or ''
         ).strip()
-        target_page.attachment_storage_path = storage_path
-        target_page.attachment_label = label[:255]
-        target_page.save(
+        evidence_rows.append((storage_path, label[:255]))
+    if not evidence_rows:
+        return
+
+    pod_lines = list(
+        TenantShipmentPodPage.objects.filter(document=pod_document).order_by(
+            'line_no',
+            'created_at',
+        )
+    )
+    action_log_obj = action_log if getattr(action_log, 'pk', None) else None
+    for idx, (storage_path, label) in enumerate(evidence_rows, start=1):
+        if idx <= len(pod_lines):
+            pod_line = pod_lines[idx - 1]
+        else:
+            pod_line = TenantShipmentPodPage.objects.create(
+                document=pod_document,
+                line_no=idx,
+                doc_page=f'Evidence-{idx}',
+                source='Action Log',
+                action_log=action_log_obj,
+                physical_location='With Driver',
+                soft_copy_status='Collected',
+                digital_evidence_status='Not Collected',
+            )
+            pod_lines.append(pod_line)
+
+        pod_line.map_url = storage_path
+        pod_line.attachment_label = label
+        pod_line.digital_evidence_status = 'Collected'
+        if action_log_obj is not None:
+            pod_line.action_log = action_log_obj
+        pod_line.save(
             update_fields=[
-                'attachment_storage_path',
+                'map_url',
                 'attachment_label',
+                'digital_evidence_status',
+                'action_log',
                 'updated_at',
             ],
         )
-        if media_type in photo_types:
-            page_idx = min(page_idx + 1, len(pages) - 1)
-
-    source_document.sync_pod_pages_from_document_pages()
-    if pod_document is not None:
-        for pod_line in TenantShipmentPodPage.objects.filter(
-            document=pod_document,
-        ).order_by('line_no'):
-            source_line = source_document.document_pages.filter(
-                line_no=pod_line.line_no,
-            ).first()
-            if source_line is None:
-                continue
-            pod_line.map_url = source_line.attachment_storage_path or ''
-            pod_line.attachment_label = source_line.attachment_label or ''
-            pod_line.digital_evidence_status = 'Collected'
-            pod_line.save(
-                update_fields=[
-                    'map_url',
-                    'attachment_label',
-                    'digital_evidence_status',
-                    'updated_at',
-                ],
-            )
 
 
 def apply_a7h_hard_pod_physical_posting(
@@ -427,10 +479,14 @@ def _apply_a7h_hard_pod_physical_posting_body(
             .order_by('-created_at')
             .first()
         )
-        for page in document.document_pages.order_by('line_no'):
+        document_pages = list(document.document_pages.order_by('line_no'))
+        all_pages_collected = bool(document_pages)
+        for page in document_pages:
             page_key = ('page_id', str(page.pk))
             line_key = ('line', f'{document.pk}:{page.line_no}')
             collected = page_key in confirmed_keys or line_key in confirmed_keys
+            if not collected:
+                all_pages_collected = False
             if collected:
                 page.completion_status = TenantShipmentDocumentPage.CompletionStatus.COMPLETED
                 page.signer_location = TenantShipmentDocumentPage.SignerLocation.WITH_DRIVER
@@ -486,7 +542,11 @@ def _apply_a7h_hard_pod_physical_posting_body(
         # Do not call sync_pod_pages_from_document_pages() here — POD child lines
         # hold PROTECT FKs to DN pod_pages; delete-all sync raises ProtectedError.
         document.physical_location = 'With Driver'
-        document.save(update_fields=['physical_location', 'updated_at'])
+        header_update_fields = ['physical_location', 'updated_at']
+        if all_pages_collected:
+            document.status = TenantShipmentDocument.Status.VERIFIED
+            header_update_fields.append('status')
+        document.save(update_fields=header_update_fields)
 
     _tenant_shipment_document_refresh_shipment_pod(shipment)
 
@@ -522,9 +582,8 @@ def apply_pod_posting_from_action_log(
             header_physical_location='with_driver',
         )
         pod_document.save(update_fields=['status', 'physical_location', 'updated_at'])
-    _sync_a7_action_log_media_to_delivery_note(
+    _sync_a7_action_log_media_to_pod_pages(
         action_log=action_log,
-        source_document=source_document,
         pod_document=pod_document,
     )
     apply_a7_shipment_pod_type_classification(shipment)

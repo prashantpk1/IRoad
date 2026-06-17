@@ -57,7 +57,7 @@
       <div class="field"><div class="label">Date</div><div class="value">{{ shipment.shipment_date|date:'d M Y' }}</div></div>
       <div class="field"><div class="label">Status</div><div class="value">{{ shipment.shipment_status|default:'-' }}</div></div>
       <div class="field"><div class="label">Order Type</div><div class="value">{{ shipment.order_type|default:'-' }}</div></div>
-      <div class="field"><div class="label">Collection Status</div><div class="value">{{ shipment.collection_status|default:'-' }}</div></div>
+      <div class="field"><div class="label">Collection Status</div><div class="value">{{ cod_payment_status|default:shipment.collection_status|default:'-' }}</div></div>
       <div class="field"><div class="label">Created By</div><div class="value">{{ shipment.created_by_label|default:'-' }}</div></div>
     </div>
   </div>

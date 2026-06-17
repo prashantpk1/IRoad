@@ -9,16 +9,23 @@
       <li class="breadcrumb-item"><a href="{% url 'iroad_tenants:tenant_dashboard' %}">Dashboard</a></li>
       <li class="breadcrumb-item">Operations</li>
       <li class="breadcrumb-item">Operations Management</li>
-      <li class="breadcrumb-item active" aria-current="page">Operation Actions</li>
+      <li class="breadcrumb-item">
+        <a href="{% url 'iroad_tenants:tenant_operation_actions_list' %}">Operation Actions List</a>
+      </li>
+      <li class="breadcrumb-item active" aria-current="page">{{ operation_action_page_title|default:'Action Master' }}</li>
     </ol>
   </nav>
   <div class="page-header-row">
     <div class="page-header-left">
       <h1 class="page-title">{{ operation_action_page_title|default:'Action Master' }}</h1>
-      <p class="page-subtitle">Configure operation action types.</p>
+      <!-- <p class="page-subtitle">Configure operation action types.</p> -->
     </div>
     <div class="page-header-right">
       <div class="eal-header-actions">
+        <a href="{% url 'iroad_tenants:tenant_operation_actions_list' %}" class="eal-btn eal-btn-outline">
+          <i class="bi bi-arrow-left"></i>
+          <span>Back</span>
+        </a>
         <a href="{% url 'iroad_tenants:tenant_operation_action_log_create' %}" class="eal-btn eal-btn-outline">
           <i class="bi bi-clock-history"></i>
           <span>Go to Action Log</span>
@@ -35,7 +42,6 @@
       <div class="form-card-icon blue"><i class="bi bi-card-heading"></i></div>
       <div class="form-card-header-text">
         <h2 class="form-card-title">Header</h2>
-        <p class="form-card-desc">Define action identity and status.</p>
       </div>
     </div>
     <div class="form-card-body">
@@ -79,7 +85,6 @@
       <div class="form-card-icon amber"><i class="bi bi-list-ol"></i></div>
       <div class="form-card-header-text">
         <h2 class="form-card-title">Action Scope &amp; Sequence</h2>
-        <p class="form-card-desc">Configure scope and execution sequence.</p>
       </div>
     </div>
     <div class="form-card-body">
@@ -130,7 +135,6 @@
       <div class="form-card-icon green"><i class="bi bi-diagram-3"></i></div>
       <div class="form-card-header-text">
         <h2 class="form-card-title">Operation Impact</h2>
-        <p class="form-card-desc">Define posting behavior and status impacts.</p>
       </div>
     </div>
     <div class="form-card-body">

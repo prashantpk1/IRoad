@@ -2,7 +2,7 @@
 {% load static %}
 {% load i18n %}
 
-{% block title %}{% if is_view %}{% translate "Cargo Detail" %}{% elif is_edit %}{% translate "Edit Cargo" %}{% else %}{% translate "Create Cargo" %}{% endif %} | iRoad{% endblock %}
+{% block title %}{% if is_view %}{% translate "Cargo Detail" %}{% elif is_edit %}{% translate "Edit Cargo" %}{% else %}{% translate "Cargo Master" %}{% endif %} | iRoad{% endblock %}
 {% block breadcrumb %}{% endblock %}
 
 {% block extra_css %}
@@ -86,18 +86,18 @@
       <li class="breadcrumb-item">{% translate "Master Data" %}</li>
       <li class="breadcrumb-item">{% translate "Cargo Management" %}</li>
       <li class="breadcrumb-item active" aria-current="page">
-        {% if is_view %}{% translate "Cargo Detail" %}{% elif is_edit %}{% translate "Edit Cargo" %}{% else %}{% translate "Create Cargo" %}{% endif %}
+        {% if is_view %}{% translate "Cargo Detail" %}{% elif is_edit %}{% translate "Edit Cargo" %}{% else %}{% translate "Cargo Master" %}{% endif %}
       </li>
     </ol>
   </nav>
   <div class="page-header-row align-items-start">
     <div class="page-header-left">
-      <h1 class="page-title">{% if is_view %}{% translate "Cargo Detail" %}{% elif is_edit %}{% translate "Edit Cargo" %}{% else %}{% translate "Create Cargo" %}{% endif %}</h1>
-      <p class="page-subtitle">{% translate "Manage physical specifications, handling requirements, and essential details of the cargo." %}</p>
+      <h1 class="page-title">{% if is_view %}{% translate "Cargo Detail" %}{% elif is_edit %}{% translate "Edit Cargo" %}{% else %}{% translate "Cargo Master" %}{% endif %}</h1>
+      <!-- <p class="page-subtitle">{% translate "Manage physical specifications, handling requirements, and essential details of the cargo." %}</p> -->
     </div>
     <div class="page-header-right ms-auto">
       <a href="{{ back_to_list_url|default_if_none:'' }}{% if not back_to_list_url %}{% url 'iroad_tenants:tenant_cargo_master_list' %}{% endif %}" class="btn btn-outline-secondary">
-        <i class="bi bi-arrow-left me-1"></i>{% translate "Back to list" %}
+        <i class="bi bi-arrow-left me-1"></i>{% translate "Back" %}
       </a>
       {% if is_view and edit_cargo_url %}
       <a href="{{ edit_cargo_url }}" class="btn btn-primary ms-2">
@@ -121,7 +121,6 @@
       <div class="form-card-icon blue"><i class="bi bi-box-seam"></i></div>
       <div class="form-card-header-text">
         <h2 class="form-card-title">{% translate "Basic Information" %}</h2>
-        <p class="form-card-desc">{% translate "Core details regarding the cargo identity and classification." %}</p>
       </div>
     </div>
     <div class="form-card-body">
@@ -183,14 +182,15 @@
       <div class="form-card-icon green"><i class="bi bi-rulers"></i></div>
       <div class="form-card-header-text">
         <h2 class="form-card-title">{% translate "Physical Specifications" %}</h2>
-        <p class="form-card-desc">{% translate "Dimensions, weight, and volume metrics of the cargo item." %}</p>
       </div>
     </div>
     <div class="form-card-body">
       <div class="field-group">
         <div class="fields-grid cols-2">
           <div class="field">
-            <label class="form-label" for="{{ form.uom.id_for_label }}">{{ form.uom.label }}</label>
+            <label class="form-label" for="{{ form.uom.id_for_label }}">
+              {{ form.uom.label }} <span class="required">*</span>
+            </label>
             {{ form.uom }}
             {% if form.uom.errors %}<div class="text-danger small">{{ form.uom.errors }}</div>{% endif %}
           </div>
@@ -207,7 +207,9 @@
             {% if form.volume_per_unit.errors %}<div class="text-danger small">{{ form.volume_per_unit.errors }}</div>{% endif %}
           </div>
         </div>
-        <h4 class="field-group-title mt-4"><i class="bi bi-bounding-box"></i> {% translate "Dimensions (meters)" %}</h4>
+        <h4 class="field-group-title mt-4">
+          <i class="bi bi-bounding-box"></i> {% translate "DIMENSIONS (METERS)" %}
+        </h4>
         <div class="fields-grid cols-3 gap-3">
           <div class="field">
             <label class="form-label" for="{{ form.length.id_for_label }}">{{ form.length.label }}</label>
@@ -234,7 +236,6 @@
       <div class="form-card-icon blue"><i class="bi bi-exclamation-triangle"></i></div>
       <div class="form-card-header-text">
         <h2 class="form-card-title">{% translate "Handling Requirements" %}</h2>
-        <p class="form-card-desc">{% translate "Special conditions and safety constraints for storing and transporting." %}</p>
       </div>
     </div>
     <div class="form-card-body">
@@ -284,7 +285,6 @@
       <div class="form-card-icon green"><i class="bi bi-journal-text"></i></div>
       <div class="form-card-header-text">
         <h2 class="form-card-title">{% translate "Additional Information" %}</h2>
-        <p class="form-card-desc">{% translate "Extra notes and documents related to the cargo." %}</p>
       </div>
     </div>
     <div class="form-card-body">

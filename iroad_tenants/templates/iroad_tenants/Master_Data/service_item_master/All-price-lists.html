@@ -25,7 +25,7 @@
   <div class="page-header-row">
     <div class="page-header-left">
       <h1 class="page-title">{% translate "Price List Master List" %}</h1>
-      <p class="page-subtitle">{% translate "Manage and view all registered price lists." %}</p>
+      <!-- <p class="page-subtitle">{% translate "Manage and view all registered price lists." %}</p> -->
     </div>
     <div class="page-header-right">
       <div class="eal-header-actions">
@@ -86,51 +86,69 @@
   data-eal-empty-filter-message="{% translate 'No price lists match the selected search/filter criteria.' %}"
   data-eal-global-search-columns="1,2,3,4,5,6,7"
 >
-  <div class="eal-toolbar eal-toolbar--inline-filters">
-    <div class="eal-toolbar-left w-100">
-      <div class="eal-toolbar-filters-row">
-        <div class="eal-search eal-search--toolbar-grow">
-          <i class="bi bi-search"></i>
-          <input
-            type="search"
-            id="priceListMasterSearch"
-            data-eal-global-search
-            value="{{ search_q|default:'' }}"
-            autocomplete="off"
-            placeholder="{% translate 'Search price lists…' %}"
-            aria-label="{% translate 'Search price lists' %}"
-          />
-          <button
-            type="button"
-            class="eal-search-clear-btn"
-            id="priceListMasterSearchClear"
-            title="{% translate 'Clear search' %}"
-            aria-label="{% translate 'Clear search' %}"
-            hidden
-          >
-            <i class="bi bi-x-lg"></i>
-          </button>
-        </div>
-        <div class="eal-toolbar-filter-pair">
-          <label class="form-label mb-0 small text-nowrap text-muted" for="plListStatus">{% translate "Status" %}</label>
-          <select id="plListStatus" data-query-param="status" class="form-select form-select-sm">
-            <option value="all" {% if filter_status == 'all' %}selected{% endif %}>{% translate "All" %}</option>
-            <option value="draft" {% if filter_status == 'draft' %}selected{% endif %}>{% translate "Draft" %}</option>
-            <option value="active" {% if filter_status == 'active' %}selected{% endif %}>{% translate "Active" %}</option>
-            <option value="inactive" {% if filter_status == 'inactive' %}selected{% endif %}>{% translate "Inactive" %}</option>
-          </select>
-        </div>
-        <div class="eal-toolbar-filter-pair">
-          <label class="form-label mb-0 small text-nowrap text-muted" for="plListClient">{% translate "Client" %}</label>
-          <select id="plListClient" data-query-param="client" class="form-select form-select-sm">
-            <option value="">{% translate "All clients" %}</option>
-            {% for ca in client_filter_choices %}
-            <option value="{{ ca.account_id }}" {% if filter_client_id and ca.account_id|stringformat:'s' == filter_client_id %}selected{% endif %}>
-              {{ ca.display_name }} ({{ ca.account_no }})
-            </option>
-            {% endfor %}
-          </select>
-        </div>
+  <div class="eal-toolbar">
+    <div class="eal-toolbar-left">
+      <div class="eal-search">
+        <i class="bi bi-search"></i>
+        <input
+          type="search"
+          id="priceListMasterSearch"
+          data-eal-global-search
+          value="{{ search_q|default:'' }}"
+          autocomplete="off"
+          placeholder="{% translate 'Search price lists…' %}"
+          aria-label="{% translate 'Search price lists' %}"
+        />
+        <button
+          type="button"
+          class="eal-search-clear-btn"
+          id="priceListMasterSearchClear"
+          title="{% translate 'Clear search' %}"
+          aria-label="{% translate 'Clear search' %}"
+          hidden
+        >
+          <i class="bi bi-x-lg"></i>
+        </button>
+      </div>
+      <div class="eal-chip-group">
+        <a
+          href="{{ price_list_chip_all_url }}"
+          class="eal-chip text-decoration-none text-reset{% if filter_status == 'all' %} active{% endif %}"
+        >{% translate "All" %}</a>
+        <a
+          href="{{ price_list_chip_draft_url }}"
+          class="eal-chip text-decoration-none text-reset{% if filter_status == 'draft' %} active{% endif %}"
+        >
+          <i class="bi bi-pencil-square"></i>
+          {% translate "Draft" %}
+        </a>
+        <a
+          href="{{ price_list_chip_active_url }}"
+          class="eal-chip text-decoration-none text-reset{% if filter_status == 'active' %} active{% endif %}"
+        >
+          <i class="bi bi-check-circle"></i>
+          {% translate "Active" %}
+        </a>
+        <a
+          href="{{ price_list_chip_inactive_url }}"
+          class="eal-chip text-decoration-none text-reset{% if filter_status == 'inactive' %} active{% endif %}"
+        >
+          <i class="bi bi-pause-circle"></i>
+          {% translate "Inactive" %}
+        </a>
+      </div>
+    </div>
+    <div class="eal-toolbar-right">
+      <div class="eal-toolbar-filter-pair">
+        <label class="form-label mb-0 small text-nowrap text-muted" for="plListClient">{% translate "Client" %}</label>
+        <select id="plListClient" data-query-param="client" class="form-select form-select-sm">
+          <option value="">{% translate "All clients" %}</option>
+          {% for ca in client_filter_choices %}
+          <option value="{{ ca.account_id }}" {% if filter_client_id and ca.account_id|stringformat:'s' == filter_client_id %}selected{% endif %}>
+            {{ ca.display_name }} ({{ ca.account_no }})
+          </option>
+          {% endfor %}
+        </select>
       </div>
     </div>
   </div>
@@ -199,6 +217,36 @@
                     <i class="bi bi-eye text-info me-2"></i>{% translate "View" %}
                   </a>
                 </li>
+                <li>
+                  <form
+                    method="post"
+                    action="{% url 'iroad_tenants:tenant_price_list_master_duplicate' item.price_list_code %}"
+                    class="d-inline w-100"
+                  >
+                    {% csrf_token %}
+                    <button type="submit" class="dropdown-item">
+                      <i class="bi bi-files text-secondary me-2"></i>{% translate "Duplicate" %}
+                    </button>
+                  </form>
+                </li>
+                <li>
+                  <form
+                    method="post"
+                    action="{% url 'iroad_tenants:tenant_price_list_master_toggle_status' item.price_list_code %}"
+                    class="d-inline w-100"
+                  >
+                    {% csrf_token %}
+                    {% if item.status == 'Inactive' %}
+                    <button type="submit" class="dropdown-item text-success">
+                      <i class="bi bi-arrow-counterclockwise me-2"></i>{% translate "Activate" %}
+                    </button>
+                    {% else %}
+                    <button type="submit" class="dropdown-item">
+                      <i class="bi bi-person-slash text-secondary me-2"></i>{% translate "Deactivate" %}
+                    </button>
+                    {% endif %}
+                  </form>
+                </li>
                 <li><hr class="dropdown-divider" /></li>
                 <li>
                   <form
@@ -259,5 +307,5 @@
 {% block extra_js %}
 {{ block.super }}
 {% url 'iroad_tenants:tenant_price_list_master_list' as price_list_list_url %}
-{% include 'iroad_tenants/partials/eal_list_live_search_js.html' with list_url=price_list_list_url search_input_id='priceListMasterSearch' clear_btn_id='priceListMasterSearchClear' filter_select_ids='plListStatus,plListClient' %}
+{% include 'iroad_tenants/partials/eal_list_live_search_js.html' with list_url=price_list_list_url search_input_id='priceListMasterSearch' clear_btn_id='priceListMasterSearchClear' filter_select_ids='plListClient' %}
 {% endblock extra_js %}

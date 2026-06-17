@@ -31,7 +31,7 @@
   <div class="page-header-row">
     <div class="page-header-left">
       <h1 class="page-title">{% if is_view_mode %}View Role & Permissions{% elif is_edit_mode %}Edit Role & Permissions{% else %}Create Role & Permissions{% endif %}</h1>
-      <p class="page-subtitle">Configure role details and specific module permissions.</p>
+      <!-- <p class="page-subtitle">Configure role details and specific module permissions.</p> -->
     </div>
     <div class="page-header-right">
       <div class="eal-header-actions">
@@ -50,7 +50,6 @@
       <div class="form-card-icon blue"><i class="bi bi-person-badge"></i></div>
       <div class="form-card-header-text">
         <h2 class="form-card-title">Role Details</h2>
-        <p class="form-card-desc">Core identity and status configuration for this role.</p>
       </div>
     </div>
     <div class="form-card-body">
@@ -112,7 +111,6 @@
       <div class="form-card-icon green"><i class="bi bi-shield-check"></i></div>
       <div class="form-card-header-text">
         <h2 class="form-card-title">Permissions Matrix</h2>
-        <p class="form-card-desc">Granular control over module access and specific form actions.</p>
       </div>
     </div>
     <div class="form-card-body">
@@ -129,20 +127,20 @@
       <div class="table-responsive eal-table-wrapper" style="border: 1px solid #e2e8f0; border-radius: 8px">
         <table class="eal-table" id="permissionsMatrix" style="margin-bottom: 0">
           <thead>
-            <tr><th>Module</th><th>Form</th><th class="text-center">View</th><th class="text-center">Create</th><th class="text-center">Edit</th><th class="text-center">Delete</th><th class="text-center">Post</th><th class="text-center">Approve</th><th class="text-center">Export</th><th class="text-center">Print</th></tr>
+            <tr><th>Module</th><th>Form</th><th class="text-center">Access</th><th class="text-center">Write</th><th class="text-center">Read</th><th class="text-center">View</th><th class="text-center">Edit</th><th class="text-center">Export</th><th class="text-center">Approve</th><th class="text-center">Print</th></tr>
           </thead>
           <tbody>
             {% for permission_row in permission_matrix %}
             <tr>
               <td>{% if permission_row.show_module_name %}<strong>{{ permission_row.module_name }}</strong>{% endif %}</td>
               <td>{{ permission_row.form_name }}</td>
+              <td class="text-center"><input class="form-check-input perm-matrix-check" name="perm_{{ forloop.counter0 }}_access" type="checkbox" {% if permission_row.can_access %}checked{% endif %} {% if is_view_mode %}disabled{% endif %}/></td>
+              <td class="text-center"><input class="form-check-input perm-matrix-check" name="perm_{{ forloop.counter0 }}_write" type="checkbox" {% if permission_row.can_write %}checked{% endif %} {% if is_view_mode %}disabled{% endif %}/></td>
+              <td class="text-center"><input class="form-check-input perm-matrix-check" name="perm_{{ forloop.counter0 }}_read" type="checkbox" {% if permission_row.can_read %}checked{% endif %} {% if is_view_mode %}disabled{% endif %}/></td>
               <td class="text-center"><input class="form-check-input perm-matrix-check" name="perm_{{ forloop.counter0 }}_view" type="checkbox" {% if permission_row.can_view %}checked{% endif %} {% if is_view_mode %}disabled{% endif %}/></td>
-              <td class="text-center"><input class="form-check-input perm-matrix-check" name="perm_{{ forloop.counter0 }}_create" type="checkbox" {% if permission_row.can_create %}checked{% endif %} {% if is_view_mode %}disabled{% endif %}/></td>
               <td class="text-center"><input class="form-check-input perm-matrix-check" name="perm_{{ forloop.counter0 }}_edit" type="checkbox" {% if permission_row.can_edit %}checked{% endif %} {% if is_view_mode %}disabled{% endif %}/></td>
-              <td class="text-center"><input class="form-check-input perm-matrix-check" name="perm_{{ forloop.counter0 }}_delete" type="checkbox" {% if permission_row.can_delete %}checked{% endif %} {% if is_view_mode %}disabled{% endif %}/></td>
-              <td class="text-center"><input class="form-check-input perm-matrix-check" name="perm_{{ forloop.counter0 }}_post" type="checkbox" {% if permission_row.can_post %}checked{% endif %} {% if is_view_mode %}disabled{% endif %}/></td>
-              <td class="text-center"><input class="form-check-input perm-matrix-check" name="perm_{{ forloop.counter0 }}_approve" type="checkbox" {% if permission_row.can_approve %}checked{% endif %} {% if is_view_mode %}disabled{% endif %}/></td>
               <td class="text-center"><input class="form-check-input perm-matrix-check" name="perm_{{ forloop.counter0 }}_export" type="checkbox" {% if permission_row.can_export %}checked{% endif %} {% if is_view_mode %}disabled{% endif %}/></td>
+              <td class="text-center"><input class="form-check-input perm-matrix-check" name="perm_{{ forloop.counter0 }}_approve" type="checkbox" {% if permission_row.can_approve %}checked{% endif %} {% if is_view_mode %}disabled{% endif %}/></td>
               <td class="text-center"><input class="form-check-input perm-matrix-check" name="perm_{{ forloop.counter0 }}_print" type="checkbox" {% if permission_row.can_print %}checked{% endif %} {% if is_view_mode %}disabled{% endif %}/></td>
             </tr>
             {% endfor %}

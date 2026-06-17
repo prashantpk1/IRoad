@@ -12,6 +12,22 @@ from tenant_workspace.models import DriverMaster, TenantUser, TruckMaster
 
 from iroad_tenants.forms_tenant_address import PublicCountryChoiceField
 
+SAUDI_COUNTRY_CODE = 'SA'
+SAUDI_DOCUMENT_NUMBER_MAX_LEN = 10
+OTHER_PASSPORT_NUMBER_MAX_LEN = 15
+
+
+def _nationality_country_code(country) -> str:
+    if country is None:
+        return ''
+    return str(getattr(country, 'country_code', country) or '').strip().upper()
+
+
+def passport_number_max_len(country_code: str) -> int:
+    if country_code == SAUDI_COUNTRY_CODE:
+        return SAUDI_DOCUMENT_NUMBER_MAX_LEN
+    return OTHER_PASSPORT_NUMBER_MAX_LEN
+
 
 def driver_current_assigned_truck(driver):
     if not driver or not getattr(driver, 'pk', None):
@@ -85,7 +101,11 @@ class DriverMasterForm(forms.ModelForm):
                 attrs={'class': 'form-select'}
             ),
             'arabic_name': forms.TextInput(
-                attrs={'class': 'form-control'}
+                attrs={
+                    'class': 'form-control eal-arabic',
+                    'dir': 'rtl',
+                    'lang': 'ar',
+                }
             ),
             'english_name': forms.TextInput(
                 attrs={'class': 'form-control'}
@@ -100,6 +120,8 @@ class DriverMasterForm(forms.ModelForm):
                 attrs={
                     'class': 'form-control',
                     'inputmode': 'numeric',
+                    'maxlength': '10',
+                    'pattern': r'\d{0,10}',
                 }
             ),
             'id_expiry_date': forms.DateInput(
@@ -112,7 +134,11 @@ class DriverMasterForm(forms.ModelForm):
                 attrs={'class': 'form-control'}
             ),
             'passport_number': forms.TextInput(
-                attrs={'class': 'form-control'}
+                attrs={
+                    'class': 'form-control',
+                    'inputmode': 'numeric',
+                    'maxlength': str(OTHER_PASSPORT_NUMBER_MAX_LEN),
+                }
             ),
             'passport_expiry_date': forms.DateInput(
                 attrs={
@@ -124,7 +150,10 @@ class DriverMasterForm(forms.ModelForm):
                 attrs={'class': 'form-control'}
             ),
             'dl_number': forms.TextInput(
-                attrs={'class': 'form-control'}
+                attrs={
+                    'class': 'form-control',
+                    'inputmode': 'numeric',
+                }
             ),
             'dl_expiry_date': forms.DateInput(
                 attrs={
@@ -136,7 +165,10 @@ class DriverMasterForm(forms.ModelForm):
                 attrs={'class': 'form-control'}
             ),
             'card_number': forms.TextInput(
-                attrs={'class': 'form-control'}
+                attrs={
+                    'class': 'form-control',
+                    'inputmode': 'numeric',
+                }
             ),
             'card_expiry_date': forms.DateInput(
                 attrs={
@@ -318,6 +350,37 @@ class DriverMasterForm(forms.ModelForm):
         id_num = (cleaned.get('id_number') or '').strip()
         if id_num and not re.match(r'^\d+$', id_num):
             errors['id_number'] = _('ID number must contain digits only')
+        elif id_num and len(id_num) > SAUDI_DOCUMENT_NUMBER_MAX_LEN:
+            errors['id_number'] = _(
+                'ID number must be at most %(max)s digits'
+            ) % {'max': SAUDI_DOCUMENT_NUMBER_MAX_LEN}
+
+        nationality_code = _nationality_country_code(
+            cleaned.get('nationality_country'),
+        )
+        passport_num = (cleaned.get('passport_number') or '').strip()
+        passport_max = passport_number_max_len(nationality_code)
+        if passport_num and not re.match(r'^\d+$', passport_num):
+            errors['passport_number'] = _('Passport number must contain digits only')
+        elif passport_num and len(passport_num) > passport_max:
+            if nationality_code == SAUDI_COUNTRY_CODE:
+                errors['passport_number'] = _(
+                    'Passport number must be at most %(max)s digits for Saudi Arabia'
+                ) % {'max': passport_max}
+            else:
+                errors['passport_number'] = _(
+                    'Passport number must be at most %(max)s digits'
+                ) % {'max': passport_max}
+
+        def _check_digits_only(field_name, label):
+            value = (cleaned.get(field_name) or '').strip()
+            if value and not re.match(r'^\d+$', value):
+                errors[field_name] = _(
+                    '%(label)s must contain digits only'
+                ) % {'label': label}
+
+        _check_digits_only('dl_number', _('DL number'))
+        _check_digits_only('card_number', _('Card number'))
 
         def _check_unique(field_name, value, label):
             if not value or not str(value).strip():
@@ -333,7 +396,7 @@ class DriverMasterForm(forms.ModelForm):
         _check_unique('id_number', id_num, _('ID number'))
         _check_unique(
             'passport_number',
-            (cleaned.get('passport_number') or '').strip(),
+            passport_num,
             _('Passport number'),
         )
         _check_unique(
@@ -365,7 +428,7 @@ class DriverMasterForm(forms.ModelForm):
 
         _check_expiry(id_num, cleaned.get('id_expiry_date'), 'id_expiry_date', _('ID'))
         _check_expiry(
-            (cleaned.get('passport_number') or '').strip(),
+            passport_num,
             cleaned.get('passport_expiry_date'),
             'passport_expiry_date',
             _('Passport'),

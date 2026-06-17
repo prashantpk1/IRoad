@@ -1,6 +1,6 @@
 {% load static %}
 <!doctype html>
-<html lang="en">
+<html lang="{{ tenant_system_config.system_language|default:'en' }}" dir="{% if tenant_system_config.system_language == 'ar' %}rtl{% else %}ltr{% endif %}">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
@@ -74,11 +74,14 @@
         },
       };
     </script>
+    {% if tenant_system_config_js %}
+      {{ tenant_system_config_js|json_script:"tenant-system-config" }}
+    {% endif %}
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
-    <script src="{% static 'tenantdesign/Javascript/main.js' %}?v=20260609-shipment-doc-location"></script>
+    <script src="{% static 'tenantdesign/Javascript/main.js' %}?v=20260612-document-handover-lines"></script>
     <script src="{% static 'tenantdesign/Javascript/dashboard.js' %}?v=20260521-fleet-donut"></script>
-    <script src="{% static 'tenantdesign/Javascript/eal-datatable-filters.js' %}?v=20260611-list-filters"></script>
+    <script src="{% static 'tenantdesign/Javascript/eal-datatable-filters.js' %}?v=20260612-export-selection"></script>
     {{ tenant_web_push_config|json_script:"tenant-web-push-config" }}
     <script type="module" src="{% static 'tenantdesign/Javascript/web_push_register.js' %}"></script>
     {% block extra_js %}{% endblock %}

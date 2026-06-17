@@ -213,6 +213,12 @@ class PaymentValidationService:
         if shipment is None:
             return False
 
+        if getattr(shipment, 'shipment_status', None) == TenantShipment.ShipmentStatus.CANCELLED:
+            return True
+
+        if getattr(shipment, 'collection_status', None) == TenantShipment.CollectionStatus.CANCELLED:
+            return True
+
         if getattr(shipment, 'collection_status', None) == TenantShipment.CollectionStatus.COLLECTED:
             return True
 

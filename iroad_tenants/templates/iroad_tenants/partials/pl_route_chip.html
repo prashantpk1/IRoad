@@ -1,0 +1,21 @@
+{% if route_chip %}
+<div class="pl-route-chip" title="{{ route_chip.title }}">
+  <span>{{ route_chip.origin }}</span>
+  <span
+    class="pl-route-arrow pl-route-arrow--{{ route_chip.arrow_variant|default:'outbound' }}{% if route_chip.arrow_variant == 'round' %} pl-route-arrow--stacked{% endif %}"
+    aria-hidden="true"
+  >
+    {% if route_chip.arrow_variant == 'round' %}
+    <i class="bi bi-arrow-right pl-route-arrow-out"></i>
+    <i class="bi bi-arrow-left pl-route-arrow-in"></i>
+    {% else %}
+    <i class="bi bi-arrow-right"></i>
+    {% endif %}
+  </span>
+  <span>{{ route_chip.destination }}</span>
+</div>
+{% elif route_fallback %}
+<span class="text-muted">{{ route_fallback }}</span>
+{% else %}
+<span class="text-muted">—</span>
+{% endif %}

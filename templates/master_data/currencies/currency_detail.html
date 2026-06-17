@@ -57,20 +57,12 @@
       <div class="value font-arabic" dir="rtl">{{ currency.name_ar|default:"-" }}</div>
     </div>
     <div class="detail-item">
-      <label>{% translate "English Sub-Unit" %}</label>
-      <div class="value">{{ currency.subunit_en|default:"-" }}</div>
-    </div>
-    <div class="detail-item">
-      <label>{% translate "Arabic Sub-Unit" %}</label>
-      <div class="value font-arabic" dir="rtl">{{ currency.subunit_ar|default:"-" }}</div>
-    </div>
-    <div class="detail-item">
-      <label>{% translate "Symbol" %}</label>
-      <div class="value fw-bold">{{ currency.symbol|default:"-" }}</div>
+      <label>{% translate "Currency Symbol" %}</label>
+      <div class="value fw-bold">{{ currency.currency_symbol|default:"-" }}</div>
     </div>
     <div class="detail-item">
       <label>{% translate "Decimal Places" %}</label>
-      <div class="value">{{ currency.decimal_places }}</div>
+      <div class="value">{{ currency.decimal_places|default:"2" }}</div>
     </div>
     <div class="detail-item">
       <label>{% translate "Status" %}</label>

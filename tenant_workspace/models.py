@@ -588,6 +588,8 @@ class TenantClientContractSetting(models.Model):
         SYSTEM_ADMIN = 'System Admin', 'System Admin'
         ADMIN_FINANCE = 'Admin+Finance', 'Admin+Finance'
 
+    NOTIFICATION_AUDIENCE_SEPARATOR = ','
+
     setting_id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     expired_contract_handling_mode = models.CharField(
         max_length=30,
@@ -603,14 +605,37 @@ class TenantClientContractSetting(models.Model):
         default=NotificationFrequency.DAILY,
     )
     notification_audience = models.CharField(
-        max_length=20,
-        choices=NotificationAudience.choices,
+        max_length=50,
         default=NotificationAudience.SYSTEM_ADMIN,
     )
     updated_at = models.DateTimeField(auto_now=True)
 
     class Meta:
         db_table = 'tenant_client_contract_settings'
+
+    def get_notification_audience_list(self):
+        raw = (self.notification_audience or '').strip()
+        if not raw:
+            return [self.NotificationAudience.SYSTEM_ADMIN]
+        valid = {choice.value for choice in self.NotificationAudience}
+        selected = [
+            part.strip()
+            for part in raw.split(self.NOTIFICATION_AUDIENCE_SEPARATOR)
+            if part.strip() in valid
+        ]
+        return selected or [self.NotificationAudience.SYSTEM_ADMIN]
+
+    @classmethod
+    def serialize_notification_audiences(cls, selected):
+        valid = {choice.value for choice in cls.NotificationAudience}
+        order = [choice.value for choice in cls.NotificationAudience]
+        normalized = []
+        for item in selected or []:
+            value = (item or '').strip()
+            if value in valid and value not in normalized:
+                normalized.append(value)
+        normalized.sort(key=lambda value: order.index(value))
+        return cls.NOTIFICATION_AUDIENCE_SEPARATOR.join(normalized)
 
     def __str__(self):
         return 'Client contract settings'
@@ -758,6 +783,7 @@ class TenantAddressMaster(models.Model):
     mobile_no_2 = models.CharField(max_length=30, blank=True, default='')
     whatsapp_no = models.CharField(max_length=30, blank=True, default='')
     phone_no = models.CharField(max_length=30, blank=True, default='')
+    extension = models.CharField(max_length=30, blank=True, default='')
     email = models.EmailField(blank=True, default='')
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
@@ -1642,11 +1668,27 @@ class DriverMaster(models.Model):
                     'WhatsApp number must contain digits only'
                 )
 
-        # Rule 5: id_number digits only if provided
-        if self.id_number:
-            if not re.match(r'^\d+$', self.id_number):
-                errors['id_number'] = (
-                    'ID number must contain digits only'
+        # Rule 5: document numbers digits only if provided
+        numeric_doc_fields = (
+            ('id_number', 'ID number'),
+            ('passport_number', 'Passport number'),
+            ('dl_number', 'DL number'),
+            ('card_number', 'Card number'),
+        )
+        for field_name, label in numeric_doc_fields:
+            value = (getattr(self, field_name, None) or '').strip()
+            if value and not re.match(r'^\d+$', value):
+                errors[field_name] = f'{label} must contain digits only'
+            if field_name == 'id_number' and value and len(value) > 10:
+                errors[field_name] = 'ID number must be at most 10 digits'
+
+        nationality_code = str(self.nationality_country_id or '').strip().upper()
+        passport_value = (self.passport_number or '').strip()
+        if passport_value:
+            passport_max = 10 if nationality_code == 'SA' else 15
+            if len(passport_value) > passport_max:
+                errors['passport_number'] = (
+                    f'Passport number must be at most {passport_max} digits'
                 )
 
         # Rule 6: Uniqueness checks (if provided)
@@ -2518,6 +2560,43 @@ class TenantRouteMaster(models.Model):
             raise ValidationError(errors)
 
 
+class TenantServiceItemCategory(models.Model):
+    """Service item category master (tenant schema). Referenced by TenantServiceItemMaster."""
+
+    class Status(models.TextChoices):
+        ACTIVE = 'Active', 'Active'
+        INACTIVE = 'Inactive', 'Inactive'
+
+    category_id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    category_code = models.CharField(max_length=64, unique=True)
+    category_sequence = models.PositiveIntegerField(default=0)
+    name_english = models.CharField(max_length=200)
+    name_arabic = models.CharField(max_length=200, blank=True, default='')
+    status = models.CharField(
+        max_length=12,
+        choices=Status.choices,
+        default=Status.ACTIVE,
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        db_table = 'tenant_service_item_category'
+        ordering = ['-created_at']
+        verbose_name = 'Service Item Category'
+        verbose_name_plural = 'Service Item Categories'
+
+    def __str__(self):
+        return f'{self.category_code} — {self.name_english}'
+
+    def clean(self):
+        errors = {}
+        if not (self.name_english or '').strip():
+            errors['name_english'] = [_('English name is required.')]
+        if errors:
+            raise ValidationError(errors)
+
+
 class TenantServiceItemMaster(models.Model):
     """SV-001 Service item master (service/trip pricing item)."""
 
@@ -2536,6 +2615,13 @@ class TenantServiceItemMaster(models.Model):
     status = models.CharField(max_length=12, choices=Status.choices, default=Status.ACTIVE)
     english_name = models.CharField(max_length=200)
     arabic_name = models.CharField(max_length=200, blank=True, default='')
+    service_category = models.ForeignKey(
+        TenantServiceItemCategory,
+        on_delete=models.PROTECT,
+        related_name='service_items',
+        null=True,
+        blank=True,
+    )
     category_name = models.CharField(max_length=200)
     route = models.ForeignKey(
         TenantRouteMaster,
@@ -2564,7 +2650,12 @@ class TenantServiceItemMaster(models.Model):
         errors = {}
         if not (self.english_name or '').strip():
             errors['english_name'] = [_('English name is required.')]
-        if not (self.category_name or '').strip():
+        if self.service_category_id:
+            if self.service_category.status != TenantServiceItemCategory.Status.ACTIVE:
+                errors['service_category'] = [_('Service category must be Active.')]
+            if not (self.category_name or '').strip():
+                self.category_name = self.service_category.name_english
+        elif not (self.category_name or '').strip():
             errors['category_name'] = [_('Category is required.')]
 
         if self.sell_price is not None and self.sell_price < 0:
@@ -3291,13 +3382,13 @@ class TenantRolePermission(models.Model):
     role = models.ForeignKey(TenantRole, on_delete=models.CASCADE, related_name='permissions')
     module_name = models.CharField(max_length=100)
     form_name = models.CharField(max_length=120)
+    can_access = models.BooleanField(default=False)
+    can_write = models.BooleanField(default=False)
+    can_read = models.BooleanField(default=False)
     can_view = models.BooleanField(default=False)
-    can_create = models.BooleanField(default=False)
     can_edit = models.BooleanField(default=False)
-    can_delete = models.BooleanField(default=False)
-    can_post = models.BooleanField(default=False)
-    can_approve = models.BooleanField(default=False)
     can_export = models.BooleanField(default=False)
+    can_approve = models.BooleanField(default=False)
     can_print = models.BooleanField(default=False)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
@@ -3495,6 +3586,7 @@ class TenantShipment(models.Model):
     class CollectionStatus(models.TextChoices):
         PENDING = 'Pending', 'Pending'
         COLLECTED = 'Collected', 'Collected'
+        CANCELLED = 'Cancelled', 'Cancelled'
 
     shipment_id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     shipment_no = models.CharField(max_length=64, unique=True)
@@ -3646,8 +3738,20 @@ class TenantShipment(models.Model):
         if self.truck_id and self.truck and not self.driver_id and self.truck.default_driver_id_id:
             self.driver = self.truck.default_driver_id
 
+    def sync_collection_status_for_lifecycle(self):
+        """COD collection is void when the shipment is cancelled."""
+        if self.shipment_status != self.ShipmentStatus.CANCELLED:
+            return
+        if (self.order_type or '').upper() != 'COD':
+            return
+        cod_amount = self.cod_amount or 0
+        if cod_amount <= 0:
+            return
+        self.collection_status = self.CollectionStatus.CANCELLED
+
     def save(self, *args, **kwargs):
         self.apply_truck_default_driver()
+        self.sync_collection_status_for_lifecycle()
         super().save(*args, **kwargs)
 
     def __str__(self):
@@ -3682,9 +3786,11 @@ class TenantShipment(models.Model):
 
         if self.shipment_status == self.ShipmentStatus.CANCELLED:
             if self.pk:
-                previous = TenantShipment.objects.filter(pk=self.pk).values_list(
-                    'shipment_status', flat=True
-                ).first()
+                previous = getattr(self, '_original_shipment_status', None)
+                if previous is None:
+                    previous = TenantShipment.objects.filter(pk=self.pk).values_list(
+                        'shipment_status', flat=True
+                    ).first()
                 cancellable = {
                     self.ShipmentStatus.LOADED,
                     self.ShipmentStatus.CREATED,
@@ -3692,7 +3798,7 @@ class TenantShipment(models.Model):
                     self.ShipmentStatus.AT_DELIVERY,
                     self.ShipmentStatus.POD_SUBMITTED,
                 }
-                if previous not in cancellable:
+                if previous not in cancellable and previous != self.ShipmentStatus.CANCELLED:
                     errors['shipment_status'] = [
                         _('Cancelled is allowed only before the shipment is closed.'),
                     ]

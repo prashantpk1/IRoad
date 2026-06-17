@@ -23,15 +23,15 @@
               Action Log &mdash;
               <span style="color: var(--primary-color)">{{ action_log_detail.log_no }}</span>
             </h1>
-            <p class="page-subtitle">
+            <!-- <p class="page-subtitle">
               Full details for this operation action log record.
-            </p>
+            </p> -->
           </div>
           <div class="page-header-right">
             <div class="eal-header-actions">
               <a href="{% url 'iroad_tenants:tenant_operation_action_log_list' %}" class="eal-btn eal-btn-outline">
                 <i class="bi bi-arrow-left"></i>
-                <span>Back to List</span>
+                <span>Back</span>
               </a>
               {% if is_tenant_admin %}
               <a href="{{ action_log_detail.edit_url }}" class="eal-btn eal-btn-primary">
@@ -65,8 +65,7 @@
               </div>
               <div class="form-card-header-text">
                 <h2 class="form-card-title">Header</h2>
-                <p class="form-card-desc">Primary action log details.</p>
-              </div>
+      </div>
             </div>
             <div class="form-card-body">
               <div class="fields-grid cols-3">
@@ -105,8 +104,7 @@
               </div>
               <div class="form-card-header-text">
                 <h2 class="form-card-title">References</h2>
-                <p class="form-card-desc">Linked operation entities.</p>
-              </div>
+      </div>
             </div>
             <div class="form-card-body">
               <div class="fields-grid cols-3">
@@ -145,8 +143,7 @@
               </div>
               <div class="form-card-header-text">
                 <h2 class="form-card-title">Location Details</h2>
-                <p class="form-card-desc">Captured location and map reference.</p>
-              </div>
+      </div>
             </div>
             <div class="form-card-body">
               <div class="fields-grid cols-3">
@@ -224,10 +221,7 @@
           </div>
           <div class="form-card-header-text">
             <h2 class="form-card-title">Evidence Attachments</h2>
-            <p class="form-card-desc">
-              Mirror view of OperationActionMedia rows.
-            </p>
-          </div>
+      </div>
         </div>
         <div class="form-card-body" style="padding: 0">
           <div class="eal-table-wrap">

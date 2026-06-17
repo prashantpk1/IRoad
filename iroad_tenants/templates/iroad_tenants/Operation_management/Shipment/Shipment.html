@@ -18,9 +18,20 @@
         <div class="page-header-row">
           <div class="page-header-left">
             <h1 class="page-title">{% if shipment_is_edit %}Edit Shipment{% else %}Shipment{% endif %}</h1>
-            <p class="page-subtitle">
+            <!-- <p class="page-subtitle">
               {% if shipment_is_edit %}Update shipment details, references, and documentation.{% else %}Create a shipment. Manage shipment details, references, and documentation.{% endif %}
-            </p>
+            </p> -->
+          </div>
+          <div class="page-header-right">
+            <div class="eal-header-actions">
+              <a
+                href="{% url 'iroad_tenants:tenant_operation_shipment_list' %}"
+                class="eal-btn eal-btn-outline"
+              >
+                <i class="bi bi-arrow-left"></i>
+                <span>Back</span>
+              </a>
+            </div>
           </div>
         </div>
       </div>
@@ -36,10 +47,7 @@
             </div>
             <div class="form-card-header-text">
               <h2 class="form-card-title">Shipment Info</h2>
-              <p class="form-card-desc">
-                Primary shipment details and status information.
-              </p>
-            </div>
+      </div>
           </div>
           <div class="form-card-body">
             <div class="fields-grid cols-3">
@@ -128,10 +136,7 @@
             </div>
             <div class="form-card-header-text">
               <h2 class="form-card-title">Booking info</h2>
-              <p class="form-card-desc">
-                Booking reference and auto-updated booking attributes.
-              </p>
-            </div>
+      </div>
           </div>
           <div class="form-card-body">
             <div class="fields-grid cols-3">
@@ -394,8 +399,7 @@
             </div>
             <div class="form-card-header-text">
               <h2 class="form-card-title">Address</h2>
-              <p class="form-card-desc">Pickup and delivery locations for this shipment line.</p>
-            </div>
+      </div>
           </div>
           <div class="form-card-body">
             <div class="field-group">
@@ -498,8 +502,7 @@
             </div>
             <div class="form-card-header-text">
               <h2 class="form-card-title">Cargo Information</h2>
-              <p class="form-card-desc">Weight is total tonnage for the line; totals update automatically.</p>
-            </div>
+      </div>
           </div>
           <div class="form-card-body">
             <div class="eal-table-card">

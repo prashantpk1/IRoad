@@ -1,0 +1,1323 @@
+{
+  "info": {
+    "_postman_id": "f3e8a1b2-4c5d-6e7f-8a9b-0c1d2e3f4a5b",
+    "name": "IRoute — Full Job Flow (Booking → A4 → POD Branching → Close)",
+    "description": "# IRoute Full Job Flow E2E\n\nComplete driver mobile test: **planned booking job** (no shipment yet) through **A4 auto-shipment birth**, delivery workflow, POD branching, and job close.\n\n## Prerequisites (tenant portal / shell)\n1. Confirmed booking with truck + driver assigned (Planned — no manual shipment).\n2. Action Master A4 has **Auto Shipment Post** + **Auto Movement Post** ON:\n   `python manage.py ensure_production_action_master --schema YOUR_TENANT_SCHEMA`\n\n## Import\n1. `IRoute_Full_Job_Flow_Collection.json`\n2. `IRoute-Full-Job-Flow.postman_environment.json`\n3. Set `driver_email`, `driver_password`\n\n## Flow\n```\nLogin → Dashboard (job_type=booking) → Job Detail\n→ A1 → A2 → A3 → A4 (creates shipment)\n→ switch to job_type=shipment → A5 → A6\n→ POD Capture → A7 → branch (04A digital OR 04B hard POD)\n→ A8 → A9 (COD only) → A10 → Dashboard\n```\n\n## Variables auto-saved\n| Variable | When |\n|----------|------|\n| job_type, job_id | Dashboard — `booking` before A4, `shipment` after A4 |\n| booking_id | Dashboard when job_type=booking |\n| shipment_id | After A4 execute |\n| content_hash, workflow_version | Job Detail + each execute |\n\n## Attach files\n- **A4**: 2 photos on media[0/1][file_ref]\n- **POD Capture**: photo + signature + MP4 on media[0/1/2][file_ref]\n",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {
+      "key": "base_url",
+      "value": "http://127.0.0.1:8001/api/v1/mobile"
+    },
+    {
+      "key": "_iroute_helpers",
+      "value": "function irouteSaveSync(data) {\n  if (!data || !data.sync_metadata) return;\n  var sm = data.sync_metadata;\n  pm.collectionVariables.set('content_hash', sm.content_hash || '');\n  pm.collectionVariables.set('workflow_version', sm.workflow_version || '');\n  pm.environment.set('content_hash', sm.content_hash || '');\n  pm.environment.set('workflow_version', sm.workflow_version || '');\n}\nfunction irouteSavePodSync(data) {\n  if (!data) return;\n  pm.collectionVariables.set('pod_content_hash', data.content_hash || '');\n  pm.collectionVariables.set('pod_workflow_version', data.workflow_version || '');\n  pm.environment.set('pod_content_hash', data.content_hash || '');\n  pm.environment.set('pod_workflow_version', data.workflow_version || '');\n}\nfunction irouteSaveDashboardJob(data) {\n  var job = (data || {}).active_job;\n  if (!job || !job.job_id) return;\n  var jt = (job.job_type || 'shipment').toLowerCase();\n  pm.collectionVariables.set('job_type', jt);\n  pm.collectionVariables.set('job_id', job.job_id);\n  pm.environment.set('job_type', jt);\n  pm.environment.set('job_id', job.job_id);\n  if (jt === 'booking') {\n    pm.collectionVariables.set('booking_id', job.job_id);\n    pm.environment.set('booking_id', job.job_id);\n    console.log('[IRoute] Planned job (pre-A4): booking', job.job_no || job.job_id);\n  } else {\n    pm.collectionVariables.set('shipment_id', job.job_id);\n    pm.environment.set('shipment_id', job.job_id);\n  }\n  if (job.job_no) {\n    pm.collectionVariables.set('job_no', job.job_no);\n    pm.collectionVariables.set('shipment_no', job.job_no);\n    pm.environment.set('job_no', job.job_no);\n    pm.environment.set('shipment_no', job.job_no);\n  }\n}\nfunction irouteSaveJobIds(data) {\n  var job = data.job || {};\n  var jid = job.job_id || data.shipment_id || '';\n  var jt = (job.job_type || pm.variables.get('job_type') || 'shipment').toLowerCase();\n  if (jid) {\n    pm.collectionVariables.set('job_id', jid);\n    pm.collectionVariables.set('job_type', jt);\n    pm.environment.set('job_id', jid);\n    pm.environment.set('job_type', jt);\n    if (jt === 'shipment') {\n      pm.collectionVariables.set('shipment_id', jid);\n      pm.environment.set('shipment_id', jid);\n    }\n  }\n  if (job.job_no) {\n    pm.collectionVariables.set('job_no', job.job_no);\n    pm.collectionVariables.set('shipment_no', job.job_no);\n    pm.environment.set('job_no', job.job_no);\n    pm.environment.set('shipment_no', job.job_no);\n  }\n}\nfunction irouteAfterA4(data) {\n  irouteSaveSync(data);\n  var sid = data.shipment_id || (data.execution || {}).shipment_id || '';\n  if (!sid && data.job && data.job.job_id) sid = data.job.job_id;\n  if (sid) {\n    pm.collectionVariables.set('shipment_id', sid);\n    pm.collectionVariables.set('job_id', sid);\n    pm.collectionVariables.set('job_type', 'shipment');\n    pm.environment.set('shipment_id', sid);\n    pm.environment.set('job_id', sid);\n    pm.environment.set('job_type', 'shipment');\n    console.log('[IRoute] A4 complete — switched to shipment scope:', sid);\n  }\n  var hint = data.next_action_hint || {};\n  if (hint) irouteLogHint(hint, 'AFTER A4');\n}\nfunction irouteSaveBranchState(data) {\n  var pod = data.pod_cod || {};\n  var hint = data.next_action_hint || {};\n  var hard = pod.hard_pod_pending === true || (pod.hard_copy_confirmation || {}).required === true;\n  var branch = hard ? 'hard_pod' : 'digital_only';\n  pm.collectionVariables.set('hard_pod_required', hard ? 'true' : 'false');\n  pm.environment.set('hard_pod_required', hard ? 'true' : 'false');\n  pm.collectionVariables.set('pod_branch', branch);\n  pm.environment.set('pod_branch', branch);\n  pm.collectionVariables.set('next_action_code', String(hint.action_code || '').toUpperCase());\n  pm.environment.set('next_action_code', String(hint.action_code || '').toUpperCase());\n}\nfunction irouteAssertToken() {\n  var t = pm.variables.get('access_token') || '';\n  if (!t || String(t).indexOf('{{') >= 0) throw new Error('Run 01 Login first.');\n}\nfunction irouteLogHint(hint, label) {\n  hint = hint || {};\n  console.log('=== ' + (label || 'NEXT ACTION HINT') + ' ===');\n  console.log('action:', hint.action, '| screen:', hint.screen, '| code:', hint.action_code);\n  console.log('capture_mode:', hint.capture_mode, '| reason:', hint.reason);\n  console.log('job_closed:', hint.job_closed);\n}"
+    },
+    {
+      "key": "driver_email",
+      "value": ""
+    },
+    {
+      "key": "driver_password",
+      "value": ""
+    },
+    {
+      "key": "driver_extension",
+      "value": "+966"
+    },
+    {
+      "key": "driver_phone",
+      "value": ""
+    },
+    {
+      "key": "access_token",
+      "value": ""
+    },
+    {
+      "key": "refresh_token",
+      "value": ""
+    },
+    {
+      "key": "shipment_id",
+      "value": ""
+    },
+    {
+      "key": "job_id",
+      "value": ""
+    },
+    {
+      "key": "job_type",
+      "value": "shipment"
+    },
+    {
+      "key": "shipment_no",
+      "value": ""
+    },
+    {
+      "key": "content_hash",
+      "value": ""
+    },
+    {
+      "key": "workflow_version",
+      "value": ""
+    },
+    {
+      "key": "pod_content_hash",
+      "value": ""
+    },
+    {
+      "key": "pod_workflow_version",
+      "value": ""
+    },
+    {
+      "key": "capture_bundle_id",
+      "value": ""
+    },
+    {
+      "key": "pod_video_duration_seconds",
+      "value": "8"
+    },
+    {
+      "key": "hard_pod_required",
+      "value": ""
+    },
+    {
+      "key": "pod_branch",
+      "value": ""
+    },
+    {
+      "key": "next_action_code",
+      "value": ""
+    },
+    {
+      "key": "mobile_cod_amount",
+      "value": ""
+    },
+    {
+      "key": "hard_pod_confirmed_pages_json",
+      "value": "[]"
+    },
+    {
+      "key": "hard_pod_custody_submission_id",
+      "value": ""
+    },
+    {
+      "key": "hard_pod_client_submission_id",
+      "value": ""
+    },
+    {
+      "key": "hard_pod_receiver_name",
+      "value": "Receiver Name"
+    },
+    {
+      "key": "hard_pod_receiver_contact",
+      "value": "0500000000"
+    },
+    {
+      "key": "hard_pod_handoff_notes",
+      "value": "Hard copy DN collected"
+    },
+    {
+      "key": "document_ref_no",
+      "value": ""
+    },
+    {
+      "key": "booking_id",
+      "value": ""
+    },
+    {
+      "key": "job_no",
+      "value": ""
+    }
+  ],
+  "event": [
+    {
+      "listen": "prerequest",
+      "script": {
+        "type": "text/javascript",
+        "exec": [
+          "eval(pm.collectionVariables.get('_iroute_helpers') || '');"
+        ]
+      }
+    }
+  ],
+  "item": [
+    {
+      "name": "00 — Setup",
+      "description": "Login and resolve job. Run Job Detail before any execute.",
+      "item": [
+        {
+          "name": "01 — Login (Email)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              }
+            ],
+            "url": "{{base_url}}/driver/auth/login/",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"{{driver_email}}\",\n  \"password\": \"{{driver_password}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "var r = pm.response.json();",
+                  "if (r.status === 1 && r.data && r.data.access_token) {",
+                  "  pm.collectionVariables.set('access_token', r.data.access_token);",
+                  "  pm.environment.set('access_token', r.data.access_token);",
+                  "  pm.test('Login OK', function () { pm.expect(r.status).to.eql(1); });",
+                  "} else { pm.test('Login failed', function () { pm.expect.fail(r.message); }); }"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "02 — Dashboard",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              }
+            ],
+            "url": "{{base_url}}/driver/dashboard/"
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "eval(pm.collectionVariables.get('_iroute_helpers') || '');",
+                  "irouteAssertToken();"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "eval(pm.collectionVariables.get('_iroute_helpers') || '');",
+                  "pm.test('HTTP 200', function () { pm.response.to.have.status(200); });",
+                  "var resp = pm.response.json();",
+                  "pm.test('Dashboard OK', function () { pm.expect(resp.status).to.eql(1); });",
+                  "if (resp.data && resp.data.active_job) {",
+                  "  irouteSaveDashboardJob(resp.data);",
+                  "  var jt = pm.variables.get('job_type');",
+                  "  pm.test('Active job saved', function () { pm.expect(resp.data.active_job.job_id).to.exist; });",
+                  "  if (jt === 'booking') {",
+                  "    pm.test('Pre-A4 planned job is booking scope', function () { pm.expect(jt).to.eql('booking'); });",
+                  "  }",
+                  "} else {",
+                  "  pm.test('No active job — assign driver to confirmed booking first', function () { pm.expect(resp.data.active_job).to.exist; });",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "03 — Job Detail",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              }
+            ],
+            "url": "{{base_url}}/driver/jobs/{{job_type}}/{{job_id}}/"
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "eval(pm.collectionVariables.get('_iroute_helpers') || '');",
+                  "irouteAssertToken();"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "eval(pm.collectionVariables.get('_iroute_helpers') || '');",
+                  "pm.test('HTTP 200', function () { pm.response.to.have.status(200); });",
+                  "var data = pm.response.json().data || {};",
+                  "irouteSaveJobIds(data);",
+                  "irouteSaveSync(data);",
+                  "irouteSaveBranchState(data);",
+                  "irouteLogHint(data.next_action_hint, 'JOB DETAIL');",
+                  "var pod = data.pod_cod || {};",
+                  "console.log('pod_type/shipment:', (data.job || {}).pod_type);",
+                  "console.log('hard_pod_pending:', pod.hard_pod_pending);"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "01 — Workflow → A6",
+      "description": "Run through delivery arrival. Skip steps already done (action_not_allowed = skip).",
+      "item": [
+        {
+          "name": "04 — Execute A1",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              }
+            ],
+            "url": "{{base_url}}/driver/jobs/{{job_type}}/{{job_id}}/actions/A1/execute/",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"client_action_id\": \"a1-{{$guid}}\",\n  \"workflow_version\": \"{{workflow_version}}\",\n  \"content_hash\": \"{{content_hash}}\",\n  \"latitude\": 21.3891,\n  \"longitude\": 39.8579,\n  \"notes\": \"A1 — {{shipment_no}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "description": "Start job"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "eval(pm.collectionVariables.get('_iroute_helpers') || '');",
+                  "var resp = pm.response.json();",
+                  "pm.test('HTTP OK', function () { pm.expect([200, 201]).to.include(pm.response.code); });",
+                  "if (resp.status === 1 && resp.data) { irouteSaveSync(resp.data); }",
+                  "var hint = (resp.data || {}).next_action_hint;",
+                  "if (hint) { irouteLogHint(hint, 'A1'); }"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "05 — Execute A2",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              }
+            ],
+            "url": "{{base_url}}/driver/jobs/{{job_type}}/{{job_id}}/actions/A2/execute/",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"client_action_id\": \"a2-{{$guid}}\",\n  \"workflow_version\": \"{{workflow_version}}\",\n  \"content_hash\": \"{{content_hash}}\",\n  \"latitude\": 21.3891,\n  \"longitude\": 39.8579,\n  \"notes\": \"A2 — {{shipment_no}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "description": "Pickup arrival"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "eval(pm.collectionVariables.get('_iroute_helpers') || '');",
+                  "var resp = pm.response.json();",
+                  "pm.test('HTTP OK', function () { pm.expect([200, 201]).to.include(pm.response.code); });",
+                  "if (resp.status === 1 && resp.data) { irouteSaveSync(resp.data); }",
+                  "var hint = (resp.data || {}).next_action_hint;",
+                  "if (hint) { irouteLogHint(hint, 'A2'); }"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "06 — Execute A3",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              }
+            ],
+            "url": "{{base_url}}/driver/jobs/{{job_type}}/{{job_id}}/actions/A3/execute/",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"client_action_id\": \"a3-{{$guid}}\",\n  \"workflow_version\": \"{{workflow_version}}\",\n  \"content_hash\": \"{{content_hash}}\",\n  \"latitude\": 21.3891,\n  \"longitude\": 39.8579,\n  \"notes\": \"A3 — {{shipment_no}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "description": "Start loading"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "eval(pm.collectionVariables.get('_iroute_helpers') || '');",
+                  "var resp = pm.response.json();",
+                  "pm.test('HTTP OK', function () { pm.expect([200, 201]).to.include(pm.response.code); });",
+                  "if (resp.status === 1 && resp.data) { irouteSaveSync(resp.data); }",
+                  "var hint = (resp.data || {}).next_action_hint;",
+                  "if (hint) { irouteLogHint(hint, 'A3'); }"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "07 — Execute A4 (2 photos — form-data)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              }
+            ],
+            "url": "{{base_url}}/driver/jobs/{{job_type}}/{{job_id}}/actions/A4/execute/",
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "client_action_id",
+                  "value": "a4-{{$guid}}",
+                  "type": "text"
+                },
+                {
+                  "key": "workflow_version",
+                  "value": "{{workflow_version}}",
+                  "type": "text"
+                },
+                {
+                  "key": "content_hash",
+                  "value": "{{content_hash}}",
+                  "type": "text"
+                },
+                {
+                  "key": "latitude",
+                  "value": "21.4858",
+                  "type": "text"
+                },
+                {
+                  "key": "longitude",
+                  "value": "39.1925",
+                  "type": "text"
+                },
+                {
+                  "key": "notes",
+                  "value": "Confirm loaded",
+                  "type": "text"
+                },
+                {
+                  "key": "media[0][media_type]",
+                  "value": "photo",
+                  "type": "text"
+                },
+                {
+                  "key": "media[0][file_ref]",
+                  "type": "file",
+                  "src": []
+                },
+                {
+                  "key": "media[1][media_type]",
+                  "value": "photo",
+                  "type": "text"
+                },
+                {
+                  "key": "media[1][file_ref]",
+                  "type": "file",
+                  "src": []
+                }
+              ]
+            },
+            "description": "Attach 2 JPG/PNG on media[0] and media[1] file rows."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "eval(pm.collectionVariables.get('_iroute_helpers') || '');",
+                  "var resp = pm.response.json();",
+                  "pm.test('HTTP OK', function () { pm.expect([200, 201]).to.include(pm.response.code); });",
+                  "if (resp.status === 1 && resp.data) { irouteAfterA4(resp.data); }",
+                  "pm.test('Switched to shipment after A4', function () {",
+                  "  pm.expect(pm.variables.get('job_type')).to.eql('shipment');",
+                  "  pm.expect(pm.variables.get('shipment_id')).to.be.ok;",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "08 — Execute A5",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              }
+            ],
+            "url": "{{base_url}}/driver/jobs/{{job_type}}/{{job_id}}/actions/A5/execute/",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"client_action_id\": \"a5-{{$guid}}\",\n  \"workflow_version\": \"{{workflow_version}}\",\n  \"content_hash\": \"{{content_hash}}\",\n  \"latitude\": 21.3891,\n  \"longitude\": 39.8579,\n  \"notes\": \"A5 — {{shipment_no}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "description": "Depart in transit"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "eval(pm.collectionVariables.get('_iroute_helpers') || '');",
+                  "var resp = pm.response.json();",
+                  "pm.test('HTTP OK', function () { pm.expect([200, 201]).to.include(pm.response.code); });",
+                  "if (resp.status === 1 && resp.data) { irouteSaveSync(resp.data); }",
+                  "var hint = (resp.data || {}).next_action_hint;",
+                  "if (hint) { irouteLogHint(hint, 'A5'); }"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "09 — Execute A6",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              }
+            ],
+            "url": "{{base_url}}/driver/jobs/{{job_type}}/{{job_id}}/actions/A6/execute/",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"client_action_id\": \"a6-{{$guid}}\",\n  \"workflow_version\": \"{{workflow_version}}\",\n  \"content_hash\": \"{{content_hash}}\",\n  \"latitude\": 21.3891,\n  \"longitude\": 39.8579,\n  \"notes\": \"A6 — {{shipment_no}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "description": "Delivery arrival"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "eval(pm.collectionVariables.get('_iroute_helpers') || '');",
+                  "var resp = pm.response.json();",
+                  "pm.test('HTTP OK', function () { pm.expect([200, 201]).to.include(pm.response.code); });",
+                  "if (resp.status === 1 && resp.data) { irouteSaveSync(resp.data); }",
+                  "var hint = (resp.data || {}).next_action_hint;",
+                  "if (hint) { irouteLogHint(hint, 'A6'); }"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "02 — Digital POD (photo + signature + video → A7)",
+      "description": "Stage digital evidence then execute A7. Video required for digital POD.",
+      "item": [
+        {
+          "name": "10a — POD Capture Sync",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              }
+            ],
+            "url": "{{base_url}}/driver/jobs/shipments/{{shipment_id}}/pod/capture/"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "eval(pm.collectionVariables.get('_iroute_helpers') || '');",
+                  "pm.test('HTTP 200', function () { pm.response.to.have.status(200); });",
+                  "var d = pm.response.json().data || {};",
+                  "irouteSavePodSync(d);",
+                  "pm.test('digital_evidence screen', function () {",
+                  "  pm.expect(d.screen).to.eql('pod_capture');",
+                  "  pm.expect(d.capture_mode).to.eql('digital_evidence');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "10 — POD Capture POST (photo + signature + video)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              }
+            ],
+            "url": "{{base_url}}/driver/jobs/shipments/{{shipment_id}}/pod/capture/",
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "client_capture_id",
+                  "value": "pod-{{$guid}}",
+                  "type": "text"
+                },
+                {
+                  "key": "content_hash",
+                  "value": "{{pod_content_hash}}",
+                  "type": "text"
+                },
+                {
+                  "key": "workflow_version",
+                  "value": "{{pod_workflow_version}}",
+                  "type": "text"
+                },
+                {
+                  "key": "pod_type",
+                  "value": "digital",
+                  "type": "text"
+                },
+                {
+                  "key": "target_action_code",
+                  "value": "A7",
+                  "type": "text"
+                },
+                {
+                  "key": "latitude",
+                  "value": "21.3891",
+                  "type": "text"
+                },
+                {
+                  "key": "longitude",
+                  "value": "39.8579",
+                  "type": "text"
+                },
+                {
+                  "key": "notes",
+                  "value": "Digital POD evidence",
+                  "type": "text"
+                },
+                {
+                  "key": "media[0][media_type]",
+                  "value": "photo",
+                  "type": "text"
+                },
+                {
+                  "key": "media[0][file_name]",
+                  "value": "dn-photo.jpg",
+                  "type": "text"
+                },
+                {
+                  "key": "media[0][sort_order]",
+                  "value": "1",
+                  "type": "text"
+                },
+                {
+                  "key": "media[0][file_ref]",
+                  "type": "file",
+                  "src": []
+                },
+                {
+                  "key": "media[1][media_type]",
+                  "value": "signature",
+                  "type": "text"
+                },
+                {
+                  "key": "media[1][file_name]",
+                  "value": "signature.png",
+                  "type": "text"
+                },
+                {
+                  "key": "media[1][sort_order]",
+                  "value": "2",
+                  "type": "text"
+                },
+                {
+                  "key": "media[1][file_ref]",
+                  "type": "file",
+                  "src": []
+                },
+                {
+                  "key": "media[2][media_type]",
+                  "value": "video",
+                  "type": "text"
+                },
+                {
+                  "key": "media[2][file_name]",
+                  "value": "dn-video.mp4",
+                  "type": "text"
+                },
+                {
+                  "key": "media[2][duration_seconds]",
+                  "value": "{{pod_video_duration_seconds}}",
+                  "type": "text"
+                },
+                {
+                  "key": "media[2][sort_order]",
+                  "value": "3",
+                  "type": "text"
+                },
+                {
+                  "key": "media[2][file_ref]",
+                  "type": "file",
+                  "src": []
+                }
+              ]
+            },
+            "description": "Attach photo, signature, MP4 (≤15s) on media[0/1/2][file_ref]."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "eval(pm.collectionVariables.get('_iroute_helpers') || '');",
+                  "pm.test('HTTP 200/201', function () { pm.expect([200,201]).to.include(pm.response.code); });",
+                  "var d = pm.response.json().data || {};",
+                  "var b = d.capture_bundle || {};",
+                  "var id = b.capture_bundle_id || d.capture_bundle_id || '';",
+                  "pm.collectionVariables.set('capture_bundle_id', id);",
+                  "pm.environment.set('capture_bundle_id', id);",
+                  "var sum = (d.compliance || {}).summary || {};",
+                  "pm.test('video staged', function () { pm.expect(sum.video_count).to.be.at.least(1); });",
+                  "pm.test('execute_ready', function () { pm.expect(b.execute_ready).to.eql(true); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "10.5 — Job Detail (refresh before A7)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              }
+            ],
+            "url": "{{base_url}}/driver/jobs/{{job_type}}/{{job_id}}/"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "eval(pm.collectionVariables.get('_iroute_helpers') || '');",
+                  "var data = pm.response.json().data || {};",
+                  "irouteSaveSync(data);",
+                  "pm.test('A7 allowed', function () {",
+                  "  var codes = (data.workflow.allowed_actions || []).map(function (a) { return a.action_code; });",
+                  "  pm.expect(codes).to.include('A7');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "11 — Execute A7 (digital POD)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              }
+            ],
+            "url": "{{base_url}}/driver/jobs/{{job_type}}/{{job_id}}/actions/A7/execute/",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"client_action_id\": \"a7-{{$guid}}\",\n  \"workflow_version\": \"{{workflow_version}}\",\n  \"content_hash\": \"{{content_hash}}\",\n  \"latitude\": 21.3891,\n  \"longitude\": 39.8579,\n  \"notes\": \"A7 — {{shipment_no}}\",\n  \"capture_bundle_id\": \"{{capture_bundle_id}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "description": "JSON only — promotes staged bundle. No files."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "eval(pm.collectionVariables.get('_iroute_helpers') || '');",
+                  "pm.test('A7 OK', function () { pm.expect([200,201]).to.include(pm.response.code); });",
+                  "var data = (pm.response.json().data || {});",
+                  "irouteSaveSync(data);",
+                  "irouteSaveBranchState(data);",
+                  "var hint = data.next_action_hint || {};",
+                  "irouteLogHint(hint, 'AFTER A7');",
+                  "var hard = pm.variables.get('hard_pod_required') === 'true';",
+                  "if (hard) {",
+                  "  pm.test('Hard POD: next is A7H confirmation (no camera)', function () {",
+                  "    pm.expect(hint.action).to.eql('go_to_pod_capture');",
+                  "    pm.expect(hint.capture_mode).to.eql('hard_copy_confirmation');",
+                  "    pm.expect(hint.action_code).to.eql('A7H');",
+                  "    pm.expect(hint.ui_mode).to.eql('hard_pod_collection_confirmation');",
+                  "  });",
+                  "  console.log('>>> RUN FOLDER 04B Hard POD branch');",
+                  "} else {",
+                  "  pm.test('Digital only: next is A8', function () {",
+                  "    pm.expect(hint.action).to.eql('execute_action');",
+                  "    pm.expect(hint.action_code).to.eql('A8');",
+                  "    pm.expect(hint.screen).to.eql('job_detail');",
+                  "  });",
+                  "  console.log('>>> RUN FOLDER 04A Digital-only branch (skip 04B)');",
+                  "}"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "03 — After A7 Branch Check",
+      "description": "Confirms which path to run. Sets `pod_branch` = hard_pod | digital_only.",
+      "item": [
+        {
+          "name": "12 — Job Detail (branch decision)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              }
+            ],
+            "url": "{{base_url}}/driver/jobs/{{job_type}}/{{job_id}}/"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "eval(pm.collectionVariables.get('_iroute_helpers') || '');",
+                  "var data = pm.response.json().data || {};",
+                  "irouteSaveSync(data);",
+                  "irouteSaveBranchState(data);",
+                  "var hint = data.next_action_hint || {};",
+                  "irouteLogHint(hint, 'BRANCH CHECK');",
+                  "var branch = pm.variables.get('pod_branch');",
+                  "console.log('pod_branch=', branch, '| hard_pod_required=', pm.variables.get('hard_pod_required'));",
+                  "if (branch === 'hard_pod') {",
+                  "  pm.test('Branch: Hard POD → run folder 04B', function () {",
+                  "    pm.expect(hint.action_code).to.be.oneOf(['A7H', 'A7']);",
+                  "    pm.expect(hint.capture_mode || hint.ui_mode).to.satisfy(function (v) {",
+                  "      return v === 'hard_copy_confirmation' || hint.ui_mode === 'hard_pod_collection_confirmation';",
+                  "    });",
+                  "  });",
+                  "} else {",
+                  "  pm.test('Branch: Digital only → run folder 04A', function () {",
+                  "    pm.expect(hint.action_code).to.eql('A8');",
+                  "  });",
+                  "}"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "04A — Digital POD only → A8 (skip if hard_pod_required=true)",
+      "description": "Run when after A7 next_action is A8. No A7H steps.",
+      "item": [
+        {
+          "name": "13A — Job Detail before A8",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              }
+            ],
+            "url": "{{base_url}}/driver/jobs/{{job_type}}/{{job_id}}/"
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "eval(pm.collectionVariables.get('_iroute_helpers') || '');",
+                  "if (pm.variables.get('hard_pod_required') === 'true') {",
+                  "  console.warn('Hard POD required — skip 04A, use folder 04B instead');",
+                  "}"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "eval(pm.collectionVariables.get('_iroute_helpers') || '');",
+                  "var data = pm.response.json().data || {};",
+                  "irouteSaveSync(data);",
+                  "var hint = data.next_action_hint || {};",
+                  "pm.test('next is A8', function () {",
+                  "  if (pm.variables.get('hard_pod_required') !== 'true') {",
+                  "    pm.expect(hint.action_code).to.eql('A8');",
+                  "  }",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "14A — Execute A8 (Unloading)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              }
+            ],
+            "url": "{{base_url}}/driver/jobs/{{job_type}}/{{job_id}}/actions/A8/execute/",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"client_action_id\": \"a8-{{$guid}}\",\n  \"workflow_version\": \"{{workflow_version}}\",\n  \"content_hash\": \"{{content_hash}}\",\n  \"latitude\": 21.3891,\n  \"longitude\": 39.8579,\n  \"notes\": \"A8 — {{shipment_no}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "description": "GPS + notes only. No media."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "eval(pm.collectionVariables.get('_iroute_helpers') || '');",
+                  "var resp = pm.response.json();",
+                  "pm.test('HTTP OK', function () { pm.expect([200, 201]).to.include(pm.response.code); });",
+                  "if (resp.status === 1 && resp.data) { irouteSaveSync(resp.data); }",
+                  "var hint = (resp.data || {}).next_action_hint;",
+                  "if (hint) { irouteLogHint(hint, 'A8'); }"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "04B — Hard POD + DN → A7H confirmation → A8",
+      "description": "After A7: confirmation page only (no camera). Run when hard_pod_required=true.",
+      "item": [
+        {
+          "name": "13B — POD Capture GET (hard copy unlocked)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              }
+            ],
+            "url": "{{base_url}}/driver/jobs/shipments/{{shipment_id}}/pod/capture/"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "eval(pm.collectionVariables.get('_iroute_helpers') || '');",
+                  "var d = pm.response.json().data || {};",
+                  "pm.test('hard copy mode after A7', function () {",
+                  "  pm.expect(d.capture_mode).to.eql('hard_copy_confirmation');",
+                  "  pm.expect(d.screen).to.eql('pod_capture');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "13C — Hard copy confirmation UI (?step=hard_copy_confirmation)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              }
+            ],
+            "url": "{{base_url}}/driver/jobs/shipments/{{shipment_id}}/pod/capture/?step=hard_copy_confirmation"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "eval(pm.collectionVariables.get('_iroute_helpers') || '');",
+                  "var d = pm.response.json().data || {};",
+                  "pm.test('confirmation page — no capture UI', function () {",
+                  "  pm.expect(d.ui_mode).to.eql('hard_pod_collection_confirmation');",
+                  "  pm.expect(Object.keys(d.capture_ui || {}).length).to.eql(0);",
+                  "  pm.expect((d.confirmation_ui || {}).screen_title).to.eql('Hard POD Collection Confirmation');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "14B — Hard POD Documents GET",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              }
+            ],
+            "url": "{{base_url}}/driver/jobs/shipments/{{shipment_id}}/hard-pod/documents/"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "eval(pm.collectionVariables.get('_iroute_helpers') || '');",
+                  "var pages = (pm.response.json().data || {}).pages || [];",
+                  "pm.test('DN pages present', function () { pm.expect(pages.length).to.be.at.least(1); });",
+                  "var confirmed = pages.map(function (p) {",
+                  "  return { page_id: p.page_id, document_id: p.document_id, line_no: p.line_no || 1, confirmed: true };",
+                  "});",
+                  "var json = JSON.stringify(confirmed);",
+                  "pm.collectionVariables.set('hard_pod_confirmed_pages_json', json);",
+                  "pm.environment.set('hard_pod_confirmed_pages_json', json);",
+                  "pm.collectionVariables.set('hard_pod_client_submission_id', 'hard-' + Date.now());",
+                  "pm.environment.set('hard_pod_client_submission_id', 'hard-' + Date.now());"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "15B — Hard POD Submit",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              }
+            ],
+            "url": "{{base_url}}/driver/hard-pod/submit/",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"client_submission_id\": \"{{hard_pod_client_submission_id}}\",\n  \"shipment_id\": \"{{shipment_id}}\",\n  \"receiver_name\": \"{{hard_pod_receiver_name}}\",\n  \"receiver_contact\": \"{{hard_pod_receiver_contact}}\",\n  \"handoff_notes\": \"{{hard_pod_handoff_notes}}\",\n  \"latitude\": 21.3891,\n  \"longitude\": 39.8579,\n  \"confirmed_pages\": {{hard_pod_confirmed_pages_json}},\n  \"media\": []\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "eval(pm.collectionVariables.get('_iroute_helpers') || '');",
+                  "var sub = (pm.response.json().data || {}).custody_submission || {};",
+                  "pm.collectionVariables.set('hard_pod_custody_submission_id', sub.submission_id || '');",
+                  "pm.environment.set('hard_pod_custody_submission_id', sub.submission_id || '');",
+                  "pm.test('custody_submission_id saved', function () { pm.expect(sub.submission_id).to.be.ok; });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "15.5B — Job Detail refresh (before A7H)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              }
+            ],
+            "url": "{{base_url}}/driver/jobs/{{job_type}}/{{job_id}}/"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "eval(pm.collectionVariables.get('_iroute_helpers') || '');",
+                  "irouteSaveSync(pm.response.json().data || {});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "16B — Execute A7H (hard copy confirmation)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              }
+            ],
+            "url": "{{base_url}}/driver/jobs/{{job_type}}/{{job_id}}/actions/A7H/execute/",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"client_action_id\": \"a7h-{{$guid}}\",\n  \"workflow_version\": \"{{workflow_version}}\",\n  \"content_hash\": \"{{content_hash}}\",\n  \"latitude\": 21.3891,\n  \"longitude\": 39.8579,\n  \"notes\": \"A7H — {{shipment_no}}\",\n  \"custody_submission_id\": \"{{hard_pod_custody_submission_id}}\",\n  \"client_submission_id\": \"{{hard_pod_client_submission_id}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "eval(pm.collectionVariables.get('_iroute_helpers') || '');",
+                  "pm.test('A7H OK', function () { pm.expect([200,201]).to.include(pm.response.code); });",
+                  "var data = (pm.response.json().data || {});",
+                  "irouteSaveSync(data);",
+                  "var hint = data.next_action_hint || {};",
+                  "irouteLogHint(hint, 'AFTER A7H');",
+                  "pm.test('after A7H next is A8', function () {",
+                  "  pm.expect(hint.action_code).to.eql('A8');",
+                  "  pm.expect(hint.action).to.eql('execute_action');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "17B — Execute A8 (after Hard POD)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              }
+            ],
+            "url": "{{base_url}}/driver/jobs/{{job_type}}/{{job_id}}/actions/A8/execute/",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"client_action_id\": \"a8-{{$guid}}\",\n  \"workflow_version\": \"{{workflow_version}}\",\n  \"content_hash\": \"{{content_hash}}\",\n  \"latitude\": 21.3891,\n  \"longitude\": 39.8579,\n  \"notes\": \"A8 — {{shipment_no}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "eval(pm.collectionVariables.get('_iroute_helpers') || '');",
+                  "var resp = pm.response.json();",
+                  "pm.test('HTTP OK', function () { pm.expect([200, 201]).to.include(pm.response.code); });",
+                  "if (resp.status === 1 && resp.data) { irouteSaveSync(resp.data); }",
+                  "var hint = (resp.data || {}).next_action_hint;",
+                  "if (hint) { irouteLogHint(hint, 'A8'); }"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "05 — COD Close (A9 → A10)",
+      "description": "Run after A8. Skip A9 if Credit order.",
+      "item": [
+        {
+          "name": "18 — Execute A9 (COD)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              }
+            ],
+            "url": "{{base_url}}/driver/jobs/{{job_type}}/{{job_id}}/actions/A9/execute/",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"client_action_id\": \"a9-{{$guid}}\",\n  \"workflow_version\": \"{{workflow_version}}\",\n  \"content_hash\": \"{{content_hash}}\",\n  \"latitude\": 21.3891,\n  \"longitude\": 39.8579,\n  \"notes\": \"A9 — {{shipment_no}}\",\n  \"mobile_cod_amount\": {{mobile_cod_amount}}\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "eval(pm.collectionVariables.get('_iroute_helpers') || '');",
+                  "var resp = pm.response.json();",
+                  "pm.test('HTTP OK', function () { pm.expect([200, 201]).to.include(pm.response.code); });",
+                  "if (resp.status === 1 && resp.data) { irouteSaveSync(resp.data); }",
+                  "var hint = (resp.data || {}).next_action_hint;",
+                  "if (hint) { irouteLogHint(hint, 'A9'); }"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "19 — Job Detail (expect A10)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              }
+            ],
+            "url": "{{base_url}}/driver/jobs/{{job_type}}/{{job_id}}/"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "eval(pm.collectionVariables.get('_iroute_helpers') || '');",
+                  "irouteSaveSync(pm.response.json().data || {});",
+                  "var hint = (pm.response.json().data || {}).next_action_hint || {};",
+                  "pm.test('A10 ready', function () { pm.expect(hint.action_code).to.eql('A10'); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "20 — Execute A10 (Job Closed)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              }
+            ],
+            "url": "{{base_url}}/driver/jobs/{{job_type}}/{{job_id}}/actions/A10/execute/",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"client_action_id\": \"a10-{{$guid}}\",\n  \"workflow_version\": \"{{workflow_version}}\",\n  \"content_hash\": \"{{content_hash}}\",\n  \"latitude\": 21.3891,\n  \"longitude\": 39.8579,\n  \"notes\": \"A10 — {{shipment_no}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "eval(pm.collectionVariables.get('_iroute_helpers') || '');",
+                  "pm.test('A10 OK', function () { pm.expect([200,201]).to.include(pm.response.code); });",
+                  "var hint = (pm.response.json().data || {}).next_action_hint || {};",
+                  "pm.test('job closed', function () { pm.expect(hint.job_closed).to.eql(true); });"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

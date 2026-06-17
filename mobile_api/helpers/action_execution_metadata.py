@@ -126,8 +126,43 @@ def infer_requires_note(action) -> bool:
     return bool((action.booking_status_impact or '').strip())
 
 
+def _is_job_closed_action(action) -> bool:
+    if action is None:
+        return False
+    return (getattr(action, 'action_code', '') or '').strip().upper() == 'A10'
+
+
+def _job_closed_execution_requirements(action) -> dict[str, Any]:
+    """A10 closes the job — no GPS, photo, video, or note capture."""
+    return {
+        'gps': False,
+        'photo': False,
+        'photo_min_count': 0,
+        'video': False,
+        'video_min_count': 0,
+        'video_max_count': 0,
+        'video_optional': False,
+        'note': False,
+        'note_required': False,
+        'signature': False,
+        'auto_movement_post': False,
+        'auto_pod_post': False,
+        'auto_shipment_post': False,
+        'auto_treasury_post': False,
+        'hard_copy_collection': False,
+        'shipment_status_impact': (action.shipment_status_impact or '').strip()
+        if action
+        else '',
+        'movement_status_impact': (action.movement_status_impact or '').strip()
+        if action
+        else '',
+    }
+
+
 def build_execution_requirements(action, *, shipment=None) -> dict[str, Any]:
     """Structured capture requirements for mobile execute-action UI."""
+    if _is_job_closed_action(action):
+        return _job_closed_execution_requirements(action)
     if _is_hard_copy_action(action):
         return {
             'gps': False,

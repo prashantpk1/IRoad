@@ -2,7 +2,7 @@
 {% load static %}
 {% load i18n %}
 
-{% block title %}{% if is_view %}Route Detail{% else %}Route Master{% endif %} | iRoad{% endblock %}
+{% block title %}{% if is_edit %}{% translate "Edit Route" %}{% else %}{% translate "Route Master" %}{% endif %} | iRoad{% endblock %}
 {% block breadcrumb %}{% endblock %}
 
 {% block content %}
@@ -17,16 +17,22 @@
             </li>
             <li class="breadcrumb-item">Master Data</li>
             <li class="breadcrumb-item">Route Management</li>
-            <li class="breadcrumb-item active" aria-current="page">{% if is_view %}Route Detail{% else %}Route Master{% endif %}</li>
+            <li class="breadcrumb-item active" aria-current="page">
+              {% if is_edit %}{% translate "Edit Route" %}{% else %}{% translate "Route Master" %}{% endif %}
+            </li>
           </ol>
         </nav>
-        <div class="page-header-row">
+        <div class="page-header-row align-items-start">
           <div class="page-header-left">
-            <h1 class="page-title">{% if is_view %}Route Detail{% elif is_edit %}Edit Route{% else %}Route Master{% endif %}</h1>
-            <p class="page-subtitle">
-              Define routes between origin and destination locations for
-              planning and pricing.
-            </p>
+            <h1 class="page-title">{% if is_edit %}{% translate "Edit Route" %}{% else %}{% translate "Route Master" %}{% endif %}</h1>
+            <!-- <p class="page-subtitle">
+              {% translate "Define routes between origin and destination locations for planning and pricing." %}
+            </p> -->
+          </div>
+          <div class="page-header-right ms-auto">
+            <a href="{% url 'iroad_tenants:tenant_route_master_list' %}" class="btn btn-outline-secondary">
+              <i class="bi bi-arrow-left me-1"></i>{% translate "Back" %}
+            </a>
           </div>
         </div>
       </div>
@@ -49,10 +55,7 @@
             </div>
             <div class="form-card-header-text">
               <h2 class="form-card-title">Route Details</h2>
-              <p class="form-card-desc">
-                Define the route identity, type, and origin–destination points.
-              </p>
-            </div>
+      </div>
           </div>
 
           <div class="form-card-body">
@@ -62,24 +65,12 @@
                 Basic Information
               </h3>
 
-              <div class="fields-grid {% if is_view %}cols-3{% else %}cols-2{% endif %}">
+              <div class="fields-grid cols-2">
                 <div class="field">
-                  <label for="routeCode" class="form-label">Route Code</label>
+                  <label for="routeCode" class="form-label">{% translate "Route Code" %}</label>
                   <input type="text" class="form-control" id="routeCode" value="{{ preview_route_code|default:'' }}" readonly />
-                  <span class="field-hint"
-                    >Unique code used to identify this route.</span
-                  >
+                  <span class="field-hint">{% translate "Unique code used to identify this route." %}</span>
                 </div>
-
-                {% if is_view %}
-                <div class="field">
-                  <label class="form-label" id="routeLabelHeading">{% translate "Route Label" %}</label>
-                  <div class="form-control bg-light text-body" id="routeLabelDisplay" aria-readonly="true">
-                    {{ route.route_label }}
-                  </div>
-                  <span class="field-hint">{% translate "Derived from origin and destination display names (read-only)." %}</span>
-                </div>
-                {% endif %}
 
                 <div class="field">
                   <label for="routeType" class="form-label">Route Type</label>
@@ -130,11 +121,7 @@
             </div>
             <div class="form-card-header-text">
               <h2 class="form-card-title">Distance & Duration</h2>
-              <p class="form-card-desc">
-                Set distance, estimated trip duration, and route-specific
-                options.
-              </p>
-            </div>
+      </div>
           </div>
 
           <div class="form-card-body">
@@ -190,13 +177,11 @@
                     disabled
                     autocomplete="off"
                     aria-readonly="true"
-                    {% if is_view and route.has_customs %}checked{% elif not is_view and form.computed_has_customs == True %}checked{% endif %}
+                    {% if form.computed_has_customs == True %}checked{% endif %}
                   />
                   <span class="toggle-track"></span>
                   <span class="toggle-label">
-                    {% if is_view %}
-                      {% if route.has_customs %}{% translate "Enabled" %}{% else %}{% translate "Disabled" %}{% endif %}
-                    {% elif form.computed_has_customs == True %}
+                    {% if form.computed_has_customs == True %}
                       {% translate "Enabled" %}
                     {% else %}
                       {% translate "Disabled" %}
@@ -233,16 +218,10 @@
             </button>
           </div>
           <div class="form-actions-right">
-            <a href="{% url 'iroad_tenants:tenant_route_master_list' %}" class="btn btn-outline-secondary me-2">
-              <i class="bi bi-arrow-left"></i>
-              Back
-            </a>
-            {% if not is_view %}
-              <button type="submit" class="btn btn-primary">
-                <i class="bi bi-check-circle"></i>
-                {% if is_edit %}Update Route{% else %}Save Route{% endif %}
-              </button>
-            {% endif %}
+            <button type="submit" class="btn btn-primary">
+              <i class="bi bi-check-circle"></i>
+              {% if is_edit %}{% translate "Update Route" %}{% else %}{% translate "Save Route" %}{% endif %}
+            </button>
           </div>
         </div>
       </form>
@@ -251,19 +230,6 @@
 {% block extra_js %}
     <script>
       (function () {
-        const isView = "{{ is_view|yesno:'1,0' }}" === "1";
-        if (isView) {
-          document.querySelectorAll("#routeMasterForm input, #routeMasterForm select, #routeMasterForm textarea").forEach((el) => {
-            if (el.type === "checkbox" || el.type === "radio") {
-              el.disabled = true;
-            } else {
-              el.readOnly = true;
-              el.disabled = true;
-            }
-          });
-          return;
-        }
-
         function countryIdFromSelect(sel) {
           if (!sel || sel.selectedIndex < 0) return "";
           const opt = sel.options[sel.selectedIndex];
