@@ -1,0 +1,1036 @@
+{
+  "info": {
+    "_postman_id": "4a46f8d9-9e82-4f74-9f84-2f711adcad44",
+    "name": "IRoute - Job Assign To Close Flow",
+    "description": "# IRoute Job Assign To Close Flow\n\nManual E2E flow to validate driver mobile execution from assigned job pickup to close.\n\n## Import\n1. `IRoute_Job_Assign_To_Close_Flow_Collection.json`\n2. Your environment (or set variables in collection)\n\n## Precondition\n- Booking is already created and **assigned to this driver** from portal/admin side.\n- Driver can login in mobile API.\n- For COD shipments, payment flow (A9) is expected before A10.\n\n## Run order\n1. **00 Setup** - Login, Dashboard, Job Detail sync\n2. **01 Assigned Job Check** - Ensure assigned job is visible\n3. **02 Execute Core** - A1 to A7\n4. **03 COD (Optional)** - A9 for COD shipments\n5. **04 Close Job** - A8 then A10\n6. **05 Final Verify** - Job detail + timeline\n",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "auth": {
+    "type": "bearer",
+    "bearer": [
+      {
+        "key": "token",
+        "value": "{{access_token}}",
+        "type": "string"
+      }
+    ]
+  },
+  "variable": [
+    {
+      "key": "base_url",
+      "value": "http://127.0.0.1:8001/api/v1/mobile"
+    },
+    {
+      "key": "driver_email",
+      "value": ""
+    },
+    {
+      "key": "driver_password",
+      "value": ""
+    },
+    {
+      "key": "access_token",
+      "value": ""
+    },
+    {
+      "key": "refresh_token",
+      "value": ""
+    },
+    {
+      "key": "booking_id",
+      "value": ""
+    },
+    {
+      "key": "shipment_id",
+      "value": ""
+    },
+    {
+      "key": "job_id",
+      "value": ""
+    },
+    {
+      "key": "job_type",
+      "value": "shipment"
+    },
+    {
+      "key": "shipment_no",
+      "value": ""
+    },
+    {
+      "key": "content_hash",
+      "value": ""
+    },
+    {
+      "key": "workflow_version",
+      "value": ""
+    },
+    {
+      "key": "execute_action_code",
+      "value": "A1"
+    },
+    {
+      "key": "execute_client_action_id",
+      "value": ""
+    },
+    {
+      "key": "execute_latitude",
+      "value": "24.7136"
+    },
+    {
+      "key": "execute_longitude",
+      "value": "46.6753"
+    },
+    {
+      "key": "execute_notes",
+      "value": "Manual flow verification"
+    },
+    {
+      "key": "execute_media_json",
+      "value": "[]"
+    },
+    {
+      "key": "accept_language",
+      "value": "en"
+    }
+  ],
+  "event": [],
+  "item": [
+    {
+      "name": "00 - Setup",
+      "item": [
+        {
+          "name": "01 - Login (Email)",
+          "request": {
+            "auth": {
+              "type": "noauth"
+            },
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{base_url}}/driver/auth/login/",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"{{driver_email}}\",\n  \"password\": \"{{driver_password}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "var r = pm.response.json();",
+                  "pm.test('HTTP 200', function () { pm.response.to.have.status(200); });",
+                  "pm.test('status=1', function () { pm.expect(r.status).to.eql(1); });",
+                  "if (r.data && r.data.access_token) {",
+                  "  pm.collectionVariables.set('access_token', r.data.access_token);",
+                  "  try { pm.environment.set('access_token', r.data.access_token); } catch (e) {}",
+                  "}",
+                  "if (r.data && r.data.refresh_token) {",
+                  "  pm.collectionVariables.set('refresh_token', r.data.refresh_token);",
+                  "  try { pm.environment.set('refresh_token', r.data.refresh_token); } catch (e) {}",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "02 - Dashboard (resolve assigned job)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Accept-Language",
+                "value": "{{accept_language}}"
+              }
+            ],
+            "url": "{{base_url}}/driver/dashboard/"
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "var t = pm.variables.get('access_token') || pm.collectionVariables.get('access_token') || '';",
+                  "if (!t || String(t).indexOf('{{') >= 0) { throw new Error('Run 01 Login first.'); }"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 200', function () { pm.response.to.have.status(200); });",
+                  "var d = (pm.response.json().data || {});",
+                  "var active = d.active_job || {};",
+                  "var current = d.current_job || {};",
+                  "if (active.job_id) {",
+                  "  var jt = active.job_type || 'shipment';",
+                  "  pm.collectionVariables.set('job_id', active.job_id);",
+                  "  pm.collectionVariables.set('job_type', jt);",
+                  "  if (jt === 'booking') {",
+                  "    pm.collectionVariables.set('booking_id', active.job_id);",
+                  "  } else if (jt === 'shipment') {",
+                  "    pm.collectionVariables.set('shipment_id', active.job_id);",
+                  "  }",
+                  "  try {",
+                  "    pm.environment.set('job_id', active.job_id);",
+                  "    pm.environment.set('job_type', jt);",
+                  "    if (jt === 'booking') pm.environment.set('booking_id', active.job_id);",
+                  "    else if (jt === 'shipment') pm.environment.set('shipment_id', active.job_id);",
+                  "  } catch (e) {}",
+                  "}",
+                  "if (current.booking_id) {",
+                  "  pm.collectionVariables.set('booking_id', current.booking_id);",
+                  "  try { pm.environment.set('booking_id', current.booking_id); } catch (e) {}",
+                  "}",
+                  "if (active.job_no) {",
+                  "  pm.collectionVariables.set('shipment_no', active.job_no);",
+                  "  try { pm.environment.set('shipment_no', active.job_no); } catch (e) {}",
+                  "}",
+                  "pm.test('active_job object exists', function () { pm.expect(d.active_job || {}).to.be.an('object'); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "03 - Job Detail (sync state)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Accept-Language",
+                "value": "{{accept_language}}"
+              }
+            ],
+            "url": "{{base_url}}/driver/jobs/{{job_type}}/{{job_id}}/"
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "var t = pm.variables.get('access_token') || pm.collectionVariables.get('access_token') || '';",
+                  "if (!t || String(t).indexOf('{{') >= 0) { throw new Error('Run 01 Login first.'); }"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 200', function () { pm.response.to.have.status(200); });",
+                  "var data = (pm.response.json().data || {});",
+                  "var sm = (data || {}).sync_metadata || {};",
+                  "if (sm.content_hash) {",
+                  "  pm.collectionVariables.set('content_hash', sm.content_hash);",
+                  "  try { pm.environment.set('content_hash', sm.content_hash); } catch (e) {}",
+                  "}",
+                  "if (sm.workflow_version) {",
+                  "  pm.collectionVariables.set('workflow_version', sm.workflow_version);",
+                  "  try { pm.environment.set('workflow_version', sm.workflow_version); } catch (e) {}",
+                  "}"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "01 - Assigned Job Check",
+      "item": [
+        {
+          "name": "Dashboard - assert assigned job visible",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Accept-Language",
+                "value": "{{accept_language}}"
+              }
+            ],
+            "url": "{{base_url}}/driver/dashboard/"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "var d = (pm.response.json().data || {});",
+                  "pm.test('HTTP 200', function () { pm.response.to.have.status(200); });",
+                  "pm.test('Assigned active job present', function () {",
+                  "  pm.expect((d.active_job || {}).job_id || '').to.not.eql('');",
+                  "});",
+                  "var active = d.active_job || {};",
+                  "var current = d.current_job || {};",
+                  "if (active.job_id) {",
+                  "  var jt = active.job_type || 'shipment';",
+                  "  pm.collectionVariables.set('job_id', active.job_id);",
+                  "  pm.collectionVariables.set('job_type', jt);",
+                  "  if (jt === 'booking') {",
+                  "    pm.collectionVariables.set('booking_id', active.job_id);",
+                  "  } else if (jt === 'shipment') {",
+                  "    pm.collectionVariables.set('shipment_id', active.job_id);",
+                  "  }",
+                  "  try {",
+                  "    pm.environment.set('job_id', active.job_id);",
+                  "    pm.environment.set('job_type', jt);",
+                  "    if (jt === 'booking') pm.environment.set('booking_id', active.job_id);",
+                  "    else if (jt === 'shipment') pm.environment.set('shipment_id', active.job_id);",
+                  "  } catch (e) {}",
+                  "}",
+                  "if (current.booking_id) {",
+                  "  pm.collectionVariables.set('booking_id', current.booking_id);",
+                  "  try { pm.environment.set('booking_id', current.booking_id); } catch (e) {}",
+                  "}",
+                  "if (active.job_no) {",
+                  "  pm.collectionVariables.set('shipment_no', active.job_no);",
+                  "  try { pm.environment.set('shipment_no', active.job_no); } catch (e) {}",
+                  "}"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "02 - Execute Core (A1 to A7)",
+      "description": "Run these requests in order. If some actions are already done for this shipment, skip that step.",
+      "item": [
+        {
+          "name": "A1 - Start Job",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Accept-Language",
+                "value": "{{accept_language}}"
+              }
+            ],
+            "url": "{{base_url}}/driver/jobs/{{job_type}}/{{job_id}}/actions/A1/execute/",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"client_action_id\": \"{{execute_client_action_id}}\",\n  \"workflow_version\": \"{{workflow_version}}\",\n  \"content_hash\": \"{{content_hash}}\",\n  \"latitude\": {{execute_latitude}},\n  \"longitude\": {{execute_longitude}},\n  \"notes\": \"{{execute_notes}}\",\n  \"media\": {{execute_media_json}}\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "var cid = pm.variables.replaceIn('{{$guid}}');",
+                  "pm.collectionVariables.set('execute_client_action_id', cid);",
+                  "try { pm.environment.set('execute_client_action_id', cid); } catch (e) {}"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 200/201', function () { pm.expect([200, 201]).to.include(pm.response.code); });",
+                  "var __data = (pm.response.json() || {}).data || {};",
+                  "var __sm = __data.sync_metadata || {};",
+                  "if (__sm.content_hash) {",
+                  "  pm.collectionVariables.set('content_hash', __sm.content_hash);",
+                  "  try { pm.environment.set('content_hash', __sm.content_hash); } catch (e) {}",
+                  "}",
+                  "if (__sm.workflow_version) {",
+                  "  pm.collectionVariables.set('workflow_version', __sm.workflow_version);",
+                  "  try { pm.environment.set('workflow_version', __sm.workflow_version); } catch (e) {}",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "A2 - Pickup Arrival",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Accept-Language",
+                "value": "{{accept_language}}"
+              }
+            ],
+            "url": "{{base_url}}/driver/jobs/{{job_type}}/{{job_id}}/actions/A2/execute/",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"client_action_id\": \"{{execute_client_action_id}}\",\n  \"workflow_version\": \"{{workflow_version}}\",\n  \"content_hash\": \"{{content_hash}}\",\n  \"latitude\": {{execute_latitude}},\n  \"longitude\": {{execute_longitude}},\n  \"notes\": \"{{execute_notes}}\",\n  \"media\": {{execute_media_json}}\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "var cid = pm.variables.replaceIn('{{$guid}}');",
+                  "pm.collectionVariables.set('execute_client_action_id', cid);",
+                  "try { pm.environment.set('execute_client_action_id', cid); } catch (e) {}"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 200/201', function () { pm.expect([200, 201]).to.include(pm.response.code); });",
+                  "var __data = (pm.response.json() || {}).data || {};",
+                  "var __sm = __data.sync_metadata || {};",
+                  "if (__sm.content_hash) {",
+                  "  pm.collectionVariables.set('content_hash', __sm.content_hash);",
+                  "  try { pm.environment.set('content_hash', __sm.content_hash); } catch (e) {}",
+                  "}",
+                  "if (__sm.workflow_version) {",
+                  "  pm.collectionVariables.set('workflow_version', __sm.workflow_version);",
+                  "  try { pm.environment.set('workflow_version', __sm.workflow_version); } catch (e) {}",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "A3 - Start Loading",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Accept-Language",
+                "value": "{{accept_language}}"
+              }
+            ],
+            "url": "{{base_url}}/driver/jobs/{{job_type}}/{{job_id}}/actions/A3/execute/",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"client_action_id\": \"{{execute_client_action_id}}\",\n  \"workflow_version\": \"{{workflow_version}}\",\n  \"content_hash\": \"{{content_hash}}\",\n  \"latitude\": {{execute_latitude}},\n  \"longitude\": {{execute_longitude}},\n  \"notes\": \"{{execute_notes}}\",\n  \"media\": {{execute_media_json}}\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "var cid = pm.variables.replaceIn('{{$guid}}');",
+                  "pm.collectionVariables.set('execute_client_action_id', cid);",
+                  "try { pm.environment.set('execute_client_action_id', cid); } catch (e) {}"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 200/201', function () { pm.expect([200, 201]).to.include(pm.response.code); });",
+                  "var __data = (pm.response.json() || {}).data || {};",
+                  "var __sm = __data.sync_metadata || {};",
+                  "if (__sm.content_hash) {",
+                  "  pm.collectionVariables.set('content_hash', __sm.content_hash);",
+                  "  try { pm.environment.set('content_hash', __sm.content_hash); } catch (e) {}",
+                  "}",
+                  "if (__sm.workflow_version) {",
+                  "  pm.collectionVariables.set('workflow_version', __sm.workflow_version);",
+                  "  try { pm.environment.set('workflow_version', __sm.workflow_version); } catch (e) {}",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "A4 - Confirm Loaded",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Accept-Language",
+                "value": "{{accept_language}}"
+              }
+            ],
+            "url": "{{base_url}}/driver/jobs/{{job_type}}/{{job_id}}/actions/A4/execute/",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"client_action_id\": \"{{execute_client_action_id}}\",\n  \"workflow_version\": \"{{workflow_version}}\",\n  \"content_hash\": \"{{content_hash}}\",\n  \"latitude\": {{execute_latitude}},\n  \"longitude\": {{execute_longitude}},\n  \"notes\": \"{{execute_notes}}\",\n  \"media\": {{execute_media_json}}\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "var cid = pm.variables.replaceIn('{{$guid}}');",
+                  "pm.collectionVariables.set('execute_client_action_id', cid);",
+                  "try { pm.environment.set('execute_client_action_id', cid); } catch (e) {}"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 200/201', function () { pm.expect([200, 201]).to.include(pm.response.code); });",
+                  "var __data = (pm.response.json() || {}).data || {};",
+                  "var __sm = __data.sync_metadata || {};",
+                  "if (__sm.content_hash) {",
+                  "  pm.collectionVariables.set('content_hash', __sm.content_hash);",
+                  "  try { pm.environment.set('content_hash', __sm.content_hash); } catch (e) {}",
+                  "}",
+                  "if (__sm.workflow_version) {",
+                  "  pm.collectionVariables.set('workflow_version', __sm.workflow_version);",
+                  "  try { pm.environment.set('workflow_version', __sm.workflow_version); } catch (e) {}",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "A5 - Depart In Transit",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Accept-Language",
+                "value": "{{accept_language}}"
+              }
+            ],
+            "url": "{{base_url}}/driver/jobs/{{job_type}}/{{job_id}}/actions/A5/execute/",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"client_action_id\": \"{{execute_client_action_id}}\",\n  \"workflow_version\": \"{{workflow_version}}\",\n  \"content_hash\": \"{{content_hash}}\",\n  \"latitude\": {{execute_latitude}},\n  \"longitude\": {{execute_longitude}},\n  \"notes\": \"{{execute_notes}}\",\n  \"media\": {{execute_media_json}}\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "var cid = pm.variables.replaceIn('{{$guid}}');",
+                  "pm.collectionVariables.set('execute_client_action_id', cid);",
+                  "try { pm.environment.set('execute_client_action_id', cid); } catch (e) {}"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 200/201', function () { pm.expect([200, 201]).to.include(pm.response.code); });",
+                  "var __data = (pm.response.json() || {}).data || {};",
+                  "var __sm = __data.sync_metadata || {};",
+                  "if (__sm.content_hash) {",
+                  "  pm.collectionVariables.set('content_hash', __sm.content_hash);",
+                  "  try { pm.environment.set('content_hash', __sm.content_hash); } catch (e) {}",
+                  "}",
+                  "if (__sm.workflow_version) {",
+                  "  pm.collectionVariables.set('workflow_version', __sm.workflow_version);",
+                  "  try { pm.environment.set('workflow_version', __sm.workflow_version); } catch (e) {}",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "A6 - Delivery Arrival",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Accept-Language",
+                "value": "{{accept_language}}"
+              }
+            ],
+            "url": "{{base_url}}/driver/jobs/{{job_type}}/{{job_id}}/actions/A6/execute/",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"client_action_id\": \"{{execute_client_action_id}}\",\n  \"workflow_version\": \"{{workflow_version}}\",\n  \"content_hash\": \"{{content_hash}}\",\n  \"latitude\": {{execute_latitude}},\n  \"longitude\": {{execute_longitude}},\n  \"notes\": \"{{execute_notes}}\",\n  \"media\": {{execute_media_json}}\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "var cid = pm.variables.replaceIn('{{$guid}}');",
+                  "pm.collectionVariables.set('execute_client_action_id', cid);",
+                  "try { pm.environment.set('execute_client_action_id', cid); } catch (e) {}"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 200/201', function () { pm.expect([200, 201]).to.include(pm.response.code); });",
+                  "var __data = (pm.response.json() || {}).data || {};",
+                  "var __sm = __data.sync_metadata || {};",
+                  "if (__sm.content_hash) {",
+                  "  pm.collectionVariables.set('content_hash', __sm.content_hash);",
+                  "  try { pm.environment.set('content_hash', __sm.content_hash); } catch (e) {}",
+                  "}",
+                  "if (__sm.workflow_version) {",
+                  "  pm.collectionVariables.set('workflow_version', __sm.workflow_version);",
+                  "  try { pm.environment.set('workflow_version', __sm.workflow_version); } catch (e) {}",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "A7 - Upload POD",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Accept-Language",
+                "value": "{{accept_language}}"
+              }
+            ],
+            "url": "{{base_url}}/driver/jobs/{{job_type}}/{{job_id}}/actions/A7/execute/",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"client_action_id\": \"{{execute_client_action_id}}\",\n  \"workflow_version\": \"{{workflow_version}}\",\n  \"content_hash\": \"{{content_hash}}\",\n  \"latitude\": {{execute_latitude}},\n  \"longitude\": {{execute_longitude}},\n  \"notes\": \"{{execute_notes}}\",\n  \"media\": {{execute_media_json}}\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "var cid = pm.variables.replaceIn('{{$guid}}');",
+                  "pm.collectionVariables.set('execute_client_action_id', cid);",
+                  "try { pm.environment.set('execute_client_action_id', cid); } catch (e) {}"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 200/201', function () { pm.expect([200, 201]).to.include(pm.response.code); });",
+                  "var __data = (pm.response.json() || {}).data || {};",
+                  "var __sm = __data.sync_metadata || {};",
+                  "if (__sm.content_hash) {",
+                  "  pm.collectionVariables.set('content_hash', __sm.content_hash);",
+                  "  try { pm.environment.set('content_hash', __sm.content_hash); } catch (e) {}",
+                  "}",
+                  "if (__sm.workflow_version) {",
+                  "  pm.collectionVariables.set('workflow_version', __sm.workflow_version);",
+                  "  try { pm.environment.set('workflow_version', __sm.workflow_version); } catch (e) {}",
+                  "}"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "03 - COD Optional (A9)",
+      "description": "Run only for COD shipments. Skip for non-COD.",
+      "item": [
+        {
+          "name": "A9 - Collect Payment (COD only)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Accept-Language",
+                "value": "{{accept_language}}"
+              }
+            ],
+            "url": "{{base_url}}/driver/jobs/{{job_type}}/{{job_id}}/actions/A9/execute/",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"client_action_id\": \"{{execute_client_action_id}}\",\n  \"workflow_version\": \"{{workflow_version}}\",\n  \"content_hash\": \"{{content_hash}}\",\n  \"latitude\": {{execute_latitude}},\n  \"longitude\": {{execute_longitude}},\n  \"notes\": \"{{execute_notes}}\",\n  \"media\": {{execute_media_json}}\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "var cid = pm.variables.replaceIn('{{$guid}}');",
+                  "pm.collectionVariables.set('execute_client_action_id', cid);",
+                  "try { pm.environment.set('execute_client_action_id', cid); } catch (e) {}"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP is 200/201/400', function () { pm.expect([200, 201, 400]).to.include(pm.response.code); });",
+                  "if ([200, 201].indexOf(pm.response.code) >= 0) {",
+                  "  var __data = (pm.response.json() || {}).data || {};",
+                  "  var __sm = __data.sync_metadata || {};",
+                  "  if (__sm.content_hash) {",
+                  "    pm.collectionVariables.set('content_hash', __sm.content_hash);",
+                  "    try { pm.environment.set('content_hash', __sm.content_hash); } catch (e) {}",
+                  "  }",
+                  "  if (__sm.workflow_version) {",
+                  "    pm.collectionVariables.set('workflow_version', __sm.workflow_version);",
+                  "    try { pm.environment.set('workflow_version', __sm.workflow_version); } catch (e) {}",
+                  "  }",
+                  "}"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "04 - Close Job",
+      "item": [
+        {
+          "name": "A8 - Unloading Completed",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Accept-Language",
+                "value": "{{accept_language}}"
+              }
+            ],
+            "url": "{{base_url}}/driver/jobs/{{job_type}}/{{job_id}}/actions/A8/execute/",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"client_action_id\": \"{{execute_client_action_id}}\",\n  \"workflow_version\": \"{{workflow_version}}\",\n  \"content_hash\": \"{{content_hash}}\",\n  \"latitude\": {{execute_latitude}},\n  \"longitude\": {{execute_longitude}},\n  \"notes\": \"{{execute_notes}}\",\n  \"media\": {{execute_media_json}}\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "var cid = pm.variables.replaceIn('{{$guid}}');",
+                  "pm.collectionVariables.set('execute_client_action_id', cid);",
+                  "try { pm.environment.set('execute_client_action_id', cid); } catch (e) {}"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 200/201', function () { pm.expect([200, 201]).to.include(pm.response.code); });",
+                  "var __data = (pm.response.json() || {}).data || {};",
+                  "var __sm = __data.sync_metadata || {};",
+                  "if (__sm.content_hash) {",
+                  "  pm.collectionVariables.set('content_hash', __sm.content_hash);",
+                  "  try { pm.environment.set('content_hash', __sm.content_hash); } catch (e) {}",
+                  "}",
+                  "if (__sm.workflow_version) {",
+                  "  pm.collectionVariables.set('workflow_version', __sm.workflow_version);",
+                  "  try { pm.environment.set('workflow_version', __sm.workflow_version); } catch (e) {}",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "A10 - Job Closed",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Accept-Language",
+                "value": "{{accept_language}}"
+              }
+            ],
+            "url": "{{base_url}}/driver/jobs/{{job_type}}/{{job_id}}/actions/A10/execute/",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"client_action_id\": \"{{execute_client_action_id}}\",\n  \"workflow_version\": \"{{workflow_version}}\",\n  \"content_hash\": \"{{content_hash}}\",\n  \"latitude\": {{execute_latitude}},\n  \"longitude\": {{execute_longitude}},\n  \"notes\": \"{{execute_notes}}\",\n  \"media\": {{execute_media_json}}\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "var cid = pm.variables.replaceIn('{{$guid}}');",
+                  "pm.collectionVariables.set('execute_client_action_id', cid);",
+                  "try { pm.environment.set('execute_client_action_id', cid); } catch (e) {}"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 200/201', function () { pm.expect([200, 201]).to.include(pm.response.code); });",
+                  "var __data = (pm.response.json() || {}).data || {};",
+                  "var __sm = __data.sync_metadata || {};",
+                  "if (__sm.content_hash) {",
+                  "  pm.collectionVariables.set('content_hash', __sm.content_hash);",
+                  "  try { pm.environment.set('content_hash', __sm.content_hash); } catch (e) {}",
+                  "}",
+                  "if (__sm.workflow_version) {",
+                  "  pm.collectionVariables.set('workflow_version', __sm.workflow_version);",
+                  "  try { pm.environment.set('workflow_version', __sm.workflow_version); } catch (e) {}",
+                  "}"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "05 - Final Verify",
+      "item": [
+        {
+          "name": "Job Detail - after close",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Accept-Language",
+                "value": "{{accept_language}}"
+              }
+            ],
+            "url": "{{base_url}}/driver/jobs/{{job_type}}/{{job_id}}/"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 200', function () { pm.response.to.have.status(200); });",
+                  "var data = (pm.response.json().data || {});",
+                  "pm.test('Job payload exists', function () { pm.expect(data).to.be.an('object'); });",
+                  "console.log('Final workflow:', data.workflow || {});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Timeline - verify action history",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Accept-Language",
+                "value": "{{accept_language}}"
+              }
+            ],
+            "url": "{{base_url}}/driver/jobs/{{job_type}}/{{job_id}}/timeline/?limit=20"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 200', function () { pm.response.to.have.status(200); });",
+                  "var data = (pm.response.json().data || {});",
+                  "pm.test('Timeline payload exists', function () { pm.expect(data).to.be.an('object'); });"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

@@ -17,6 +17,7 @@ from mobile_api.dashboard.dto.driver_dashboard_context import (
 from mobile_api.dashboard.dto.driver_empty_move_selection import (
     DriverEmptyMoveSelectionResult,
 )
+from mobile_api.dashboard.selectors import booking_selection_policy as policy
 from mobile_api.dashboard.projections.workflow_projection import (
     build_empty_move_workflow,
     build_shipment_workflow,
@@ -242,6 +243,34 @@ class WorkflowProjectionTests(SimpleTestCase):
         workflow = build_workflow_for_dashboard_context(context)
         self.assertEqual(workflow['current_stage'], 'Pickup')
         mock_shipment.assert_called_once()
+        mock_empty.assert_not_called()
+
+    @patch(
+        'mobile_api.dashboard.projections.workflow_projection.build_empty_move_workflow',
+    )
+    @patch(
+        'mobile_api.dashboard.projections.workflow_projection.build_booking_workflow',
+    )
+    def test_context_uses_booking_workflow_when_no_shipment(
+        self, mock_booking_wf, mock_empty
+    ):
+        mock_booking_wf.return_value = {'current_stage': 'Planned', 'allowed_actions': []}
+        booking = _booking()
+        context = DriverDashboardContext(
+            driver=MagicMock(),
+            tenant_schema='tenant_a',
+            user_id='u1',
+            active_booking=booking,
+            booking_selection=DriverBookingSelectionResult(
+                booking=booking,
+                active_shipment=None,
+                next_executable_shipment=None,
+                booking_execution_stage=policy.BOOKING_EXECUTION_STAGE_NOT_STARTED,
+            ),
+        )
+        workflow = build_workflow_for_dashboard_context(context)
+        self.assertEqual(workflow['current_stage'], 'Planned')
+        mock_booking_wf.assert_called_once()
         mock_empty.assert_not_called()
 
     def test_empty_projection_without_entity(self):

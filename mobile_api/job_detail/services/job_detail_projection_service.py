@@ -113,6 +113,8 @@ def _resolver_ok(context: JobDetailContext) -> bool:
         return True
     if context.job_type == 'shipment' and context.shipment is not None:
         return True
+    if context.job_type == 'booking' and context.booking is not None:
+        return True
     if context.job_type == 'movement' and context.movement is not None:
         return True
     return False

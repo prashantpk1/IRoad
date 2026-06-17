@@ -10,7 +10,18 @@ from __future__ import annotations
 import uuid
 from typing import Any
 
-from tenant_workspace.models import TenantShipment, TenantTruckMovementLog
+from tenant_workspace.models import TenantBooking, TenantShipment, TenantTruckMovementLog
+
+_BOOKING_SELECT = (
+    'client_account',
+    'route',
+    'route__origin_point',
+    'route__destination_point',
+    'loading_address',
+    'delivery_address',
+    'assigned_truck',
+    'assigned_driver',
+)
 
 _SHIPMENT_SELECT = (
     'booking',
@@ -38,6 +49,23 @@ _MOVEMENT_SELECT = (
     'truck',
 )
 
+# Tenant schemas may lag migration 0106; defer optional column so mobile lookups
+# do not fail when ``tenant_address_master.extension`` is not migrated yet.
+_BOOKING_ADDRESS_DEFER = (
+    'loading_address__extension',
+    'delivery_address__extension',
+)
+_SHIPMENT_ADDRESS_DEFER = (
+    'loading_address__extension',
+    'delivery_address__extension',
+    'booking__loading_address__extension',
+    'booking__delivery_address__extension',
+)
+_MOVEMENT_ADDRESS_DEFER = (
+    'shipment__loading_address__extension',
+    'shipment__delivery_address__extension',
+)
+
 
 def _is_uuid(value: str) -> bool:
     try:
@@ -45,6 +73,19 @@ def _is_uuid(value: str) -> bool:
         return True
     except (TypeError, ValueError, AttributeError):
         return False
+
+
+def lookup_booking_by_reference(reference: str) -> TenantBooking | None:
+    """Load one booking by ``booking_id`` (UUID) or ``booking_no``."""
+    token = (reference or '').strip()
+    if not token:
+        return None
+    qs = TenantBooking.objects.select_related(*_BOOKING_SELECT).defer(
+        *_BOOKING_ADDRESS_DEFER,
+    )
+    if _is_uuid(token):
+        return qs.filter(pk=token).first()
+    return qs.filter(booking_no=token).first()
 
 
 def lookup_shipment_by_reference(reference: str) -> TenantShipment | None:
@@ -56,7 +97,9 @@ def lookup_shipment_by_reference(reference: str) -> TenantShipment | None:
     token = (reference or '').strip()
     if not token:
         return None
-    qs = TenantShipment.objects.select_related(*_SHIPMENT_SELECT)
+    qs = TenantShipment.objects.select_related(*_SHIPMENT_SELECT).defer(
+        *_SHIPMENT_ADDRESS_DEFER,
+    )
     if _is_uuid(token):
         return qs.filter(pk=token).first()
     return qs.filter(shipment_no=token).first()
@@ -69,10 +112,23 @@ def lookup_movement_by_reference(reference: str) -> TenantTruckMovementLog | Non
     token = (reference or '').strip()
     if not token:
         return None
-    qs = TenantTruckMovementLog.objects.select_related(*_MOVEMENT_SELECT)
+    qs = TenantTruckMovementLog.objects.select_related(*_MOVEMENT_SELECT).defer(
+        *_MOVEMENT_ADDRESS_DEFER,
+    )
     if _is_uuid(token):
         return qs.filter(pk=token).first()
     return qs.filter(movement_no=token).first()
+
+
+def booking_entity_summary(booking: Any) -> dict[str, Any]:
+    """Minimal serializable booking identity for resolver output."""
+    return {
+        'entity_kind': 'booking',
+        'booking_id': str(getattr(booking, 'booking_id', None) or booking.pk or ''),
+        'booking_no': str(getattr(booking, 'booking_no', '') or ''),
+        'booking_status': str(getattr(booking, 'booking_status', '') or ''),
+        'assigned_driver_id': str(getattr(booking, 'assigned_driver_id', None) or ''),
+    }
 
 
 def shipment_entity_summary(shipment: Any) -> dict[str, Any]:

@@ -54,3 +54,56 @@ def sync_from_job_detail(
         getattr(job_detail_context, 'latest_action_log_id', '') or ''
     )
     execute_context.content_hash = getattr(job_detail_context, 'content_hash', '') or ''
+
+
+def pivot_execute_context_to_born_shipment(
+    context: ExecuteActionContext,
+) -> bool:
+    """
+    After booking-scoped execute links a new shipment (Auto Shipment at A4), switch
+    post-execute read model to shipment scope so workflow shows A5+ instead of
+    stale booking-only actions (e.g. A8).
+    """
+    if context.job_type != 'booking':
+        return False
+
+    action_log = context.action_log
+    shipment_ref = ''
+    if action_log is not None:
+        shipment_ref = str(
+            getattr(action_log, 'shipment_id', None)
+            or getattr(getattr(action_log, 'shipment', None), 'pk', None)
+            or ''
+        ).strip()
+    if not shipment_ref:
+        return False
+
+    shipment = context.shipment
+    ship_pk = ''
+    if shipment is not None:
+        ship_pk = str(
+            getattr(shipment, 'shipment_id', None) or getattr(shipment, 'pk', None) or ''
+        ).strip()
+    if not ship_pk or ship_pk != shipment_ref:
+        from mobile_api.job_detail.guards.entity_lookup import lookup_shipment_by_reference
+
+        shipment = lookup_shipment_by_reference(shipment_ref)
+    if shipment is None:
+        return False
+
+    ship_id = str(
+        getattr(shipment, 'shipment_id', None) or getattr(shipment, 'pk', None) or ''
+    ).strip()
+    if not ship_id:
+        return False
+
+    context.job_type = 'shipment'
+    context.job_id = ship_id
+    context.shipment = shipment
+    context.booking = getattr(shipment, 'booking', None) or context.booking
+
+    cache = getattr(context, '_execution_projection_cache', None)
+    if cache is not None and hasattr(cache, 'reset_job_detail_scope'):
+        cache.reset_job_detail_scope()
+
+    return True

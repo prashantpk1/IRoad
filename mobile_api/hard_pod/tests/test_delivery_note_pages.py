@@ -64,3 +64,38 @@ class DeliveryNotePagesTests(SimpleTestCase):
 
         flat_rows = build_hard_pod_confirmation_pages(shipment)
         self.assertEqual(len(flat_rows), 1)
+
+    @patch(
+        'mobile_api.hard_pod.services.delivery_note_pages._load_delivery_note_documents',
+        return_value=[
+            {
+                'document_id': 'doc-empty',
+                'record_no': 'REC-0099',
+                'document_type': 'Delivery Note',
+                'document_ref_no': 'SH-G007',
+                'document_date': '',
+                'is_delivery_note': True,
+                'page_count': 1,
+                'status': 'Uploaded',
+                'physical_location': 'With Driver',
+                'pages': [],
+            }
+        ],
+    )
+    @patch('mobile_api.hard_pod.services.delivery_note_pages.schema_context')
+    def test_empty_document_pages_fall_back_to_synthetic(self, mock_schema, _mock_load):
+        mock_schema.return_value.__enter__ = MagicMock(return_value=None)
+        mock_schema.return_value.__exit__ = MagicMock(return_value=False)
+
+        shipment = MagicMock()
+        shipment.pk = uuid.uuid4()
+        shipment.shipment_no = 'SH-G007'
+        shipment.pod_doc_count = 1
+
+        context = build_hard_pod_confirmation_context(
+            shipment,
+            tenant_schema='tenant_test',
+        )
+        rows = context['pages']
+        self.assertEqual(len(rows), 1)
+        self.assertIn('SH-G007', rows[0]['label'])

@@ -29,6 +29,8 @@ def build_dashboard_active_job(
     from mobile_api.job_detail.projections.job_location_projection import (
         build_movement_location_block,
         build_shipment_location_block,
+        serialize_address,
+        serialize_route,
     )
 
     if shipment is not None:
@@ -90,5 +92,36 @@ def build_dashboard_active_job(
         }
         block.update(build_movement_location_block(movement, request=request))
         return block
+
+    if booking is not None:
+        booking_id = getattr(booking, 'booking_id', None) or getattr(booking, 'pk', None)
+        return {
+            'job_type': 'booking',
+            'job_id': str(booking_id) if booking_id is not None else '',
+            'job_no': str(getattr(booking, 'booking_no', '') or ''),
+            'entity_type': 'booking',
+            'order_type': resolve_order_type_text(
+                shipment=None,
+                booking=booking,
+            ),
+            'client_name': resolve_client_name(
+                shipment=None,
+                booking=booking,
+                request=request,
+            ),
+            'execution_date': resolve_execution_date(
+                shipment=None,
+                booking=booking,
+            ),
+            'route': serialize_route(booking=booking, request=request),
+            'pickup_address': serialize_address(
+                getattr(booking, 'loading_address', None),
+                request=request,
+            ),
+            'drop_address': serialize_address(
+                getattr(booking, 'delivery_address', None),
+                request=request,
+            ),
+        }
 
     return {}

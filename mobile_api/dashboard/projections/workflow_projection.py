@@ -107,6 +107,14 @@ def build_workflow_for_dashboard_context(
             booking=context.active_booking,
             request=request,
         )
+    elif context.active_booking is not None:
+        wf = build_booking_workflow(
+            context.active_booking,
+            request=request,
+            booking_stage=(
+                getattr(context.booking_selection, 'booking_execution_stage', '') or ''
+            ),
+        )
     elif context.active_empty_movement is not None:
         wf = build_empty_move_workflow(
             context.active_empty_movement,
@@ -134,11 +142,48 @@ def build_workflow_from_booking_selection(
     """Workflow for the current booking job card."""
     shipment = selection.active_shipment
     if shipment is None:
-        return dict(_EMPTY_WORKFLOW)
+        return build_booking_workflow(
+            selection.booking,
+            request=request,
+            booking_stage=selection.booking_execution_stage,
+        )
     return build_shipment_workflow(
         shipment,
         booking=selection.booking,
         request=request,
+    )
+
+
+def build_booking_workflow(
+    booking: Any,
+    *,
+    request: Any | None = None,
+    booking_stage: str = '',
+) -> dict[str, Any]:
+    """Booking-only workflow (used before shipment is auto-created)."""
+    if booking is None:
+        return dict(_EMPTY_WORKFLOW)
+
+    booking_id = getattr(booking, 'booking_id', None) or getattr(booking, 'pk', None)
+    engine_payload = OperationExecutionService.get_allowed_driver_actions(
+        booking=booking,
+        shipment=None,
+        movement=None,
+        request=request,
+        job_type='booking',
+        job_id=str(booking_id) if booking_id is not None else '',
+        job_no=str(getattr(booking, 'booking_no', '') or ''),
+    )
+    stage_block = {
+        'entity_type': 'booking',
+        'operational_stage': booking_stage or '',
+        'execution_sub_stage': '',
+        'status_for_workflow': str(getattr(booking, 'booking_status', '') or ''),
+    }
+    return _map_engine_payload_to_dashboard(
+        engine_payload,
+        stage_block=stage_block,
+        entity_type='booking',
     )
 
 

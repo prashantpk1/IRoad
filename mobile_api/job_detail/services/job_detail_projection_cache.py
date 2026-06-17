@@ -13,6 +13,7 @@ from mobile_api.job_detail.dto.job_detail_context import JobDetailContext
 from mobile_api.job_detail.guards.ownership import driver_pk
 
 from iroad_tenants.operation_runtime.latest_action_aggregator import (
+    scoped_booking_action_logs,
     scoped_movement_action_logs,
     scoped_shipment_action_logs,
 )
@@ -24,6 +25,7 @@ class JobDetailProjectionCache:
 
     shipment_logs: list[Any] = field(default_factory=list)
     movement_logs: list[Any] = field(default_factory=list)
+    booking_logs: list[Any] = field(default_factory=list)
     latest_action_log_id: str = ''
     log_scan_limit: int = JOB_DETAIL_ACTION_LOG_SCAN_LIMIT
     queries_executed: int = 0
@@ -31,6 +33,8 @@ class JobDetailProjectionCache:
     def primary_logs(self) -> list[Any]:
         if self.shipment_logs:
             return self.shipment_logs
+        if self.booking_logs:
+            return self.booking_logs
         return self.movement_logs
 
 
@@ -57,6 +61,15 @@ def load_projection_cache(context: JobDetailContext) -> JobDetailProjectionCache
             scoped_shipment_action_logs(
                 context.shipment,
                 movement=None,
+                driver_id=driver_id,
+                scan_limit=limit,
+            )
+        )
+        cache.queries_executed += 1
+    elif context.job_type == 'booking' and context.booking is not None:
+        cache.booking_logs = list(
+            scoped_booking_action_logs(
+                context.booking,
                 driver_id=driver_id,
                 scan_limit=limit,
             )

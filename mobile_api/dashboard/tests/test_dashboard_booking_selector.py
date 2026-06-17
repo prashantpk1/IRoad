@@ -11,6 +11,7 @@ from unittest.mock import MagicMock, patch
 from uuid import uuid4
 
 from django.test import SimpleTestCase
+from django.db.models.query import ModelIterable
 
 from mobile_api.dashboard.projections.booking_projection import (
     build_booking_card,
@@ -78,6 +79,14 @@ def _shipment(
     return s
 
 
+def _mock_shipments_prefetch_qs():
+    qs = MagicMock()
+    qs._iterable_class = ModelIterable
+    qs.select_related.return_value = qs
+    qs.order_by.return_value = qs
+    return qs
+
+
 def _mock_booking_queryset(bookings):
     """Mock ORM chain ending in a sliceable prefetch result."""
     qs = MagicMock()
@@ -87,15 +96,13 @@ def _mock_booking_queryset(bookings):
     prefetched = list(bookings)
 
     class _Sliceable:
-        def __iter__(self):
-            return iter(prefetched)
-
         def __getitem__(self, item):
             if isinstance(item, slice):
-                return iter(prefetched[item])
+                return prefetched[item]
             return prefetched[item]
 
     qs.prefetch_related.return_value = _Sliceable()
+    qs.select_related.return_value = qs
     return qs
 
 
@@ -384,10 +391,25 @@ class BookingProjectionTests(SimpleTestCase):
 
 
 class DashboardBookingSelectorTests(SimpleTestCase):
+    def setUp(self):
+        super().setUp()
+        shipment_patcher = patch(
+            'mobile_api.dashboard.selectors.dashboard_booking_selector.TenantShipment'
+        )
+        self.mock_shipment_model = shipment_patcher.start()
+        self.addCleanup(shipment_patcher.stop)
+        self.mock_shipment_model.objects.select_related.return_value.order_by.return_value = (
+            _mock_shipments_prefetch_qs()
+        )
+
+    @patch(
+        'mobile_api.dashboard.selectors.dashboard_booking_selector.DashboardBookingSelector._auto_shipment_bootstrap_enabled',
+        return_value=False,
+    )
     @patch(
         'mobile_api.dashboard.selectors.dashboard_booking_selector.TenantBooking'
     )
-    def test_select_skips_fully_completed_booking(self, mock_booking_model):
+    def test_select_skips_fully_completed_booking(self, mock_booking_model, _bootstrap):
         driver = _driver()
         done = _booking(assigned_driver_id=driver.pk, booking_date=date(2026, 5, 1))
         done.shipments.all.return_value = [
@@ -409,10 +431,14 @@ class DashboardBookingSelectorTests(SimpleTestCase):
         self.assertIs(result.booking, active)
 
     @patch(
+        'mobile_api.dashboard.selectors.dashboard_booking_selector.DashboardBookingSelector._auto_shipment_bootstrap_enabled',
+        return_value=False,
+    )
+    @patch(
         'mobile_api.dashboard.selectors.dashboard_booking_selector.TenantBooking'
     )
     def test_select_keeps_booking_when_outbound_delivered_backload_open(
-        self, mock_booking_model
+        self, mock_booking_model, _bootstrap
     ):
         driver = _driver()
         round_trip = _booking(
@@ -450,18 +476,56 @@ class DashboardBookingSelectorTests(SimpleTestCase):
         )
 
     @patch(
+        'mobile_api.dashboard.selectors.dashboard_booking_selector.DashboardBookingSelector._auto_shipment_bootstrap_enabled',
+        return_value=False,
+    )
+    @patch(
         'mobile_api.dashboard.selectors.dashboard_booking_selector.TenantBooking'
     )
-    def test_select_returns_none_when_no_assignments(self, mock_booking_model):
+    def test_select_returns_none_when_no_assignments(self, mock_booking_model, _bootstrap):
         driver = _driver()
         mock_booking_model.objects.filter.return_value = _mock_booking_queryset([])
 
         self.assertIsNone(select_current_driver_booking(driver))
 
     @patch(
+        'mobile_api.dashboard.selectors.dashboard_booking_selector.DashboardBookingSelector._auto_shipment_bootstrap_enabled',
+        return_value=True,
+    )
+    @patch(
         'mobile_api.dashboard.selectors.dashboard_booking_selector.TenantBooking'
     )
-    def test_booking_ordering_picks_earlier_date_first(self, mock_booking_model):
+    def test_select_booking_without_shipment_when_autoshipment_bootstrap_enabled(
+        self, mock_booking_model, _mock_bootstrap
+    ):
+        driver = _driver()
+        booking_only = _booking(
+            assigned_driver_id=driver.pk,
+            booking_date=date(2026, 6, 17),
+        )
+        booking_only.shipments.all.return_value = []
+
+        mock_booking_model.objects.filter.return_value = _mock_booking_queryset(
+            [booking_only]
+        )
+
+        result = DashboardBookingSelector().select_current_driver_booking(driver)
+        self.assertIsNotNone(result)
+        self.assertIs(result.booking, booking_only)
+        self.assertIsNone(result.active_shipment)
+        self.assertEqual(
+            result.booking_execution_stage,
+            policy.BOOKING_EXECUTION_STAGE_NOT_STARTED,
+        )
+
+    @patch(
+        'mobile_api.dashboard.selectors.dashboard_booking_selector.DashboardBookingSelector._auto_shipment_bootstrap_enabled',
+        return_value=False,
+    )
+    @patch(
+        'mobile_api.dashboard.selectors.dashboard_booking_selector.TenantBooking'
+    )
+    def test_booking_ordering_picks_earlier_date_first(self, mock_booking_model, _bootstrap):
         driver = _driver()
         later = _booking(
             assigned_driver_id=driver.pk,

@@ -70,6 +70,26 @@ def driver_owns_shipment_leg(
     return getattr(booking, 'assigned_driver_id', None) == pk
 
 
+def driver_owns_booking(driver: Any, booking: TenantBooking | Any | None) -> bool:
+    """Driver is assigned on the booking header (outbound or backload)."""
+    pk = driver_pk(driver)
+    if pk is None or booking is None:
+        return False
+    if getattr(booking, 'assigned_driver_id', None) == pk:
+        return True
+    return getattr(booking, 'booking_line_backload_driver_id', None) == pk
+
+
+def booking_is_driver_accessible(booking: TenantBooking | Any | None) -> bool:
+    """Confirmed, non-cancelled booking eligible for mobile execution."""
+    if booking is None:
+        return False
+    status = str(getattr(booking, 'booking_status', '') or '').strip()
+    if status == TenantBooking.Status.CANCELLED:
+        return False
+    return status == TenantBooking.Status.CONFIRMED
+
+
 def driver_owns_movement(driver: Any, movement: Any) -> bool:
     """Movement ``driver_id`` must match the authenticated driver."""
     pk = driver_pk(driver)

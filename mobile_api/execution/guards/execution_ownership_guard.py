@@ -19,12 +19,15 @@ from mobile_api.execution.exceptions import (
 )
 from mobile_api.job_detail.guards.ownership import (
     assert_driver_active,
+    booking_is_driver_accessible,
+    driver_owns_booking,
     driver_owns_movement,
     driver_owns_shipment_leg,
     movement_is_empty_move_job,
     movement_is_driver_accessible,
     shipment_is_driver_accessible,
 )
+from mobile_api.job_detail.services.booking_job_resolver import BookingJobResolver
 from mobile_api.job_detail.services.movement_job_resolver import MovementJobResolver
 from mobile_api.job_detail.services.shipment_job_resolver import ShipmentJobResolver
 
@@ -46,9 +49,11 @@ class ExecutionOwnershipGuard:
         *,
         shipment_resolver: ShipmentJobResolver | None = None,
         movement_resolver: MovementJobResolver | None = None,
+        booking_resolver: BookingJobResolver | None = None,
     ) -> None:
         self._shipment_resolver = shipment_resolver or ShipmentJobResolver()
         self._movement_resolver = movement_resolver or MovementJobResolver()
+        self._booking_resolver = booking_resolver or BookingJobResolver()
 
     def assert_tenant_and_driver(self, context: ExecuteActionContext) -> None:
         """JWT tenant + driver principal (view layer should already authenticate)."""
@@ -96,6 +101,9 @@ class ExecutionOwnershipGuard:
         if context.job_type == 'shipment':
             self._resolve_shipment(context, job_id)
             return
+        if context.job_type == 'booking':
+            self._resolve_booking(context, job_id)
+            return
         self._resolve_movement(context, job_id)
 
     def assert_driver_may_execute(self, context: ExecuteActionContext) -> None:
@@ -127,6 +135,31 @@ class ExecutionOwnershipGuard:
                 context.booking,
                 shipment,
             ):
+                raise ExecuteActionError(
+                    str(_('mobile.auth.forbidden')),
+                    code='forbidden',
+                    http_status=403,
+                    message_key='mobile.auth.forbidden',
+                )
+            return
+
+        if context.job_type == 'booking':
+            booking = context.booking
+            if booking is None:
+                raise ExecuteActionError(
+                    str(_('mobile.jobs.not_found')),
+                    code='job_not_found',
+                    http_status=404,
+                    message_key='mobile.jobs.not_found',
+                )
+            if not booking_is_driver_accessible(booking):
+                raise ExecuteActionError(
+                    str(_('mobile.jobs.inactive')),
+                    code='job_inactive',
+                    http_status=404,
+                    message_key='mobile.jobs.inactive',
+                )
+            if not driver_owns_booking(context.driver, booking):
                 raise ExecuteActionError(
                     str(_('mobile.auth.forbidden')),
                     code='forbidden',
@@ -186,6 +219,26 @@ class ExecutionOwnershipGuard:
         if result.resolve_context is not None:
             context.resolver_meta = result.resolve_context.to_resolver_meta()
 
+    def _resolve_booking(self, context: ExecuteActionContext, job_id: str) -> None:
+        result = self._booking_resolver.resolve(
+            context.driver,
+            job_id,
+            tenant_schema=context.tenant_schema,
+        )
+        if result.resolve_context is not None and not result.resolve_context.ok:
+            raise execute_action_error_from_resolver(
+                error_code=result.error_code,
+                error_message=result.error_message,
+            )
+        if result.booking is None:
+            raise execute_action_error_from_resolver(
+                error_code=result.error_code or 'job_not_found',
+                error_message=result.error_message,
+            )
+        context.booking = result.booking
+        if result.resolve_context is not None:
+            context.resolver_meta = result.resolve_context.to_resolver_meta()
+
     def _resolve_movement(self, context: ExecuteActionContext, job_id: str) -> None:
         result = self._movement_resolver.resolve(
             context.driver,
@@ -213,6 +266,8 @@ class ExecutionOwnershipGuard:
             return 'shipment'
         if token in ('movement', 'movements', 'empty_move', 'empty-move'):
             return 'movement'
+        if token in ('booking', 'bookings'):
+            return 'booking'
         raise ExecuteActionError(
             f'unsupported job_type: {job_type!r}',
             code='invalid_job_type',

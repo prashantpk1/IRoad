@@ -281,6 +281,17 @@ def _auto_create_delivery_note_for_a7(action_log, *, shipment, created_by_label=
         shipment=shipment,
     )
     source_document.save()
+    page_count = max(1, int(getattr(source_document, 'page_count', None) or 1))
+    doc_ref = (source_document.document_ref_no or shipment.shipment_no or record_no).strip()
+    for line_no in range(1, page_count + 1):
+        TenantShipmentDocumentPage.objects.create(
+            document=source_document,
+            line_no=line_no,
+            physical_page_no=line_no,
+            doc_ref_no=f'{doc_ref}-P{line_no:03d}',
+            completion_status=TenantShipmentDocumentPage.CompletionStatus.NOT_COMPLETED,
+            signer_location=TenantShipmentDocumentPage.SignerLocation.WITH_DRIVER,
+        )
     return source_document
 
 

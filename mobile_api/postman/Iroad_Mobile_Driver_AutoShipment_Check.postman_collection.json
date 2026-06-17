@@ -1,0 +1,431 @@
+{
+  "info": {
+    "_postman_id": "a4f1a95e-f3aa-4baf-a5cc-9d8e3f5c4f11",
+    "name": "Iroad - Mobile Driver AutoShipment Check",
+    "description": "Validation collection for Auto Shipment behavior in mobile driver APIs.\n\nFlow coverage:\n1) auto_shipment_post ON: booking assignment should become actionable and then transition to shipment workflow.\n2) auto_shipment_post OFF: job should be visible after shipment exists.\n\nRecommended run:\n- Folder 01 prechecks\n- Folder 02 ON scenario checks\n- Folder 03 OFF scenario checks\n- Folder 04 lifecycle A4 to A10\n\nBase URL default: {{base_url}}",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "auth": {
+    "type": "bearer",
+    "bearer": [
+      {
+        "key": "token",
+        "value": "{{access_token}}",
+        "type": "string"
+      }
+    ]
+  },
+  "event": [
+    {
+      "listen": "prerequest",
+      "script": {
+        "type": "text/javascript",
+        "exec": [
+          "if (!pm.collectionVariables.get('request_id')) {",
+          "  pm.collectionVariables.set('request_id', 'postman-' + pm.variables.replaceIn('{{$guid}}'));",
+          "}",
+          "if (!pm.collectionVariables.get('execute_client_action_id')) {",
+          "  pm.collectionVariables.set('execute_client_action_id', pm.variables.replaceIn('{{$guid}}'));",
+          "}"
+        ]
+      }
+    }
+  ],
+  "variable": [
+    { "key": "base_url", "value": "http://127.0.0.1:8000/api/v1/mobile" },
+    { "key": "access_token", "value": "" },
+    { "key": "tenant_schema", "value": "" },
+    { "key": "accept_language", "value": "en" },
+    { "key": "request_id", "value": "" },
+    { "key": "booking_id", "value": "" },
+    { "key": "shipment_id", "value": "" },
+    { "key": "foreign_shipment_id", "value": "00000000-0000-0000-0000-000000000001" },
+    { "key": "dashboard_etag", "value": "" },
+    { "key": "execute_workflow_version", "value": "1" },
+    { "key": "execute_content_hash", "value": "" },
+    { "key": "execute_client_action_id", "value": "" },
+    { "key": "execute_latitude", "value": "24.7136" },
+    { "key": "execute_longitude", "value": "46.6753" },
+    { "key": "execute_media_json", "value": "[]" },
+    { "key": "execute_notes", "value": "AutoShipment verification from Postman" }
+  ],
+  "item": [
+    {
+      "name": "01 - Prechecks",
+      "item": [
+        {
+          "name": "Dashboard - Baseline",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Accept", "value": "application/json" },
+              { "key": "Accept-Language", "value": "{{accept_language}}" },
+              { "key": "X-Request-ID", "value": "{{request_id}}" },
+              { "key": "X-Tenant-ID", "value": "{{tenant_schema}}" }
+            ],
+            "url": "{{base_url}}/driver/dashboard/"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 200', function () { pm.response.to.have.status(200); });",
+                  "const json = pm.response.json();",
+                  "pm.test('status=1', function () { pm.expect(json.status).to.eql(1); });",
+                  "const data = json.data || {};",
+                  "const activeJob = data.active_job || {};",
+                  "const currentJob = data.current_job || {};",
+                  "if (activeJob.job_id) { pm.collectionVariables.set('shipment_id', activeJob.job_id); }",
+                  "if (currentJob.booking_id) { pm.collectionVariables.set('booking_id', currentJob.booking_id); }",
+                  "const etag = pm.response.headers.get('ETag');",
+                  "if (etag) { pm.collectionVariables.set('dashboard_etag', etag); }"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Dashboard - ETag Poll (Expect 304 if unchanged)",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Accept", "value": "application/json" },
+              { "key": "Accept-Language", "value": "{{accept_language}}" },
+              { "key": "If-None-Match", "value": "{{dashboard_etag}}" },
+              { "key": "X-Request-ID", "value": "{{request_id}}" },
+              { "key": "X-Tenant-ID", "value": "{{tenant_schema}}" }
+            ],
+            "url": "{{base_url}}/driver/dashboard/"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP is 304 or 200', function () { pm.expect([304, 200]).to.include(pm.response.code); });"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "02 - AutoShipment ON checks",
+      "description": "Use this when Action Master auto_shipment_post is enabled and booking is assigned to current driver.",
+      "item": [
+        {
+          "name": "Dashboard - Verify booking/job visible",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Accept", "value": "application/json" },
+              { "key": "Accept-Language", "value": "{{accept_language}}" },
+              { "key": "X-Request-ID", "value": "{{request_id}}" },
+              { "key": "X-Tenant-ID", "value": "{{tenant_schema}}" }
+            ],
+            "url": "{{base_url}}/driver/dashboard/"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 200', function () { pm.response.to.have.status(200); });",
+                  "const d = (pm.response.json().data || {});",
+                  "pm.test('current_job present', function () { pm.expect(d.current_job || {}).to.be.an('object'); });",
+                  "pm.test('workflow present', function () { pm.expect(d.workflow || {}).to.be.an('object'); });",
+                  "const activeJob = d.active_job || {};",
+                  "if (activeJob.job_id) { pm.collectionVariables.set('shipment_id', activeJob.job_id); }"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Job Detail - Shipment (if shipment already available)",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Accept", "value": "application/json" },
+              { "key": "Accept-Language", "value": "{{accept_language}}" },
+              { "key": "X-Request-ID", "value": "{{request_id}}" },
+              { "key": "X-Tenant-ID", "value": "{{tenant_schema}}" }
+            ],
+            "url": "{{base_url}}/driver/jobs/shipment/{{shipment_id}}/"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP is 200 or 404 depending on shipment availability', function () { pm.expect([200, 404]).to.include(pm.response.code); });",
+                  "if (pm.response.code === 200) {",
+                  "  const json = pm.response.json();",
+                  "  const sync = (((json || {}).data || {}).sync_metadata || {});",
+                  "  if (sync.workflow_version) pm.collectionVariables.set('execute_workflow_version', sync.workflow_version);",
+                  "  if (sync.content_hash) pm.collectionVariables.set('execute_content_hash', sync.content_hash);",
+                  "}"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "03 - AutoShipment OFF checks",
+      "description": "Use this when shipment must exist before mobile job appears.",
+      "item": [
+        {
+          "name": "Dashboard - Verify shipment-based job visibility",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Accept", "value": "application/json" },
+              { "key": "Accept-Language", "value": "{{accept_language}}" },
+              { "key": "X-Request-ID", "value": "{{request_id}}" },
+              { "key": "X-Tenant-ID", "value": "{{tenant_schema}}" }
+            ],
+            "url": "{{base_url}}/driver/dashboard/"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 200', function () { pm.response.to.have.status(200); });",
+                  "const d = (pm.response.json().data || {});",
+                  "const activeJob = d.active_job || {};",
+                  "pm.test('active job type is shipment when visible', function () {",
+                  "  if (activeJob.job_id) { pm.expect(activeJob.job_type).to.eql('shipment'); }",
+                  "});",
+                  "if (activeJob.job_id) { pm.collectionVariables.set('shipment_id', activeJob.job_id); }"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "04 - Lifecycle execute (A4 to A10)",
+      "description": "Run in sequence on same shipment. For non-COD, skip A9. Ensure execute_workflow_version and execute_content_hash are fresh from Job Detail.",
+      "item": [
+        {
+          "name": "0. Refresh Job Detail sync metadata",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Accept", "value": "application/json" },
+              { "key": "Accept-Language", "value": "{{accept_language}}" },
+              { "key": "X-Request-ID", "value": "{{request_id}}" },
+              { "key": "X-Tenant-ID", "value": "{{tenant_schema}}" }
+            ],
+            "url": "{{base_url}}/driver/jobs/shipment/{{shipment_id}}/"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 200', function () { pm.response.to.have.status(200); });",
+                  "const json = pm.response.json();",
+                  "const sync = (((json || {}).data || {}).sync_metadata || {});",
+                  "if (sync.workflow_version) pm.collectionVariables.set('execute_workflow_version', sync.workflow_version);",
+                  "if (sync.content_hash) pm.collectionVariables.set('execute_content_hash', sync.content_hash);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "1. Execute A4 Confirm Loaded",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Accept", "value": "application/json" },
+              { "key": "Accept-Language", "value": "{{accept_language}}" },
+              { "key": "X-Request-ID", "value": "{{request_id}}" },
+              { "key": "X-Tenant-ID", "value": "{{tenant_schema}}" }
+            ],
+            "url": "{{base_url}}/driver/jobs/shipment/{{shipment_id}}/actions/A4/execute/",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"client_action_id\": \"{{execute_client_action_id}}\",\n  \"workflow_version\": \"{{execute_workflow_version}}\",\n  \"content_hash\": \"{{execute_content_hash}}\",\n  \"latitude\": {{execute_latitude}},\n  \"longitude\": {{execute_longitude}},\n  \"notes\": \"{{execute_notes}}\",\n  \"media\": {{execute_media_json}}\n}",
+              "options": { "raw": { "language": "json" } }
+            }
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": { "type": "text/javascript", "exec": [ "pm.collectionVariables.set('execute_client_action_id', pm.variables.replaceIn('{{$guid}}'));" ] }
+            },
+            {
+              "listen": "test",
+              "script": { "type": "text/javascript", "exec": [ "pm.test('HTTP 200/201', function () { pm.expect([200,201]).to.include(pm.response.code); });" ] }
+            }
+          ]
+        },
+        {
+          "name": "2. Execute A5 Depart In Transit",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Accept", "value": "application/json" },
+              { "key": "Accept-Language", "value": "{{accept_language}}" },
+              { "key": "X-Request-ID", "value": "{{request_id}}" },
+              { "key": "X-Tenant-ID", "value": "{{tenant_schema}}" }
+            ],
+            "url": "{{base_url}}/driver/jobs/shipment/{{shipment_id}}/actions/A5/execute/",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"client_action_id\": \"{{execute_client_action_id}}\",\n  \"workflow_version\": \"{{execute_workflow_version}}\",\n  \"content_hash\": \"{{execute_content_hash}}\",\n  \"latitude\": {{execute_latitude}},\n  \"longitude\": {{execute_longitude}},\n  \"notes\": \"{{execute_notes}}\",\n  \"media\": {{execute_media_json}}\n}",
+              "options": { "raw": { "language": "json" } }
+            }
+          },
+          "event": [
+            { "listen": "prerequest", "script": { "type": "text/javascript", "exec": [ "pm.collectionVariables.set('execute_client_action_id', pm.variables.replaceIn('{{$guid}}'));" ] } },
+            { "listen": "test", "script": { "type": "text/javascript", "exec": [ "pm.test('HTTP 200/201', function () { pm.expect([200,201]).to.include(pm.response.code); });" ] } }
+          ]
+        },
+        {
+          "name": "3. Execute A6 Delivery Arrival",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Accept", "value": "application/json" },
+              { "key": "Accept-Language", "value": "{{accept_language}}" },
+              { "key": "X-Request-ID", "value": "{{request_id}}" },
+              { "key": "X-Tenant-ID", "value": "{{tenant_schema}}" }
+            ],
+            "url": "{{base_url}}/driver/jobs/shipment/{{shipment_id}}/actions/A6/execute/",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"client_action_id\": \"{{execute_client_action_id}}\",\n  \"workflow_version\": \"{{execute_workflow_version}}\",\n  \"content_hash\": \"{{execute_content_hash}}\",\n  \"latitude\": {{execute_latitude}},\n  \"longitude\": {{execute_longitude}},\n  \"notes\": \"{{execute_notes}}\",\n  \"media\": {{execute_media_json}}\n}",
+              "options": { "raw": { "language": "json" } }
+            }
+          },
+          "event": [
+            { "listen": "prerequest", "script": { "type": "text/javascript", "exec": [ "pm.collectionVariables.set('execute_client_action_id', pm.variables.replaceIn('{{$guid}}'));" ] } },
+            { "listen": "test", "script": { "type": "text/javascript", "exec": [ "pm.test('HTTP 200/201', function () { pm.expect([200,201]).to.include(pm.response.code); });" ] } }
+          ]
+        },
+        {
+          "name": "4. Execute A7 Upload POD",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Accept", "value": "application/json" },
+              { "key": "Accept-Language", "value": "{{accept_language}}" },
+              { "key": "X-Request-ID", "value": "{{request_id}}" },
+              { "key": "X-Tenant-ID", "value": "{{tenant_schema}}" }
+            ],
+            "url": "{{base_url}}/driver/jobs/shipment/{{shipment_id}}/actions/A7/execute/",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"client_action_id\": \"{{execute_client_action_id}}\",\n  \"workflow_version\": \"{{execute_workflow_version}}\",\n  \"content_hash\": \"{{execute_content_hash}}\",\n  \"latitude\": {{execute_latitude}},\n  \"longitude\": {{execute_longitude}},\n  \"notes\": \"{{execute_notes}}\",\n  \"media\": {{execute_media_json}}\n}",
+              "options": { "raw": { "language": "json" } }
+            }
+          },
+          "event": [
+            { "listen": "prerequest", "script": { "type": "text/javascript", "exec": [ "pm.collectionVariables.set('execute_client_action_id', pm.variables.replaceIn('{{$guid}}'));" ] } },
+            { "listen": "test", "script": { "type": "text/javascript", "exec": [ "pm.test('HTTP 200/201', function () { pm.expect([200,201]).to.include(pm.response.code); });" ] } }
+          ]
+        },
+        {
+          "name": "5. Execute A9 Collect Payment (COD only)",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Accept", "value": "application/json" },
+              { "key": "Accept-Language", "value": "{{accept_language}}" },
+              { "key": "X-Request-ID", "value": "{{request_id}}" },
+              { "key": "X-Tenant-ID", "value": "{{tenant_schema}}" }
+            ],
+            "url": "{{base_url}}/driver/jobs/shipment/{{shipment_id}}/actions/A9/execute/",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"client_action_id\": \"{{execute_client_action_id}}\",\n  \"workflow_version\": \"{{execute_workflow_version}}\",\n  \"content_hash\": \"{{execute_content_hash}}\",\n  \"latitude\": {{execute_latitude}},\n  \"longitude\": {{execute_longitude}},\n  \"notes\": \"{{execute_notes}}\",\n  \"media\": {{execute_media_json}}\n}",
+              "options": { "raw": { "language": "json" } }
+            }
+          },
+          "event": [
+            { "listen": "prerequest", "script": { "type": "text/javascript", "exec": [ "pm.collectionVariables.set('execute_client_action_id', pm.variables.replaceIn('{{$guid}}'));" ] } },
+            { "listen": "test", "script": { "type": "text/javascript", "exec": [ "pm.test('HTTP is 200/201/400 (skip when non-COD)', function () { pm.expect([200,201,400]).to.include(pm.response.code); });" ] } }
+          ]
+        },
+        {
+          "name": "6. Execute A10 Job Closed",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Accept", "value": "application/json" },
+              { "key": "Accept-Language", "value": "{{accept_language}}" },
+              { "key": "X-Request-ID", "value": "{{request_id}}" },
+              { "key": "X-Tenant-ID", "value": "{{tenant_schema}}" }
+            ],
+            "url": "{{base_url}}/driver/jobs/shipment/{{shipment_id}}/actions/A10/execute/",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"client_action_id\": \"{{execute_client_action_id}}\",\n  \"workflow_version\": \"{{execute_workflow_version}}\",\n  \"content_hash\": \"{{execute_content_hash}}\",\n  \"latitude\": {{execute_latitude}},\n  \"longitude\": {{execute_longitude}},\n  \"notes\": \"{{execute_notes}}\",\n  \"media\": {{execute_media_json}}\n}",
+              "options": { "raw": { "language": "json" } }
+            }
+          },
+          "event": [
+            { "listen": "prerequest", "script": { "type": "text/javascript", "exec": [ "pm.collectionVariables.set('execute_client_action_id', pm.variables.replaceIn('{{$guid}}'));" ] } },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 200/201', function () { pm.expect([200,201]).to.include(pm.response.code); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "7. Final verify - Job Detail after close",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Accept", "value": "application/json" },
+              { "key": "Accept-Language", "value": "{{accept_language}}" },
+              { "key": "X-Request-ID", "value": "{{request_id}}" },
+              { "key": "X-Tenant-ID", "value": "{{tenant_schema}}" }
+            ],
+            "url": "{{base_url}}/driver/jobs/shipment/{{shipment_id}}/"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 200', function () { pm.response.to.have.status(200); });",
+                  "const data = (pm.response.json().data || {});",
+                  "const workflow = data.workflow || {};",
+                  "pm.test('Workflow exists', function () { pm.expect(workflow).to.be.an('object'); });"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

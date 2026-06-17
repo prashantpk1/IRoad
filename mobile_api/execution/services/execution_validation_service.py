@@ -270,9 +270,13 @@ class ExecutionValidationService:
 
     @staticmethod
     def _booking_item_type(context: ExecuteActionContext) -> str:
-        if context.job_type != 'shipment' or context.shipment is None:
-            return ''
-        return str(getattr(context.shipment, 'booking_item_type', '') or '').strip()
+        if context.shipment is not None:
+            return str(getattr(context.shipment, 'booking_item_type', '') or '').strip()
+        if context.booking is not None:
+            return str(
+                getattr(context.booking, 'loading_booking_item', None) or 'Outbound'
+            ).strip()
+        return ''
 
     @staticmethod
     def _build_next_action_hint_for_context(

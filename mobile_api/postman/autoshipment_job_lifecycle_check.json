@@ -1,0 +1,147 @@
+{
+  "title": "Auto-shipment mobile lifecycle check",
+  "version": "1.0",
+  "base_url": "{{base_url}}",
+  "auth": {
+    "type": "Bearer",
+    "token_variable": "access_token",
+    "required_headers": [
+      "Authorization: Bearer {{access_token}}",
+      "Accept: application/json",
+      "Accept-Language: en"
+    ]
+  },
+  "common_variables": {
+    "tenant_schema": "{{tenant_schema}}",
+    "driver_id": "{{driver_id}}",
+    "booking_id": "{{booking_id}}",
+    "shipment_id": "{{shipment_id}}",
+    "job_id": "{{job_id}}",
+    "workflow_version": "{{execute_workflow_version}}",
+    "content_hash": "{{execute_content_hash}}",
+    "client_action_id": "{{execute_client_action_id}}"
+  },
+  "scenarios": [
+    {
+      "id": "S1",
+      "name": "auto_shipment_post ON (booking assigned before shipment row)",
+      "precondition": [
+        "Action Master has active mobile-visible row with auto_shipment_post=true (usually A4 Confirm Loaded).",
+        "Booking is Confirmed and assigned to current driver."
+      ],
+      "steps": [
+        {
+          "step": 1,
+          "request": {
+            "method": "GET",
+            "url": "{{base_url}}/driver/dashboard/"
+          },
+          "expect": [
+            "HTTP 200",
+            "data.current_job.booking_id is present",
+            "data.active_job.job_type can be booking before shipment exists",
+            "data.workflow.allowed_actions is not empty (booking-context actions)"
+          ]
+        },
+        {
+          "step": 2,
+          "request": {
+            "method": "POST",
+            "url": "{{base_url}}/driver/execution/execute-action/",
+            "body": {
+              "client_action_id": "{{client_action_id}}",
+              "job_type": "booking",
+              "job_id": "{{booking_id}}",
+              "action_code": "A4",
+              "workflow_version": "{{workflow_version}}",
+              "content_hash": "{{content_hash}}",
+              "latitude": 24.7136,
+              "longitude": 46.6753,
+              "notes": "Confirm loaded from booking context"
+            }
+          },
+          "expect": [
+            "HTTP 200/201",
+            "Response indicates shipment created or linked",
+            "No validation error for booking-context execution when auto_shipment_post=true"
+          ]
+        },
+        {
+          "step": 3,
+          "request": {
+            "method": "GET",
+            "url": "{{base_url}}/driver/dashboard/"
+          },
+          "expect": [
+            "HTTP 200",
+            "data.active_job.job_type becomes shipment",
+            "data.current_job.active_shipment.shipment_id is present",
+            "Workflow continues with A5/A6/A7..."
+          ]
+        }
+      ]
+    },
+    {
+      "id": "S2",
+      "name": "auto_shipment_post OFF (shipment must exist first)",
+      "precondition": [
+        "Action Master row does not permit booking-context auto shipment creation.",
+        "Booking + Shipment are created in portal flow and shipment assigned to same driver."
+      ],
+      "steps": [
+        {
+          "step": 1,
+          "request": {
+            "method": "GET",
+            "url": "{{base_url}}/driver/dashboard/"
+          },
+          "expect": [
+            "HTTP 200",
+            "current_job appears only after shipment exists",
+            "active_job.job_type is shipment",
+            "active_job.job_id equals shipment_id"
+          ]
+        }
+      ]
+    }
+  ],
+  "job_close_sequence": [
+    {
+      "action_code": "A4",
+      "name": "Confirm Loaded",
+      "expected_shipment_status": "Loaded"
+    },
+    {
+      "action_code": "A5",
+      "name": "Depart In Transit",
+      "expected_shipment_status": "In Transit"
+    },
+    {
+      "action_code": "A6",
+      "name": "Delivery Arrival",
+      "expected_shipment_status": "At Delivery"
+    },
+    {
+      "action_code": "A7",
+      "name": "Upload POD",
+      "expected_shipment_status": "POD Submitted"
+    },
+    {
+      "action_code": "A9",
+      "name": "Collect Payment (COD only)",
+      "expected_shipment_status": "POD Submitted or Delivered",
+      "conditional": "required_if_order_type_is_COD"
+    },
+    {
+      "action_code": "A10",
+      "name": "Job Closed",
+      "expected_shipment_status": "Closed"
+    }
+  ],
+  "final_assertions": [
+    "Dashboard shows no executable actions after A10.",
+    "Job detail timeline includes all executed actions in correct sequence.",
+    "Shipment status is Closed.",
+    "Booking execution stage reaches EXECUTION_COMPLETED/BUSINESS_COMPLETED as applicable."
+  ]
+}

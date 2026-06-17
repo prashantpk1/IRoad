@@ -609,6 +609,8 @@ class ExecuteActionOrchestrator:
             return getattr(context.shipment, 'truck', None)
         if context.movement is not None:
             return getattr(context.movement, 'truck', None)
+        if context.booking is not None:
+            return getattr(context.booking, 'assigned_truck', None)
         return None
 
     @staticmethod
@@ -772,6 +774,8 @@ class ExecuteActionOrchestrator:
             return 'shipment'
         if raw in ('movement', 'movements', 'empty_move', 'empty_moves'):
             return 'movement'
+        if raw in ('booking', 'bookings'):
+            return 'booking'
         raise ExecuteActionError(
             f'Invalid job_type: {job_type!r}',
             code='invalid_job_type',

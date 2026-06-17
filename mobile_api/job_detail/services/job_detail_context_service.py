@@ -34,6 +34,7 @@ from mobile_api.job_detail.services.job_detail_sync_metadata import (
     finalize_job_detail_sync,
     should_short_circuit_polling,
 )
+from mobile_api.job_detail.services.booking_job_resolver import BookingJobResolver
 from mobile_api.job_detail.services.movement_job_resolver import (
     MovementJobResolver,
 )
@@ -70,11 +71,13 @@ class JobDetailContextService:
         *,
         shipment_resolver: ShipmentJobResolver | None = None,
         movement_resolver: MovementJobResolver | None = None,
+        booking_resolver: BookingJobResolver | None = None,
         projection_service: JobDetailProjectionService | None = None,
         response_builder: JobDetailResponseBuilder | None = None,
     ) -> None:
         self._shipment_resolver = shipment_resolver or ShipmentJobResolver()
         self._movement_resolver = movement_resolver or MovementJobResolver()
+        self._booking_resolver = booking_resolver or BookingJobResolver()
         self._projection_service = projection_service or JobDetailProjectionService()
         self._response_builder = response_builder or JobDetailResponseBuilder()
 
@@ -177,6 +180,8 @@ class JobDetailContextService:
             return 'shipment'
         if token in ('movement', 'movements', 'empty_move', 'empty-move'):
             return 'movement'
+        if token in ('booking', 'bookings'):
+            return 'booking'
         raise ValueError(f'unsupported job_type: {job_type!r}')
 
     def _resolve_entity(self, context: JobDetailContext) -> None:
@@ -198,6 +203,27 @@ class JobDetailContextService:
                     error_message=result.error_message,
                 )
             context.shipment = result.shipment
+            context.booking = result.booking
+            if result.resolve_context is not None:
+                context.resolver_meta = result.resolve_context.to_resolver_meta()
+            return
+
+        if context.job_type == 'booking':
+            result = self._booking_resolver.resolve(
+                context.driver,
+                context.job_id,
+                tenant_schema=context.tenant_schema,
+            )
+            if result.resolve_context is not None and not result.resolve_context.ok:
+                raise job_detail_error_from_resolver(
+                    error_code=result.error_code,
+                    error_message=result.error_message,
+                )
+            if result.booking is None:
+                raise job_detail_error_from_resolver(
+                    error_code=result.error_code or 'job_not_found',
+                    error_message=result.error_message,
+                )
             context.booking = result.booking
             if result.resolve_context is not None:
                 context.resolver_meta = result.resolve_context.to_resolver_meta()

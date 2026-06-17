@@ -10,10 +10,12 @@ from __future__ import annotations
 
 from typing import Any
 
+from django.db.utils import OperationalError, ProgrammingError
 from django.db.models import Prefetch, Q
 from django.db.models.functions import Coalesce
+from django.test.testcases import DatabaseOperationForbidden
 
-from tenant_workspace.models import TenantBooking, TenantShipment
+from tenant_workspace.models import TenantBooking, TenantOperationAction, TenantShipment
 
 from mobile_api.dashboard.dto.driver_booking_selection import (
     DriverBookingSelectionResult,
@@ -50,6 +52,7 @@ class DashboardBookingSelector:
         driver_pk = policy._driver_pk(driver)
         if driver_pk is None:
             return None
+        allow_booking_bootstrap = self._auto_shipment_bootstrap_enabled()
 
         shipments_qs = (
             TenantShipment.objects.select_related(
@@ -57,6 +60,7 @@ class DashboardBookingSelector:
                 'delivery_address',
                 'client_account',
             )
+            .defer('loading_address__extension', 'delivery_address__extension')
             .order_by('shipment_sequence', 'created_at')
         )
         bookings = (
@@ -66,7 +70,14 @@ class DashboardBookingSelector:
                 | Q(shipments__driver_id=driver_pk),
                 booking_status=TenantBooking.Status.CONFIRMED,
             )
-            .filter(shipments__shipment_status__in=_OPEN_SHIPMENT_STATUSES)
+            .filter(
+                Q(shipments__shipment_status__in=_OPEN_SHIPMENT_STATUSES)
+                | (
+                    Q(shipments__isnull=True)
+                    if allow_booking_bootstrap
+                    else Q(pk__isnull=True)
+                )
+            )
             .distinct()
             .order_by(
                 'booking_date',
@@ -81,6 +92,7 @@ class DashboardBookingSelector:
                 'delivery_address',
                 'client_account',
             )
+            .defer('loading_address__extension', 'delivery_address__extension')
             .prefetch_related(
                 Prefetch('shipments', queryset=shipments_qs),
             )[:DASHBOARD_BOOKING_CANDIDATE_LIMIT]
@@ -88,14 +100,15 @@ class DashboardBookingSelector:
 
         for booking in bookings:
             shipments = list(booking.shipments.all())
+            is_bootstrap_booking = allow_booking_bootstrap and not shipments
             if not policy.booking_is_visible_to_driver(driver, booking, shipments):
                 continue
-            if policy.is_booking_fully_complete(shipments):
+            if shipments and policy.is_booking_fully_complete(shipments):
                 continue
 
             ordered = policy.sorted_countable_shipments(shipments)
             active = policy.get_active_shipment_for_driver(driver, booking, ordered)
-            if active is None:
+            if active is None and not is_bootstrap_booking:
                 continue
 
             total, exec_completed, exec_pct = policy.booking_execution_progress(
@@ -123,6 +136,22 @@ class DashboardBookingSelector:
             )
 
         return None
+
+    @staticmethod
+    def _auto_shipment_bootstrap_enabled() -> bool:
+        """
+        Booking-only bootstrap is allowed when at least one mobile action can
+        auto-create a shipment from booking context.
+        """
+        try:
+            return TenantOperationAction.objects.filter(
+                status=TenantOperationAction.Status.ACTIVE,
+                auto_shipment_post=True,
+                mobile_visible=True,
+                admin_only=False,
+            ).exists()
+        except (DatabaseOperationForbidden, OperationalError, ProgrammingError):
+            return False
 
     def select_primary_booking(
         self,

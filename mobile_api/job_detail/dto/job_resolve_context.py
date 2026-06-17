@@ -8,7 +8,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Any, Literal
 
-JobType = Literal['shipment', 'movement']
+JobType = Literal['shipment', 'movement', 'booking']
 
 WORKFLOW_SOURCE_ENTITY_RESOLVER = 'job_detail.entity_resolver'
 

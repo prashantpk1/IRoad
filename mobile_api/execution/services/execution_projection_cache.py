@@ -132,6 +132,11 @@ class ExecutionProjectionCache:
         self._execute_context.round_trip = build_round_trip_section(ctx, request=request)
         ctx.round_trip = dict(self._execute_context.round_trip or {})
 
+    def reset_job_detail_scope(self) -> None:
+        """Drop cached JobDetailContext after execute scope pivot (booking → shipment)."""
+        self._job_detail_ctx = None
+        self.invalidate_after_mutation()
+
     def invalidate_after_mutation(self) -> None:
         """Force one fresh log scan after Action Log append."""
         self._reconciled = False

@@ -59,8 +59,9 @@ class JobDetailFoundationTests(SimpleTestCase):
         svc = JobDetailContextService()
         self.assertEqual(svc._normalize_job_type('empty_move'), 'movement')
         self.assertEqual(svc._normalize_job_type('SHIPMENT'), 'shipment')
+        self.assertEqual(svc._normalize_job_type('booking'), 'booking')
 
     def test_invalid_job_type_raises(self):
         svc = JobDetailContextService()
         with self.assertRaises(ValueError):
-            svc._normalize_job_type('booking')
+            svc._normalize_job_type('warehouse')

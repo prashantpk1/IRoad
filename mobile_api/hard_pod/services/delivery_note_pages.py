@@ -54,6 +54,10 @@ def build_hard_pod_confirmation_context(
         )
         documents = [_synthetic_document_from_shipment(shipment, limit=limit)]
     pages = _flatten_pages(documents)
+    if not pages:
+        # A7 auto_pod_post may create a delivery-note header without page rows.
+        documents = [_synthetic_document_from_shipment(shipment, limit=limit)]
+        pages = _flatten_pages(documents)
     return {'documents': documents, 'pages': pages}
 
 
@@ -129,6 +133,27 @@ def _document_row_from_shipment_document(
     else:
         pod_pages = list(document.pod_pages.order_by('line_no', 'created_at')[:limit])
         pages = [_page_row_from_pod_page(line, document=document) for line in pod_pages]
+
+    if not pages:
+        page_count = int(getattr(document, 'page_count', None) or 1)
+        page_count = max(1, min(page_count, limit))
+        doc_ref = (getattr(document, 'document_ref_no', None) or '').strip()
+        shipment_no = doc_ref or 'DOC'
+        for line_no in range(1, page_count + 1):
+            pages.append(
+                {
+                    'page_id': '',
+                    'line_no': line_no,
+                    'label': f'IMG-({shipment_no}-{line_no:03d})',
+                    'physical_page_no': line_no,
+                    'confirmation_text': (
+                        f'I confirm the physical receipt of this original document of {line_no}'
+                    ),
+                    'attachment_label': '',
+                    'signer_location': '',
+                    'completion_status': '',
+                }
+            )
 
     return {
         'document_id': str(getattr(document, 'pk', '') or ''),

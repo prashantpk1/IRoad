@@ -17,6 +17,8 @@ from mobile_api.job_detail.dto.job_detail_context import JobDetailContext
 from mobile_api.job_detail.projections.job_location_projection import (
     build_movement_location_block,
     build_shipment_location_block,
+    serialize_address,
+    serialize_route,
 )
 
 
@@ -96,6 +98,32 @@ def build_job_header(
         )
         base.update(
             build_movement_location_block(context.movement, request=request),
+        )
+        return base
+
+    if context.job_type == 'booking' and context.booking is not None:
+        base['job_no'] = str(getattr(context.booking, 'booking_no', '') or '')
+        base['order_type'] = resolve_order_type_text(
+            shipment=None,
+            booking=context.booking,
+        )
+        base['client_name'] = resolve_client_name(
+            shipment=None,
+            booking=context.booking,
+            request=request,
+        )
+        base['execution_date'] = resolve_execution_date(
+            shipment=None,
+            booking=context.booking,
+        )
+        base['route'] = serialize_route(booking=context.booking, request=request)
+        base['pickup_address'] = serialize_address(
+            getattr(context.booking, 'loading_address', None),
+            request=request,
+        )
+        base['drop_address'] = serialize_address(
+            getattr(context.booking, 'delivery_address', None),
+            request=request,
         )
         return base
 

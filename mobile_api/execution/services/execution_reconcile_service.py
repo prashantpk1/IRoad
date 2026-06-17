@@ -17,6 +17,7 @@ from mobile_api.execution.dto.authoritative_execution_context import (
 from mobile_api.execution.dto.execute_action_context import ExecuteActionContext
 from mobile_api.execution.guards.execution_ownership_guard import ExecutionOwnershipGuard
 from mobile_api.execution.services.execution_context_adapter import (
+    pivot_execute_context_to_born_shipment,
     sync_from_job_detail,
     to_job_detail_context,
 )
@@ -24,6 +25,7 @@ from mobile_api.execution.services.execution_projection_cache import (
     ExecutionProjectionCache,
 )
 from mobile_api.job_detail.guards.entity_lookup import (
+    booking_entity_summary,
     movement_entity_summary,
     shipment_entity_summary,
 )
@@ -87,6 +89,7 @@ class ExecutionReconcileService:
 
         One post-mutation projection pass (no duplicate log scans).
         """
+        pivot_execute_context_to_born_shipment(context)
         projection = ExecutionProjectionCache.attach(context)
         projection.build_post_execute_sections(request=request)
         context.authoritative = dict(self.build_authoritative_context(context))
@@ -150,6 +153,15 @@ def _build_entity_snapshot(
         base = shipment_entity_summary(context.shipment)
         if auth_status:
             base['shipment_status'] = auth_status
+            base['status_authority'] = 'action_log'
+        elif meta_entity:
+            base.update({k: v for k, v in meta_entity.items() if k not in base})
+        return base
+
+    if context.job_type == 'booking' and context.booking is not None:
+        base = booking_entity_summary(context.booking)
+        if auth_status:
+            base['booking_status'] = auth_status
             base['status_authority'] = 'action_log'
         elif meta_entity:
             base.update({k: v for k, v in meta_entity.items() if k not in base})

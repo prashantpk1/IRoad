@@ -53,6 +53,8 @@ def build_workflow_section(
         return dict(_EMPTY_WORKFLOW)
     if context.job_type == 'movement' and context.movement is None:
         return dict(_EMPTY_WORKFLOW)
+    if context.job_type == 'booking' and context.booking is None:
+        return dict(_EMPTY_WORKFLOW)
 
     recon_block = entity_reconciliation_block(context)
     top_integrity = dict((context.reconciliation or {}).get('workflow_integrity') or {})
@@ -64,6 +66,8 @@ def build_workflow_section(
         prefetched = (
             cache.shipment_logs
             if context.job_type == 'shipment'
+            else cache.booking_logs
+            if context.job_type == 'booking'
             else cache.movement_logs
         )
     auth_status = authoritative_entity_status(context)
@@ -76,6 +80,8 @@ def build_workflow_section(
                 authoritative_status=auth_status,
                 prefetched_logs=prefetched,
             )
+        elif context.job_type == 'booking':
+            workflow = _build_booking_workflow(context, request=request)
         else:
             workflow = _build_movement_workflow(
                 context,
@@ -124,6 +130,36 @@ def _build_shipment_workflow(
         entity_type='shipment',
     )
     return _strip_hard_copy_from_driver_workflow(workflow)
+
+
+def _build_booking_workflow(
+    context: JobDetailContext,
+    *,
+    request: Any | None,
+) -> dict[str, Any]:
+    """Booking-only workflow before Auto Shipment creates the first leg."""
+    booking = context.booking
+    booking_id = getattr(booking, 'booking_id', None) or getattr(booking, 'pk', None)
+    stage_block = {
+        'entity_type': 'booking',
+        'operational_stage': '',
+        'execution_sub_stage': '',
+        'status_for_workflow': str(getattr(booking, 'booking_status', '') or ''),
+    }
+    engine_payload = OperationExecutionService.get_allowed_driver_actions(
+        booking=booking,
+        shipment=None,
+        movement=None,
+        request=request,
+        job_type='booking',
+        job_id=str(booking_id) if booking_id is not None else context.job_id,
+        job_no=str(getattr(booking, 'booking_no', '') or ''),
+    )
+    return _map_engine_payload(
+        engine_payload,
+        stage_block=stage_block,
+        entity_type='booking',
+    )
 
 
 def _build_movement_workflow(
