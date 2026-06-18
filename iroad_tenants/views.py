@@ -9418,7 +9418,8 @@ class TenantOperationShipmentPodDetailView(View):
             return response
         try:
             document = (
-                TenantShipmentDocument.objects.prefetch_related(
+                TenantShipmentDocument.objects.select_related('source_document', 'shipment')
+                .prefetch_related(
                     Prefetch(
                         'pod_pages',
                         queryset=TenantShipmentPodPage.objects.select_related('action_log').order_by('line_no'),
@@ -19781,7 +19782,8 @@ class TenantOperationShipmentDocumentsEditView(TenantOperationShipmentDocumentsC
             return response
         try:
             document = (
-                TenantShipmentDocument.objects.prefetch_related('document_pages', 'pod_pages')
+                TenantShipmentDocument.objects.select_related('source_document', 'shipment')
+                .prefetch_related('document_pages', 'pod_pages')
                 .filter(pk=document_id)
                 .first()
             )
@@ -20071,10 +20073,11 @@ def _shipment_pod_display_data(document, shipment=None):
                 'color': '#28a745' if pod_status == 'Compliant' else 'var(--primary-color)',
             },
         )
+    source_doc = document.source_document if document.source_document_id else None
     return {
         'record_no': document.record_no,
         'record_date': document.record_date,
-        'doc_no': document.shipment.shipment_no if document.shipment_id else '',
+        'doc_no': (source_doc.record_no or '').strip() if source_doc else '',
         'document_date': document.document_date,
         'document_type': document.document_type,
         'document_ref_no': document.document_ref_no,
@@ -20112,7 +20115,7 @@ class TenantOperationShipmentPodListView(View):
             pod_prefix = f'{SHIPMENT_POD_REF_PREFIX}-'
             qs = (
                 TenantShipmentDocument.objects.select_related(
-                    'shipment', 'booking', 'shipment__booking', 'receiver_user'
+                    'shipment', 'booking', 'shipment__booking', 'receiver_user', 'source_document'
                 )
                 .prefetch_related('pod_pages')
                 .filter(record_no__startswith=pod_prefix)
@@ -20661,7 +20664,8 @@ class TenantOperationShipmentPodDetailView(View):
             return response
         try:
             document = (
-                TenantShipmentDocument.objects.prefetch_related(
+                TenantShipmentDocument.objects.select_related('source_document', 'shipment')
+                .prefetch_related(
                     Prefetch(
                         'pod_pages',
                         queryset=TenantShipmentPodPage.objects.select_related('action_log').order_by('line_no'),
