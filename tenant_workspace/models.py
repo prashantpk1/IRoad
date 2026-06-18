@@ -525,7 +525,7 @@ def client_contract_upload_to(instance, filename):
 
 
 class TenantClientContract(models.Model):
-    """Tenant-scoped single contract per client account."""
+    """Tenant-scoped client contract; multiple non-overlapping periods per client."""
 
     class Status(models.TextChoices):
         UPCOMING = 'Upcoming', 'Upcoming'
@@ -547,16 +547,22 @@ class TenantClientContract(models.Model):
     created_by_label = models.CharField(max_length=200, blank=True, default='')
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
-    client_account = models.OneToOneField(
+    client_account = models.ForeignKey(
         TenantClientAccount,
         on_delete=models.CASCADE,
-        related_name='contract',
+        related_name='contracts',
         db_column='client_id',
     )
 
     class Meta:
         db_table = 'tenant_client_contracts'
         ordering = ['-created_at']
+        indexes = [
+            models.Index(
+                fields=['client_account', 'start_date', 'end_date'],
+                name='tnt_client_contract_period_idx',
+            ),
+        ]
 
     def __str__(self):
         return self.contract_no

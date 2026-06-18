@@ -7,6 +7,7 @@ from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
 from django_tenants.utils import schema_context
 
+from config.text_validators import ArabicTextFormMixin
 from superadmin.models import Country
 from tenant_workspace.models import DriverMaster, TenantUser, TruckMaster
 
@@ -54,7 +55,7 @@ def driver_default_truck_queryset(*, driver=None, extra_truck_pks=None):
     return qs.order_by('truck_code')
 
 
-class DriverMasterForm(forms.ModelForm):
+class DriverMasterForm(ArabicTextFormMixin, forms.ModelForm):
     """
     Driver master create/edit. ``driver_code`` is never collected here (auto /
     sequence elsewhere). ``nationality_country`` uses ``PublicCountryChoiceField``;

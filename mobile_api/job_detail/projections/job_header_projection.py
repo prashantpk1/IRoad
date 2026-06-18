@@ -14,10 +14,16 @@ from mobile_api.helpers.job_booking_meta import (
 )
 from mobile_api.helpers.order_type import resolve_order_type_text
 from mobile_api.job_detail.dto.job_detail_context import JobDetailContext
+from mobile_api.helpers.booking_endpoint_addresses import (
+    resolve_booking_endpoint_addresses,
+)
+from mobile_api.job_detail.helpers.booking_job_context import (
+    leg_is_backload_for_addresses,
+    resolve_booking_job_execution_context,
+)
 from mobile_api.job_detail.projections.job_location_projection import (
     build_movement_location_block,
     build_shipment_location_block,
-    serialize_address,
     serialize_route,
 )
 
@@ -102,29 +108,41 @@ def build_job_header(
         return base
 
     if context.job_type == 'booking' and context.booking is not None:
-        base['job_no'] = str(getattr(context.booking, 'booking_no', '') or '')
+        booking = context.booking
+        exec_ctx = resolve_booking_job_execution_context(context)
+        route_booking = exec_ctx.get('route_booking') or booking
+        leg_is_backload = leg_is_backload_for_addresses(exec_ctx)
+        pickup_address, drop_address = resolve_booking_endpoint_addresses(
+            booking,
+            leg_is_backload=leg_is_backload,
+            request=request,
+        )
+
+        base['job_no'] = str(getattr(booking, 'booking_no', '') or '')
         base['order_type'] = resolve_order_type_text(
             shipment=None,
-            booking=context.booking,
+            booking=booking,
         )
         base['client_name'] = resolve_client_name(
             shipment=None,
-            booking=context.booking,
+            booking=booking,
             request=request,
         )
         base['execution_date'] = resolve_execution_date(
             shipment=None,
-            booking=context.booking,
+            booking=booking,
         )
-        base['route'] = serialize_route(booking=context.booking, request=request)
-        base['pickup_address'] = serialize_address(
-            getattr(context.booking, 'loading_address', None),
-            request=request,
-        )
-        base['drop_address'] = serialize_address(
-            getattr(context.booking, 'delivery_address', None),
-            request=request,
-        )
+        base['route'] = serialize_route(booking=route_booking, request=request)
+        base['pickup_address'] = pickup_address
+        base['drop_address'] = drop_address
+        if exec_ctx.get('booking_execution_stage'):
+            base['booking_execution_stage'] = exec_ctx['booking_execution_stage']
+        if exec_ctx.get('booking_item_type'):
+            base['booking_item_type'] = exec_ctx['booking_item_type']
+        if exec_ctx.get('backload_bootstrap'):
+            base['backload_bootstrap_pending'] = True
+        if (context.resolver_meta or {}).get('backload_booking_redirect'):
+            base['backload_booking_redirect'] = True
         return base
 
     return base

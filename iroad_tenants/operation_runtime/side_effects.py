@@ -267,6 +267,188 @@ def _apply_auto_delivered_for_cod(
     shipment.save(update_fields=['shipment_status', 'updated_at'])
 
 
+def maybe_advance_delivered_when_job_close_ready(
+    shipment,
+    *,
+    created_by_label: str = 'system',
+) -> bool:
+    """
+    When POD/COD gates pass but the column is still POD Submitted, advance to
+    Delivered so A10 (Job Closed) appears on mobile Job Detail refresh.
+    """
+    if shipment is None:
+        return False
+    current = (shipment.shipment_status or '').strip()
+    if current != TenantShipment.ShipmentStatus.POD_SUBMITTED:
+        return False
+    if not _shipment_job_close_gates_satisfied_for_advance(shipment):
+        return False
+    anchor_log = (
+        TenantOperationActionLog.objects.filter(shipment_id=shipment.pk)
+        .exclude(operation_action__isnull=True)
+        .order_by('-log_date', '-created_at')
+        .first()
+    )
+    if anchor_log is None:
+        return False
+    _ensure_auto_delivered_verify_log(
+        shipment,
+        action_log=anchor_log,
+        created_by_label=created_by_label,
+        source_channel='mobile_job_close_ready',
+        notes='Auto POD verified when job-close gates satisfied',
+    )
+    shipment.shipment_status = TenantShipment.ShipmentStatus.DELIVERED
+    shipment.save(update_fields=['shipment_status', 'updated_at'])
+    return True
+
+
+def _shipment_job_close_gates_satisfied_for_advance(shipment) -> bool:
+    if not _mobile_pod_compliance_satisfied(shipment):
+        return False
+    if (shipment.order_type or '').strip().upper() == 'COD':
+        if (
+            getattr(shipment, 'collection_status', None)
+            != TenantShipment.CollectionStatus.COLLECTED
+        ):
+            return False
+    return True
+
+
+def _should_auto_close_shipment(shipment) -> bool:
+    """Delivered leg with POD (+ COD when applicable) may auto-close (A10)."""
+    if shipment is None:
+        return False
+    if (shipment.shipment_status or '').strip() != TenantShipment.ShipmentStatus.DELIVERED:
+        return False
+    _sync_pod_status_from_mobile_logs(shipment)
+    if hasattr(shipment, 'refresh_from_db'):
+        shipment.refresh_from_db(
+            fields=[
+                'pod_status',
+                'collection_status',
+                'order_type',
+                'pod_type',
+                'shipment_status',
+                'updated_at',
+            ],
+        )
+    if not _mobile_pod_compliance_satisfied(shipment):
+        return False
+    if (shipment.order_type or '').strip().upper() == 'COD':
+        if (
+            getattr(shipment, 'collection_status', None)
+            != TenantShipment.CollectionStatus.COLLECTED
+        ):
+            return False
+    return True
+
+
+def _ensure_auto_close_job_log(
+    shipment,
+    *,
+    action_log: TenantOperationActionLog | None = None,
+    created_by_label: str = '',
+    source_channel: str = 'auto_job_close',
+    notes: str = 'Auto job close after delivery completion',
+) -> None:
+    from iroad_tenants.operation_runtime.action_master_catalog import (
+        resolve_auto_close_job_action,
+    )
+
+    close_action = resolve_auto_close_job_action()
+    if close_action is None:
+        return
+
+    shipment_pk = str(getattr(shipment, 'pk', '') or getattr(shipment, 'shipment_id', ''))
+    idempotency_key = f'auto-job-close-{shipment_pk}'
+    log_no = f'LOG-JOB-CLOSE-{shipment_pk[:24]}'
+
+    driver = None
+    if action_log is not None:
+        driver = getattr(action_log, 'driver', None)
+    if driver is None:
+        driver = getattr(shipment, 'driver', None)
+
+    log_row, _created = TenantOperationActionLog.objects.get_or_create(
+        idempotency_key=idempotency_key,
+        defaults={
+            'log_no': log_no,
+            'log_sequence': 100,
+            'log_date': timezone.now(),
+            'operation_action': close_action,
+            'source': 'System',
+            'source_channel': source_channel,
+            'source_ref': source_channel,
+            'created_by_label': created_by_label or 'system',
+            'notes': notes,
+            'booking': getattr(shipment, 'booking', None),
+            'shipment': shipment,
+            'truck': getattr(shipment, 'truck', None),
+            'driver': driver,
+        },
+    )
+    if log_row.operation_action_id != close_action.pk:
+        log_row.operation_action = close_action
+        log_row.source_channel = source_channel
+        log_row.save(
+            update_fields=['operation_action', 'source_channel', 'updated_at'],
+        )
+
+
+def _apply_auto_close_when_ready(
+    shipment,
+    *,
+    action_log: TenantOperationActionLog | None = None,
+    created_by_label: str = '',
+) -> bool:
+    """
+    Advance Delivered → Closed when POD/COD gates are satisfied (A10 equivalent).
+
+    Returns True when the shipment column was closed.
+    """
+    if not _should_auto_close_shipment(shipment):
+        return False
+    _ensure_auto_close_job_log(
+        shipment,
+        action_log=action_log,
+        created_by_label=created_by_label,
+    )
+    shipment.shipment_status = TenantShipment.ShipmentStatus.CLOSED
+    shipment.save(update_fields=['shipment_status', 'updated_at'])
+    booking = getattr(shipment, 'booking', None)
+    if booking is not None:
+        from iroad_tenants.operation_runtime.action_master_catalog import (
+            resolve_auto_close_job_action,
+        )
+
+        close_action = resolve_auto_close_job_action()
+        if close_action is not None:
+            apply_booking_status_impact(
+                booking,
+                getattr(close_action, 'booking_status_impact', '') or '',
+            )
+    from iroad_tenants.operation_runtime.latest_state import (
+        after_shipment_status_side_effects,
+    )
+
+    after_shipment_status_side_effects(shipment)
+    return True
+
+
+def maybe_auto_close_delivered_shipment(shipment, *, created_by_label: str = '') -> bool:
+    """
+    Manual repair helper only — not invoked from mobile execute or payment flows.
+
+    Drivers must tap Job Closed (A10) on the mobile app.
+    """
+    return _apply_auto_close_when_ready(
+        shipment,
+        action_log=None,
+        created_by_label=created_by_label,
+    )
+
+
 def _assert_a3_fired_for_a4(action_log) -> None:
     if not _is_confirm_loaded_action(action_log.operation_action):
         return
@@ -286,10 +468,22 @@ def _assert_a3_fired_for_a4(action_log) -> None:
             models.Q(shipment__isnull=True)
             | models.Q(shipment__booking_item_type__iexact=booking_item_type)
         )
+
     if not qs.filter(
-        operation_action__action_code__iexact='A3',
-    ).exists() and not qs.filter(
-        operation_action__english_label__icontains='Start Loading',
+        models.Q(operation_action__action_code__iexact='A1')
+        | models.Q(operation_action__english_label__icontains='Start Job'),
+    ).exists():
+        raise ValidationError('Start Job must be executed before Confirm Loaded.')
+
+    if not qs.filter(
+        models.Q(operation_action__action_code__iexact='A2')
+        | models.Q(operation_action__english_label__icontains='Pickup Arrival'),
+    ).exists():
+        raise ValidationError('Pickup Arrival must be executed before Confirm Loaded.')
+
+    if not qs.filter(
+        models.Q(operation_action__action_code__iexact='A3')
+        | models.Q(operation_action__english_label__icontains='Start Loading'),
     ).exists():
         raise ValidationError('Start Loading must be executed before Confirm Loaded.')
 
@@ -357,26 +551,22 @@ def apply_execution_side_effects(action_log, *, created_by_label='') -> None:
         _assert_a3_fired_for_a4(action_log)
         from iroad_tenants.views import (
             _tenant_shipment_birth_from_booking_line,
-            _tenant_shipment_booking_line_rows,
-            _tenant_shipment_has_active_duplicate,
-            _tenant_shipment_match_booking_line,
+        )
+        from iroad_tenants.operation_runtime.auto_shipment_line import (
+            resolve_auto_shipment_target_line,
         )
 
         booking_item_type_hint = (
             getattr(action_log, '_birth_booking_item_type', None) or ''
         ).strip()
-        target_line = _tenant_shipment_match_booking_line(
-            booking,
-            booking_item_type=booking_item_type_hint,
+        from iroad_tenants.operation_runtime.auto_shipment_line import (
+            resolve_auto_shipment_target_line,
         )
-        if target_line is None:
-            for line in _tenant_shipment_booking_line_rows(booking):
-                if not _tenant_shipment_has_active_duplicate(
-                    booking,
-                    line['booking_item_type'],
-                ):
-                    target_line = line
-                    break
+
+        target_line = resolve_auto_shipment_target_line(
+            booking,
+            booking_item_type_hint=booking_item_type_hint,
+        )
         if target_line is None:
             raise ValidationError(
                 'Auto Shipment Post requires a confirmed booking line without an active shipment.'
@@ -531,3 +721,4 @@ def apply_execution_side_effects(action_log, *, created_by_label='') -> None:
     if shipment is not None:
         apply_hard_copy_pod_type_if_needed(shipment=shipment, action=action)
         apply_hard_copy_received_if_needed(shipment=shipment, action=action)
+        # Job close (A10) is driver-initiated only — never auto-close after payment/POD.

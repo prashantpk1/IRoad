@@ -219,7 +219,9 @@
           </td>
           <td>{{ row.english_label }}</td>
           <td>
-            {% if row.file_name %}
+            {% if row.file_url %}
+            {% include 'partials/attachment_preview_link.html' with file_url=row.file_url file_name=row.file_name label=row.file_name link_class="ta-att-file" %}
+            {% elif row.file_name %}
             <span class="ta-att-file" title="{{ row.file_name }}">{{ row.file_name }}</span>
             {% else %}
             &mdash;

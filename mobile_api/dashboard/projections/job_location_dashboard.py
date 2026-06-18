@@ -7,11 +7,16 @@ from __future__ import annotations
 
 from typing import Any
 
+from mobile_api.dashboard.selectors import booking_selection_policy as policy
+from mobile_api.helpers.booking_endpoint_addresses import (
+    resolve_booking_endpoint_addresses,
+)
 from mobile_api.helpers.job_booking_meta import (
     resolve_client_name,
     resolve_execution_date,
 )
 from mobile_api.helpers.order_type import resolve_order_type_text
+from mobile_api.helpers.route_backload_proxy import backload_route_booking_proxy
 
 
 def build_dashboard_active_job(
@@ -19,6 +24,7 @@ def build_dashboard_active_job(
     shipment: Any | None = None,
     booking: Any | None = None,
     movement: Any | None = None,
+    driver: Any | None = None,
     request: Any | None = None,
 ) -> dict[str, Any]:
     """
@@ -29,9 +35,24 @@ def build_dashboard_active_job(
     from mobile_api.job_detail.projections.job_location_projection import (
         build_movement_location_block,
         build_shipment_location_block,
-        serialize_address,
         serialize_route,
     )
+
+    from mobile_api.helpers.backload_booking_redirect import (
+        should_pivot_shipment_to_backload_booking,
+    )
+
+    if (
+        shipment is not None
+        and booking is not None
+        and driver is not None
+        and should_pivot_shipment_to_backload_booking(
+            driver=driver,
+            booking=booking,
+            shipment=shipment,
+        )
+    ):
+        shipment = None
 
     if shipment is not None:
         shipment_id = getattr(shipment, 'shipment_id', None) or getattr(
@@ -95,11 +116,38 @@ def build_dashboard_active_job(
 
     if booking is not None:
         booking_id = getattr(booking, 'booking_id', None) or getattr(booking, 'pk', None)
-        return {
+        shipments = list(
+            booking.shipments.all() if hasattr(booking, 'shipments') else []
+        )
+        ordered = policy.sorted_countable_shipments(shipments)
+        stage = policy.derive_booking_execution_stage(booking, ordered)
+        show_backload_route = policy.should_display_backload_route(
+            booking,
+            ordered,
+            booking_stage=stage,
+        )
+        route_booking = booking
+        if show_backload_route:
+            route_booking = backload_route_booking_proxy(booking)
+        is_backload_bootstrap = policy.is_backload_leg_pending(booking, ordered)
+        if is_backload_bootstrap and driver is not None:
+            is_backload_bootstrap = policy.driver_owns_backload_leg(driver, booking)
+        pickup_address, drop_address = resolve_booking_endpoint_addresses(
+            booking,
+            leg_is_backload=(
+                is_backload_bootstrap
+                or show_backload_route
+                or stage == policy.BOOKING_EXECUTION_STAGE_OUTBOUND_COMPLETED
+            ),
+            request=request,
+        )
+        booking_item_type = 'Backload' if is_backload_bootstrap else 'Outbound'
+        block = {
             'job_type': 'booking',
             'job_id': str(booking_id) if booking_id is not None else '',
             'job_no': str(getattr(booking, 'booking_no', '') or ''),
             'entity_type': 'booking',
+            'booking_item_type': booking_item_type,
             'order_type': resolve_order_type_text(
                 shipment=None,
                 booking=booking,
@@ -113,15 +161,13 @@ def build_dashboard_active_job(
                 shipment=None,
                 booking=booking,
             ),
-            'route': serialize_route(booking=booking, request=request),
-            'pickup_address': serialize_address(
-                getattr(booking, 'loading_address', None),
-                request=request,
-            ),
-            'drop_address': serialize_address(
-                getattr(booking, 'delivery_address', None),
-                request=request,
-            ),
+            'route': serialize_route(booking=route_booking, request=request),
+            'pickup_address': pickup_address,
+            'drop_address': drop_address,
+            'booking_execution_stage': stage or '',
         }
+        if is_backload_bootstrap:
+            block['backload_bootstrap_pending'] = True
+        return block
 
     return {}

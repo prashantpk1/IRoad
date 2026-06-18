@@ -608,9 +608,16 @@
                   </div>
                   <div class="eal-actions-cell pt-0 pb-0" onclick="event.stopPropagation()">
                     <a
+                      href="{{ client_contract.list_detail_url }}"
+                      class="eal-row-btn"
+                      title="View"
+                      aria-label="View"
+                    ><i class="bi bi-eye"></i></a>
+                    <a
                       href="{{ client_contract.list_edit_url }}"
                       class="eal-row-btn"
                       title="Edit"
+                      aria-label="Edit"
                     ><i class="bi bi-pencil"></i></a>
                   </div>
                 </div>
@@ -647,10 +654,7 @@
                         <span class="cd-field-label">Contract Attachment</span>
                         <span class="cd-field-value">
                           {% if client_contract.contract_attachment %}
-                          <a href="{{ client_contract.contract_attachment.url }}" target="_blank" rel="noopener" style="text-decoration: none; display: inline-flex; align-items: center; gap: 6px; color: #5051f9; font-size: 0.9rem; font-weight: 500;">
-                            <i class="bi bi-file-earmark-text" style="font-size: 1.1rem"></i>
-                            {{ client_contract.contract_file_name }}
-                          </a>
+                          {% include 'partials/attachment_preview_link.html' with file_url=client_contract.contract_attachment.url file_name=client_contract.contract_file_name label=client_contract.contract_file_name link_class="text-decoration-none" %}
                           {% else %}
                           <span class="text-muted">—</span>
                           {% endif %}
@@ -701,9 +705,16 @@
                   </div>
                   <div class="eal-actions-cell pt-0 pb-0" onclick="event.stopPropagation()">
                     <a
+                      href="{% url 'iroad_tenants:tenant_client_contact_detail' contact.contact_id %}"
+                      class="eal-row-btn"
+                      title="View"
+                      aria-label="View"
+                    ><i class="bi bi-eye"></i></a>
+                    <a
                       href="{% url 'iroad_tenants:tenant_client_contact_edit' contact.contact_id %}?return_to=details"
                       class="eal-row-btn"
                       title="Edit"
+                      aria-label="Edit"
                     ><i class="bi bi-pencil"></i></a>
                   </div>
                 </div>

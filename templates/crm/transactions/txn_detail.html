@@ -101,7 +101,13 @@
     </div>
   </div>
   <div class="form-card-body">
-    <a href="{{ txn.attachment.url }}" target="_blank" rel="noopener" class="eal-btn eal-btn-outline">
+    <a
+      href="{{ txn.attachment.url }}"
+      class="eal-btn eal-btn-outline iroad-attachment-preview-link"
+      data-attachment-preview
+      data-file-url="{{ txn.attachment.url }}"
+      data-file-name="{{ txn.attachment.name }}"
+    >
       <i class="bi bi-download"></i>
       <span>{% if LANGUAGE_CODE|slice:':2' == 'ar' %}فتح المرفق{% else %}{% translate "Open attachment" %}{% endif %}</span>
     </a>

@@ -4,6 +4,7 @@ Shipment execution sub-stage and A2/A3 shipment-bound policy tests.
 
 from __future__ import annotations
 
+from datetime import date
 from unittest.mock import MagicMock, patch
 from uuid import uuid4
 
@@ -172,7 +173,158 @@ class BookingOnlyRegressionTests(SimpleTestCase):
         booking = MagicMock()
         booking.booking_id = uuid4()
         booking.booking_status = 'Confirmed'
-        action = _action('A2', 'Pickup')
+        action = _action('A2', 'Pickup Arrival')
         self.assertFalse(
             _action_is_allowed(action, booking=booking),
         )
+
+    @patch(
+        'iroad_tenants.operation_execution._booking_has_active_shipment',
+        return_value=False,
+    )
+    @patch(
+        'iroad_tenants.operation_execution._booking_loading_done',
+        return_value=False,
+    )
+    @patch(
+        'iroad_tenants.operation_execution._booking_pickup_done',
+        return_value=False,
+    )
+    @patch(
+        'iroad_tenants.operation_execution._booking_start_job_done',
+        return_value=False,
+    )
+    @patch(
+        'iroad_tenants.operation_execution._executed_action_ids',
+        return_value=set(),
+    )
+    def test_auto_shipment_a4_blocked_until_loading_done(self, _ids, _a1, _a2, _a3, _active):
+        booking = MagicMock()
+        booking.booking_id = uuid4()
+        booking.booking_status = 'Confirmed'
+        action = _action('A4', 'Confirm Loaded', auto_shipment_post=True)
+        self.assertFalse(_action_is_allowed(action, booking=booking))
+
+    @patch(
+        'iroad_tenants.operation_execution._booking_has_active_shipment',
+        return_value=False,
+    )
+    @patch(
+        'iroad_tenants.operation_execution._booking_loading_done',
+        return_value=True,
+    )
+    @patch(
+        'iroad_tenants.operation_execution._booking_pickup_done',
+        return_value=True,
+    )
+    @patch(
+        'iroad_tenants.operation_execution._booking_start_job_done',
+        return_value=True,
+    )
+    @patch(
+        'iroad_tenants.operation_execution._executed_action_ids',
+        return_value=set(),
+    )
+    def test_auto_shipment_a4_allowed_after_a1_a2_a3(self, _ids, _a1, _a2, _a3, _active):
+        booking = MagicMock()
+        booking.booking_id = uuid4()
+        booking.booking_status = 'Confirmed'
+        action = _action('A4', 'Confirm Loaded', auto_shipment_post=True)
+        self.assertTrue(_action_is_allowed(action, booking=booking))
+
+    @patch(
+        'iroad_tenants.operation_execution._booking_has_active_shipment',
+        return_value=False,
+    )
+    @patch(
+        'iroad_tenants.operation_execution._booking_start_job_done',
+        return_value=False,
+    )
+    @patch(
+        'iroad_tenants.operation_execution._executed_action_ids',
+        return_value=set(),
+    )
+    def test_booking_a2_blocked_until_start_job(self, _ids, _a1, _active):
+        booking = MagicMock()
+        booking.booking_id = uuid4()
+        booking.booking_status = 'Confirmed'
+        action = _action('A2', 'Pickup Arrival')
+        self.assertFalse(_action_is_allowed(action, booking=booking))
+
+    @patch(
+        'iroad_tenants.operation_execution.TenantOperationActionLog',
+    )
+    def test_execution_date_alone_does_not_count_as_start_job(self, mock_log_model):
+        booking = MagicMock()
+        booking.booking_id = uuid4()
+        booking.execution_date = date(2026, 6, 17)
+        mock_log_model.objects.filter.return_value.exclude.return_value.select_related.return_value = []
+        from iroad_tenants.operation_execution import _booking_start_job_done
+
+        self.assertFalse(_booking_start_job_done(booking))
+
+    @patch(
+        'iroad_tenants.operation_execution._booking_has_active_shipment',
+        return_value=False,
+    )
+    @patch(
+        'iroad_tenants.operation_execution._booking_loading_done',
+        return_value=True,
+    )
+    @patch(
+        'iroad_tenants.operation_execution._booking_pickup_done',
+        return_value=True,
+    )
+    @patch(
+        'iroad_tenants.operation_execution._booking_start_job_done',
+        return_value=False,
+    )
+    @patch(
+        'iroad_tenants.operation_execution._executed_action_ids',
+        return_value=set(),
+    )
+    def test_auto_shipment_a4_blocked_until_start_job_even_if_loading_logged(
+        self,
+        _ids,
+        _a1,
+        _a2,
+        _a3,
+        _active,
+    ):
+        booking = MagicMock()
+        booking.booking_id = uuid4()
+        booking.booking_status = 'Confirmed'
+        action = _action('A4', 'Confirm Loaded', auto_shipment_post=True)
+        self.assertFalse(_action_is_allowed(action, booking=booking))
+
+    @patch(
+        'iroad_tenants.operation_execution._executed_action_ids',
+        return_value=set(),
+    )
+    def test_booking_only_blocks_shipment_phase_actions_like_a8(self, _ids):
+        booking = MagicMock()
+        booking.booking_id = uuid4()
+        booking.booking_status = 'Confirmed'
+        action = _action('A8', 'Unloading Completed', movement_status_impact='Completed')
+        self.assertFalse(_action_is_allowed(action, booking=booking))
+
+    @patch(
+        'iroad_tenants.operation_execution._executed_action_ids',
+        return_value=set(),
+    )
+    @patch(
+        'iroad_tenants.operation_execution._shipment_has_active_movement',
+        return_value=False,
+    )
+    @patch(
+        'iroad_tenants.operation_execution._shipment_pickup_loading_done',
+        return_value=(False, False),
+    )
+    def test_shipment_a4_blocked_until_pickup_and_loading(self, _logs, _movement, _ids):
+        action = _action(
+            'A4',
+            'Confirm Loaded',
+            shipment_status_impact=TenantShipment.ShipmentStatus.LOADED,
+        )
+        shipment = _shipment()
+        self.assertFalse(_action_is_allowed(action, shipment=shipment))

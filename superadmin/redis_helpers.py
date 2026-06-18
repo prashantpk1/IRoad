@@ -1,39 +1,151 @@
 import json
 import logging
+import threading
+import time
 import uuid
 
 import redis
-from datetime import timedelta
-
 from django.conf import settings
 from django.utils import timezone
 
 logger = logging.getLogger(__name__)
 
+REDIS_UNAVAILABLE = object()
+
+_redis_pool = None
+_redis_pool_lock = threading.Lock()
+_redis_unavailable_until = 0.0
+
+
+def _redis_circuit_seconds():
+    return max(5, int(getattr(settings, 'REDIS_CIRCUIT_BREAKER_SECONDS', 30)))
+
+
+def _redis_connect_timeout():
+    return max(1, int(getattr(settings, 'REDIS_SOCKET_CONNECT_TIMEOUT', 2)))
+
+
+def _redis_socket_timeout():
+    return max(1, int(getattr(settings, 'REDIS_SOCKET_TIMEOUT', 5)))
+
+
+def is_redis_circuit_open():
+    """True when recent Redis failures triggered the circuit breaker."""
+    return time.monotonic() < _redis_unavailable_until
+
+
+def redis_safe_get(key):
+    """Return key value, ``REDIS_UNAVAILABLE`` when Redis is down, else None if missing."""
+    if is_redis_circuit_open():
+        return REDIS_UNAVAILABLE
+
+    def _get():
+        return get_redis_client().get(key)
+
+    _get.__name__ = 'redis_get'
+    return _redis_call(_get, fallback=REDIS_UNAVAILABLE)
+
+
+def redis_safe_setex(key, ttl_seconds, value):
+    """Persist a key with TTL. Returns True, False (Redis down), or raises on hard errors."""
+    if is_redis_circuit_open():
+        return False
+
+    def _setex():
+        get_redis_client().setex(key, ttl_seconds, value)
+        return True
+
+    _setex.__name__ = 'redis_setex'
+    result = _redis_call(_setex, fallback=False)
+    return result is True
+
+
+def redis_safe_set(key, value, *, nx=False, ex=None):
+    """SET with optional NX/EX. Returns True/False/None (nx miss), or False when Redis is down."""
+    if is_redis_circuit_open():
+        return False
+
+    def _set():
+        kwargs = {}
+        if nx:
+            kwargs['nx'] = True
+        if ex is not None:
+            kwargs['ex'] = ex
+        return get_redis_client().set(key, value, **kwargs)
+
+    _set.__name__ = 'redis_set'
+    return _redis_call(_set, fallback=False)
+
+
+def redis_safe_delete(key):
+    if is_redis_circuit_open():
+        return False
+
+    def _delete():
+        get_redis_client().delete(key)
+        return True
+
+    _delete.__name__ = 'redis_delete'
+    return _redis_call(_delete, fallback=False) is True
+
 
 def get_redis_client():
-    return redis.from_url(settings.REDIS_URL, decode_responses=True)
+    """Return a pooled Redis client (one pool per process)."""
+    global _redis_pool
+    if _redis_pool is None:
+        with _redis_pool_lock:
+            if _redis_pool is None:
+                _redis_pool = redis.ConnectionPool.from_url(
+                    settings.REDIS_URL,
+                    decode_responses=True,
+                    socket_connect_timeout=_redis_connect_timeout(),
+                    socket_timeout=_redis_socket_timeout(),
+                    retry_on_timeout=True,
+                    health_check_interval=30,
+                )
+    return redis.Redis(connection_pool=_redis_pool)
+
+
+def reset_redis_client():
+    """Drop pooled connections (tests or after Redis restarts)."""
+    global _redis_pool, _redis_unavailable_until
+    with _redis_pool_lock:
+        if _redis_pool is not None:
+            try:
+                _redis_pool.disconnect(inuse_connections=True)
+            except Exception:
+                pass
+            _redis_pool = None
+        _redis_unavailable_until = 0.0
 
 
 def _redis_call(action, fallback=None):
     """Run a Redis operation; return fallback when Redis is unavailable."""
+    global _redis_unavailable_until
+    now = time.monotonic()
+    if now < _redis_unavailable_until:
+        return fallback
     try:
-        return action()
+        result = action()
+        _redis_unavailable_until = 0.0
+        return result
     except (redis.RedisError, OSError, ConnectionError) as exc:
+        _redis_unavailable_until = now + _redis_circuit_seconds()
         logger.warning(
-            'Redis unavailable during %s (%s)',
-            action.__name__,
+            'Redis unavailable during %s (%s). Retrying after %ss.',
+            getattr(action, '__name__', 'redis_op'),
             exc,
+            _redis_circuit_seconds(),
         )
         return fallback
 
 
 def redis_health_check():
-    try:
-        get_redis_client().ping()
-        return True
-    except Exception:
-        return False
+    def _ping():
+        return get_redis_client().ping()
+
+    _ping.__name__ = 'redis_health_check'
+    return _redis_call(_ping, fallback=False) is True
 
 
 # ─────────────────────────────────────────
@@ -46,10 +158,10 @@ def create_admin_session(admin_user, ip_address, user_agent, timeout_minutes):
     / Sales / Support). Payload uses ``admin_id`` only — **no** subscriber
     ``tenant_id`` (tenant UUID is for tenant workspace / API bridge only).
 
-    Returns jti (session ID).
+    Returns jti (session ID). When Redis is unavailable the jti is still returned
+    so Django session auth can proceed in degraded mode (kill-switch disabled).
     Key: admin:session:{jti}
     """
-    client = get_redis_client()
     jti = str(uuid.uuid4())
     now = timezone.now().isoformat()
 
@@ -69,7 +181,11 @@ def create_admin_session(admin_user, ip_address, user_agent, timeout_minutes):
 
     ttl_seconds = timeout_minutes * 60
     key = f'admin:session:{jti}'
-    client.setex(key, ttl_seconds, json.dumps(session_data))
+    if not redis_safe_setex(key, ttl_seconds, json.dumps(session_data)):
+        logger.warning(
+            'Redis unavailable; admin session %s not persisted (Django session auth may still work).',
+            jti,
+        )
     return jti
 
 
@@ -221,9 +337,9 @@ def create_tenant_session(
     in claims (e.g. ``tenant_id``) for this domain only — never mix into admin
     tokens.
 
-    Returns JTI string (UUID).
+    Returns JTI string (UUID). When Redis is unavailable the jti is still returned
+    so tenant portal JWT/cookie auth can proceed in degraded mode.
     """
-    client = get_redis_client()
     token = jti or str(uuid.uuid4())
     now = timezone.now().isoformat()
     session_data = {
@@ -239,7 +355,11 @@ def create_tenant_session(
     }
     ttl_seconds = max(60, int(timeout_minutes) * 60)
     key = f'tenant:{tenant_id}:session:{token}'
-    client.setex(key, ttl_seconds, json.dumps(session_data))
+    if not redis_safe_setex(key, ttl_seconds, json.dumps(session_data)):
+        logger.warning(
+            'Redis unavailable; tenant session %s not persisted (JWT/cookie auth may still work).',
+            token,
+        )
     return token
 
 
@@ -360,4 +480,3 @@ def get_tenant_session(tenant_id, jti):
 
     _fetch.__name__ = 'get_tenant_session'
     return _redis_call(_fetch, fallback=None)
-

@@ -333,9 +333,7 @@
                 <td>{{ row.signer_location }}</td>
                 <td>
                   {% if row.attachment_url %}
-                  <a href="{{ row.attachment_url }}" target="_blank" rel="noopener" style="color: var(--primary-color)">
-                    <span class="status-badge in-transit"><i class="bi bi-paperclip"></i> {{ row.attachment_label|default:"View" }}</span>
-                  </a>
+                  {% include 'partials/attachment_preview_link.html' with file_url=row.attachment_url file_name=row.attachment_label label=row.attachment_label|default:"View" link_class="status-badge in-transit" %}
                   {% elif row.attachment_label %}
                   <span class="status-badge in-transit"><i class="bi bi-paperclip"></i> {{ row.attachment_label }}</span>
                   {% else %}

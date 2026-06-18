@@ -655,6 +655,8 @@
                           <option
                             value="{{ cargo.cargo_id }}"
                             data-client-account-id="{{ cargo.client_account_id }}"
+                            data-uom="{{ cargo.uom|default:'' }}"
+                            data-weight-per-unit="{{ cargo.weight_per_unit|default:'' }}"
                             {% if booking_form_data.cargo_id_1 == cargo.cargo_id|stringformat:'s' %}selected{% endif %}
                           >
                             {{ cargo.cargo_code }} - {{ cargo.display_name }}
@@ -678,6 +680,8 @@
                           class="form-control cargo-unit-input{% if booking_form_errors.cargo_unit_1 %} is-invalid{% endif %}"
                           name="cargo_unit_1"
                           maxlength="50"
+                          placeholder="e.g. PCS, Ton, Box"
+                          autocomplete="off"
                           value="{{ booking_form_data.cargo_unit_1|default:'' }}"
                         />
                       </td>
@@ -1324,6 +1328,32 @@
               }
             }
           }
+          syncCargoFromSelectedOption(false);
+        }
+
+        function getSelectedCargoOption(cargoSelect) {
+          if (!cargoSelect || cargoSelect.selectedIndex < 0) return null;
+          return cargoSelect.options[cargoSelect.selectedIndex];
+        }
+
+        function syncCargoFromSelectedOption(useOptionDefaults) {
+          var cargoSelect = document.querySelector("select[name='cargo_id_1']");
+          var cargoUnitInput = document.querySelector("input[name='cargo_unit_1']");
+          var cargoWeightInput = document.querySelector("input[name='cargo_weight_1']");
+          var selectedCargo = getSelectedCargoOption(cargoSelect);
+          if (!selectedCargo || !selectedCargo.value) {
+            if (useOptionDefaults && cargoUnitInput) cargoUnitInput.value = "";
+            if (useOptionDefaults && cargoWeightInput) cargoWeightInput.value = "";
+            updateCargoTotals();
+            return;
+          }
+          if (cargoUnitInput && (useOptionDefaults || !(cargoUnitInput.value || "").trim())) {
+            cargoUnitInput.value = selectedCargo.getAttribute("data-uom") || "";
+          }
+          if (cargoWeightInput && (useOptionDefaults || !(cargoWeightInput.value || "").trim())) {
+            cargoWeightInput.value = selectedCargo.getAttribute("data-weight-per-unit") || "";
+          }
+          updateCargoTotals();
         }
 
         function updateBookingLineSelectors() {
@@ -1544,6 +1574,10 @@
             }
             if (cargoWeight && Number(cargoWeight.value || "0") < 0) {
               addFieldError("cargo_weight_1", "Cargo weight cannot be negative.");
+            }
+            var cargoUnit = formEl.querySelector("input[name='cargo_unit_1']");
+            if (cargoUnit && !(cargoUnit.value || "").trim()) {
+              addFieldError("cargo_unit_1", "Cargo unit is required before confirming a booking.");
             }
           }
 
@@ -2094,6 +2128,7 @@
             return;
           }
           if (event.target.matches("select[name='cargo_id_1']")) {
+            syncCargoFromSelectedOption(true);
             syncBookingForeignKeyFields();
           }
         });

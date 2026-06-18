@@ -23,9 +23,6 @@ def _is_hard_copy_action(action) -> bool:
 
 # IRoute Ch.2 forward-action evidence conventions (UI metadata only).
 _GPS_ACTION_NEEDLES = (
-    'start job',
-    'a1',
-    'action 1',
     'pickup',
     'arrival',
     'a2',
@@ -80,7 +77,7 @@ def _localized_action_name(action, request=None) -> str:
 
 
 def infer_requires_gps(action) -> bool:
-    if action is None:
+    if action is None or _is_direct_execute_action(action):
         return False
     if action_matches(action, *_GPS_ACTION_NEEDLES):
         return True
@@ -119,11 +116,36 @@ def infer_requires_video(action) -> bool:
 
 
 def infer_requires_note(action) -> bool:
-    if action is None:
+    if action is None or _is_start_job_action(action):
         return False
     if action_matches(action, *_NOTE_ACTION_NEEDLES):
         return True
     return bool((action.booking_status_impact or '').strip())
+
+
+def _is_start_job_action(action) -> bool:
+    if action is None:
+        return False
+    if (getattr(action, 'action_code', '') or '').strip().upper() == 'A1':
+        return True
+    return action_matches(action, 'start job', 'action 1')
+
+
+def _is_unloading_completed_action(action) -> bool:
+    if action is None:
+        return False
+    if (getattr(action, 'action_code', '') or '').strip().upper() == 'A8':
+        return True
+    return action_matches(action, 'unloading completed', 'action 8')
+
+
+def _is_direct_execute_action(action) -> bool:
+    """One-tap status actions — no evidence capture wizard on execute."""
+    return (
+        _is_start_job_action(action)
+        or _is_unloading_completed_action(action)
+        or _is_job_closed_action(action)
+    )
 
 
 def _is_job_closed_action(action) -> bool:
@@ -133,7 +155,7 @@ def _is_job_closed_action(action) -> bool:
 
 
 def _job_closed_execution_requirements(action) -> dict[str, Any]:
-    """A10 closes the job — no GPS, photo, video, or note capture."""
+    """Status-only actions — no GPS, photo, video, or note capture."""
     return {
         'gps': False,
         'photo': False,
@@ -145,6 +167,8 @@ def _job_closed_execution_requirements(action) -> dict[str, Any]:
         'note': False,
         'note_required': False,
         'signature': False,
+        'direct_execute': True,
+        'capture_mode': '',
         'auto_movement_post': False,
         'auto_pod_post': False,
         'auto_shipment_post': False,
@@ -161,7 +185,7 @@ def _job_closed_execution_requirements(action) -> dict[str, Any]:
 
 def build_execution_requirements(action, *, shipment=None) -> dict[str, Any]:
     """Structured capture requirements for mobile execute-action UI."""
-    if _is_job_closed_action(action):
+    if _is_direct_execute_action(action):
         return _job_closed_execution_requirements(action)
     if _is_hard_copy_action(action):
         return {
@@ -338,33 +362,43 @@ def project_allowed_action_row(
             tenant_schema=tenant_schema,
         )
 
-    code = (getattr(action, 'action_code', '') or '').strip().upper()
-    if code == 'A8':
-        row['screen'] = 'job_detail'
-        row['action'] = 'execute_action'
-        row.pop('capture_mode', None)
-        row.pop('capture_ui', None)
-        row.pop('screen_title', None)
-        requirements = dict(row.get('execution_requirements') or {})
-        requirements.update(
-            {
-                'photo': False,
-                'photo_min_count': 0,
-                'video': False,
-                'video_min_count': 0,
-                'video_max_count': 0,
-                'video_optional': False,
-                'note': False,
-                'note_required': False,
-                'signature': False,
-                'capture_mode': '',
-            },
-        )
-        row['execution_requirements'] = requirements
-        row['requires_photo'] = False
-        row['requires_video'] = False
-        row['requires_note'] = False
+    if _is_direct_execute_action(action):
+        return _apply_direct_execute_action_row(row)
     return row
+
+
+def _apply_direct_execute_action_row(row: dict[str, Any]) -> dict[str, Any]:
+    """Tap-to-execute on Job Detail — never open the evidence capture wizard."""
+    out = dict(row)
+    out['screen'] = 'job_detail'
+    out['action'] = 'execute_action'
+    out.pop('capture_mode', None)
+    out.pop('capture_ui', None)
+    out.pop('screen_title', None)
+    out.pop('pod_capture_steps', None)
+    requirements = dict(out.get('execution_requirements') or {})
+    requirements.update(
+        {
+            'gps': False,
+            'photo': False,
+            'photo_min_count': 0,
+            'video': False,
+            'video_min_count': 0,
+            'video_max_count': 0,
+            'video_optional': False,
+            'note': False,
+            'note_required': False,
+            'signature': False,
+            'direct_execute': True,
+            'capture_mode': '',
+        },
+    )
+    out['execution_requirements'] = requirements
+    out['requires_gps'] = False
+    out['requires_photo'] = False
+    out['requires_video'] = False
+    out['requires_note'] = False
+    return out
 
 
 def project_allowed_actions_payload(

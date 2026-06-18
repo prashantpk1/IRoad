@@ -5,6 +5,7 @@ from django.db.models import Q
 from django.utils.translation import gettext_lazy as _
 from django_tenants.utils import schema_context
 
+from config.text_validators import ArabicTextFormMixin
 from superadmin.models import Country
 from tenant_workspace.models import (
     TenantAddressMaster,
@@ -57,7 +58,7 @@ def _digits_only(value: str, required: bool) -> str:
     return s
 
 
-class TenantAddressMasterForm(forms.ModelForm):
+class TenantAddressMasterForm(ArabicTextFormMixin, forms.ModelForm):
     address_code_preview = forms.CharField(
         label=_('Address Code'),
         required=False,
@@ -111,7 +112,13 @@ class TenantAddressMasterForm(forms.ModelForm):
                 attrs={'class': 'form-control', 'placeholder': _('e.g. Main Warehouse')}
             ),
             'arabic_label': forms.TextInput(
-                attrs={'class': 'form-control', 'dir': 'rtl', 'placeholder': _('مثال: المستودع الرئيسي')}
+                attrs={
+                    'class': 'form-control eal-arabic',
+                    'dir': 'rtl',
+                    'lang': 'ar',
+                    'data-arabic-only': '1',
+                    'placeholder': _('مثال: المستودع الرئيسي'),
+                }
             ),
             'english_label': forms.TextInput(
                 attrs={'class': 'form-control', 'placeholder': _('e.g. Head Office')}

@@ -2,6 +2,7 @@ import os
 import re
 
 from django import forms
+from config.text_validators import ArabicTextFormMixin, apply_arabic_field_widgets, is_arabic_text_field
 from django.core.exceptions import ValidationError
 import pytz
 
@@ -65,6 +66,18 @@ def apply_premium_styling(form):
             existing_classes = widget.attrs.get('class', '')
             if 'form-check-input' not in existing_classes:
                 widget.attrs['class'] = f"{existing_classes} form-check-input".strip()
+
+        if is_arabic_text_field(field_name) and widget_name in {
+            'TextInput', 'Textarea',
+        }:
+            existing_classes = widget.attrs.get('class', '')
+            if 'eal-arabic' not in existing_classes:
+                widget.attrs['class'] = f"{existing_classes} eal-arabic".strip()
+            widget.attrs.setdefault('dir', 'rtl')
+            widget.attrs.setdefault('lang', 'ar')
+            widget.attrs.setdefault('data-arabic-only', '1')
+
+    apply_arabic_field_widgets(form)
 
 
 class LoginForm(forms.Form):
@@ -176,7 +189,7 @@ class SetPasswordForm(forms.Form):
             self.add_error('password_confirm', 'Passwords do not match.')
         return cleaned
 
-class RoleForm(forms.ModelForm):
+class RoleForm(ArabicTextFormMixin, forms.ModelForm):
     """Status is edited via a boolean toggle (Active ↔ Inactive) in templates."""
 
     status_active = forms.BooleanField(
@@ -380,7 +393,7 @@ class MyAccountForm(forms.ModelForm):
         return cleaned_data
 
 
-class CountryForm(forms.ModelForm):
+class CountryForm(ArabicTextFormMixin, forms.ModelForm):
     class Meta:
         model = Country
         fields = ['country_code', 'name_en', 'name_ar', 'is_active']
@@ -432,7 +445,7 @@ class CountryForm(forms.ModelForm):
         return value
 
 
-class CurrencyForm(forms.ModelForm):
+class CurrencyForm(ArabicTextFormMixin, forms.ModelForm):
     class Meta:
         model = Currency
         fields = [
@@ -503,7 +516,7 @@ class CurrencyForm(forms.ModelForm):
         return value
 
 
-class TaxCodeForm(forms.ModelForm):
+class TaxCodeForm(ArabicTextFormMixin, forms.ModelForm):
     DEFAULT_CHOICES = [
         ('country', 'Set as Country Default'),
         ('international', 'Set as International Default'),
@@ -642,7 +655,7 @@ class GeneralTaxSettingsForm(forms.ModelForm):
             ]
 
 
-class LegalIdentityForm(forms.ModelForm):
+class LegalIdentityForm(ArabicTextFormMixin, forms.ModelForm):
     class Meta:
         model = LegalIdentity
         fields = [
@@ -778,7 +791,7 @@ class ExchangeRateForm(forms.ModelForm):
         return value
 
 
-class SubscriptionPlanForm(forms.ModelForm):
+class SubscriptionPlanForm(ArabicTextFormMixin, forms.ModelForm):
     MAX_FIELDS = [
         'max_internal_users',
         'max_internal_trucks',
@@ -1232,7 +1245,7 @@ class PaymentGatewayForm(forms.ModelForm):
         return value
 
 
-class PaymentMethodForm(forms.ModelForm):
+class PaymentMethodForm(ArabicTextFormMixin, forms.ModelForm):
     class Meta:
         model = PaymentMethod
         fields = [
@@ -1379,7 +1392,7 @@ class CommGatewayForm(forms.ModelForm):
         return cleaned
 
 
-class NotificationTemplateForm(forms.ModelForm):
+class NotificationTemplateForm(ArabicTextFormMixin, forms.ModelForm):
     class Meta:
         model = NotificationTemplate
         fields = [
@@ -1548,7 +1561,7 @@ class EventMappingForm(forms.ModelForm):
         return cleaned
 
 
-class PushNotificationForm(forms.ModelForm):
+class PushNotificationForm(ArabicTextFormMixin, forms.ModelForm):
     class Meta:
         model = PushNotification
         fields = [
@@ -1669,7 +1682,7 @@ class PushNotificationForm(forms.ModelForm):
         return cleaned
 
 
-class SystemBannerForm(forms.ModelForm):
+class SystemBannerForm(ArabicTextFormMixin, forms.ModelForm):
     class Meta:
         model = SystemBanner
         fields = [
@@ -1906,7 +1919,7 @@ class TenantProfileUpdateForm(forms.ModelForm):
         return value
 
 
-class SupportCategoryForm(forms.ModelForm):
+class SupportCategoryForm(ArabicTextFormMixin, forms.ModelForm):
     class Meta:
         model = SupportCategory
         fields = ['name_en', 'name_ar', 'is_active']

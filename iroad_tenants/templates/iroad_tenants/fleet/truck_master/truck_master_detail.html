@@ -350,10 +350,8 @@
                     {% endif %}
                   </td>
                   <td>
-                    {% if row.file_name %}
-                    <span class="tm-doc-file" title="{{ row.file_name }}">
-                      <i class="bi {{ row.file_icon_class }} me-1 flex-shrink-0"></i><span class="tm-doc-file-name">{{ row.file_name }}</span>
-                    </span>
+                    {% if row.has_file %}
+                    {% include 'partials/attachment_preview_link.html' with file_url=row.file_url file_name=row.file_name label=row.file_name icon_class=row.file_icon_class link_class="tm-doc-file" %}
                     {% else %}
                     <span class="text-muted">—</span>
                     {% endif %}

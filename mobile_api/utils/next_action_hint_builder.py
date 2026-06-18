@@ -7,6 +7,7 @@ from __future__ import annotations
 
 from typing import Any
 
+from mobile_api.dashboard.selectors import booking_selection_policy as booking_policy
 from mobile_api.helpers.cod_amount import build_cod_payment_display
 from tenant_workspace.models import TenantShipment
 
@@ -79,6 +80,37 @@ def _hard_copy_step_required(pod_cod: dict[str, Any]) -> bool:
     return _hard_copy_applicable(pod_cod)
 
 
+def _resolve_round_trip_return_open_job(
+    booking: Any | None,
+    *,
+    driver: Any | None = None,
+) -> dict[str, Any] | None:
+    """
+    When outbound is done but backload has no shipment row yet, tell mobile to
+    open the booking-scoped return leg from the dashboard card.
+    """
+    if booking is None:
+        return None
+    from mobile_api.job_detail.helpers.booking_job_context import load_booking_shipments
+
+    shipments = load_booking_shipments(booking)
+    if not booking_policy.is_backload_leg_pending(booking, shipments):
+        return None
+    if driver is not None and not booking_policy.driver_owns_backload_leg(
+        driver,
+        booking,
+    ):
+        return None
+    booking_id = getattr(booking, 'booking_id', None) or getattr(booking, 'pk', None)
+    return {
+        'job_type': 'booking',
+        'job_id': str(booking_id) if booking_id is not None else '',
+        'job_no': str(getattr(booking, 'booking_no', '') or ''),
+        'booking_item_type': 'Backload',
+        'backload_bootstrap_pending': True,
+    }
+
+
 def _enrich_collect_payment_hint(
     hint: dict[str, Any],
     *,
@@ -92,6 +124,55 @@ def _enrich_collect_payment_hint(
     return out
 
 
+def _close_job_hint() -> dict[str, Any]:
+    return {
+        'action': 'execute_action',
+        'screen': 'job_detail',
+        'action_code': 'A10',
+        'reason': 'All steps complete. Tap to close the job.',
+        'job_closed': False,
+        'show_completion_screen': False,
+        'show_close_job_button': True,
+        'direct_execute': True,
+    }
+
+
+def _a10_in_allowed_actions(allowed: list[Any]) -> bool:
+    for row in allowed:
+        if not isinstance(row, dict):
+            continue
+        if str(row.get('action_code') or '').strip().upper() == 'A10':
+            return True
+    return False
+
+
+def _job_close_ready_for_hint(
+    *,
+    pod_cod: dict[str, Any],
+    order_type: str,
+    is_job_closed: bool,
+    shipment_status: str,
+) -> bool:
+    """Driver may close the job when POD/COD gates pass (POD Submitted or Delivered)."""
+    if is_job_closed:
+        return False
+    if _hard_copy_step_required(pod_cod):
+        return False
+    if pod_cod.get('treasury_pending'):
+        return False
+    if pod_cod.get('delivery_blocked') and not pod_cod.get('pod_compliant'):
+        return False
+    if not pod_cod.get('pod_compliant'):
+        return False
+    is_cod = (order_type or '').upper() == 'COD'
+    if is_cod and not pod_cod.get('cod_collected'):
+        return False
+    return (shipment_status or '').strip() in {
+        TenantShipment.ShipmentStatus.POD_SUBMITTED,
+        TenantShipment.ShipmentStatus.DELIVERED,
+    }
+
+
 def build_next_action_hint(
     workflow: dict[str, Any] | None = None,
     pod_cod: dict[str, Any] | None = None,
@@ -100,6 +181,7 @@ def build_next_action_hint(
     *,
     shipment: Any | None = None,
     booking: Any | None = None,
+    driver: Any | None = None,
     allowed_actions: Any | None = None,
 ) -> dict[str, Any]:
     """
@@ -153,24 +235,32 @@ def build_next_action_hint(
 
     # TERMINAL STATE — shipment column Closed (Delivered still needs A10)
     if is_job_closed or action_code == 'A10':
-        return {
+        open_job = _resolve_round_trip_return_open_job(booking, driver=driver)
+        hint: dict[str, Any] = {
             'action': 'go_to_dashboard',
             'screen': 'dashboard',
-            'reason': 'Job is complete. No more actions required.',
             'job_closed': True,
             'show_completion_screen': True,
         }
+        if open_job:
+            hint.update(
+                {
+                    'reason': (
+                        'Outbound trip complete. Tap Open Job on My Jobs to '
+                        'start the return trip.'
+                    ),
+                    'leg_completed': True,
+                    'booking_continues': True,
+                    'open_job': open_job,
+                },
+            )
+        else:
+            hint['reason'] = 'Job is complete. No more actions required.'
+        return hint
 
     # A10 is next — job about to close
     if next_code == 'A10':
-        return {
-            'action': 'execute_action',
-            'screen': 'job_detail',
-            'action_code': 'A10',
-            'reason': 'All steps complete. Tap to close the job.',
-            'job_closed': False,
-            'show_completion_screen': False,
-        }
+        return _close_job_hint()
 
     # A7 is next — open digital evidence capture (hard copy is a later A7H step)
     if next_code == 'A7':
@@ -215,6 +305,19 @@ def build_next_action_hint(
         '',
     }:
         return _hard_copy_confirmation_hint()
+
+    # A1 — booking start: direct execute, no evidence wizard
+    if next_code == 'A1':
+        return {
+            'action': 'execute_action',
+            'screen': 'job_detail',
+            'action_code': 'A1',
+            'direct_execute': True,
+            'requires_evidence_capture': False,
+            'reason': 'Start the job.',
+            'job_closed': False,
+            'show_completion_screen': False,
+        }
 
     # A8 — unloading is GPS-only (only after hard copy complete on Hard POD)
     if next_code == 'A8':
@@ -337,21 +440,18 @@ def build_next_action_hint(
             'show_completion_screen': False,
         }
 
-    # POD + COD complete — close job (A10)
-    if (
-        pod_compliant
-        and not is_job_closed
-        and (not is_cod or cod_collected)
-        and next_code == 'A10'
+    # POD + COD complete — show Close Job even when workflow lags (e.g. POD Submitted)
+    if _job_close_ready_for_hint(
+        pod_cod=pod_cod,
+        order_type=order_type,
+        is_job_closed=is_job_closed,
+        shipment_status=shipment_status,
+    ) and (
+        next_code == 'A10'
+        or _a10_in_allowed_actions(allowed)
+        or not next_code
     ):
-        return {
-            'action': 'execute_action',
-            'screen': 'job_detail',
-            'action_code': 'A10',
-            'reason': 'All steps complete. Tap to close the job.',
-            'job_closed': False,
-            'show_completion_screen': False,
-        }
+        return _close_job_hint()
 
     # POD compliant, A8 done, waiting for Delivered
     if pod_compliant and not is_job_closed:
@@ -370,6 +470,13 @@ def build_next_action_hint(
                 shipment=shipment,
                 booking=booking,
             )
+        if _job_close_ready_for_hint(
+            pod_cod=pod_cod,
+            order_type=order_type,
+            is_job_closed=is_job_closed,
+            shipment_status=shipment_status,
+        ):
+            return _close_job_hint()
         return {
             'action': 'refresh_job_detail',
             'screen': 'job_detail',

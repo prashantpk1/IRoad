@@ -222,7 +222,9 @@
             <span class="da-att-cell-text" title="{{ row.english_label }}">{{ row.english_label }}</span>
           </td>
           <td class="da-att-col-file da-att-col-clip">
-            {% if row.file_name %}
+            {% if row.file_url %}
+            {% include 'partials/attachment_preview_link.html' with file_url=row.file_url file_name=row.file_name label=row.file_name link_class="da-att-cell-text" %}
+            {% elif row.file_name %}
             <span class="da-att-cell-text" title="{{ row.file_name }}">{{ row.file_name }}</span>
             {% else %}
             &mdash;

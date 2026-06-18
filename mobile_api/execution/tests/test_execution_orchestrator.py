@@ -934,3 +934,60 @@ class ExecuteActionOrchestratorTests(SimpleTestCase):
             mock_aes.execute_driver_action.call_args.kwargs['mobile_cod_amount'],
             '100.50',
         )
+
+    def test_a7_execute_syncs_pod_attachments_after_media_persist(self):
+        orch = self._orchestrator()
+        with patch.object(orch._reconcile_service, 'prepare_pre_execute') as prep, patch.object(
+            orch._idempotency_guard,
+            'normalize_request_keys',
+            return_value=SimpleNamespace(idempotency_key='k1', source_ref=''),
+        ), patch.object(
+            orch._idempotency_guard,
+            'detect_idempotent_replay',
+            return_value=False,
+        ), patch.object(
+            orch._validation_service,
+            'validate_pre_execute_after_idempotency',
+            return_value=SimpleNamespace(ok=True, idempotent_replay=False),
+        ), patch(
+            'mobile_api.execution.services.execute_action_orchestrator.lock_execution_entities',
+        ), patch(
+            'mobile_api.execution.services.execute_action_orchestrator.prepare_a7_execute_evidence',
+        ), patch.object(
+            orch._evidence_service,
+            'validate_required_evidence',
+        ), patch.object(
+            orch._validation_service,
+            'resolve_operation_action',
+            return_value=SimpleNamespace(
+                action_code='A7',
+                english_label='Upload POD',
+                auto_pod_post=True,
+            ),
+        ), patch.object(
+            orch,
+            '_execute_kernel',
+            return_value=SimpleNamespace(action_log=_action_log(), reused_existing=False),
+        ), patch.object(
+            orch._media_service,
+            'persist_execution_media',
+        ), patch(
+            'iroad_tenants.operation_runtime.pod_action.sync_a7_pod_evidence_attachments',
+        ) as mock_sync, patch.object(
+            orch._response_service,
+            'build_execute_result',
+            return_value=ExecuteActionResult(payload={'execution': {}}, http_status=201),
+        ):
+            prep.side_effect = lambda ctx, **kw: setattr(ctx, 'shipment', _shipment()) or {}
+            orch._run_execute_pipeline(
+                driver=_driver(),
+                tenant_schema='tenant_test',
+                job_type='shipment',
+                job_id='ship-1',
+                action_code='A7',
+                payload=self._base_payload(),
+                request=None,
+                tenant_user=None,
+                user_id='user-1',
+            )
+        mock_sync.assert_called_once()

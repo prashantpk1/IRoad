@@ -281,6 +281,17 @@ class ExecuteActionOrchestrator:
         else:
             self._media_service.persist_execution_media(context)
 
+        # 11.5 A7 — promote evidence onto POD / delivery-note lines after media exists
+        if (context.action_code or '').strip().upper() == 'A7' and context.action_log is not None:
+            from iroad_tenants.operation_runtime.pod_action import (
+                sync_a7_pod_evidence_attachments,
+            )
+
+            sync_a7_pod_evidence_attachments(
+                action_log=context.action_log,
+                shipment=context.shipment,
+            )
+
         # 12. post reconcile + response
         result = self._response_service.build_execute_result(
             context,
@@ -610,6 +621,22 @@ class ExecuteActionOrchestrator:
         if context.movement is not None:
             return getattr(context.movement, 'truck', None)
         if context.booking is not None:
+            from mobile_api.job_detail.helpers.booking_job_context import (
+                resolve_pending_booking_item_type,
+            )
+
+            item_type = resolve_pending_booking_item_type(
+                context.booking,
+                driver=context.driver,
+            )
+            if (item_type or '').strip().casefold() in {'backload', 'inbound'}:
+                backload_truck = getattr(
+                    context.booking,
+                    'booking_line_backload_truck',
+                    None,
+                )
+                if backload_truck is not None:
+                    return backload_truck
             return getattr(context.booking, 'assigned_truck', None)
         return None
 

@@ -11,6 +11,7 @@ document.addEventListener("DOMContentLoaded", function () {
       initSidebarCollapse,
       initTimeValidation,
       initFormValidation,
+      initArabicTextInputs,
       initConfirmForms,
       initUserProfile,
       initNotificationPanel,
@@ -428,6 +429,70 @@ function initFormValidation() {
         });
       });
   }
+}
+
+/* ============================================
+   Arabic-only text inputs
+   ============================================ */
+var ARABIC_TEXT_INPUT_SELECTOR =
+  'input.eal-arabic, textarea.eal-arabic, input[data-arabic-only], textarea[data-arabic-only], input.arabic-input, textarea.arabic-input';
+
+var ARABIC_TEXT_DISALLOWED_RE =
+  /[^\s\u0600-\u06FF\u0750-\u077F\u08A0-\u08FF\uFB50-\uFDFF\uFE70-\uFEFF]/g;
+
+function sanitizeArabicTextInput(value) {
+  return String(value || "").replace(ARABIC_TEXT_DISALLOWED_RE, "");
+}
+
+function bindArabicTextInput(input) {
+  if (!input || input.dataset.arabicBound === "1") return;
+  input.dataset.arabicBound = "1";
+  if (!input.getAttribute("dir")) input.setAttribute("dir", "rtl");
+  if (!input.getAttribute("lang")) input.setAttribute("lang", "ar");
+
+  function applySanitizedValue(nextValue) {
+    if (input.value !== nextValue) {
+      input.value = nextValue;
+    }
+  }
+
+  input.addEventListener("input", function () {
+    applySanitizedValue(sanitizeArabicTextInput(input.value));
+  });
+
+  input.addEventListener("paste", function (event) {
+    event.preventDefault();
+    var pasted = "";
+    if (event.clipboardData) {
+      pasted = event.clipboardData.getData("text");
+    } else if (window.clipboardData) {
+      pasted = window.clipboardData.getData("Text");
+    }
+    var start = input.selectionStart;
+    var end = input.selectionEnd;
+    if (start == null || end == null) {
+      applySanitizedValue(sanitizeArabicTextInput((input.value || "") + pasted));
+      return;
+    }
+    var merged =
+      (input.value || "").slice(0, start) +
+      pasted +
+      (input.value || "").slice(end);
+    applySanitizedValue(sanitizeArabicTextInput(merged));
+    var caret = start + sanitizeArabicTextInput(pasted).length;
+    if (typeof input.setSelectionRange === "function") {
+      input.setSelectionRange(caret, caret);
+    }
+  });
+}
+
+function initArabicTextInputs(root) {
+  if (window.iroadArabicTextInputs && window.iroadArabicTextInputs.init) {
+    window.iroadArabicTextInputs.init(root);
+    return;
+  }
+  var scope = root && root.querySelectorAll ? root : document;
+  scope.querySelectorAll(ARABIC_TEXT_INPUT_SELECTOR).forEach(bindArabicTextInput);
 }
 
 /* ============================================

@@ -301,7 +301,13 @@
             {% for a in attachments %}
             <tr>
               <td>{{ forloop.counter }}</td>
-              <td class="text-break">{{ a.file.name|default:a.attachment_id }}</td>
+              <td class="text-break">
+                {% if a.file %}
+                {% include 'partials/attachment_preview_link.html' with file_url=a.file.url file_name=a.file.name label=a.file.name|default:a.attachment_id %}
+                {% else %}
+                {{ a.file.name|default:a.attachment_id }}
+                {% endif %}
+              </td>
               <td>{{ a.created_at|date:"d M Y, g:i A" }}</td>
               <td>
                 <a href="{{ a.file.url }}" class="eal-row-btn" title="{% translate 'Download' %}" target="_blank" rel="noopener">

@@ -53,11 +53,12 @@ def scoped_shipment_action_logs(
 ):
     if shipment is None:
         return TenantOperationActionLog.objects.none()
+    booking_id = getattr(shipment, 'booking_id', None)
+    scope = Q(shipment_id=shipment.pk) | Q(truck_movement__shipment_id=shipment.pk)
+    if booking_id:
+        scope |= Q(booking_id=booking_id, shipment__isnull=True)
     qs = (
-        TenantOperationActionLog.objects.filter(
-            Q(shipment_id=shipment.pk)
-            | Q(truck_movement__shipment_id=shipment.pk),
-        )
+        TenantOperationActionLog.objects.filter(scope)
         .exclude(operation_action__isnull=True)
         .select_related('operation_action', 'driver')
         .order_by('-log_date', '-created_at', '-log_id')
@@ -87,6 +88,7 @@ def scoped_booking_action_logs(
         return TenantOperationActionLog.objects.none()
     qs = (
         TenantOperationActionLog.objects.filter(booking_id=booking.pk)
+        .filter(shipment__isnull=True)
         .exclude(operation_action__isnull=True)
         .select_related('operation_action', 'driver')
         .order_by('-log_date', '-created_at', '-log_id')

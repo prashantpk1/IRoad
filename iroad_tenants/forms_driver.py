@@ -3,6 +3,7 @@ import os
 from django import forms
 from django.core.exceptions import ValidationError
 
+from config.text_validators import ArabicTextFormMixin
 from tenant_workspace.models import DriverAttachment, DriverSettings
 
 _ALLOWED_EXT = frozenset(
@@ -11,7 +12,7 @@ _ALLOWED_EXT = frozenset(
 _MAX_ATTACHMENT_BYTES = 10 * 1024 * 1024
 
 
-class DriverAttachmentForm(forms.ModelForm):
+class DriverAttachmentForm(ArabicTextFormMixin, forms.ModelForm):
     class Meta:
         model = DriverAttachment
         fields = [
@@ -28,9 +29,11 @@ class DriverAttachmentForm(forms.ModelForm):
         widgets = {
             'arabic_label': forms.TextInput(
                 attrs={
-                    'class': 'form-control',
+                    'class': 'form-control eal-arabic',
                     'placeholder': 'Enter Arabic label',
                     'dir': 'rtl',
+                    'lang': 'ar',
+                    'data-arabic-only': '1',
                 }
             ),
             'english_label': forms.TextInput(

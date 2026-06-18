@@ -26,3 +26,4 @@ class DriverBookingSelectionResult:
     shipments_completed: int = 0
     progress_percentage: int = 0
     booking_execution_stage: str = ''
+    is_backload_bootstrap: bool = False

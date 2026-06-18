@@ -457,85 +457,6 @@
           </div>
         </div>
 
-        <!-- Section 3: Hard Copy - Document Location & User (Dynamic Visibility) -->
-        <div
-          class="form-card pod-section-hard"
-          data-section="3"
-          id="hardCopySection"
-          style="display: none"
-        >
-          <div class="form-card-header">
-            <div class="form-card-icon amber">
-              <i class="bi bi-file-earmark-ruled"></i>
-            </div>
-            <div class="form-card-header-text">
-              <h2 class="form-card-title">Hard Copy Tracking</h2>
-      </div>
-            <span class="pod-section-badge hard"
-              ><i class="bi bi-file-earmark"></i> Hard Copy</span
-            >
-          </div>
-          <div class="form-card-body">
-            <div class="pod-info-callout warning">
-              <i class="bi bi-exclamation-triangle-fill"></i>
-              <div>
-                <strong>Hard POD Logic</strong> - Status becomes
-                <em>Complete</em> only when Document Location =
-                <strong>With Admin</strong>. Tracks document movement via
-                Document Location and Current User.
-              </div>
-            </div>
-            <div class="field-group">
-              <h3 class="field-group-title">
-                <i class="bi bi-person-check"></i>
-                Document Custody
-              </h3>
-              <div class="fields-grid cols-2">
-                <div class="field">
-                  <label class="form-label">Current Document Location</label>
-                  <div class="pod-location-visual" id="hardCopyLocationVisual">
-                    <div class="pod-loc-option" data-value="not_collected">
-                      <div class="pod-loc-icon error">
-                        <i class="bi bi-x-circle"></i>
-                      </div>
-                      <span>Not Collected</span>
-                    </div>
-                    <div class="pod-loc-option" data-value="with_driver">
-                      <div class="pod-loc-icon warning">
-                        <i class="bi bi-truck"></i>
-                      </div>
-                      <span>With Driver</span>
-                    </div>
-                    <div class="pod-loc-option" data-value="with_admin">
-                      <div class="pod-loc-icon success">
-                        <i class="bi bi-building-check"></i>
-                      </div>
-                      <span>With Admin</span>
-                    </div>
-                    <div class="pod-loc-option" data-value="with_client">
-                      <div class="pod-loc-icon info">
-                        <i class="bi bi-person"></i>
-                      </div>
-                      <span>With Client</span>
-                    </div>
-                  </div>
-                </div>
-                <div class="field">
-                  <label for="hardCurrentUser" class="form-label">Current User</label>
-                  <select class="form-select" id="hardCurrentUser">
-                    <option value="" {% if not pod_form_data.receiver_user_id %}selected{% endif %}>- Select User -</option>
-                    {% for user in user_options %}
-                    <option value="{{ user.user_id }}" {% if pod_form_data.receiver_user_id == user.user_id|stringformat:'s' %}selected{% endif %}>
-                      {{ user.full_name }}{% if user.username %} ({{ user.username }}){% endif %}
-                    </option>
-                    {% endfor %}
-                  </select>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-
         <!-- Section 4: POD Pages -->
         <div class="form-card" data-section="4">
           <div class="form-card-header">
@@ -734,7 +655,6 @@
         // ── POD Type (Digital / Soft / Hard — same as Booking & Shipment) ──
         const podTypeSelect = document.getElementById("podType");
         const softSection = document.getElementById("softCopySection");
-        const hardSection = document.getElementById("hardCopySection");
         const modeIndicator = document.getElementById("podModeIndicator");
         const podForm = document.getElementById("digitalPodForm");
 
@@ -746,12 +666,10 @@
           const token = normalizePodTypeToken(value);
           if (token === "soft") {
             if (softSection) softSection.style.display = "";
-            if (hardSection) hardSection.style.display = "none";
             if (modeIndicator) modeIndicator.className = "pod-mode-indicator";
             if (podForm) podForm.classList.remove("pod-mode-hard");
           } else if (token === "hard") {
             if (softSection) softSection.style.display = "none";
-            if (hardSection) hardSection.style.display = "";
             if (modeIndicator) {
               modeIndicator.className = "pod-mode-indicator hard-mode";
               modeIndicator.innerHTML =
@@ -760,7 +678,6 @@
             if (podForm) podForm.classList.add("pod-mode-hard");
           } else {
             if (softSection) softSection.style.display = "";
-            if (hardSection) hardSection.style.display = "none";
             if (modeIndicator) modeIndicator.className = "pod-mode-indicator";
             if (podForm) podForm.classList.remove("pod-mode-hard");
           }
@@ -1354,7 +1271,6 @@
         const docLocationSelect = document.getElementById("documentLocation");
         const locationBadge = document.getElementById("locationStatusBadge");
         const receiverUserId = document.getElementById("receiverUserId");
-        const hardCurrentUser = document.getElementById("hardCurrentUser");
 
         const locationConfig = {
           not_collected: {
@@ -1386,12 +1302,10 @@
           if (isOutOfCompany) {
             receiverUserId.value = "";
             receiverUserId.removeAttribute("required");
-            if (hardCurrentUser) hardCurrentUser.value = "";
           } else {
             receiverUserId.setAttribute("required", "required");
           }
           receiverUserId.disabled = isOutOfCompany;
-          if (hardCurrentUser) hardCurrentUser.disabled = isOutOfCompany;
         }
 
         function syncPodPageLocations(locationValue) {
@@ -1428,50 +1342,10 @@
                 "</span>";
             }
             syncReceiverUserAvailability(val);
-
-            // If Hard copy mode, sync hard copy visual
-            const hardVisual = document.getElementById(
-              "hardCopyLocationVisual",
-            );
-            if (hardVisual) {
-              hardVisual
-                .querySelectorAll(".pod-loc-option")
-                .forEach(function (opt) {
-                  opt.classList.toggle(
-                    "selected",
-                    opt.getAttribute("data-value") === val,
-                  );
-                });
-            }
             syncPodPageLocations(val);
           }
           docLocationSelect.addEventListener("change", syncDocumentLocation);
           syncDocumentLocation();
-        }
-        if (receiverUserId && hardCurrentUser) {
-          receiverUserId.addEventListener("change", function () {
-            hardCurrentUser.value = receiverUserId.value;
-          });
-          hardCurrentUser.addEventListener("change", function () {
-            receiverUserId.value = hardCurrentUser.value;
-          });
-        }
-
-        // ── Hard Copy Visual Location Selector ─────────
-        const hardVisual = document.getElementById("hardCopyLocationVisual");
-        if (hardVisual) {
-          hardVisual
-            .querySelectorAll(".pod-loc-option")
-            .forEach(function (opt) {
-              opt.addEventListener("click", function () {
-                const val = this.getAttribute("data-value");
-                // Update the main dropdown
-                if (docLocationSelect) {
-                  docLocationSelect.value = val;
-                  docLocationSelect.dispatchEvent(new Event("change"));
-                }
-              });
-            });
         }
 
         // ── Add / Remove POD Lines ─────────────────────

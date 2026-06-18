@@ -1,0 +1,50 @@
+{% if file_url %}
+<a
+  href="{{ file_url }}"
+  class="iroad-attachment-preview-link{% if link_class %} {{ link_class }}{% endif %}"
+  data-attachment-preview
+  data-file-url="{{ file_url }}"
+  data-file-name="{{ file_name|default:label|default:'' }}"
+  title="{% if preview_title %}{{ preview_title }}{% else %}Preview attachment{% endif %}"
+>
+  {% if not hide_icon %}
+    {% if icon_class %}
+    <i class="bi {{ icon_class }}"></i>
+    {% else %}
+      {% with fn=file_name|default:label|default:''|lower %}
+      {% if ".pdf" in fn %}
+      <i class="bi bi-file-earmark-pdf text-danger"></i>
+      {% elif ".png" in fn or ".jpg" in fn or ".jpeg" in fn or ".gif" in fn or ".webp" in fn %}
+      <i class="bi bi-file-earmark-image text-primary"></i>
+      {% elif ".mp4" in fn or ".webm" in fn or ".mov" in fn %}
+      <i class="bi bi-file-earmark-play text-primary"></i>
+      {% else %}
+      <i class="bi bi-paperclip"></i>
+      {% endif %}
+      {% endwith %}
+    {% endif %}
+  {% endif %}
+  <span class="iroad-attachment-preview-label">{{ label|default:file_name|default:"—" }}</span>
+</a>
+{% else %}
+<span class="iroad-attachment-preview-static{% if link_class %} {{ link_class }}{% endif %}">
+  {% if not hide_icon %}
+    {% if icon_class %}
+    <i class="bi {{ icon_class }}"></i>
+    {% else %}
+      {% with fn=file_name|default:label|default:''|lower %}
+      {% if ".pdf" in fn %}
+      <i class="bi bi-file-earmark-pdf text-danger"></i>
+      {% elif ".png" in fn or ".jpg" in fn or ".jpeg" in fn or ".gif" in fn or ".webp" in fn %}
+      <i class="bi bi-file-earmark-image text-primary"></i>
+      {% elif ".mp4" in fn or ".webm" in fn or ".mov" in fn %}
+      <i class="bi bi-file-earmark-play text-primary"></i>
+      {% else %}
+      <i class="bi bi-paperclip"></i>
+      {% endif %}
+      {% endwith %}
+    {% endif %}
+  {% endif %}
+  <span>{{ label|default:file_name|default:"—" }}</span>
+</span>
+{% endif %}

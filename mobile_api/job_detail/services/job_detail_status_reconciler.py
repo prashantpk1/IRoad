@@ -98,6 +98,15 @@ def reconcile_job_detail_entities(
             bundle['any_drift'] = True
 
     if context.job_type == 'shipment' and context.shipment is not None:
+        from iroad_tenants.operation_runtime.side_effects import (
+            maybe_advance_delivered_when_job_close_ready,
+        )
+
+        if maybe_advance_delivered_when_job_close_ready(context.shipment):
+            if hasattr(context.shipment, 'refresh_from_db'):
+                context.shipment.refresh_from_db(
+                    fields=['shipment_status', 'updated_at'],
+                )
         pod_bundle = reconcile_job_detail_pod_cod(context)
         bundle['pod_cod'] = pod_bundle
         bundle['compliance_integrity'] = dict(

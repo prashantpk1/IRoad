@@ -295,20 +295,16 @@
                             <i class="bi bi-arrow-repeat text-secondary me-2"></i>Update
                           </a>
                         </li>
-                        {% if not shipment.ui_locks.lock_delivery_address %}
                         <li>
                           <a class="dropdown-item" href="{% url 'iroad_tenants:tenant_operation_shipment_edit' shipment.shipment_id %}#shipment-address-section">
                             <i class="bi bi-pin-map text-success me-2"></i>Update Address
                           </a>
                         </li>
-                        {% endif %}
-                        {% if not shipment.ui_locks.lock_cargo %}
                         <li>
                           <a class="dropdown-item" href="{% url 'iroad_tenants:tenant_operation_shipment_edit' shipment.shipment_id %}#shipment-cargo-section">
                             <i class="bi bi-box text-warning me-2"></i>Update Cargo
                           </a>
                         </li>
-                        {% endif %}
                         <li>
                           {% if shipment.booking_action_id %}
                           <a class="dropdown-item" href="{% url 'iroad_tenants:tenant_operation_booking_assign_truck' shipment.booking_action_id %}">
@@ -320,7 +316,6 @@
                           </a>
                           {% endif %}
                         </li>
-                        {% if shipment.ui_locks.can_delete %}
                         <li><hr class="dropdown-divider" /></li>
                         <li>
                           <form method="post" action="{% url 'iroad_tenants:tenant_operation_shipment_delete' shipment.shipment_id %}" onsubmit="return confirm('Delete shipment {{ shipment.shipment_no|escapejs }}?');">
@@ -330,7 +325,6 @@
                             </button>
                           </form>
                         </li>
-                        {% endif %}
                       </ul>
                     </div>
                   </td>

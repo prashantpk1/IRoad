@@ -64,6 +64,12 @@ class JobDetailResponseBuilder:
         workflow = self._build_workflow(context)
         pod_cod = self._build_pod_cod(context)
         workflow = apply_hard_pod_workflow_overlay(workflow, pod_cod)
+        timeline = self._build_timeline(context)
+        workflow = self._attach_booking_timeline_to_workflow(
+            context,
+            workflow,
+            timeline,
+        )
 
         order_type = ''
         try:
@@ -82,12 +88,13 @@ class JobDetailResponseBuilder:
             order_type=order_type,
             shipment=getattr(context, 'shipment', None),
             booking=getattr(context, 'booking', None),
+            driver=getattr(context, 'driver', None),
         )
 
         return JobDetailApiPayload(
             job=self._build_job(context),
             workflow=workflow,
-            timeline=self._build_timeline(context),
+            timeline=timeline,
             pod_cod=pod_cod,
             round_trip=self._build_round_trip(context),
             alerts=self._build_alerts(context),
@@ -108,6 +115,26 @@ class JobDetailResponseBuilder:
 
     def _build_timeline(self, context: JobDetailContext) -> dict[str, Any]:
         return dict(context.timeline or {})
+
+    @staticmethod
+    def _attach_booking_timeline_to_workflow(
+        context: JobDetailContext,
+        workflow: dict[str, Any],
+        timeline: dict[str, Any],
+    ) -> dict[str, Any]:
+        """
+        Booking-scoped jobs: mirror full timeline steps on workflow for clients
+        that render the stepper from ``workflow`` instead of ``timeline``.
+        """
+        if context.job_type != 'booking':
+            return workflow
+        preview = list(timeline.get('timeline_preview') or [])
+        if not preview:
+            return workflow
+        out = dict(workflow or {})
+        out['timeline_preview'] = preview
+        out['timeline_step_count'] = len(preview)
+        return out
 
     def _build_pod_cod(self, context: JobDetailContext) -> dict[str, Any]:
         # TODO: return {} for movement jobs at assembly time if not already omitted upstream.

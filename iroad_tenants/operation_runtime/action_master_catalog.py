@@ -283,6 +283,28 @@ def resolve_auto_cod_verify_action() -> TenantOperationAction | None:
     return None
 
 
+def resolve_auto_close_job_action() -> TenantOperationAction | None:
+    """Resolve Action Master A10 (Job Closed) for post-Delivered auto-close logs."""
+    close_action = TenantOperationAction.objects.filter(
+        action_code__iexact='A10',
+        status=TenantOperationAction.Status.ACTIVE,
+    ).first()
+    if close_action is not None:
+        impact = resolve_shipment_status_impact(close_action.shipment_status_impact)
+        if impact == TenantShipment.ShipmentStatus.CLOSED:
+            return close_action
+    for row in TenantOperationAction.objects.filter(
+        status=TenantOperationAction.Status.ACTIVE,
+    ).order_by('sequence_number', 'action_code'):
+        code = (row.action_code or '').strip().upper()
+        if code != 'A10':
+            continue
+        impact = resolve_shipment_status_impact(row.shipment_status_impact)
+        if impact == TenantShipment.ShipmentStatus.CLOSED:
+            return row
+    return None
+
+
 def validate_production_action_master() -> list[str]:
     """Return human-readable configuration errors (empty = production-ready)."""
     errors: list[str] = []

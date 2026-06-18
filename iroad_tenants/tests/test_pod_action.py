@@ -13,6 +13,7 @@ from iroad_tenants.operation_runtime.pod_action import (
     apply_a7h_hard_pod_physical_posting,
     apply_pod_posting_from_action_log,
     birth_pod_from_action_log,
+    sync_a7_pod_evidence_attachments,
 )
 from tenant_workspace.models import TenantShipment, TenantShipmentDocumentPage
 
@@ -159,10 +160,43 @@ class SyncA7ActionLogMediaToPodPagesTests(TestCase):
 
         self.assertEqual(pod_line_1.map_url, 'uploads/photo1.jpg')
         self.assertEqual(pod_line_1.attachment_label, 'photo1.jpg')
+        self.assertEqual(pod_line_1.soft_copy_status, 'Collected')
         self.assertEqual(pod_line_1.digital_evidence_status, 'Collected')
         mock_pod_page_model.objects.create.assert_called_once()
         self.assertEqual(pod_line_2.map_url, 'uploads/clip.mp4')
         self.assertEqual(pod_line_2.attachment_label, 'clip.mp4')
+
+
+class SyncA7PodEvidenceAttachmentsTests(TestCase):
+    @patch('iroad_tenants.operation_runtime.pod_action._sync_a7_action_log_media_to_pod_pages')
+    @patch('iroad_tenants.operation_runtime.pod_action._find_existing_pod_for_source')
+    @patch('iroad_tenants.operation_runtime.pod_action.TenantShipmentDocument')
+    def test_finds_pod_and_syncs_after_mobile_media_persist(
+        self,
+        mock_document_model,
+        mock_find_pod,
+        mock_sync,
+    ):
+        action_log = MagicMock()
+        action_log.operation_action = SimpleNamespace(action_code='A7', english_label='Upload POD')
+        shipment = MagicMock()
+        shipment.pk = 'shipment-1'
+        action_log.shipment = shipment
+        source_document = MagicMock()
+        mock_document_model.objects.filter.return_value.order_by.return_value.first.return_value = (
+            source_document
+        )
+        pod_document = MagicMock()
+        pod_document.source_document = source_document
+        mock_find_pod.return_value = pod_document
+
+        sync_a7_pod_evidence_attachments(action_log=action_log, shipment=shipment)
+
+        mock_sync.assert_called_once_with(
+            action_log=action_log,
+            pod_document=pod_document,
+            source_document=source_document,
+        )
 
 
 class ApplyA7hHardPodPhysicalPostingTests(TestCase):

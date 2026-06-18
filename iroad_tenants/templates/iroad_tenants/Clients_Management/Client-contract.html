@@ -261,7 +261,7 @@
                   {% if is_edit_mode and editing_contract.has_contract_file %}
                   <p class="small text-muted mb-2">
                     Current file:
-                    <a href="{{ editing_contract.contract_attachment.url }}" target="_blank" rel="noopener">{{ editing_contract.contract_file_name }}</a>
+                    {% include 'partials/attachment_preview_link.html' with file_url=editing_contract.contract_attachment.url file_name=editing_contract.contract_file_name label=editing_contract.contract_file_name %}
                   </p>
                   {% endif %}
                   <input

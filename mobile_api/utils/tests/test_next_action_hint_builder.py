@@ -1,6 +1,8 @@
 """Unit tests for next_action_hint builder."""
 from __future__ import annotations
 
+from unittest.mock import MagicMock
+
 from django.test import SimpleTestCase
 
 from mobile_api.utils.next_action_hint_builder import build_next_action_hint
@@ -18,6 +20,29 @@ class NextActionHintBuilderTests(SimpleTestCase):
         )
         self.assertEqual(hint['action_code'], 'A10')
         self.assertEqual(hint['action'], 'execute_action')
+        self.assertTrue(hint.get('show_close_job_button'))
+
+    def test_cod_payment_complete_pod_submitted_shows_close_job_without_workflow_a10(
+        self,
+    ):
+        hint = build_next_action_hint(
+            workflow={
+                'allowed_actions': [],
+                'next_action': {},
+                'reconciliation': {'column_status': 'POD Submitted'},
+            },
+            pod_cod={
+                'pod_compliant': True,
+                'pod_pending': False,
+                'cod_collected': True,
+                'cod_pending': False,
+                'treasury_pending': False,
+                'delivery_blocked': False,
+            },
+            order_type='COD',
+        )
+        self.assertEqual(hint['action_code'], 'A10')
+        self.assertTrue(hint.get('show_close_job_button'))
 
     def test_after_a10_execute_go_dashboard(self):
         hint = build_next_action_hint(
@@ -28,6 +53,54 @@ class NextActionHintBuilderTests(SimpleTestCase):
         )
         self.assertTrue(hint['job_closed'])
         self.assertEqual(hint['action'], 'go_to_dashboard')
+
+    def test_after_a10_round_trip_outbound_hints_open_return_job(self):
+        booking = MagicMock()
+        booking.pk = 'bk-round-1'
+        booking.booking_id = booking.pk
+        booking.booking_no = 'BK-0043'
+        booking.trip_type = 'Round'
+        booking.assigned_driver_id = 'drv-1'
+        booking.booking_line_backload_driver_id = 'drv-1'
+        booking.shipments = MagicMock()
+        outbound = MagicMock()
+        outbound.booking_item_type = 'Outbound'
+        outbound.shipment_status = 'Closed'
+        outbound.shipment_sequence = 1
+        booking.shipments.all.return_value = [outbound]
+
+        driver = MagicMock()
+        driver.pk = 'drv-1'
+        driver.driver_id = 'drv-1'
+
+        hint = build_next_action_hint(
+            workflow={'allowed_actions': [], 'next_action': {}},
+            pod_cod={},
+            action_code='A10',
+            order_type='Credit',
+            booking=booking,
+            driver=driver,
+        )
+        self.assertEqual(hint['action'], 'go_to_dashboard')
+        self.assertTrue(hint.get('booking_continues'))
+        self.assertTrue(hint.get('leg_completed'))
+        open_job = hint.get('open_job') or {}
+        self.assertEqual(open_job.get('job_type'), 'booking')
+        self.assertEqual(open_job.get('job_id'), 'bk-round-1')
+        self.assertEqual(open_job.get('booking_item_type'), 'Backload')
+        self.assertTrue(open_job.get('backload_bootstrap_pending'))
+
+    def test_a1_hint_direct_execute(self):
+        hint = build_next_action_hint(
+            workflow={
+                'allowed_actions': [{'action_code': 'A1'}],
+                'next_action': {'action_code': 'A1'},
+            },
+        )
+        self.assertEqual(hint['action_code'], 'A1')
+        self.assertEqual(hint['action'], 'execute_action')
+        self.assertTrue(hint.get('direct_execute'))
+        self.assertFalse(hint.get('requires_evidence_capture', True))
 
     def test_a7_routes_to_pod_capture(self):
         hint = build_next_action_hint(

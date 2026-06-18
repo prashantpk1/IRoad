@@ -71,10 +71,42 @@ class EvidenceValidationTests(SimpleTestCase):
         self._media_security_patch.stop()
 
     def test_missing_gps_raises(self):
-        ctx = _context(payload={'latitude': '', 'longitude': ''})
+        ctx = _context(
+            operation_action=_action(
+                action_code='A2',
+                english_label='Pickup Arrival',
+                movement_status_impact='',
+            ),
+            action_code='A2',
+            payload={'latitude': '', 'longitude': ''},
+        )
         with self.assertRaises(ExecuteActionError) as exc:
             EvidenceValidationService().validate_required_evidence(ctx)
         self.assertEqual(exc.exception.code, 'gps_required')
+
+    def test_start_job_does_not_require_gps(self):
+        ctx = _context(
+            operation_action=_action(
+                action_code='A1',
+                english_label='Start Job',
+                movement_status_impact='',
+                booking_status_impact='In_Execution',
+            ),
+            payload={'latitude': '', 'longitude': ''},
+        )
+        EvidenceValidationService().validate_required_evidence(ctx)
+
+    def test_a8_unloading_does_not_require_gps(self):
+        ctx = _context(
+            operation_action=_action(
+                action_code='A8',
+                english_label='Unloading Completed',
+                movement_status_impact='Completed',
+            ),
+            action_code='A8',
+            payload={'latitude': '', 'longitude': ''},
+        )
+        EvidenceValidationService().validate_required_evidence(ctx)
 
     def test_gps_passes_when_provided(self):
         ctx = _context(
@@ -94,30 +126,49 @@ class EvidenceValidationTests(SimpleTestCase):
         with self.assertRaises(ExecuteActionError) as exc:
             EvidenceValidationService().validate_required_evidence(ctx)
         self.assertEqual(exc.exception.code, 'notes_required')
+        self.assertIn('Notes are required', str(exc.exception))
+        self.assertEqual(
+            exc.exception.validation_error.get('field'),
+            'notes',
+        )
 
     def test_invalid_media_type(self):
-        ctx = _context(
-            payload={
-                'latitude': '1',
-                'longitude': '2',
-                'media': [{'media_type': 'audio', 'file_ref': 'x'}],
-            },
-        )
-        with patch(
-            'mobile_api.execution.evidence.evidence_validation_service.build_execution_requirements',
-            return_value={
-                'gps': True,
-                'photo': True,
-                'photo_min_count': 1,
-                'video': False,
-                'video_min_count': 0,
-                'note': False,
-                'signature': False,
-            },
-        ):
-            with self.assertRaises(ExecuteActionError) as exc:
-                EvidenceValidationService().validate_required_evidence(ctx)
-        self.assertEqual(exc.exception.code, 'invalid_media_type')
+        self._media_security_patch.stop()
+        try:
+            ctx = _context(
+                operation_action=_action(
+                    action_code='A2',
+                    english_label='Pickup Arrival',
+                    movement_status_impact='',
+                ),
+                action_code='A2',
+                payload={
+                    'latitude': '1',
+                    'longitude': '2',
+                    'media': [
+                        {
+                            'media_type': 'bogus',
+                            'file_ref': 'tenant_operation_action_media/OAM_x.jpg',
+                        },
+                    ],
+                },
+            )
+            with patch(
+                'mobile_api.execution.evidence.evidence_validation_service.build_execution_requirements',
+                return_value={
+                    'gps': True,
+                    'photo': True,
+                    'photo_min_count': 1,
+                    'video': False,
+                    'video_min_count': 0,
+                    'note': False,
+                    'signature': False,
+                },
+            ):
+                with self.assertRaises(ExecuteActionError):
+                    EvidenceValidationService().validate_required_evidence(ctx)
+        finally:
+            self._media_security_patch.start()
 
     def test_upload_limit_exceeded(self):
         media = [

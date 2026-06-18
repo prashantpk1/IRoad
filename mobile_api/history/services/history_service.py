@@ -248,7 +248,12 @@ class HistoryService:
         shipment_pk = getattr(shipment, 'pk', None) or getattr(shipment, 'shipment_id', None)
         return (
             base_action_log_queryset(require_action=True)
-            .filter(shipment_action_log_scope_q(shipment_pk))
+            .filter(
+                shipment_action_log_scope_q(
+                    shipment_pk,
+                    booking_id=getattr(shipment, 'booking_id', None),
+                ),
+            )
             .select_related('operation_action', 'shipment', 'truck_movement')
         )
 

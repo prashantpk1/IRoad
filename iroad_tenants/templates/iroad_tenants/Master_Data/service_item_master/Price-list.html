@@ -75,7 +75,7 @@
                 </div>
                 <div class="field">
                   <label for="priceListNameAr" class="form-label">Price List Name (Arabic)</label>
-                  <input type="text" class="form-control" id="priceListNameAr" placeholder="الاسم العربي" dir="rtl" {% if is_view %}readonly{% endif %} />
+                  <input type="text" class="form-control eal-arabic" id="priceListNameAr" name="price_list_name_ar" placeholder="الاسم العربي" dir="rtl" lang="ar" data-arabic-only="1" {% if is_view %}readonly{% endif %} />
                 </div>
               </div>
             </div>
@@ -309,21 +309,13 @@
       const inSell = row.querySelector(".pl-in-sell");
       if (routeWrap) routeWrap.style.display = isTrip ? "" : "none";
       if (routeNa) routeNa.style.display = isTrip ? "none" : "";
-      if (sell) sell.readOnly = !!isTrip;
+      if (sell) sell.readOnly = false;
       if (outSell) { outSell.disabled = !isTrip; if (!isTrip) outSell.value = ""; }
       if (inSell) { inSell.disabled = !isTrip; if (!isTrip) inSell.value = ""; }
     }
 
-    function syncTripSellPrice(row) {
-      const typeSel = row.querySelector(".pl-service-type");
-      const sell = row.querySelector(".pl-sell");
-      const outSell = row.querySelector(".pl-out-sell");
-      const inSell = row.querySelector(".pl-in-sell");
-      if (!typeSel || !sell) return;
-      if (typeSel.value !== "Trip") return;
-      const outVal = outSell && String(outSell.value || "").trim() ? String(outSell.value).trim() : "";
-      const inVal = inSell && String(inSell.value || "").trim() ? String(inSell.value).trim() : "";
-      sell.value = outVal || inVal || "";
+    function isPriceFieldEmpty(input) {
+      return !input || String(input.value || "").trim() === "";
     }
 
     function formatPriceValue(val) {
@@ -350,12 +342,12 @@
       const catalogItem = findServiceItemCatalog(typeSel.value, serviceItemId);
       if (!catalogItem) return;
       if (typeSel.value === "Trip") {
-        if (sell) sell.value = formatPriceValue(catalogItem.sellPrice);
-        if (outSell) outSell.value = formatPriceValue(catalogItem.outboundSellPrice);
-        if (inSell) inSell.value = formatPriceValue(catalogItem.inboundSellPrice);
+        if (sell && isPriceFieldEmpty(sell)) sell.value = formatPriceValue(catalogItem.sellPrice);
+        if (outSell && isPriceFieldEmpty(outSell)) outSell.value = formatPriceValue(catalogItem.outboundSellPrice);
+        if (inSell && isPriceFieldEmpty(inSell)) inSell.value = formatPriceValue(catalogItem.inboundSellPrice);
         return;
       }
-      if (sell) sell.value = formatPriceValue(catalogItem.sellPrice);
+      if (sell && isPriceFieldEmpty(sell)) sell.value = formatPriceValue(catalogItem.sellPrice);
     }
 
     function populateServiceItems(row, keepValue) {
@@ -411,12 +403,18 @@
       const delBtn = row.querySelector(".pl-del");
       const dupBtn = row.querySelector(".pl-dup");
       if (typeSel) typeSel.addEventListener("change", function () {
+        row.querySelectorAll(".pl-sell, .pl-out-sell, .pl-in-sell").forEach(function (input) {
+          if (input) input.value = "";
+        });
         populateServiceItems(row, false);
         applyTripVisibility(row);
         updateTripRouteFromService(row);
         updateTotals();
       });
       if (svcSel) svcSel.addEventListener("change", function () {
+        row.querySelectorAll(".pl-sell, .pl-out-sell, .pl-in-sell").forEach(function (input) {
+          if (input) input.value = "";
+        });
         updateTripRouteFromService(row);
         applySellPriceFromServiceItem(row);
       });

@@ -30,6 +30,9 @@ from mobile_api.execution.services.execution_reconcile_service import (
 from mobile_api.hard_pod.services.hard_pod_execute_integration import (
     HardPodExecuteIntegrationService,
 )
+from mobile_api.job_detail.helpers.booking_job_context import (
+    resolve_pending_booking_item_type,
+)
 from mobile_api.job_detail.projections.workflow_projection import build_workflow_section
 from mobile_api.execution.services.execution_context_adapter import to_job_detail_context
 from mobile_api.utils.next_action_hint_builder import build_next_action_hint
@@ -270,12 +273,34 @@ class ExecutionValidationService:
 
     @staticmethod
     def _booking_item_type(context: ExecuteActionContext) -> str:
+        if context.job_type == 'booking' and context.booking is not None:
+            return resolve_pending_booking_item_type(
+                context.booking,
+                driver=context.driver,
+            )
+        if context.shipment is not None and context.booking is not None:
+            from mobile_api.helpers.backload_booking_redirect import (
+                should_pivot_shipment_to_backload_booking,
+            )
+
+            if should_pivot_shipment_to_backload_booking(
+                driver=context.driver,
+                booking=context.booking,
+                shipment=context.shipment,
+            ):
+                return resolve_pending_booking_item_type(
+                    context.booking,
+                    driver=context.driver,
+                )
         if context.shipment is not None:
-            return str(getattr(context.shipment, 'booking_item_type', '') or '').strip()
-        if context.booking is not None:
             return str(
-                getattr(context.booking, 'loading_booking_item', None) or 'Outbound'
+                getattr(context.shipment, 'booking_item_type', '') or ''
             ).strip()
+        if context.booking is not None:
+            return resolve_pending_booking_item_type(
+                context.booking,
+                driver=context.driver,
+            )
         return ''
 
     @staticmethod
@@ -295,6 +320,7 @@ class ExecutionValidationService:
             order_type=order_type,
             shipment=context.shipment,
             booking=context.booking,
+            driver=context.driver,
         )
 
     @staticmethod

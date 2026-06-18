@@ -242,9 +242,7 @@
                   <td>{{ media.timestamp|date:'d M Y, h:i A' }}</td>
                   <td>
                     {% if media.file_url %}
-                    <a href="{{ media.file_url }}" class="status-badge in-transit" target="_blank" rel="noopener">
-                      <i class="bi bi-paperclip"></i> {{ media.file_name }}
-                    </a>
+                    {% include 'partials/attachment_preview_link.html' with file_url=media.file_url file_name=media.file_name label=media.file_name link_class="status-badge in-transit" %}
                     {% else %}
                     <span class="status-badge in-transit"><i class="bi bi-paperclip"></i> {{ media.file_name }}</span>
                     {% endif %}

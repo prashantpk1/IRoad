@@ -147,7 +147,7 @@
           <td>{{ row.english_label|default:"—"|truncatechars:24 }}</td>
           <td>
             {% if row.attachment_file %}
-            <a href="{{ row.attachment_file.url }}" target="_blank" rel="noopener" class="eal-entity-id text-decoration-none">{{ row.attachment_file.name }}</a>
+            {% include 'partials/attachment_preview_link.html' with file_url=row.attachment_file.url file_name=row.attachment_file.name label=row.attachment_file.name link_class="eal-entity-id text-decoration-none" %}
             <small class="text-muted d-block">{{ row.attachment_file.size|filesizeformat }}</small>
             {% else %}—{% endif %}
           </td>

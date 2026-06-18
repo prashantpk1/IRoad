@@ -91,3 +91,22 @@ class ActionExecutionMetadataTests(TestCase):
         self.assertFalse(row['requires_note'])
         self.assertFalse(row['execution_requirements']['gps'])
         self.assertFalse(row['execution_requirements']['note'])
+
+    def test_a1_start_job_has_no_capture_requirements(self):
+        action = _action(
+            action_code='A1',
+            english_label='Start Job',
+            booking_status_impact='In_Execution',
+            sequence_number=1,
+        )
+        req = build_execution_requirements(action)
+        self.assertFalse(req['gps'])
+        self.assertFalse(req['photo'])
+        self.assertFalse(req['video'])
+        self.assertFalse(req['note'])
+
+        row = project_allowed_action_row(action)
+        self.assertFalse(row['requires_gps'])
+        self.assertFalse(row['requires_photo'])
+        self.assertFalse(row['requires_video'])
+        self.assertFalse(row['requires_note'])

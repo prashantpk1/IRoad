@@ -19,6 +19,9 @@ from iroad_tenants.services.operation_execution_service import (
 )
 
 from mobile_api.job_detail.dto.job_detail_context import JobDetailContext
+from mobile_api.job_detail.helpers.booking_job_context import (
+    resolve_booking_job_execution_context,
+)
 from mobile_api.job_detail.services.job_detail_projection_cache import (
     get_projection_cache,
 )
@@ -140,26 +143,36 @@ def _build_booking_workflow(
     """Booking-only workflow before Auto Shipment creates the first leg."""
     booking = context.booking
     booking_id = getattr(booking, 'booking_id', None) or getattr(booking, 'pk', None)
+    exec_ctx = resolve_booking_job_execution_context(context)
+    booking_item_type = str(exec_ctx.get('booking_item_type') or '').strip()
     stage_block = {
         'entity_type': 'booking',
         'operational_stage': '',
         'execution_sub_stage': '',
         'status_for_workflow': str(getattr(booking, 'booking_status', '') or ''),
     }
+    if exec_ctx.get('booking_execution_stage'):
+        stage_block['execution_sub_stage'] = exec_ctx['booking_execution_stage']
     engine_payload = OperationExecutionService.get_allowed_driver_actions(
         booking=booking,
         shipment=None,
         movement=None,
+        booking_item_type=booking_item_type,
         request=request,
         job_type='booking',
         job_id=str(booking_id) if booking_id is not None else context.job_id,
         job_no=str(getattr(booking, 'booking_no', '') or ''),
     )
-    return _map_engine_payload(
+    workflow = _map_engine_payload(
         engine_payload,
         stage_block=stage_block,
         entity_type='booking',
     )
+    if booking_item_type:
+        workflow['booking_item_type'] = booking_item_type
+    if exec_ctx.get('backload_bootstrap'):
+        workflow['backload_bootstrap_pending'] = True
+    return workflow
 
 
 def _build_movement_workflow(

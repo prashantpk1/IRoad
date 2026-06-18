@@ -81,7 +81,9 @@ def _get_signing_key() -> str:
 def _get_redis_client():
     """Get Redis client if available, else None."""
     try:
-        from superadmin.redis_helpers import get_redis_client
+        from superadmin.redis_helpers import get_redis_client, is_redis_circuit_open
+        if is_redis_circuit_open():
+            return None
         return get_redis_client()
     except Exception:
         return None
@@ -143,11 +145,16 @@ def is_token_blacklisted(jti: str) -> bool:
     deny_on_error = bool(
         getattr(settings, 'MOBILE_API_JWT_DENY_ON_REDIS_READ_ERROR', False)
     )
-    client = _get_redis_client()
-    if client is None:
-        return deny_on_error
     try:
-        return bool(client.get(f'mobile:jwt:blacklist:{jti}'))
+        from superadmin.redis_helpers import REDIS_UNAVAILABLE, redis_safe_get
+        result = redis_safe_get(f'mobile:jwt:blacklist:{jti}')
+        if result is REDIS_UNAVAILABLE:
+            logger.error(
+                'mobile.jwt.blacklist_read_error jti_prefix=%s err=Redis unavailable',
+                jti[:8],
+            )
+            return deny_on_error
+        return bool(result)
     except Exception as exc:
         logger.error(
             'mobile.jwt.blacklist_read_error jti_prefix=%s err=%s',
@@ -207,11 +214,16 @@ def is_refresh_family_invalidated(rt_fam: str) -> bool:
     deny_on_error = bool(
         getattr(settings, 'MOBILE_API_JWT_DENY_ON_REDIS_READ_ERROR', False)
     )
-    client = _get_redis_client()
-    if client is None:
-        return deny_on_error
     try:
-        return bool(client.get(RT_FAM_INVALID_KEY.format(rt_fam=fam)))
+        from superadmin.redis_helpers import REDIS_UNAVAILABLE, redis_safe_get
+        result = redis_safe_get(RT_FAM_INVALID_KEY.format(rt_fam=fam))
+        if result is REDIS_UNAVAILABLE:
+            logger.error(
+                'mobile.rt.fam_invalid_read_error fam_prefix=%s err=Redis unavailable',
+                fam[:8],
+            )
+            return deny_on_error
+        return bool(result)
     except Exception as exc:
         logger.error(
             'mobile.rt.fam_invalid_read_error fam_prefix=%s err=%s',

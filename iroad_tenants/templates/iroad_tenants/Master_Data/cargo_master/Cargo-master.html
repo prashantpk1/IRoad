@@ -299,7 +299,7 @@
         <h3 class="field-group-title"><i class="bi bi-paperclip"></i> {% translate "Existing attachments" %}</h3>
         <ul class="small mb-0">
           {% for att in existing_attachments %}
-          <li><a href="{{ att.file.url }}" target="_blank" rel="noopener">{{ att.file.name }}</a></li>
+          <li>{% include 'partials/attachment_preview_link.html' with file_url=att.file.url file_name=att.file.name label=att.file.name %}</li>
           {% endfor %}
         </ul>
       </div>

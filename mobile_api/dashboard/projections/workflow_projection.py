@@ -29,6 +29,10 @@ from mobile_api.dashboard.dto.driver_empty_move_selection import (
 from mobile_api.dashboard.dto.workflow_projection_input import (
     WorkflowProjectionInput,
 )
+from mobile_api.dashboard.selectors import booking_selection_policy as policy
+from mobile_api.job_detail.helpers.booking_job_context import (
+    resolve_pending_booking_item_type,
+)
 
 _EMPTY_WORKFLOW: dict[str, Any] = {
     'current_stage': '',
@@ -165,10 +169,12 @@ def build_booking_workflow(
         return dict(_EMPTY_WORKFLOW)
 
     booking_id = getattr(booking, 'booking_id', None) or getattr(booking, 'pk', None)
+    booking_item_type = resolve_pending_booking_item_type(booking)
     engine_payload = OperationExecutionService.get_allowed_driver_actions(
         booking=booking,
         shipment=None,
         movement=None,
+        booking_item_type=booking_item_type,
         request=request,
         job_type='booking',
         job_id=str(booking_id) if booking_id is not None else '',
@@ -180,11 +186,20 @@ def build_booking_workflow(
         'execution_sub_stage': '',
         'status_for_workflow': str(getattr(booking, 'booking_status', '') or ''),
     }
-    return _map_engine_payload_to_dashboard(
+    workflow = _map_engine_payload_to_dashboard(
         engine_payload,
         stage_block=stage_block,
         entity_type='booking',
     )
+    workflow['booking_item_type'] = booking_item_type
+    if policy.is_backload_leg_pending(
+        booking,
+        policy.sorted_countable_shipments(
+            list(booking.shipments.all() if hasattr(booking, 'shipments') else []),
+        ),
+    ):
+        workflow['backload_bootstrap_pending'] = True
+    return workflow
 
 
 def build_workflow_from_empty_move_selection(

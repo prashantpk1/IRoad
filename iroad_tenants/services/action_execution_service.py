@@ -92,16 +92,24 @@ class ActionExecutionService:
         source_channel: str,
         source_ref: str,
     ) -> TenantOperationActionLog | None:
-        if idempotency_key:
+        normalized_ref = (source_ref or '').strip()
+        if normalized_ref:
             row = TenantOperationActionLog.objects.filter(
-                idempotency_key=idempotency_key,
+                source_channel=source_channel,
+                source_ref=normalized_ref,
             ).first()
             if row is not None:
                 return row
-        if source_ref:
+        if idempotency_key and normalized_ref:
+            row = TenantOperationActionLog.objects.filter(
+                idempotency_key=idempotency_key,
+                source_ref=normalized_ref,
+            ).first()
+            if row is not None:
+                return row
+        if idempotency_key:
             return TenantOperationActionLog.objects.filter(
-                source_channel=source_channel,
-                source_ref=source_ref,
+                idempotency_key=idempotency_key,
             ).first()
         return None
 
@@ -168,7 +176,11 @@ class ActionExecutionService:
             source_channel=source_channel,
             source_ref=normalized_ref,
         )
-        if existing is not None:
+        if existing is not None and cls._idempotent_existing_applies(
+            booking=booking,
+            log=existing,
+            booking_item_type=birth_booking_item_type or booking_item_type,
+        ):
             return ActionExecutionResult(action_log=existing, reused_existing=True)
 
         if not skip_recent_duplicate_guard and not normalized_key:
@@ -247,11 +259,45 @@ class ActionExecutionService:
                 source_channel=source_channel,
                 source_ref=normalized_ref,
             )
-            if existing is not None:
+            if existing is not None and cls._idempotent_existing_applies(
+                booking=booking,
+                log=existing,
+                booking_item_type=birth_booking_item_type or booking_item_type,
+            ):
                 return ActionExecutionResult(action_log=existing, reused_existing=True)
             raise
 
         return ActionExecutionResult(action_log=action_log, reused_existing=False)
+
+    @staticmethod
+    def _idempotent_existing_applies(
+        *,
+        booking=None,
+        log,
+        booking_item_type: str = '',
+    ) -> bool:
+        """Booking backload must not reuse outbound preshipment idempotency rows."""
+        if booking is None:
+            return True
+        from iroad_tenants.operation_runtime.booking_preshipment_cycle import (
+            booking_preshipment_log_in_cycle,
+            is_backload_leg_pending,
+            is_backload_preshipment_cycle,
+        )
+
+        if is_backload_preshipment_cycle(booking, booking_item_type):
+            return booking_preshipment_log_in_cycle(
+                booking,
+                log,
+                booking_item_type=booking_item_type,
+            )
+        if is_backload_leg_pending(booking):
+            return booking_preshipment_log_in_cycle(
+                booking,
+                log,
+                booking_item_type='Backload',
+            )
+        return True
 
     @classmethod
     @transaction.atomic

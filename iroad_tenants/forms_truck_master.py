@@ -4,13 +4,14 @@ from django.db.models import Q
 from django.utils.translation import gettext_lazy as _
 from django_tenants.utils import schema_context
 
+from config.text_validators import ArabicTextFormMixin
 from superadmin.models import Country
 from tenant_workspace.models import DriverMaster, TruckMaster, TruckTypeMaster
 
 from iroad_tenants.forms_tenant_address import PublicCountryChoiceField
 
 
-class TruckMasterForm(forms.ModelForm):
+class TruckMasterForm(ArabicTextFormMixin, forms.ModelForm):
     class Meta:
         model = TruckMaster
         fields = [
@@ -70,9 +71,11 @@ class TruckMasterForm(forms.ModelForm):
             ),
             'saudi_arabic_letters': forms.TextInput(
                 attrs={
-                    'class': 'form-control',
+                    'class': 'form-control eal-arabic',
                     'placeholder': 'حروف عربية',
                     'dir': 'rtl',
+                    'lang': 'ar',
+                    'data-arabic-only': '1',
                 }
             ),
             'non_saudi_plate_number': forms.TextInput(

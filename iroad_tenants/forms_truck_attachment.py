@@ -3,6 +3,7 @@ import os
 from django import forms
 from django.core.exceptions import ValidationError
 
+from config.text_validators import ArabicTextFormMixin
 from tenant_workspace.models import TruckAttachment
 
 
@@ -10,7 +11,7 @@ _ALLOWED_EXT = frozenset({'.pdf', '.jpg', '.jpeg', '.png', '.doc', '.docx'})
 _MAX_ATTACHMENT_BYTES = 10 * 1024 * 1024
 
 
-class TruckAttachmentForm(forms.ModelForm):
+class TruckAttachmentForm(ArabicTextFormMixin, forms.ModelForm):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         # On edit, keep current file when no replacement is uploaded.
@@ -45,9 +46,11 @@ class TruckAttachmentForm(forms.ModelForm):
         widgets = {
             'arabic_label': forms.TextInput(
                 attrs={
-                    'class': 'form-control',
+                    'class': 'form-control eal-arabic',
                     'placeholder': 'Enter Arabic label',
                     'dir': 'rtl',
+                    'lang': 'ar',
+                    'data-arabic-only': '1',
                 },
             ),
             'english_label': forms.TextInput(

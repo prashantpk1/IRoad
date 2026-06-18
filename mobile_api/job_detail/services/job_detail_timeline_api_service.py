@@ -16,15 +16,10 @@ from mobile_api.job_detail.exceptions import (
     JobDetailError,
     job_detail_error_from_resolver,
 )
-from mobile_api.job_detail.services.job_detail_context_service import (
-    JobDetailContextService,
-)
-from mobile_api.job_detail.services.movement_job_resolver import (
-    MovementJobResolver,
-)
-from mobile_api.job_detail.services.shipment_job_resolver import (
-    ShipmentJobResolver,
-)
+from mobile_api.job_detail.helpers.resolve_job_entity import resolve_job_detail_entity
+from mobile_api.job_detail.services.booking_job_resolver import BookingJobResolver
+from mobile_api.job_detail.services.movement_job_resolver import MovementJobResolver
+from mobile_api.job_detail.services.shipment_job_resolver import ShipmentJobResolver
 from mobile_api.job_detail.timeline.timeline_cursor_service import (
     JobDetailTimelineCursorService,
 )
@@ -41,15 +36,15 @@ class JobDetailTimelineApiService:
     def __init__(
         self,
         *,
-        context_service: JobDetailContextService | None = None,
         shipment_resolver: ShipmentJobResolver | None = None,
         movement_resolver: MovementJobResolver | None = None,
+        booking_resolver: BookingJobResolver | None = None,
         timeline_service: JobDetailTimelineService | None = None,
         cursor_service: JobDetailTimelineCursorService | None = None,
     ) -> None:
-        self._context_service = context_service or JobDetailContextService()
         self._shipment_resolver = shipment_resolver or ShipmentJobResolver()
         self._movement_resolver = movement_resolver or MovementJobResolver()
+        self._booking_resolver = booking_resolver or BookingJobResolver()
         self._timeline_service = timeline_service or JobDetailTimelineService()
         self._cursor_service = cursor_service or JobDetailTimelineCursorService()
 
@@ -90,7 +85,7 @@ class JobDetailTimelineApiService:
                 message_key='mobile.validation.failed',
             )
 
-        normalized_type = self._context_service._normalize_job_type(job_type)
+        normalized_type = self._normalize_job_type(job_type)
         normalized_id = (job_id or '').strip()
         if not normalized_id:
             raise JobDetailError(
@@ -116,41 +111,22 @@ class JobDetailTimelineApiService:
                 request=request,
             )
 
-    def _resolve_entity(self, context: JobDetailContext) -> None:
-        """Shipment or movement resolver only — no projection cache."""
-        if context.job_type == 'shipment':
-            result = self._shipment_resolver.resolve(
-                context.driver,
-                context.job_id,
-                tenant_schema=context.tenant_schema,
-            )
-            if result.resolve_context is not None and not result.resolve_context.ok:
-                raise job_detail_error_from_resolver(
-                    error_code=result.error_code,
-                    error_message=result.error_message,
-                )
-            if result.shipment is None:
-                raise job_detail_error_from_resolver(
-                    error_code=result.error_code or 'job_not_found',
-                    error_message=result.error_message,
-                )
-            context.shipment = result.shipment
-            context.booking = result.booking
-            return
+    @staticmethod
+    def _normalize_job_type(job_type: JobType | str) -> JobType:
+        token = (str(job_type) if job_type is not None else '').strip().casefold()
+        if token in ('shipment', 'shipments'):
+            return 'shipment'
+        if token in ('movement', 'movements', 'empty_move', 'empty-move'):
+            return 'movement'
+        if token in ('booking', 'bookings'):
+            return 'booking'
+        raise ValueError(f'unsupported job_type: {job_type!r}')
 
-        result = self._movement_resolver.resolve(
-            context.driver,
-            context.job_id,
-            tenant_schema=context.tenant_schema,
+    def _resolve_entity(self, context: JobDetailContext) -> None:
+        """Booking/shipment/movement resolver with backload pivot."""
+        resolve_job_detail_entity(
+            context,
+            shipment_resolver=self._shipment_resolver,
+            movement_resolver=self._movement_resolver,
+            booking_resolver=self._booking_resolver,
         )
-        if result.resolve_context is not None and not result.resolve_context.ok:
-            raise job_detail_error_from_resolver(
-                error_code=result.error_code,
-                error_message=result.error_message,
-            )
-        if result.movement is None:
-            raise job_detail_error_from_resolver(
-                error_code=result.error_code or 'job_not_found',
-                error_message=result.error_message,
-            )
-        context.movement = result.movement

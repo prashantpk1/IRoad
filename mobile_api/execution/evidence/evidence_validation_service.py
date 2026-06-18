@@ -26,6 +26,7 @@ from mobile_api.execution.evidence.execution_media_security import (
     ExecutionMediaSecurityService,
 )
 from mobile_api.execution.exceptions import ExecuteActionError
+from mobile_api.execution.messages import execute_user_message
 from mobile_api.helpers.action_execution_metadata import build_execution_requirements
 from mobile_api.pod_capture.policy.canonical_pod_action_registry import (
     is_pod_upload_action,
@@ -364,9 +365,12 @@ class EvidenceValidationService:
             return
         notes = str(payload.get('notes') or '').strip()
         if not notes:
+            message_key = 'mobile.jobs.execute.notes_required'
             raise self._evidence_error(
                 error_code='notes_required',
-                message=str(_('mobile.jobs.execute.notes_required')),
+                message=execute_user_message(message_key),
+                message_key=message_key,
+                field='notes',
             )
 
     @staticmethod
@@ -616,17 +620,21 @@ class EvidenceValidationService:
         error_code: str,
         message: str,
         http_status: int = 400,
+        message_key: str = '',
+        field: str = '',
     ) -> ExecuteActionError:
+        key = (message_key or f'mobile.jobs.execute.{error_code}').strip()
         body = build_validation_error(
             error_code=error_code,
             message=message,
             refresh_required=False,
+            field=field,
         )
         return ExecuteActionError(
             message,
             code=error_code,
             http_status=http_status,
-            message_key=f'mobile.jobs.execute.{error_code}',
+            message_key=key,
             refresh_required=False,
             validation_error=body,
         )

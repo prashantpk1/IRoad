@@ -213,9 +213,14 @@ def map_action_to_pending_timeline_event(
         event['capture_mode'] = 'digital_evidence'
         event['pod_capture_steps'] = ['digital_evidence', 'hard_copy_confirmation']
         event['includes_hard_copy'] = True
-    elif action_code.upper() == 'A8':
+    elif action_code.upper() in {'A1', 'A8'}:
         event['screen'] = 'job_detail'
         event['action'] = 'execute_action'
+        event['direct_execute'] = True
+        event['requires_gps'] = False
+        event['requires_photo'] = False
+        event['requires_video'] = False
+        event['requires_note'] = False
         event.pop('capture_mode', None)
         event.pop('pod_capture_steps', None)
     return event

@@ -317,9 +317,7 @@
                   <td>{{ forloop.counter }}</td>
                   <td>
                     {% if row.has_file %}
-                    <a href="{{ a.attachment_file.url }}" target="_blank" rel="noopener" class="dm-doc-file-link">
-                      <i class="bi {{ row.file_icon_class }} me-1"></i>{{ row.file_name }}
-                    </a>
+                    {% include 'partials/attachment_preview_link.html' with file_url=row.file_url file_name=row.file_name label=row.file_name icon_class=row.file_icon_class link_class="dm-doc-file-link" %}
                     {% else %}
                     <span class="dm-doc-file-name">{{ row.file_name }}</span>
                     {% endif %}

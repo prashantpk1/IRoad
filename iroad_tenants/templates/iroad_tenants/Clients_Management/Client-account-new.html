@@ -165,13 +165,17 @@
                   >
                   <input
                     type="text"
-                    class="form-control"
+                    class="form-control eal-arabic {% if form_errors.name_arabic %}is-invalid{% endif %}"
                     id="nameArabic"
                     name="name_arabic"
                     placeholder="الاسم بالعربية"
                     value="{{ form_data.name_arabic|default:'' }}"
                     dir="rtl"
+                    lang="ar"
+                    data-arabic-only="1"
                   />
+                  <span class="field-hint">Arabic characters only</span>
+                  {% if form_errors.name_arabic %}<div class="invalid-feedback d-block">{{ form_errors.name_arabic }}</div>{% endif %}
                 </div>
                 <div class="field">
                   <label for="nameEnglish" class="form-label"
@@ -344,81 +348,7 @@
               </div>
             </div>
 
-            {% if is_edit_mode %}
-            <div class="field-group mt-4">
-              <h3 class="field-group-title">
-                <i class="bi bi-sliders"></i>
-                Billing Defaults
-              </h3>
-              <div class="fields-grid cols-2">
-                <div class="field">
-                  <label for="creditLimitAmount" class="form-label"
-                    >Credit Limit Amount</label
-                  >
-                  <div class="input-icon-wrapper">
-                    <i class="bi bi-currency-dollar"></i>
-                    <input
-                      type="number"
-                      class="form-control has-icon {% if form_errors.credit_limit_amount %}is-invalid{% endif %}"
-                      id="creditLimitAmount"
-                      name="credit_limit_amount"
-                      placeholder="0.00"
-                      value="{{ form_data.credit_limit_amount|default:'' }}"
-                      min="0"
-                      step="0.01"
-                    />
-                  </div>
-                  <span class="field-hint"
-                    >Final authoritative debt ceiling for this client, denominated in the System Base Currency.</span
-                  >
-                  {% if form_errors.credit_limit_amount %}<div class="invalid-feedback d-block">{{ form_errors.credit_limit_amount }}</div>{% endif %}
-                </div>
-                <div class="field">
-                  <label for="limitCurrencyCode" class="form-label"
-                    >Currency</label
-                  >
-                  <select
-                    class="form-select"
-                    id="limitCurrencyCode"
-                    name="limit_currency_code"
-                    disabled
-                  >
-                    <option value="SAR" selected>SAR</option>
-                    <option value="USD">USD</option>
-                    <option value="EUR">EUR</option>
-                  </select>
-                  <input type="hidden" name="limit_currency_code" value="{{ form_data.limit_currency_code|default:'SAR' }}">
-                  <span class="field-hint"
-                    >Display-only field showing the Base Currency.</span
-                  >
-                </div>
-              </div>
-              <div class="fields-grid cols-2">
-                <div class="field">
-                  <label for="paymentTermDays" class="form-label"
-                    >Payment Term (Days)</label
-                  >
-                  <div class="input-icon-wrapper">
-                    <i class="bi bi-calendar3"></i>
-                    <input
-                      type="number"
-                      class="form-control has-icon {% if form_errors.payment_term_days %}is-invalid{% endif %}"
-                      id="paymentTermDays"
-                      name="payment_term_days"
-                      placeholder="0"
-                      value="{{ form_data.payment_term_days|default:'' }}"
-                      min="0"
-                      step="1"
-                    />
-                  </div>
-                  <span class="field-hint"
-                    >Number of days used to automatically calculate the due_date on the Sales Invoice header.</span
-                  >
-                  {% if form_errors.payment_term_days %}<div class="invalid-feedback d-block">{{ form_errors.payment_term_days }}</div>{% endif %}
-                </div>
-              </div>
-            </div>
-            {% endif %}
+          
           </div>
         </div>
 

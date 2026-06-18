@@ -77,6 +77,7 @@ class DashboardResponseBuilder:
             shipment=context.active_shipment,
             booking=context.active_booking,
             movement=context.active_empty_movement,
+            driver=context.driver,
             request=request,
         )
 

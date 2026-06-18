@@ -2033,6 +2033,21 @@ msgstr "مطلوب سياق تنفيذ آمن لهذا الإجراء."
 msgid "mobile.jobs.execute.execution_context_driver_mismatch"
 msgstr "جلسة السائق لا تطابق سياق التنفيذ."
 
+msgid "mobile.jobs.execute.notes_required"
+msgstr "الملاحظات مطلوبة لهذا الإجراء."
+
+msgid "mobile.jobs.execute.gps_required"
+msgstr "موقع GPS مطلوب لهذا الإجراء."
+
+msgid "mobile.jobs.execute.photo_required"
+msgstr "صورة واحدة على الأقل مطلوبة لهذا الإجراء."
+
+msgid "mobile.jobs.execute.signature_required"
+msgstr "التوقيع مطلوب لهذا الإجراء."
+
+msgid "mobile.jobs.execute.media_file_required"
+msgstr "ملف وسائط مطلوب لهذا الإجراء."
+
 msgid "mobile.validation.failed"
 msgstr "البيانات المدخلة غير صحيحة. يرجى المراجعة."
 

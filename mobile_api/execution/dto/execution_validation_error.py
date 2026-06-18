@@ -15,6 +15,7 @@ class ExecutionValidationErrorBody(TypedDict, total=False):
     message: str
     refresh_required: bool
     next_action_hint: dict[str, Any]
+    field: str
 
 
 def build_validation_error(
@@ -23,6 +24,7 @@ def build_validation_error(
     message: str,
     refresh_required: bool = True,
     next_action_hint: dict[str, Any] | None = None,
+    field: str = '',
 ) -> ExecutionValidationErrorBody:
     body: ExecutionValidationErrorBody = ExecutionValidationErrorBody(
         error_code=(error_code or 'execute_validation_failed').strip(),
@@ -31,6 +33,9 @@ def build_validation_error(
     )
     if next_action_hint:
         body['next_action_hint'] = dict(next_action_hint)
+    field_name = (field or '').strip()
+    if field_name:
+        body['field'] = field_name
     return body
 
 

@@ -89,9 +89,7 @@
             <div class="ticket-message-body{% if reply.display_sender_kind == 'tenant' %} ticket-message-body-tenant{% endif %}">{{ reply.display_message_body }}</div>
             {% if reply.attachment %}
             <div class="ticket-message-attachment">
-              <a href="{{ reply.attachment.url }}" target="_blank" rel="noopener">
-                <i class="bi bi-paperclip"></i> {% translate "View Attachment" %}
-              </a>
+              {% include 'partials/attachment_preview_link.html' with file_url=reply.attachment.url file_name=reply.attachment.name label="View Attachment" preview_title="View Attachment" %}
             </div>
             {% endif %}
           </div>
@@ -118,10 +116,7 @@
       <div class="ticket-attachments-list">
         {% for item in ticket_attachments %}
         <div class="ticket-attachment-row">
-          <a href="{{ item.url }}" target="_blank" rel="noopener" class="ticket-attachment-link">
-            <i class="bi bi-file-earmark-arrow-down"></i>
-            {{ item.filename }}
-          </a>
+          {% include 'partials/attachment_preview_link.html' with file_url=item.url file_name=item.filename label=item.filename link_class="ticket-attachment-link" %}
           <span class="ticket-attachment-time">{{ item.uploaded_at }}</span>
         </div>
         {% endfor %}

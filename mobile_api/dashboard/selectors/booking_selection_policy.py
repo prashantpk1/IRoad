@@ -189,26 +189,166 @@ def booking_progress(
     return booking_execution_progress(shipments)
 
 
-def is_booking_fully_complete(shipments: Sequence[TenantShipment | Any]) -> bool:
+def round_trip_expected_leg_count(booking: TenantBooking | Any) -> int:
+    """Countable legs for progress UI (Round = outbound + backload)."""
+    if normalized_trip_type(booking).casefold() == 'round':
+        return 2
+    return 1
+
+
+def _has_backload_shipment_row(shipments: Sequence[TenantShipment | Any]) -> bool:
+    return any(
+        _is_secondary_line_type(s) for s in countable_shipments(shipments)
+    )
+
+
+def is_backload_leg_pending(
+    booking: TenantBooking | Any,
+    shipments: Sequence[TenantShipment | Any],
+) -> bool:
+    """
+    Round-trip backload is planned but no shipment row exists yet.
+
+    Matches portal booking line ``Planned`` after outbound is executed/closed.
+    """
+    if normalized_trip_type(booking).casefold() != 'round':
+        return False
+    if _has_backload_shipment_row(shipments):
+        return False
+    legs = _countable_sorted(shipments)
+    primary, _ = _round_trip_primary_secondary_segments(legs)
+    if not primary:
+        return False
+    return all(is_shipment_execution_complete(s) for s in primary)
+
+
+def driver_owns_backload_leg(
+    driver: Any,
+    booking: TenantBooking | Any,
+) -> bool:
+    """Whether this driver is assigned to execute the backload leg."""
+    driver_pk = _driver_pk(driver)
+    if driver_pk is None:
+        return False
+    backload_driver_id = getattr(booking, 'booking_line_backload_driver_id', None)
+    if backload_driver_id:
+        return backload_driver_id == driver_pk
+    return getattr(booking, 'assigned_driver_id', None) == driver_pk
+
+
+def is_round_trip_backload_bootstrap(
+    driver: Any,
+    booking: TenantBooking | Any,
+    shipments: Sequence[TenantShipment | Any],
+) -> bool:
+    """Driver may start backload via booking-scoped workflow (pre-A4 birth)."""
+    return is_backload_leg_pending(booking, shipments) and driver_owns_backload_leg(
+        driver,
+        booking,
+    )
+
+
+def booking_execution_progress_for_dashboard(
+    booking: TenantBooking | Any,
+    shipments: Sequence[TenantShipment | Any],
+) -> tuple[int, int, int]:
+    """
+    Execution progress including planned round-trip legs not yet born.
+
+    Without this, a closed outbound-only row reports 1/1 (100%) instead of 1/2.
+    """
+    ordered = _countable_sorted(shipments)
+    total, completed, percentage = booking_execution_progress(ordered)
+    expected = round_trip_expected_leg_count(booking)
+    if expected > total:
+        total = expected
+        percentage = int(round((completed / total) * 100)) if total else 0
+    return total, completed, percentage
+
+
+def booking_business_progress_for_dashboard(
+    booking: TenantBooking | Any,
+    shipments: Sequence[TenantShipment | Any],
+) -> tuple[int, int, int]:
+    """Business progress with planned round-trip leg denominator."""
+    ordered = _countable_sorted(shipments)
+    total, completed, percentage = booking_business_progress(ordered)
+    expected = round_trip_expected_leg_count(booking)
+    if expected > total:
+        total = expected
+        percentage = int(round((completed / total) * 100)) if total else 0
+    return total, completed, percentage
+
+
+def should_display_backload_route(
+    booking: TenantBooking | Any,
+    shipments: Sequence[TenantShipment | Any],
+    *,
+    active: Any | None = None,
+    booking_stage: str = '',
+) -> bool:
+    """True when dashboard/job UI should show the return leg (Makkah → Jeddah)."""
+    if normalized_trip_type(booking).casefold() != 'round':
+        return False
+    if active is not None and _is_secondary_line_type(active):
+        return True
+    if is_backload_leg_pending(booking, shipments):
+        return True
+    if (booking_stage or '').strip() == BOOKING_EXECUTION_STAGE_OUTBOUND_COMPLETED:
+        return True
+    return pending_executable_booking_item_type(booking, shipments).casefold() == 'backload'
+
+
+def pending_executable_booking_item_type(
+    booking: TenantBooking | Any,
+    shipments: Sequence[TenantShipment | Any],
+) -> str:
+    """Next leg label when shipment row may not exist yet (e.g. Backload)."""
+    nxt = get_next_executable_shipment(booking, shipments)
+    if nxt is not None:
+        return str(getattr(nxt, 'booking_item_type', '') or '').strip()
+    if is_backload_leg_pending(booking, shipments):
+        return 'Backload'
+    return ''
+
+
+def is_booking_fully_complete(
+    shipments: Sequence[TenantShipment | Any],
+    *,
+    booking: TenantBooking | Any | None = None,
+) -> bool:
     """
     Booking is done when every non-cancelled shipment is business-complete (CLOSED).
 
     When there are no non-cancelled shipments, the booking is not treated as
     complete (still a planned/confirmed header without executable legs).
+
+    Round trips with a pending backload leg (no active backload shipment) stay
+    open even when outbound is CLOSED.
     """
     active = countable_shipments(shipments)
     if not active:
         return False
+    if booking is not None:
+        expected = round_trip_expected_leg_count(booking)
+        if len(active) < expected:
+            return False
     return all(is_shipment_business_complete(s) for s in active)
 
 
 def is_booking_execution_fully_complete(
     shipments: Sequence[TenantShipment | Any],
+    *,
+    booking: TenantBooking | Any | None = None,
 ) -> bool:
     """All countable legs are execution-complete (``DELIVERED`` / ``CLOSED``)."""
     active = countable_shipments(shipments)
     if not active:
         return False
+    if booking is not None:
+        expected = round_trip_expected_leg_count(booking)
+        if len(active) < expected:
+            return False
     return all(is_shipment_execution_complete(s) for s in active)
 
 
@@ -296,10 +436,10 @@ def derive_booking_execution_stage(
     if not legs:
         return BOOKING_EXECUTION_STAGE_NOT_STARTED
 
-    if is_booking_fully_complete(shipments):
+    if is_booking_fully_complete(shipments, booking=booking):
         return BOOKING_EXECUTION_STAGE_BUSINESS_COMPLETED
 
-    if is_booking_execution_fully_complete(shipments):
+    if is_booking_execution_fully_complete(shipments, booking=booking):
         return BOOKING_EXECUTION_STAGE_EXECUTION_COMPLETED
 
     is_round = normalized_trip_type(booking).casefold() == 'round'
@@ -318,6 +458,9 @@ def derive_booking_execution_stage(
                 if _norm_status(next_ex) in _PRE_ROAD_STATUSES:
                     return BOOKING_EXECUTION_STAGE_OUTBOUND_COMPLETED
                 return BOOKING_EXECUTION_STAGE_BACKLOAD_ACTIVE
+
+    if is_round and is_backload_leg_pending(booking, legs):
+        return BOOKING_EXECUTION_STAGE_OUTBOUND_COMPLETED
 
     # NOT_STARTED: no execution-complete leg yet; every incomplete leg pre-road.
     any_exec_done = any(is_shipment_execution_complete(s) for s in legs)

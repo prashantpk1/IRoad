@@ -103,6 +103,10 @@ class ExecutionIdempotencyGuard:
             context.idempotent_replay = False
             return False
 
+        if not self._idempotent_log_applies_to_context(context, existing):
+            context.idempotent_replay = False
+            return False
+
         context.action_log = existing
         context.reused_existing = True
         context.idempotent_replay = True
@@ -134,9 +138,57 @@ class ExecutionIdempotencyGuard:
     def _default_source_ref(context: ExecuteActionContext) -> str:
         action = (context.action_code or '').strip()
         job = (context.job_id or '').strip()
-        if action and job:
-            return f'{context.job_type}:{job}:{action}'[:128]
-        return ''
+        if not action or not job:
+            return ''
+        leg = ''
+        if context.job_type == 'booking' and context.booking is not None:
+            from mobile_api.execution.services.execution_validation_service import (
+                ExecutionValidationService,
+            )
+
+            leg = ExecutionValidationService._booking_item_type(context)
+        elif context.shipment is not None:
+            leg = str(getattr(context.shipment, 'booking_item_type', '') or '').strip()
+        parts = [str(context.job_type or '').strip(), job]
+        if leg:
+            parts.append(leg)
+        parts.append(action)
+        return ':'.join(p for p in parts if p)[:128]
+
+    def _idempotent_log_applies_to_context(
+        self,
+        context: ExecuteActionContext,
+        log: Any,
+    ) -> bool:
+        """
+        Outbound preshipment logs must not replay as backload executes (same A1 key).
+        """
+        if context.job_type != 'booking' or context.booking is None:
+            return True
+        from iroad_tenants.operation_runtime.booking_preshipment_cycle import (
+            booking_preshipment_log_in_cycle,
+            is_backload_leg_pending,
+            is_backload_preshipment_cycle,
+        )
+        from mobile_api.execution.services.execution_validation_service import (
+            ExecutionValidationService,
+        )
+
+        booking = context.booking
+        item_type = ExecutionValidationService._booking_item_type(context)
+        if is_backload_preshipment_cycle(booking, item_type):
+            return booking_preshipment_log_in_cycle(
+                booking,
+                log,
+                booking_item_type=item_type,
+            )
+        if is_backload_leg_pending(booking):
+            return booking_preshipment_log_in_cycle(
+                booking,
+                log,
+                booking_item_type='Backload',
+            )
+        return True
 
     @staticmethod
     def _default_log_lookup(keys: IdempotencyKeys) -> Any | None:

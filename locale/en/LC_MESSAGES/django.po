@@ -594,6 +594,21 @@ msgstr "Secure execution context is required for this action."
 msgid "mobile.jobs.execute.execution_context_driver_mismatch"
 msgstr "Driver session does not match the execution context."
 
+msgid "mobile.jobs.execute.notes_required"
+msgstr "Notes are required for this action."
+
+msgid "mobile.jobs.execute.gps_required"
+msgstr "GPS location is required for this action."
+
+msgid "mobile.jobs.execute.photo_required"
+msgstr "At least one photo is required for this action."
+
+msgid "mobile.jobs.execute.signature_required"
+msgstr "A signature is required for this action."
+
+msgid "mobile.jobs.execute.media_file_required"
+msgstr "A media file is required for this action."
+
 msgid "mobile.validation.failed"
 msgstr "Validation failed. Please check your input."
 

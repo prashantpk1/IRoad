@@ -492,9 +492,7 @@
           <span class="detail-field-label">Attachment</span>
           <span class="detail-field-value">
             {% if booking.booking_attachment %}
-            <a href="{{ booking.booking_attachment.url }}" target="_blank" rel="noopener" style="color: var(--primary-color)">
-              <i class="bi bi-paperclip"></i> View
-            </a>
+            {% include 'partials/attachment_preview_link.html' with file_url=booking.booking_attachment.url file_name=booking.booking_attachment.name label="View" %}
             {% else %}
             —
             {% endif %}

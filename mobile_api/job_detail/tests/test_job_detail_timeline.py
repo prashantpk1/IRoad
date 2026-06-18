@@ -28,6 +28,7 @@ from mobile_api.job_detail.timeline.timeline_event_mapper import (
     dedupe_timeline_events,
     map_action_to_pending_timeline_event,
     map_log_to_timeline_event,
+    merge_actions_with_timeline_logs,
     sort_logs_newest_first,
 )
 from tenant_workspace.models import TenantShipment
@@ -305,6 +306,137 @@ class TimelineServiceTests(SimpleTestCase):
             [a.action_code for a in filtered_shipment],
             ['A2'],
         )
+
+        # Case 3: Booking job (Auto Shipment before first leg) — job actions only, no empty move
+        booking = MagicMock()
+        booking.order_type = 'COD'
+        ctx_booking = JobDetailContext(
+            driver=_driver(),
+            tenant_schema='t',
+            user_id='u',
+            job_type='booking',
+            job_id=str(uuid4()),
+            booking=booking,
+        )
+        filtered_booking = svc._filter_workflow_actions_for_context(actions, context=ctx_booking)
+        self.assertEqual(
+            [a.action_code for a in filtered_booking],
+            ['A2'],
+        )
+
+    def test_booking_job_uses_full_shipment_timeline(self):
+        act_a1 = _action(code='A1', label='Start Job')
+        act_a2 = _action(code='A2', label='Pickup Arrival')
+        act_a3 = _action(code='A3', label='Start Loading')
+        act_a4 = _action(code='A4', label='Confirm Loaded')
+        act_a5 = _action(code='A5', label='Depart In Transit')
+        act_a6 = _action(code='A6', label='Delivery Arrival')
+        act_a7 = _action(code='A7', label='Upload POD')
+        act_a8 = _action(code='A8', label='Unloading Completed')
+        actions = [act_a1, act_a2, act_a3, act_a4, act_a5, act_a6, act_a7, act_a8]
+
+        booking = MagicMock()
+        booking.order_type = 'COD'
+        ctx_booking = JobDetailContext(
+            driver=_driver(),
+            tenant_schema='t',
+            user_id='u',
+            job_type='booking',
+            job_id=str(uuid4()),
+            booking=booking,
+        )
+        filtered = JobDetailTimelineService()._filter_workflow_actions_for_context(
+            actions,
+            context=ctx_booking,
+        )
+        self.assertEqual(
+            [a.action_code for a in filtered],
+            ['A2', 'A3', 'A4', 'A5', 'A6', 'A7', 'A8'],
+        )
+
+    def test_backload_bootstrap_booking_uses_full_shipment_timeline(self):
+        act_a1 = _action(code='A1', label='Start Job')
+        act_a2 = _action(code='A2', label='Pickup Arrival')
+        act_a3 = _action(code='A3', label='Start Loading')
+        act_a4 = _action(code='A4', label='Confirm Loaded')
+        act_a5 = _action(code='A5', label='Depart In Transit')
+        act_a6 = _action(code='A6', label='Delivery Arrival')
+        act_a7 = _action(code='A7', label='Upload POD')
+        actions = [act_a1, act_a2, act_a3, act_a4, act_a5, act_a6, act_a7]
+
+        booking = MagicMock()
+        booking.order_type = 'Standard'
+        ctx_booking = JobDetailContext(
+            driver=_driver(),
+            tenant_schema='t',
+            user_id='u',
+            job_type='booking',
+            job_id=str(uuid4()),
+            booking=booking,
+        )
+        svc = JobDetailTimelineService()
+        with patch(
+            'mobile_api.job_detail.timeline.timeline_service.resolve_booking_job_execution_context',
+            return_value={
+                'backload_bootstrap': True,
+                'booking_item_type': 'Backload',
+            },
+        ):
+            filtered = svc._filter_workflow_actions_for_context(
+                actions,
+                context=ctx_booking,
+            )
+        self.assertEqual(
+            [a.action_code for a in filtered],
+            ['A2', 'A3', 'A4', 'A5', 'A6', 'A7'],
+        )
+
+    def test_merge_keeps_booking_preshipment_logs_on_shipment_timeline(self):
+        """A2/A3 logged on booking before A4 must stay performed on shipment job."""
+        booking_id = uuid4()
+        act_a2 = _action(code='A2', label='Pickup Arrival')
+        act_a2.action_id = uuid4()
+        act_a3 = _action(code='A3', label='Start Loading')
+        act_a3.action_id = uuid4()
+        act_a4 = _action(code='A4', label='Confirm Loaded')
+        act_a4.action_id = uuid4()
+
+        log_a2 = _log(
+            log_no='L-A2',
+            action=act_a2,
+            log_date=datetime(2026, 6, 17, 18, 0, tzinfo=timezone.utc),
+        )
+        log_a2.shipment_id = None
+        log_a2.booking_id = booking_id
+
+        log_a3 = _log(
+            log_no='L-A3',
+            action=act_a3,
+            log_date=datetime(2026, 6, 17, 18, 5, tzinfo=timezone.utc),
+        )
+        log_a3.shipment_id = None
+        log_a3.booking_id = booking_id
+
+        shipment_id = uuid4()
+        log_a4 = _log(
+            log_no='L-A4',
+            action=act_a4,
+            log_date=datetime(2026, 6, 17, 20, 9, tzinfo=timezone.utc),
+        )
+        log_a4.shipment_id = shipment_id
+
+        shipment = SimpleNamespace(pk=shipment_id, booking_id=booking_id)
+        events = merge_actions_with_timeline_logs(
+            [act_a2, act_a3, act_a4],
+            [log_a4, log_a3, log_a2],
+            shipment=shipment,
+        )
+        by_code = {event['action_code']: event for event in events}
+        self.assertTrue(by_code['A2']['is_performed'])
+        self.assertTrue(by_code['A3']['is_performed'])
+        self.assertTrue(by_code['A4']['is_performed'])
+        self.assertEqual(by_code['A2']['log_no'], 'L-A2')
+        self.assertEqual(by_code['A3']['log_no'], 'L-A3')
 
     def test_filter_always_hides_hard_pod_from_timeline(self):
         act_a7 = _action(code='A7', label='Upload POD')

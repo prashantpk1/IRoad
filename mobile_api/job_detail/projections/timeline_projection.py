@@ -40,6 +40,8 @@ def build_timeline_section(
         return dict(_EMPTY_TIMELINE)
     if context.job_type == 'movement' and context.movement is None:
         return dict(_EMPTY_TIMELINE)
+    if context.job_type == 'booking' and context.booking is None:
+        return dict(_EMPTY_TIMELINE)
 
     bundle = JobDetailTimelineService().build_preview_bundle(
         context,

@@ -10,6 +10,8 @@ from __future__ import annotations
 import uuid
 from typing import Any
 
+from django.db.models import Prefetch
+
 from tenant_workspace.models import TenantBooking, TenantShipment, TenantTruckMovementLog
 
 _BOOKING_SELECT = (
@@ -80,8 +82,13 @@ def lookup_booking_by_reference(reference: str) -> TenantBooking | None:
     token = (reference or '').strip()
     if not token:
         return None
-    qs = TenantBooking.objects.select_related(*_BOOKING_SELECT).defer(
-        *_BOOKING_ADDRESS_DEFER,
+    shipments_qs = TenantShipment.objects.exclude(
+        shipment_status=TenantShipment.ShipmentStatus.CANCELLED,
+    ).order_by('shipment_sequence', 'shipment_no')
+    qs = (
+        TenantBooking.objects.select_related(*_BOOKING_SELECT)
+        .defer(*_BOOKING_ADDRESS_DEFER)
+        .prefetch_related(Prefetch('shipments', queryset=shipments_qs))
     )
     if _is_uuid(token):
         return qs.filter(pk=token).first()

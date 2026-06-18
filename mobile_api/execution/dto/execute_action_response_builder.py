@@ -71,6 +71,7 @@ class ExecuteActionResponseBuilder:
             order_type=order_type,
             shipment=getattr(context, 'shipment', None),
             booking=getattr(context, 'booking', None),
+            driver=getattr(context, 'driver', None),
         )
         execution['job_closed'] = next_hint.get('job_closed', False)
         execution['next_step'] = next_hint.get('action', 'refresh_job_detail')
@@ -104,10 +105,27 @@ class ExecuteActionResponseBuilder:
                 else str(log_date)
             )
 
+        meta = dict(context.resolver_meta or {})
+        booking_item_type = ''
+        if context.booking is not None:
+            from mobile_api.job_detail.helpers.booking_job_context import (
+                resolve_pending_booking_item_type,
+            )
+
+            booking_item_type = resolve_pending_booking_item_type(
+                context.booking,
+                driver=context.driver,
+            )
+
         return {
             'job_type': context.job_type,
             'job_id': context.job_id,
             'action_code': context.action_code,
+            'booking_item_type': booking_item_type,
+            'backload_booking_redirect': bool(meta.get('backload_booking_redirect')),
+            'redirected_from_shipment_id': str(
+                meta.get('redirected_from_shipment_id') or ''
+            ).strip(),
             'shipment_id': str(getattr(action_log, 'shipment_id', '') or ''),
             'movement_id': str(getattr(action_log, 'truck_movement_id', '') or ''),
             'reused_existing': bool(context.reused_existing),

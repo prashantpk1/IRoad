@@ -3,6 +3,7 @@ from django.core.exceptions import ValidationError
 from django.db.models import Q
 from django.utils.translation import gettext_lazy as _
 
+from config.text_validators import ArabicTextFormMixin
 from tenant_workspace.models import (
     TenantCargoCategory,
     TenantCargoMaster,
@@ -18,7 +19,7 @@ CARGO_UOM_CHOICES = [
 ]
 
 
-class TenantCargoCategoryForm(forms.ModelForm):
+class TenantCargoCategoryForm(ArabicTextFormMixin, forms.ModelForm):
     category_code_preview = forms.CharField(
         label=_('Category Code'),
         required=False,
@@ -68,7 +69,7 @@ class TenantCargoCategoryForm(forms.ModelForm):
         return value
 
 
-class TenantCargoMasterForm(forms.ModelForm):
+class TenantCargoMasterForm(ArabicTextFormMixin, forms.ModelForm):
     cargo_code_preview = forms.CharField(
         label=_('Cargo Code'),
         required=False,
@@ -120,9 +121,10 @@ class TenantCargoMasterForm(forms.ModelForm):
             ),
             'arabic_label': forms.TextInput(
                 attrs={
-                    'class': 'form-control',
+                    'class': 'form-control eal-arabic',
                     'dir': 'rtl',
                     'lang': 'ar',
+                    'data-arabic-only': '1',
                     'placeholder': _('Arabic label'),
                 }
             ),

@@ -167,17 +167,29 @@
           <div class="field">
             <label class="form-label">File title</label>
             <div class="view-field-box">
+              {% if attachment_file_url %}
+              <p class="view-value {% if not attachment.attachment_file_title %}empty{% endif %}">
+                {% include 'partials/attachment_preview_link.html' with file_url=attachment_file_url file_name=attachment.file_name label=attachment.attachment_file_title|default:"—" %}
+              </p>
+              {% else %}
               <p class="view-value {% if not attachment.attachment_file_title %}empty{% endif %}">
                 {{ attachment.attachment_file_title|default:"—" }}
               </p>
+              {% endif %}
             </div>
           </div>
           <div class="field">
             <label class="form-label">File name</label>
             <div class="view-field-box">
+              {% if attachment_file_url %}
+              <p class="view-value {% if not attachment.file_name %}empty{% endif %}">
+                {% include 'partials/attachment_preview_link.html' with file_url=attachment_file_url file_name=attachment.file_name label=attachment.file_name|default:"—" hide_icon=True %}
+              </p>
+              {% else %}
               <p class="view-value {% if not attachment.file_name %}empty{% endif %}">
                 {{ attachment.file_name|default:"—" }}
               </p>
+              {% endif %}
             </div>
           </div>
           <div class="field">

@@ -134,9 +134,8 @@
             <p class="detail-view-value">
               {% if contract.has_contract_file %}
               <span class="eal-pi-number">
-                <i class="bi bi-file-earmark"></i>
                 {% if contract_file_url %}
-                <a href="{{ contract_file_url }}" target="_blank" rel="noopener">{{ contract.contract_file_name }}</a>
+                {% include 'partials/attachment_preview_link.html' with file_url=contract_file_url file_name=contract.contract_file_name label=contract.contract_file_name %}
                 {% else %}
                 {{ contract.contract_file_name }}
                 {% endif %}
@@ -196,7 +195,7 @@
           <span class="detail-field-value">
             {% if contract.has_contract_file %}
             {% if contract_file_url %}
-            <a href="{{ contract_file_url }}" target="_blank" rel="noopener">{{ contract.contract_file_name }}</a>
+            {% include 'partials/attachment_preview_link.html' with file_url=contract_file_url file_name=contract.contract_file_name label=contract.contract_file_name %}
             {% else %}
             {{ contract.contract_file_name }}
             {% endif %}

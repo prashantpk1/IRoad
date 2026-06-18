@@ -13,6 +13,7 @@ from django.core.exceptions import ValidationError as DjangoValidationError
 from django.utils.translation import gettext as _
 from rest_framework.parsers import FormParser, JSONParser, MultiPartParser
 from mobile_api.execution.exceptions import ExecuteActionError
+from mobile_api.execution.messages import execute_field_for_error_code
 from mobile_api.execution.serializers.execute_action_serializer import (
     ExecuteActionRequestSerializer,
     ExecuteActionResponseSerializer,
@@ -113,12 +114,26 @@ class ExecuteActionAPIView(MobileAPIView):
                 action_code,
                 exc.code,
             )
+            validation_fields = None
+            field_name = execute_field_for_error_code(exc.code)
+            if not field_name:
+                field_name = str((exc.validation_error or {}).get('field') or '').strip()
+            if field_name:
+                validation_fields = {
+                    field_name: [
+                        {
+                            'message': str(exc),
+                            'code': exc.code,
+                        },
+                    ],
+                }
             return self.error(
                 message=str(exc),
                 code=exc.code,
                 message_key=exc.message_key,
                 http_code=exc.http_status,
                 data=exc.to_validation_dict(),
+                validation_fields=validation_fields,
             )
         except DjangoValidationError as exc:
             message = '; '.join(exc.messages) if hasattr(exc, 'messages') else str(exc)

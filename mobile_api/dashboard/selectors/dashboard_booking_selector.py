@@ -33,6 +33,11 @@ _OPEN_SHIPMENT_STATUSES = [
     TenantShipment.ShipmentStatus.DELIVERED,
 ]
 
+# Round-trip: outbound closed but backload not born yet (no open shipment rows).
+_ROUND_TRIP_BACKLOAD_REOPEN = Q(trip_type__iexact='Round') & Q(
+    shipments__shipment_status=TenantShipment.ShipmentStatus.CLOSED,
+)
+
 
 class DashboardBookingSelector:
     """
@@ -53,6 +58,11 @@ class DashboardBookingSelector:
         if driver_pk is None:
             return None
         allow_booking_bootstrap = self._auto_shipment_bootstrap_enabled()
+        shipment_visibility_filter = Q(
+            shipments__shipment_status__in=_OPEN_SHIPMENT_STATUSES,
+        ) | _ROUND_TRIP_BACKLOAD_REOPEN
+        if allow_booking_bootstrap:
+            shipment_visibility_filter |= Q(shipments__isnull=True)
 
         shipments_qs = (
             TenantShipment.objects.select_related(
@@ -70,14 +80,7 @@ class DashboardBookingSelector:
                 | Q(shipments__driver_id=driver_pk),
                 booking_status=TenantBooking.Status.CONFIRMED,
             )
-            .filter(
-                Q(shipments__shipment_status__in=_OPEN_SHIPMENT_STATUSES)
-                | (
-                    Q(shipments__isnull=True)
-                    if allow_booking_bootstrap
-                    else Q(pk__isnull=True)
-                )
-            )
+            .filter(shipment_visibility_filter)
             .distinct()
             .order_by(
                 'booking_date',
@@ -101,20 +104,32 @@ class DashboardBookingSelector:
         for booking in bookings:
             shipments = list(booking.shipments.all())
             is_bootstrap_booking = allow_booking_bootstrap and not shipments
+            is_backload_bootstrap = policy.is_round_trip_backload_bootstrap(
+                driver,
+                booking,
+                shipments,
+            )
             if not policy.booking_is_visible_to_driver(driver, booking, shipments):
                 continue
-            if shipments and policy.is_booking_fully_complete(shipments):
+            if shipments and policy.is_booking_fully_complete(
+                shipments,
+                booking=booking,
+            ):
                 continue
 
             ordered = policy.sorted_countable_shipments(shipments)
             active = policy.get_active_shipment_for_driver(driver, booking, ordered)
-            if active is None and not is_bootstrap_booking:
+            if active is None and not (is_bootstrap_booking or is_backload_bootstrap):
                 continue
 
-            total, exec_completed, exec_pct = policy.booking_execution_progress(
-                ordered
+            total, exec_completed, exec_pct = policy.booking_execution_progress_for_dashboard(
+                booking,
+                ordered,
             )
-            _, biz_completed, biz_pct = policy.booking_business_progress(ordered)
+            _, biz_completed, biz_pct = policy.booking_business_progress_for_dashboard(
+                booking,
+                ordered,
+            )
             stage = policy.derive_booking_execution_stage(
                 booking, ordered, driver=driver
             )
@@ -133,6 +148,7 @@ class DashboardBookingSelector:
                 shipments_completed=exec_completed,
                 progress_percentage=exec_pct,
                 booking_execution_stage=stage,
+                is_backload_bootstrap=is_backload_bootstrap,
             )
 
         return None

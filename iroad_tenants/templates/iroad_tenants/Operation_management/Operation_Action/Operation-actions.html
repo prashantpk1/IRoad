@@ -58,7 +58,8 @@
           </div>
           <div class="field">
             <label for="arabicLabel" class="form-label">Arabic Label</label>
-            <input type="text" class="form-control" id="arabicLabel" name="arabic_label" value="{{ operation_action_form_data.arabic_label|default:'' }}" placeholder="Arabic label" dir="rtl"{% if operation_action_is_view %} readonly{% endif %} />
+            <input type="text" class="form-control eal-arabic{% if operation_action_form_errors.arabic_label %} is-invalid{% endif %}" id="arabicLabel" name="arabic_label" value="{{ operation_action_form_data.arabic_label|default:'' }}" placeholder="Arabic label" dir="rtl" lang="ar" data-arabic-only="1"{% if operation_action_is_view %} readonly{% endif %} />
+            {% if operation_action_form_errors.arabic_label %}<div class="invalid-feedback d-block">{{ operation_action_form_errors.arabic_label }}</div>{% endif %}
           </div>
           <div class="field">
             <label for="englishLabel" class="form-label">English Label <span class="required">*</span></label>

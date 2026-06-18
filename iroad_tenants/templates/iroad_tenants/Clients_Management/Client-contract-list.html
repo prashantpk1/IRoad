@@ -170,8 +170,7 @@
                 <td>
                   {% if contract.contract_attachment %}
                   <span class="eal-pi-number">
-                    <i class="bi bi-file-earmark"></i>
-                    <a href="{{ contract.contract_attachment.url }}" target="_blank" rel="noopener">{{ contract.contract_file_name }}</a>
+                    {% include 'partials/attachment_preview_link.html' with file_url=contract.contract_attachment.url file_name=contract.contract_file_name label=contract.contract_file_name %}
                   </span>
                   {% else %}
                   <span class="eal-type-badge ind"><i class="bi bi-x-lg"></i> No file</span>

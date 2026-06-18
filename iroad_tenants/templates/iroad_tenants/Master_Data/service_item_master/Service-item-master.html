@@ -145,14 +145,18 @@
                   <label for="arabicName" class="form-label">Arabic Name</label>
                   <input
                     type="text"
-                    class="form-control"
+                    class="form-control eal-arabic{% if field_errors.arabic_name %} is-invalid{% endif %}"
                     id="arabicName"
                     name="arabic_name"
                     value="{{ form_data.arabic_name|default:'' }}"
                     placeholder="الاسم العربي"
                     maxlength="200"
-                    dir="rtl" {% if is_view_mode %}readonly{% endif %}
+                    dir="rtl"
+                    lang="ar"
+                    data-arabic-only="1"
+                    {% if is_view_mode %}readonly{% endif %}
                   />
+                  {% if field_errors.arabic_name %}<div class="invalid-feedback d-block">{{ field_errors.arabic_name }}</div>{% endif %}
                 </div>
                 <div class="field">
                   <label for="category" class="form-label"

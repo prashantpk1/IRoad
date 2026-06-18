@@ -63,7 +63,8 @@
           </div>
           <div class="field">
             <label for="roleNameAr" class="form-label">Role Name (Arabic) <span class="required">*</span></label>
-            <div class="input-icon-wrapper"><i class="bi bi-translate"></i><input type="text" name="role_name_ar" class="form-control has-icon {% if form_errors.role_name_ar %}is-invalid{% endif %}" id="roleNameAr" dir="rtl" placeholder="مدير مالي" value="{{ form_data.role_name_ar|default:'' }}" {% if is_view_mode %}disabled{% endif %} /></div>
+            <div class="input-icon-wrapper"><i class="bi bi-translate"></i><input type="text" name="role_name_ar" class="form-control has-icon eal-arabic {% if form_errors.role_name_ar %}is-invalid{% endif %}" id="roleNameAr" dir="rtl" lang="ar" data-arabic-only="1" placeholder="مدير مالي" value="{{ form_data.role_name_ar|default:'' }}" {% if is_view_mode %}disabled{% endif %} /></div>
+            <span class="field-hint">Arabic characters only</span>
             {% if form_errors.role_name_ar %}<div class="invalid-feedback d-block">{{ form_errors.role_name_ar }}</div>{% endif %}
           </div>
         </div>
@@ -74,7 +75,8 @@
           </div>
           <div class="field">
             <label for="descriptionAr" class="form-label">Description (Arabic)</label>
-            <div class="input-icon-wrapper"><i class="bi bi-text-paragraph"></i><input type="text" name="description_ar" class="form-control has-icon" id="descriptionAr" dir="rtl" placeholder="وصف موجز..." value="{{ form_data.description_ar|default:'' }}" {% if is_view_mode %}disabled{% endif %} /></div>
+            <div class="input-icon-wrapper"><i class="bi bi-text-paragraph"></i><input type="text" name="description_ar" class="form-control has-icon eal-arabic" id="descriptionAr" dir="rtl" lang="ar" data-arabic-only="1" placeholder="وصف موجز..." value="{{ form_data.description_ar|default:'' }}" {% if is_view_mode %}disabled{% endif %} /></div>
+            <span class="field-hint">Arabic characters only</span>
           </div>
           <div class="field field-status">
             <label for="statusToggle" class="form-label d-block mb-2">Status</label>

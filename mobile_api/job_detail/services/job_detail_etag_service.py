@@ -112,6 +112,7 @@ def build_content_fingerprint(
         for item in (workflow.get('allowed_actions') or [])
         if isinstance(item, dict) and (item.get('action_code') or '').strip()
     )
+    fp['booking_item_type'] = str(workflow.get('booking_item_type') or '').strip()
     timeline = context.timeline or {}
     fp['timeline_preview_count'] = len(timeline.get('timeline_preview') or [])
     fp['timeline_cursor'] = (timeline.get('timeline_cursor') or '').strip()

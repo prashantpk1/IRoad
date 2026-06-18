@@ -245,6 +245,13 @@ def _prefilter_shipment_candidates(
 
     if stage == STAGE_POD:
         clauses |= Q(movement_status_impact__in=('Completed', 'completed'))
+        closed_tokens = _SHIPMENT_IMPACT_DB_TOKENS.get(
+            TenantShipment.ShipmentStatus.CLOSED,
+            (TenantShipment.ShipmentStatus.CLOSED,),
+        )
+        clauses |= Q(shipment_status_impact__in=closed_tokens) | Q(
+            action_code__iexact='A10',
+        )
 
     if clauses:
         qs = qs.filter(clauses)

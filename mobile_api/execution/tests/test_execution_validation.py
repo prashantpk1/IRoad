@@ -132,7 +132,7 @@ class ExecutionValidationTests(SimpleTestCase):
 
     def test_forbidden_action_not_in_allowed_list(self):
         ctx = _context(action_code='A99')
-        action = SimpleNamespace(action_code='A99', pk='act-99')
+        action = SimpleNamespace(action_code='A99', pk='act-99', english_label='A99')
         svc = ExecutionValidationService(operation_action_model=MagicMock())
         svc._operation_action_model.objects.filter.return_value.first.return_value = action
 
@@ -308,3 +308,32 @@ class ExecutionValidationTests(SimpleTestCase):
         keys = ExecutionIdempotencyGuard().normalize_request_keys(ctx)
         self.assertEqual(keys.idempotency_key, 'uuid-abc')
         self.assertEqual(ctx.idempotency_key, 'uuid-abc')
+
+    def test_booking_item_type_resolves_backload_after_outbound_closed(self):
+        booking = SimpleNamespace(
+            trip_type='Round',
+            loading_booking_item='Outbound',
+            shipments=SimpleNamespace(
+                all=lambda: [
+                    SimpleNamespace(
+                        shipment_status='Closed',
+                        booking_item_type='Outbound',
+                        shipment_sequence=1,
+                    ),
+                ],
+            ),
+        )
+        ctx = ExecuteActionContext(
+            driver=_driver(),
+            tenant_schema='tenant_test',
+            user_id='user-1',
+            job_type='booking',
+            job_id='bk-1',
+            action_code='A1',
+            payload={'client_action_id': 'c1'},
+            booking=booking,
+        )
+        self.assertEqual(
+            ExecutionValidationService._booking_item_type(ctx),
+            'Backload',
+        )

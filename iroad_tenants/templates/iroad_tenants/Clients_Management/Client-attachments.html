@@ -230,7 +230,7 @@
                 {% if is_edit_mode and editing_attachment %}
                 <p class="mb-2 small">
                   Current:
-                  <a href="{{ editing_attachment.attachment_file.url }}" target="_blank" rel="noopener">{{ editing_attachment.file_name }}</a>
+                  {% include 'partials/attachment_preview_link.html' with file_url=editing_attachment.attachment_file.url file_name=editing_attachment.file_name label=editing_attachment.file_name %}
                 </p>
                 {% endif %}
                 <input

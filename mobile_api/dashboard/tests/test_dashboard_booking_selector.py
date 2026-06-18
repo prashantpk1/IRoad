@@ -103,6 +103,7 @@ def _mock_booking_queryset(bookings):
 
     qs.prefetch_related.return_value = _Sliceable()
     qs.select_related.return_value = qs
+    qs.defer.return_value = qs
     return qs
 
 
@@ -172,6 +173,7 @@ class BookingSelectionPolicyTests(SimpleTestCase):
         self.assertEqual(biz_pct, 100)
 
     def test_booking_fully_complete_requires_all_legs_closed(self):
+        booking = _booking(trip_type='Round')
         shipments = [
             _shipment(status=TenantShipment.ShipmentStatus.CLOSED),
             _shipment(
@@ -180,7 +182,30 @@ class BookingSelectionPolicyTests(SimpleTestCase):
                 sequence=2,
             ),
         ]
-        self.assertTrue(policy.is_booking_fully_complete(shipments))
+        self.assertTrue(
+            policy.is_booking_fully_complete(shipments, booking=booking),
+        )
+
+    def test_closed_one_way_still_fully_complete(self):
+        booking = _booking(trip_type='One-Way')
+        shipments = [_shipment(status=TenantShipment.ShipmentStatus.CLOSED)]
+        self.assertTrue(
+            policy.is_booking_fully_complete(shipments, booking=booking),
+        )
+
+    def test_closed_outbound_round_trip_not_fully_complete_while_backload_pending(
+        self,
+    ):
+        booking = _booking(trip_type='Round')
+        shipments = [
+            _shipment(
+                booking_item_type='Outbound',
+                status=TenantShipment.ShipmentStatus.CLOSED,
+            ),
+        ]
+        self.assertFalse(
+            policy.is_booking_fully_complete(shipments, booking=booking),
+        )
 
     def test_booking_not_fully_complete_when_delivered_not_closed(self):
         shipments = [
@@ -358,6 +383,82 @@ class BookingProjectionTests(SimpleTestCase):
         )
         self.assertIn('round_trip', card)
 
+    def test_build_booking_card_includes_route_from_booking_without_shipment(self):
+        booking = _booking(trip_type='Round')
+        booking.route_display = 'jeddah To Makkah'
+        booking.route_direction = 'forward'
+        booking.route = MagicMock()
+        booking.route.route_id = uuid4()
+        booking.route.route_code = 'RT-0001'
+        booking.route.route_label = 'jeddah — Makkah'
+        booking.route.route_type = 'Domestic'
+        booking.route.origin_point = MagicMock()
+        booking.route.origin_point.display_label = 'jeddah'
+        booking.route.origin_point.location_name_english = 'jeddah'
+        booking.route.origin_point.location_name_arabic = ''
+        booking.route.destination_point = MagicMock()
+        booking.route.destination_point.display_label = 'Makkah'
+        booking.route.destination_point.location_name_english = 'Makkah'
+        booking.route.destination_point.location_name_arabic = ''
+        booking.loading_address = None
+        booking.delivery_address = None
+
+        card = build_booking_card(booking)
+
+        self.assertEqual(card['route']['route_display'], 'jeddah To Makkah')
+        self.assertEqual(card['route']['route_display_start'], 'jeddah')
+        self.assertEqual(card['route']['route_display_end'], 'Makkah')
+        self.assertEqual(card['route']['route_direction'], 'forward')
+        self.assertEqual(card['active_shipment'], {})
+
+    def test_build_booking_card_shows_backload_route_after_outbound_closed(self):
+        driver = _driver()
+        booking = _booking(
+            trip_type='Round',
+            assigned_driver_id=driver.pk,
+            backload_driver_id=driver.pk,
+        )
+        booking.route_display = 'jeddah To Makkah'
+        booking.route_direction = 'forward'
+        booking.route = MagicMock()
+        booking.route.origin_point = MagicMock()
+        booking.route.origin_point.display_label = 'jeddah'
+        booking.route.origin_point.location_name_english = 'jeddah'
+        booking.route.origin_point.location_name_arabic = ''
+        booking.route.destination_point = MagicMock()
+        booking.route.destination_point.display_label = 'Makkah'
+        booking.route.destination_point.location_name_english = 'Makkah'
+        booking.route.destination_point.location_name_arabic = ''
+        booking.loading_address = MagicMock()
+        booking.loading_address.display_name = 'Jeddah WH'
+        booking.delivery_address = MagicMock()
+        booking.delivery_address.display_name = 'Makkah DC'
+        outbound_closed = _shipment(
+            booking_item_type='Outbound',
+            status=TenantShipment.ShipmentStatus.CLOSED,
+        )
+        booking.shipments.all.return_value = [outbound_closed]
+
+        card = build_booking_card(booking, driver=driver)
+
+        self.assertEqual(card['route']['route_display_start'], 'Makkah')
+        self.assertEqual(card['route']['route_display_end'], 'jeddah')
+        self.assertEqual(card['route']['route_direction'], 'reverse')
+        self.assertEqual(
+            card['booking_execution_stage'],
+            policy.BOOKING_EXECUTION_STAGE_OUTBOUND_COMPLETED,
+        )
+        self.assertTrue(card['round_trip'].get('backload_bootstrap_pending'))
+        self.assertEqual(card['job_type'], 'booking')
+        self.assertEqual(card['job_id'], str(booking.booking_id))
+        self.assertEqual(card['booking_item_type'], 'Backload')
+        self.assertTrue(card.get('backload_bootstrap_pending'))
+        open_job = card.get('open_job') or {}
+        self.assertEqual(open_job.get('job_type'), 'booking')
+        self.assertEqual(open_job.get('job_id'), str(booking.booking_id))
+        self.assertEqual(open_job.get('booking_item_type'), 'Backload')
+        self.assertTrue(open_job.get('backload_bootstrap_pending'))
+
     def test_build_booking_card_derives_dual_progress_without_selection(self):
         driver = _driver()
         booking = _booking(
@@ -398,9 +499,9 @@ class DashboardBookingSelectorTests(SimpleTestCase):
         )
         self.mock_shipment_model = shipment_patcher.start()
         self.addCleanup(shipment_patcher.stop)
-        self.mock_shipment_model.objects.select_related.return_value.order_by.return_value = (
-            _mock_shipments_prefetch_qs()
-        )
+        prefetch_qs = _mock_shipments_prefetch_qs()
+        shipment_chain = self.mock_shipment_model.objects.select_related.return_value
+        shipment_chain.defer.return_value.order_by.return_value = prefetch_qs
 
     @patch(
         'mobile_api.dashboard.selectors.dashboard_booking_selector.DashboardBookingSelector._auto_shipment_bootstrap_enabled',
@@ -677,3 +778,136 @@ class BookingExecutionStageTests(SimpleTestCase):
             policy.derive_booking_execution_stage(booking, legs),
             policy.BOOKING_EXECUTION_STAGE_PARTIAL,
         )
+
+    def test_outbound_closed_only_backload_leg_pending(self):
+        booking = _booking(trip_type='Round')
+        legs = [
+            _shipment(
+                booking_item_type='Outbound',
+                status=TenantShipment.ShipmentStatus.CLOSED,
+                sequence=1,
+            ),
+        ]
+        self.assertTrue(policy.is_backload_leg_pending(booking, legs))
+        self.assertEqual(
+            policy.derive_booking_execution_stage(booking, legs),
+            policy.BOOKING_EXECUTION_STAGE_OUTBOUND_COMPLETED,
+        )
+        total, completed, pct = policy.booking_execution_progress_for_dashboard(
+            booking,
+            legs,
+        )
+        self.assertEqual(total, 2)
+        self.assertEqual(completed, 1)
+        self.assertEqual(pct, 50)
+        self.assertEqual(
+            policy.pending_executable_booking_item_type(booking, legs),
+            'Backload',
+        )
+
+    def test_round_trip_backload_bootstrap_driver_ownership(self):
+        driver = _driver()
+        booking = _booking(
+            trip_type='Round',
+            assigned_driver_id=driver.pk,
+            backload_driver_id=driver.pk,
+        )
+        legs = [
+            _shipment(
+                booking_item_type='Outbound',
+                status=TenantShipment.ShipmentStatus.CLOSED,
+            ),
+        ]
+        self.assertTrue(
+            policy.is_round_trip_backload_bootstrap(driver, booking, legs),
+        )
+        self.assertIsNone(
+            policy.get_active_shipment_for_driver(driver, booking, legs),
+        )
+
+
+class RoundTripBackloadBootstrapSelectorTests(SimpleTestCase):
+    def setUp(self):
+        super().setUp()
+        shipment_patcher = patch(
+            'mobile_api.dashboard.selectors.dashboard_booking_selector.TenantShipment'
+        )
+        self.mock_shipment_model = shipment_patcher.start()
+        self.addCleanup(shipment_patcher.stop)
+        prefetch_qs = _mock_shipments_prefetch_qs()
+        shipment_chain = self.mock_shipment_model.objects.select_related.return_value
+        shipment_chain.defer.return_value.order_by.return_value = prefetch_qs
+
+    @patch.object(DashboardBookingSelector, '_auto_shipment_bootstrap_enabled')
+    @patch('mobile_api.dashboard.selectors.dashboard_booking_selector.TenantBooking')
+    def test_selector_returns_booking_when_outbound_closed_backload_planned(
+        self,
+        mock_booking_model,
+        mock_bootstrap,
+    ):
+        mock_bootstrap.return_value = True
+        driver = _driver()
+        outbound_closed = _shipment(
+            booking_item_type='Outbound',
+            status=TenantShipment.ShipmentStatus.CLOSED,
+            driver_id=driver.pk,
+        )
+        booking = _booking(
+            trip_type='Round',
+            assigned_driver_id=driver.pk,
+            backload_driver_id=driver.pk,
+        )
+        booking.shipments.all.return_value = [outbound_closed]
+        mock_booking_model.objects.filter.return_value = _mock_booking_queryset(
+            [booking],
+        )
+
+        result = DashboardBookingSelector().select_current_driver_booking(
+            driver,
+            tenant_schema='tenant_test',
+        )
+
+        self.assertIsNotNone(result)
+        self.assertEqual(result.booking, booking)
+        self.assertIsNone(result.active_shipment)
+        self.assertEqual(
+            result.booking_execution_stage,
+            policy.BOOKING_EXECUTION_STAGE_OUTBOUND_COMPLETED,
+        )
+        self.assertEqual(result.shipments_total, 2)
+        self.assertEqual(result.shipments_execution_completed, 1)
+        self.assertEqual(result.execution_progress_percentage, 50)
+        self.assertTrue(result.is_backload_bootstrap)
+
+    @patch.object(DashboardBookingSelector, '_auto_shipment_bootstrap_enabled')
+    @patch('mobile_api.dashboard.selectors.dashboard_booking_selector.TenantBooking')
+    def test_selector_returns_backload_when_bootstrap_disabled(
+        self,
+        mock_booking_model,
+        mock_bootstrap,
+    ):
+        """Round-trip backload must appear even if auto_shipment_post is not configured."""
+        mock_bootstrap.return_value = False
+        driver = _driver()
+        outbound_closed = _shipment(
+            booking_item_type='Outbound',
+            status=TenantShipment.ShipmentStatus.CLOSED,
+            driver_id=driver.pk,
+        )
+        booking = _booking(
+            trip_type='Round',
+            assigned_driver_id=driver.pk,
+            backload_driver_id=driver.pk,
+        )
+        booking.shipments.all.return_value = [outbound_closed]
+        mock_booking_model.objects.filter.return_value = _mock_booking_queryset(
+            [booking],
+        )
+
+        result = DashboardBookingSelector().select_current_driver_booking(
+            driver,
+            tenant_schema='tenant_test',
+        )
+
+        self.assertIsNotNone(result)
+        self.assertTrue(result.is_backload_bootstrap)

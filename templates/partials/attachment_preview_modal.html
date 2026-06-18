@@ -1,0 +1,115 @@
+<div class="modal fade" id="iroadAttachmentPreviewModal" tabindex="-1" aria-labelledby="iroadAttachmentPreviewTitle" aria-hidden="true">
+  <div class="modal-dialog modal-xl modal-dialog-centered modal-dialog-scrollable">
+    <div class="modal-content border-0 shadow-lg overflow-hidden iroad-attachment-preview-modal">
+      <div class="modal-header px-4 py-3 border-0">
+        <div class="d-flex align-items-center gap-3 min-w-0">
+          <div class="iroad-attachment-preview-icon">
+            <i class="bi bi-eye-fill"></i>
+          </div>
+          <div class="min-w-0">
+            <h5 class="modal-title fw-bold mb-0 text-truncate" id="iroadAttachmentPreviewTitle">Attachment preview</h5>
+          </div>
+        </div>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body p-0 bg-light iroad-attachment-preview-body" id="iroadAttachmentPreviewBody"></div>
+      <div class="modal-footer bg-white border-0 px-4 py-3">
+        <a id="iroadAttachmentPreviewDownload" href="#" class="btn btn-outline-primary" download>
+          <i class="bi bi-download"></i> Download
+        </a>
+        <a id="iroadAttachmentPreviewOpen" href="#" class="btn btn-outline-secondary" target="_blank" rel="noopener">
+          <i class="bi bi-box-arrow-up-right"></i> Open in new tab
+        </a>
+        <button type="button" class="btn btn-light ms-auto" data-bs-dismiss="modal">Close</button>
+      </div>
+    </div>
+  </div>
+</div>
+<style>
+  .iroad-attachment-preview-link {
+    color: inherit;
+    text-decoration: none;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    max-width: 100%;
+  }
+  .iroad-attachment-preview-link:hover {
+    color: var(--primary-color, #5051f9);
+    text-decoration: underline;
+  }
+  .iroad-attachment-preview-modal .modal-header {
+    background: #1e293b;
+    color: #fff;
+  }
+  .iroad-attachment-preview-modal .modal-title {
+    color: #fff;
+  }
+  .iroad-attachment-preview-modal .btn-close {
+    filter: invert(1);
+  }
+  .iroad-attachment-preview-icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 40px;
+    height: 40px;
+    border-radius: 10px;
+    background: rgba(80, 81, 249, 0.25);
+    color: #a5b4fc;
+    flex-shrink: 0;
+  }
+  .iroad-attachment-preview-body {
+    min-height: 420px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    position: relative;
+  }
+  .iroad-attachment-preview-img {
+    display: block;
+    max-width: 100%;
+    max-height: 72vh;
+    margin: 0 auto;
+    object-fit: contain;
+  }
+  .iroad-attachment-preview-iframe {
+    display: block;
+    width: 100%;
+    min-height: 72vh;
+    border: 0;
+    background: #fff;
+  }
+  .iroad-attachment-preview-video {
+    display: block;
+    max-width: 100%;
+    max-height: 72vh;
+    margin: 0 auto;
+  }
+  .iroad-attachment-preview-fallback {
+    text-align: center;
+    padding: 48px 24px;
+    color: #64748b;
+  }
+  .iroad-attachment-preview-fallback i {
+    font-size: 2.5rem;
+    color: #94a3b8;
+    display: block;
+    margin-bottom: 12px;
+  }
+  .iroad-attachment-preview-loader {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 100%;
+    min-height: 420px;
+  }
+  .iroad-attachment-preview-embed {
+    display: block;
+    width: 100%;
+    min-height: 72vh;
+    border: 0;
+    background: #fff;
+  }
+</style>

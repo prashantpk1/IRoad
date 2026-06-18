@@ -2,10 +2,11 @@ from django import forms
 from django.core.exceptions import ValidationError
 from django.utils.translation import gettext_lazy as _
 
+from config.text_validators import ArabicTextFormMixin
 from tenant_workspace.models import TruckTypeMaster
 
 
-class TruckTypeMasterForm(forms.ModelForm):
+class TruckTypeMasterForm(ArabicTextFormMixin, forms.ModelForm):
     """TRT-001 — ``truck_type_code`` is never a form field; allocated on create only."""
 
     truck_type_code_preview = forms.CharField(
@@ -32,8 +33,10 @@ class TruckTypeMasterForm(forms.ModelForm):
             ),
             'arabic_label': forms.TextInput(
                 attrs={
-                    'class': 'form-control',
+                    'class': 'form-control eal-arabic',
                     'dir': 'rtl',
+                    'lang': 'ar',
+                    'data-arabic-only': '1',
                     'placeholder': _('مثال: مسطح'),
                 }
             ),

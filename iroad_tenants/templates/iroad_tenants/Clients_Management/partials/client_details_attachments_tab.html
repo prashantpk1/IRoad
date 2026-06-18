@@ -22,12 +22,16 @@
         <tr>
           <td>
             <span class="eal-pi-number">
+              {% if a.attachment_file %}
+              {% include 'partials/attachment_preview_link.html' with file_url=a.attachment_file.url file_name=a.file_name label=a.attachment_file_title|default:a.file_name|default:a.attachment_no %}
+              {% else %}
               {% with fn=a.file_name|lower %}
               {% if ".pdf" in fn %}<i class="bi bi-file-earmark-pdf text-danger"></i>
               {% elif ".png" in fn or ".jpg" in fn or ".jpeg" in fn %}<i class="bi bi-file-earmark-image text-primary"></i>
               {% else %}<i class="bi bi-paperclip"></i>{% endif %}
               {% endwith %}
               {{ a.attachment_file_title|default:a.file_name|default:a.attachment_no }}
+              {% endif %}
             </span>
           </td>
           <td>{{ a.attachment_date|date:"j M Y" }}</td>
@@ -43,7 +47,8 @@
           </td>
           <td>
             <div class="eal-actions-cell">
-              <a href="{% url 'iroad_tenants:tenant_client_attachment_edit' a.attachment_id %}?return_to=details" class="eal-row-btn" title="Edit"><i class="bi bi-pencil"></i></a>
+              <a href="{{ a.list_detail_url }}" class="eal-row-btn" title="View" aria-label="View"><i class="bi bi-eye"></i></a>
+              <a href="{{ a.list_edit_url }}" class="eal-row-btn" title="Edit" aria-label="Edit"><i class="bi bi-pencil"></i></a>
             </div>
           </td>
         </tr>

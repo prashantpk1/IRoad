@@ -159,8 +159,7 @@
   <div class="form-card-body">
     {% if attachment.attachment_file %}
     <div class="d-flex flex-wrap align-items-center gap-2 mb-3">
-      <i class="bi bi-paperclip"></i>
-      <span class="fw-semibold">{{ attachment.attachment_file.name|slice:"20:" }}</span>
+      {% include 'partials/attachment_preview_link.html' with file_url=attachment.attachment_file.url file_name=attachment.attachment_file.name label=attachment.attachment_file.name|slice:"20:" link_class="fw-semibold" %}
       <a href="{{ attachment.attachment_file.url }}" download class="btn btn-sm btn-outline-primary">
         <i class="bi bi-download"></i> Download
       </a>

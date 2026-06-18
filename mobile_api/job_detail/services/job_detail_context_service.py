@@ -34,13 +34,10 @@ from mobile_api.job_detail.services.job_detail_sync_metadata import (
     finalize_job_detail_sync,
     should_short_circuit_polling,
 )
+from mobile_api.job_detail.helpers.resolve_job_entity import resolve_job_detail_entity
 from mobile_api.job_detail.services.booking_job_resolver import BookingJobResolver
-from mobile_api.job_detail.services.movement_job_resolver import (
-    MovementJobResolver,
-)
-from mobile_api.job_detail.services.shipment_job_resolver import (
-    ShipmentJobResolver,
-)
+from mobile_api.job_detail.services.movement_job_resolver import MovementJobResolver
+from mobile_api.job_detail.services.shipment_job_resolver import ShipmentJobResolver
 
 
 @dataclass
@@ -185,65 +182,10 @@ class JobDetailContextService:
         raise ValueError(f'unsupported job_type: {job_type!r}')
 
     def _resolve_entity(self, context: JobDetailContext) -> None:
-        """Dispatch to shipment or movement resolver; raise on failure."""
-        if context.job_type == 'shipment':
-            result = self._shipment_resolver.resolve(
-                context.driver,
-                context.job_id,
-                tenant_schema=context.tenant_schema,
-            )
-            if result.resolve_context is not None and not result.resolve_context.ok:
-                raise job_detail_error_from_resolver(
-                    error_code=result.error_code,
-                    error_message=result.error_message,
-                )
-            if result.shipment is None:
-                raise job_detail_error_from_resolver(
-                    error_code=result.error_code or 'job_not_found',
-                    error_message=result.error_message,
-                )
-            context.shipment = result.shipment
-            context.booking = result.booking
-            if result.resolve_context is not None:
-                context.resolver_meta = result.resolve_context.to_resolver_meta()
-            return
-
-        if context.job_type == 'booking':
-            result = self._booking_resolver.resolve(
-                context.driver,
-                context.job_id,
-                tenant_schema=context.tenant_schema,
-            )
-            if result.resolve_context is not None and not result.resolve_context.ok:
-                raise job_detail_error_from_resolver(
-                    error_code=result.error_code,
-                    error_message=result.error_message,
-                )
-            if result.booking is None:
-                raise job_detail_error_from_resolver(
-                    error_code=result.error_code or 'job_not_found',
-                    error_message=result.error_message,
-                )
-            context.booking = result.booking
-            if result.resolve_context is not None:
-                context.resolver_meta = result.resolve_context.to_resolver_meta()
-            return
-
-        result = self._movement_resolver.resolve(
-            context.driver,
-            context.job_id,
-            tenant_schema=context.tenant_schema,
+        """Dispatch to booking/shipment/movement resolver; pivot backload when needed."""
+        resolve_job_detail_entity(
+            context,
+            shipment_resolver=self._shipment_resolver,
+            movement_resolver=self._movement_resolver,
+            booking_resolver=self._booking_resolver,
         )
-        if result.resolve_context is not None and not result.resolve_context.ok:
-            raise job_detail_error_from_resolver(
-                error_code=result.error_code,
-                error_message=result.error_message,
-            )
-        if result.movement is None:
-            raise job_detail_error_from_resolver(
-                error_code=result.error_code or 'job_not_found',
-                error_message=result.error_message,
-            )
-        context.movement = result.movement
-        if result.resolve_context is not None:
-            context.resolver_meta = result.resolve_context.to_resolver_meta()

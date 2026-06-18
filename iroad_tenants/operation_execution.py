@@ -10,6 +10,10 @@ from __future__ import annotations
 from django.core.exceptions import ValidationError
 from django.db.models import Q
 
+from iroad_tenants.operation_runtime.booking_preshipment_cycle import (
+    booking_preshipment_logs_queryset,
+    is_backload_preshipment_cycle,
+)
 from iroad_tenants.operation_runtime.shipment_execution_stage import (
     STAGE_COD,
     STAGE_COMPLETION,
@@ -17,8 +21,11 @@ from iroad_tenants.operation_runtime.shipment_execution_stage import (
     STAGE_PRE_TRANSIT,
     derive_shipment_execution_stage,
     execution_stage_operational_label,
+    is_loading_action,
+    is_pickup_action,
     is_pickup_or_loading_action,
     shipment_allows_pickup_loading_action,
+    _shipment_pickup_loading_done,
 )
 from tenant_workspace.models import (
     TenantBooking,
@@ -167,7 +174,14 @@ def _action_requires_movement(action) -> bool:
     return False
 
 
-def _executed_action_ids(*, booking=None, shipment=None, movement=None, exclude_log_id=None):
+def _executed_action_ids(
+    *,
+    booking=None,
+    shipment=None,
+    movement=None,
+    booking_item_type='',
+    exclude_log_id=None,
+):
     qs = TenantOperationActionLog.objects.exclude(operation_action__isnull=True)
     if exclude_log_id:
         qs = qs.exclude(log_id=exclude_log_id)
@@ -180,13 +194,27 @@ def _executed_action_ids(*, booking=None, shipment=None, movement=None, exclude_
 
         return movement_executed_action_ids(movement, exclude_log_id=exclude_log_id)
     elif booking is not None:
-        qs = qs.filter(booking_id=booking.booking_id, shipment__isnull=True)
+        if is_backload_preshipment_cycle(booking, booking_item_type):
+            qs = booking_preshipment_logs_queryset(
+                booking,
+                booking_item_type=booking_item_type,
+                exclude_log_id=exclude_log_id,
+            )
+        else:
+            qs = qs.filter(booking_id=booking.booking_id, shipment__isnull=True)
     else:
         return set()
     return set(qs.values_list('operation_action_id', flat=True))
 
 
-def _executed_action_codes(*, booking=None, shipment=None, movement=None, exclude_log_id=None):
+def _executed_action_codes(
+    *,
+    booking=None,
+    shipment=None,
+    movement=None,
+    booking_item_type='',
+    exclude_log_id=None,
+):
     """Uppercase action_code tokens already logged on the current context."""
     qs = TenantOperationActionLog.objects.exclude(operation_action__isnull=True)
     if exclude_log_id:
@@ -212,7 +240,14 @@ def _executed_action_codes(*, booking=None, shipment=None, movement=None, exclud
             if (code or '').strip()
         }
     elif booking is not None:
-        qs = qs.filter(booking_id=booking.booking_id, shipment__isnull=True)
+        if is_backload_preshipment_cycle(booking, booking_item_type):
+            qs = booking_preshipment_logs_queryset(
+                booking,
+                booking_item_type=booking_item_type,
+                exclude_log_id=exclude_log_id,
+            )
+        else:
+            qs = qs.filter(booking_id=booking.booking_id, shipment__isnull=True)
     else:
         return set()
     return {
@@ -252,6 +287,37 @@ def _pending_hard_pod_custody_exists(shipment) -> bool:
         shipment_id=shipment_id,
         promoted_at__isnull=True,
     ).exists()
+
+
+def _is_job_close_action(action) -> bool:
+    return (getattr(action, 'action_code', '') or '').strip().upper() == 'A10'
+
+
+def _shipment_job_close_gates_satisfied(shipment, *, exclude_log_id=None) -> bool:
+    """POD (+ COD when applicable) complete — driver may execute A10."""
+    from iroad_tenants.operation_runtime.side_effects import (
+        _mobile_pod_compliance_satisfied,
+    )
+
+    if shipment is None:
+        return False
+    current = (shipment.shipment_status or '').strip()
+    if current in _TERMINAL_SHIPMENT_STATUSES:
+        return False
+    if current not in {
+        TenantShipment.ShipmentStatus.POD_SUBMITTED,
+        TenantShipment.ShipmentStatus.DELIVERED,
+    }:
+        return False
+    if not _mobile_pod_compliance_satisfied(shipment):
+        return False
+    if (shipment.order_type or '').strip().upper() == 'COD':
+        if (
+            getattr(shipment, 'collection_status', None)
+            != TenantShipment.CollectionStatus.COLLECTED
+        ):
+            return False
+    return True
 
 
 def _hard_pod_blocks_forward_action(shipment, action_code: str) -> bool:
@@ -307,18 +373,46 @@ def _hard_copy_collection_shipment_allowed(
     return _pending_hard_pod_custody_exists(shipment)
 
 
-def _booking_start_job_done(booking, *, exclude_log_id=None):
+def _booking_start_job_done(booking, *, booking_item_type='', exclude_log_id=None):
     if booking is None:
         return False
-    if booking.execution_date is not None:
-        return True
-    qs = TenantOperationActionLog.objects.filter(booking_id=booking.booking_id).exclude(
-        operation_action__isnull=True,
+    qs = booking_preshipment_logs_queryset(
+        booking,
+        booking_item_type=booking_item_type,
+        exclude_log_id=exclude_log_id,
     )
-    if exclude_log_id:
-        qs = qs.exclude(log_id=exclude_log_id)
     for log in qs.select_related('operation_action')[:200]:
         if action_matches(log.operation_action, 'start job', 'a1', 'action 1'):
+            return True
+    return False
+
+
+def _booking_pickup_done(booking, *, booking_item_type='', exclude_log_id=None):
+    """Booking-scoped pickup arrival (A2) before Auto Shipment birth at A4."""
+    if booking is None:
+        return False
+    qs = booking_preshipment_logs_queryset(
+        booking,
+        booking_item_type=booking_item_type,
+        exclude_log_id=exclude_log_id,
+    )
+    for log in qs.select_related('operation_action')[:200]:
+        if is_pickup_action(log.operation_action):
+            return True
+    return False
+
+
+def _booking_loading_done(booking, *, booking_item_type='', exclude_log_id=None):
+    """Booking-scoped start loading (A3) before Auto Shipment birth at A4."""
+    if booking is None:
+        return False
+    qs = booking_preshipment_logs_queryset(
+        booking,
+        booking_item_type=booking_item_type,
+        exclude_log_id=exclude_log_id,
+    )
+    for log in qs.select_related('operation_action')[:200]:
+        if is_loading_action(log.operation_action):
             return True
     return False
 
@@ -352,6 +446,7 @@ def _action_is_allowed(
             booking=booking,
             shipment=shipment,
             movement=movement,
+            booking_item_type=booking_item_type,
             exclude_log_id=exclude_log_id,
         )
     )
@@ -388,6 +483,12 @@ def _action_is_allowed(
         # and shipment is in pre-movement status.
         if is_confirm_loaded:
             if not has_active_movement:
+                pickup_done, loading_done = _shipment_pickup_loading_done(
+                    shipment,
+                    exclude_log_id=exclude_log_id,
+                )
+                if not (pickup_done and loading_done):
+                    return False
                 return current in {
                     TenantShipment.ShipmentStatus.CREATED,
                     TenantShipment.ShipmentStatus.LOADED,
@@ -407,6 +508,12 @@ def _action_is_allowed(
 
         if _hard_pod_blocks_forward_action(shipment, action_code):
             return False
+
+        if _is_job_close_action(action):
+            return _shipment_job_close_gates_satisfied(
+                shipment,
+                exclude_log_id=exclude_log_id,
+            )
 
         if action_matches(action, 'collect payment', 'a9', 'action 9'):
             if (shipment.order_type or '').upper() != 'COD':
@@ -501,6 +608,24 @@ def _action_is_allowed(
         if action.auto_shipment_post:
             if booking.booking_status != TenantBooking.Status.CONFIRMED:
                 return False
+            if not _booking_start_job_done(
+                booking,
+                booking_item_type=booking_item_type,
+                exclude_log_id=exclude_log_id,
+            ):
+                return False
+            if not _booking_pickup_done(
+                booking,
+                booking_item_type=booking_item_type,
+                exclude_log_id=exclude_log_id,
+            ):
+                return False
+            if not _booking_loading_done(
+                booking,
+                booking_item_type=booking_item_type,
+                exclude_log_id=exclude_log_id,
+            ):
+                return False
             return not _booking_has_active_shipment(booking, booking_item_type)
 
         if action_matches(action, 'start job', 'a1', 'action 1'):
@@ -509,21 +634,45 @@ def _action_is_allowed(
                 TenantBooking.Status.DRAFT,
             }:
                 return False
-            return not _booking_start_job_done(booking, exclude_log_id=exclude_log_id)
+            return not _booking_start_job_done(
+                booking,
+                booking_item_type=booking_item_type,
+                exclude_log_id=exclude_log_id,
+            )
 
-        if action_matches(
-            action,
-            'pickup',
-            'arrival',
-            'a2',
-            'action 2',
-            'start loading',
-            'a3',
-            'action 3',
-        ):
+        if is_pickup_action(action):
             if booking.booking_status != TenantBooking.Status.CONFIRMED:
                 return False
-            return not _booking_has_active_shipment(booking, booking_item_type)
+            if _booking_has_active_shipment(booking, booking_item_type):
+                return False
+            if not _booking_start_job_done(
+                booking,
+                booking_item_type=booking_item_type,
+                exclude_log_id=exclude_log_id,
+            ):
+                return False
+            return not _booking_pickup_done(
+                booking,
+                booking_item_type=booking_item_type,
+                exclude_log_id=exclude_log_id,
+            )
+
+        if is_loading_action(action):
+            if booking.booking_status != TenantBooking.Status.CONFIRMED:
+                return False
+            if _booking_has_active_shipment(booking, booking_item_type):
+                return False
+            if not _booking_pickup_done(
+                booking,
+                booking_item_type=booking_item_type,
+                exclude_log_id=exclude_log_id,
+            ):
+                return False
+            return not _booking_loading_done(
+                booking,
+                booking_item_type=booking_item_type,
+                exclude_log_id=exclude_log_id,
+            )
 
         if impact:
             return False
@@ -531,7 +680,9 @@ def _action_is_allowed(
         if action.booking_status_impact:
             return booking.booking_status != TenantBooking.Status.CANCELLED
 
-        return booking.booking_status == TenantBooking.Status.CONFIRMED
+        # Booking-only scope: A1–A4 handlers above; shipment-phase actions are not allowed
+        # until Auto Shipment creates the first leg at Confirm Loaded (A4).
+        return False
 
     # --- Movement-only (empty move / no shipment on context) ---
     if movement is not None:
@@ -582,10 +733,21 @@ def get_allowed_actions(
         prefilter_allowed_action_candidates,
     )
 
+    from iroad_tenants.operation_runtime.booking_preshipment_cycle import (
+        resolve_preshipment_booking_item_type,
+    )
+
+    if booking is not None and shipment is None and movement is None:
+        booking_item_type = resolve_preshipment_booking_item_type(
+            booking,
+            booking_item_type,
+        )
+
     executed_ids = _executed_action_ids(
         booking=booking,
         shipment=shipment,
         movement=movement,
+        booking_item_type=booking_item_type,
         exclude_log_id=exclude_log_id,
     )
 

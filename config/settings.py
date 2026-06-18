@@ -11,6 +11,7 @@ https://docs.djangoproject.com/en/6.0/ref/settings/
 """
 
 from urllib.parse import urlparse
+import os
 
 from decouple import config
 from pathlib import Path
@@ -306,12 +307,36 @@ EMAIL_HOST_USER = config('EMAIL_HOST_USER')
 EMAIL_HOST_PASSWORD = config('EMAIL_HOST_PASSWORD')
 DEFAULT_FROM_EMAIL = config('DEFAULT_FROM_EMAIL', default='Iroad Admin <sohamghayal02@gmail.com>')
 
-# Redis
-REDIS_URL = config('REDIS_URL', default='redis://127.0.0.1:6379/0')
+# Redis — inside Docker, never use 127.0.0.1 (that is the web container, not Redis).
+def _running_in_docker() -> bool:
+    if os.path.exists('/.dockerenv'):
+        return True
+    return config('RUNNING_IN_DOCKER', default=False, cast=bool)
+
+
+def _build_redis_url(*, db: int, explicit_url: str = '') -> str:
+    explicit_url = (explicit_url or '').strip()
+    in_docker = _running_in_docker()
+    if explicit_url:
+        parsed = urlparse(explicit_url)
+        host = (parsed.hostname or '').lower()
+        if in_docker and host in {'127.0.0.1', 'localhost'}:
+            port = parsed.port or config('REDIS_PORT', default=6379, cast=int)
+            return f'redis://redis:{port}/{db}'
+        return explicit_url
+    host = 'redis' if in_docker else config('REDIS_HOST', default='127.0.0.1').strip()
+    port = config('REDIS_PORT', default=6379, cast=int)
+    return f'redis://{host}:{port}/{db}'
+
+
+REDIS_URL = _build_redis_url(db=0, explicit_url=config('REDIS_URL', default=''))
+REDIS_SOCKET_CONNECT_TIMEOUT = config('REDIS_SOCKET_CONNECT_TIMEOUT', default=5, cast=int)
+REDIS_SOCKET_TIMEOUT = config('REDIS_SOCKET_TIMEOUT', default=5, cast=int)
+REDIS_CIRCUIT_BREAKER_SECONDS = config('REDIS_CIRCUIT_BREAKER_SECONDS', default=30, cast=int)
 
 # Celery
-CELERY_BROKER_URL = config('CELERY_BROKER_URL', default='redis://127.0.0.1:6379/1')
-CELERY_RESULT_BACKEND = config('CELERY_RESULT_BACKEND', default='redis://127.0.0.1:6379/2')
+CELERY_BROKER_URL = _build_redis_url(db=1, explicit_url=config('CELERY_BROKER_URL', default=''))
+CELERY_RESULT_BACKEND = _build_redis_url(db=2, explicit_url=config('CELERY_RESULT_BACKEND', default=''))
 CELERY_ACCEPT_CONTENT = ['json']
 CELERY_TASK_SERIALIZER = 'json'
 CELERY_RESULT_SERIALIZER = 'json'
