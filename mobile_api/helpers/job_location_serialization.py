@@ -101,41 +101,51 @@ def serialize_route(
     route_direction = ''
     if booking is not None:
         route_direction = (getattr(booking, 'route_direction', '') or '').strip()
+    line_type = ''
     if shipment is not None:
         line_type = (getattr(shipment, 'booking_item_type', None) or '').strip().casefold()
         if line_type in {'backload', 'inbound'}:
             route_direction = 'reverse'
 
+    fk_resolved = False
     if route_direction.casefold() == 'reverse' and origin is not None and destination is not None:
         origin, destination = destination, origin
 
     route_display_start = ''
     route_display_end = ''
     if origin is not None and destination is not None:
+        fk_resolved = True
         route_display_start = _location_display_name(origin, request=request)
         route_display_end = _location_display_name(destination, request=request)
 
     route_display = ''
-    if shipment is not None:
-        route_display = (getattr(shipment, 'route_display', '') or '').strip()
-    if not route_display and booking is not None:
-        route_display = (getattr(booking, 'route_display', '') or '').strip()
-    if (
-        not route_display
-        and route_display_start
-        and route_display_end
-    ):
+    if fk_resolved and route_display_start and route_display_end:
         route_display = f'{route_display_start} → {route_display_end}'
-    elif route_display and (not route_display_start or not route_display_end):
-        parsed_start, parsed_end = _split_combined_route_label(route_display)
-        if parsed_start:
-            route_display_start = parsed_start
-        if parsed_end:
-            route_display_end = parsed_end
+    else:
+        if shipment is not None:
+            route_display = (getattr(shipment, 'route_display', '') or '').strip()
+        if not route_display and booking is not None:
+            route_display = (getattr(booking, 'route_display', '') or '').strip()
+        if (
+            not route_display
+            and route_display_start
+            and route_display_end
+        ):
+            route_display = f'{route_display_start} → {route_display_end}'
+        elif route_display and (not route_display_start or not route_display_end):
+            parsed_start, parsed_end = _split_combined_route_label(route_display)
+            if parsed_start:
+                route_display_start = parsed_start
+            if parsed_end:
+                route_display_end = parsed_end
+            if route_direction.casefold() == 'reverse' and route_display_start and route_display_end:
+                route_display = f'{route_display_start} → {route_display_end}'
     if not route_display_start and not route_display_end:
         route_display_start, route_display_end = _split_combined_route_label(
             route_display or route_label,
         )
+        if route_direction.casefold() == 'reverse' and route_display_start and route_display_end:
+            route_display = f'{route_display_start} → {route_display_end}'
 
     out: dict[str, Any] = {
         'route_display': route_display,

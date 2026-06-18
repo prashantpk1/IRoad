@@ -146,7 +146,7 @@
           </div>
           <div>
             <div class="eal-stat-value">{{ booking_stats.executed|default:0 }}</div>
-            <div class="eal-stat-label">Executed</div>
+            <div class="eal-stat-label">Completed</div>
           </div>
         </div>
         <div class="eal-stat-card">
@@ -311,10 +311,14 @@
                   </td>
                   <td>{{ row.trip_type }}</td>
                   <td>
-                    {% if row.derived_status == 'Executed' %}
+                    {% if row.derived_status == 'Completed' %}
                     <span class="status-badge active">{{ row.derived_status }}</span>
-                    {% elif row.derived_status == 'Active' %}
+                    {% elif row.derived_status == 'In Progress' %}
                     <span class="status-badge in-transit">{{ row.derived_status }}</span>
+                    {% elif row.derived_status == 'Partially Completed' %}
+                    <span class="status-badge in-transit">{{ row.derived_status }}</span>
+                    {% elif row.derived_status == 'Confirmed' %}
+                    <span class="status-badge pending">{{ row.derived_status }}</span>
                     {% elif row.derived_status == 'Cancelled' %}
                     <span class="status-badge inactive">{{ row.derived_status }}</span>
                     {% else %}

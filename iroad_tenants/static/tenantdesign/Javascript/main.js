@@ -11,6 +11,7 @@ document.addEventListener("DOMContentLoaded", function () {
       initSidebarCollapse,
       initTimeValidation,
       initFormValidation,
+      initFormSubmitGuard,
       initArabicTextInputs,
       initUserProfile,
       initNotificationPanel,
@@ -1737,6 +1738,61 @@ function initFormValidation() {
   attachFormSubmitValidation(document.getElementById("userCreationForm"), {
     validateRoles: true,
   });
+}
+
+/* ============================================
+   Prevent duplicate form submissions (double-click)
+   ============================================ */
+function initFormSubmitGuard() {
+  document
+    .querySelectorAll('form[method="post"], form[method="POST"]')
+    .forEach(function (form) {
+      if (form.dataset.submitGuardBound === "1") return;
+      if (form.hasAttribute("data-no-submit-guard")) return;
+      if (form.hasAttribute("data-tenant-global-search-form")) return;
+
+      form.dataset.submitGuardBound = "1";
+
+      var submitting = false;
+
+      function lockSubmitControls() {
+        form.querySelectorAll('button[type="submit"], input[type="submit"]').forEach(
+          function (btn) {
+            if (btn.disabled) return;
+            if (btn.tagName === "BUTTON" && !btn.dataset.submitGuardOriginalHtml) {
+              btn.dataset.submitGuardOriginalHtml = btn.innerHTML;
+              var label = btn.dataset.submittingLabel || "Saving...";
+              btn.innerHTML =
+                '<span class="spinner-border spinner-border-sm me-1" role="status" aria-hidden="true"></span> ' +
+                label;
+            }
+            btn.disabled = true;
+          },
+        );
+      }
+
+      form.addEventListener("submit", function (e) {
+        if (submitting) {
+          e.preventDefault();
+          return;
+        }
+        if (e.defaultPrevented) return;
+
+        submitting = true;
+        form.dataset.submitting = "1";
+        lockSubmitControls();
+      });
+
+      form.querySelectorAll('button[type="submit"], input[type="submit"]').forEach(
+        function (btn) {
+          btn.addEventListener("click", function (e) {
+            if (!submitting) return;
+            e.preventDefault();
+            e.stopPropagation();
+          });
+        },
+      );
+    });
 }
 
 /* ============================================

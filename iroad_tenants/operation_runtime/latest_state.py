@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from django.core.exceptions import ValidationError
 
+from iroad_tenants.operation_field_catalog import operation_pod_status_is_complete
 from iroad_tenants.operation_runtime.impacts import (
     operation_action_matches,
     resolve_shipment_status_impact,
@@ -20,11 +21,7 @@ def validate_shipment_status_transition(shipment, new_status) -> None:
         return
     if new_status != TenantShipment.ShipmentStatus.DELIVERED:
         return
-    compliant_statuses = {
-        TenantShipment.PodStatus.COMPLIANT,
-        TenantShipment.PodStatus.HARD_COPY_RECEIVED,
-    }
-    if (shipment.pod_status or '') not in compliant_statuses:
+    if not operation_pod_status_is_complete(shipment.pod_status):
         raise ValidationError(
             'Shipment cannot move to Delivered until POD is compliant '
             '(all delivery-note documents verified).'
@@ -156,5 +153,5 @@ def apply_hard_copy_received_if_needed(*, shipment, action) -> None:
         return
     if (getattr(shipment, 'pod_type', None) or '').strip() != TenantShipment.PodType.HARD:
         return
-    shipment.pod_status = TenantShipment.PodStatus.HARD_COPY_RECEIVED
+    shipment.pod_status = TenantShipment.PodStatus.COMPLETED
     shipment.save(update_fields=['pod_status', 'updated_at'])

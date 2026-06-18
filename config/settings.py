@@ -330,8 +330,20 @@ def _build_redis_url(*, db: int, explicit_url: str = '') -> str:
 
 
 REDIS_URL = _build_redis_url(db=0, explicit_url=config('REDIS_URL', default=''))
-REDIS_SOCKET_CONNECT_TIMEOUT = config('REDIS_SOCKET_CONNECT_TIMEOUT', default=5, cast=int)
-REDIS_SOCKET_TIMEOUT = config('REDIS_SOCKET_TIMEOUT', default=5, cast=int)
+REDIS_ENABLED = config('REDIS_ENABLED', default=True, cast=bool)
+# Fail fast when Redis is not running (especially local dev without Docker).
+_redis_connect_default = 1 if DEBUG else 5
+_redis_socket_default = 2 if DEBUG else 5
+REDIS_SOCKET_CONNECT_TIMEOUT = config(
+    'REDIS_SOCKET_CONNECT_TIMEOUT',
+    default=_redis_connect_default,
+    cast=int,
+)
+REDIS_SOCKET_TIMEOUT = config(
+    'REDIS_SOCKET_TIMEOUT',
+    default=_redis_socket_default,
+    cast=int,
+)
 REDIS_CIRCUIT_BREAKER_SECONDS = config('REDIS_CIRCUIT_BREAKER_SECONDS', default=30, cast=int)
 
 # Celery

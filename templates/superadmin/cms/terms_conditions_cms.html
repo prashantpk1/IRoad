@@ -177,8 +177,8 @@
                 style="max-height: 160px;"
               />
               <div class="mt-2">
-                <a href="{{ page.page_header_background.url }}" target="_blank" rel="noopener noreferrer" class="small">
-                  {% translate "Open file" %}
+                <a href="{{ page.page_header_background.url }}" class="small" data-attachment-preview data-file-url="{{ page.page_header_background.url }}" data-file-name="{{ page.page_header_background.name|default:'Header background' }}">
+                  {% translate "Preview file" %}
                 </a>
               </div>
             </div>

@@ -11,6 +11,10 @@ from django.core.exceptions import ValidationError
 from django.db import models
 from django.utils import timezone
 
+from iroad_tenants.operation_field_catalog import (
+    normalize_operation_pod_status,
+    operation_pod_status_is_complete,
+)
 from iroad_tenants.operation_runtime.booking_impact import apply_booking_status_impact
 from iroad_tenants.operation_runtime.impacts import (
     operation_action_matches,
@@ -89,10 +93,7 @@ def _should_auto_mark_delivered_for_credit(action, shipment) -> bool:
 
 def _pod_status_is_complete(shipment) -> bool:
     pod_status = (getattr(shipment, 'pod_status', None) or '').strip()
-    return pod_status in {
-        TenantShipment.PodStatus.COMPLIANT,
-        TenantShipment.PodStatus.HARD_COPY_RECEIVED,
-    }
+    return operation_pod_status_is_complete(pod_status)
 
 
 def _mobile_log_evidence_for_shipment(shipment) -> dict[str, bool]:
@@ -127,26 +128,28 @@ def _sync_pod_status_from_mobile_logs(shipment) -> None:
     pod_type = (getattr(shipment, 'pod_type', None) or '').strip().casefold()
     if pod_type == TenantShipment.PodType.HARD.casefold():
         if evidence.get('hard_pod_log'):
-            shipment.pod_status = TenantShipment.PodStatus.HARD_COPY_RECEIVED
+            shipment.pod_status = TenantShipment.PodStatus.COMPLETED
             shipment.save(update_fields=['pod_status', 'updated_at'])
         return
     if evidence.get('pod_uploaded') or evidence.get('delivered_log'):
-        shipment.pod_status = TenantShipment.PodStatus.COMPLIANT
+        shipment.pod_status = TenantShipment.PodStatus.COMPLETED
         shipment.save(update_fields=['pod_status', 'updated_at'])
 
 
 def derive_pod_status_from_shipment_rows(statuses: list[str]) -> str:
     """Aggregate shipment pod_status values for booking-level display."""
-    normalized = [(status or '').strip() for status in statuses if (status or '').strip()]
+    normalized = [
+        normalize_operation_pod_status(status, default=TenantShipment.PodStatus.NOT_COMPLETED)
+        for status in statuses
+        if (status or '').strip()
+    ]
     if not normalized:
-        return TenantShipment.PodStatus.PENDING
-    if TenantShipment.PodStatus.NOT_COMPLIANT in normalized:
-        return TenantShipment.PodStatus.NOT_COMPLIANT
-    if all(status == TenantShipment.PodStatus.COMPLIANT for status in normalized):
-        return TenantShipment.PodStatus.COMPLIANT
-    if TenantShipment.PodStatus.HARD_COPY_RECEIVED in normalized:
-        return TenantShipment.PodStatus.HARD_COPY_RECEIVED
-    return TenantShipment.PodStatus.PENDING
+        return TenantShipment.PodStatus.NOT_COMPLETED
+    if any(status == TenantShipment.PodStatus.NOT_COMPLETED for status in normalized):
+        return TenantShipment.PodStatus.NOT_COMPLETED
+    if all(status == TenantShipment.PodStatus.COMPLETED for status in normalized):
+        return TenantShipment.PodStatus.COMPLETED
+    return TenantShipment.PodStatus.NOT_COMPLETED
 
 
 def sync_booking_pod_status_from_shipments(booking) -> None:

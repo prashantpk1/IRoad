@@ -5,25 +5,22 @@ from types import SimpleNamespace
 from unittest.mock import MagicMock, patch
 from uuid import uuid4
 
-from django.test import SimpleTestCase
+from unittest import TestCase
+from unittest.mock import MagicMock, patch
+from uuid import uuid4
 
-from tenant_workspace.models import TenantBooking, TenantShipment
-
-from iroad_tenants.views import _tenant_booking_line_operational_status
+from iroad_tenants.booking_status import derive_booking_line_status
 
 
 def _booking():
     b = SimpleNamespace()
     b.booking_id = uuid4()
-    b.booking_status = TenantBooking.Status.CONFIRMED
+    b.booking_status = 'Confirmed'
     return b
 
 
 def _shipment_qs(*shipments):
-    terminal = (
-        TenantShipment.ShipmentStatus.CANCELLED,
-        TenantShipment.ShipmentStatus.CLOSED,
-    )
+    terminal = ('Cancelled', 'Closed')
     open_rows = [
         s for s in shipments if getattr(s, 'shipment_status', None) not in terminal
     ]
@@ -58,9 +55,9 @@ def _shipment_qs(*shipments):
         return qs
 
     def filter(**kwargs):
-        if kwargs.get('shipment_status') == TenantShipment.ShipmentStatus.CLOSED:
+        if kwargs.get('shipment_status') == 'Closed':
             return closed_qs
-        if kwargs.get('shipment_status') == TenantShipment.ShipmentStatus.CANCELLED:
+        if kwargs.get('shipment_status') == 'Cancelled':
             return cancelled_qs
         return qs
 
@@ -69,35 +66,35 @@ def _shipment_qs(*shipments):
     return qs
 
 
-class BookingLineOperationalStatusTests(SimpleTestCase):
-    @patch('iroad_tenants.views.TenantShipment.objects')
+class BookingLineOperationalStatusTests(TestCase):
+    @patch('tenant_workspace.models.TenantShipment.objects')
     def test_closed_outbound_shows_executed_even_if_newer_open_duplicate(self, mock_objects):
         booking = _booking()
         closed = SimpleNamespace(
-            shipment_status=TenantShipment.ShipmentStatus.CLOSED,
+            shipment_status='Closed',
         )
         open_dup = SimpleNamespace(
-            shipment_status=TenantShipment.ShipmentStatus.LOADED,
+            shipment_status='Loaded',
         )
         mock_objects.filter.return_value = _shipment_qs(closed, open_dup)
 
-        status = _tenant_booking_line_operational_status(booking, 'Outbound')
+        status = derive_booking_line_status(booking, 'Outbound')
 
-        self.assertEqual(status, 'In Execution')
+        self.assertEqual(status, 'In Progress')
 
-    @patch('iroad_tenants.views.TenantShipment.objects')
+    @patch('tenant_workspace.models.TenantShipment.objects')
     def test_only_closed_outbound_shows_executed(self, mock_objects):
         booking = _booking()
         closed = SimpleNamespace(
-            shipment_status=TenantShipment.ShipmentStatus.CLOSED,
+            shipment_status='Closed',
         )
         mock_objects.filter.return_value = _shipment_qs(closed)
 
-        status = _tenant_booking_line_operational_status(booking, 'Outbound')
+        status = derive_booking_line_status(booking, 'Outbound')
 
-        self.assertEqual(status, 'Executed')
+        self.assertEqual(status, 'Completed')
 
-    @patch('iroad_tenants.views.TenantShipment.objects')
+    @patch('tenant_workspace.models.TenantShipment.objects')
     def test_both_legs_closed_booking_lines_executed(self, mock_objects):
         booking = _booking()
 
@@ -106,13 +103,13 @@ class BookingLineOperationalStatusTests(SimpleTestCase):
             if line_type == 'Outbound':
                 return _shipment_qs(
                     SimpleNamespace(
-                        shipment_status=TenantShipment.ShipmentStatus.CLOSED,
+                        shipment_status='Closed',
                     ),
                 )
             if line_type == 'Backload':
                 return _shipment_qs(
                     SimpleNamespace(
-                        shipment_status=TenantShipment.ShipmentStatus.CLOSED,
+                        shipment_status='Closed',
                     ),
                 )
             return _shipment_qs()
@@ -120,10 +117,10 @@ class BookingLineOperationalStatusTests(SimpleTestCase):
         mock_objects.filter.side_effect = _filter_side_effect
 
         self.assertEqual(
-            _tenant_booking_line_operational_status(booking, 'Outbound'),
-            'Executed',
+            derive_booking_line_status(booking, 'Outbound'),
+            'Completed',
         )
         self.assertEqual(
-            _tenant_booking_line_operational_status(booking, 'Backload'),
-            'Executed',
+            derive_booking_line_status(booking, 'Backload'),
+            'Completed',
         )

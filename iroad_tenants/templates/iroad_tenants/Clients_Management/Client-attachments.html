@@ -112,10 +112,6 @@
                   {% if form_errors.client_account %}<div class="invalid-feedback d-block">{{ form_errors.client_account }}</div>{% endif %}
                   {% if client_account_locked %}
                   <span class="field-hint">Locked to the client you opened from.</span>
-                  {% else %}
-                  <span class="field-hint"
-                    >Select the client this attachment belongs to</span
-                  >
                   {% endif %}
                 </div>
                 <div class="field">
@@ -134,60 +130,7 @@
                     />
                   </div>
                   {% if form_errors.attachment_date %}<div class="invalid-feedback d-block">{{ form_errors.attachment_date }}</div>{% endif %}
-                  <span class="field-hint"
-                    >Date the attachment was created or received</span
-                  >
-                </div>
-              </div>
-            </div>
-
-            <!-- Row 2: Expiry & Status -->
-            <div class="field-group">
-              <h3 class="field-group-title">
-                <i class="bi bi-calendar-check"></i>
-                Expiry & Status
-              </h3>
-              <div class="fields-grid cols-3">
-                <div class="field">
-                  <label for="isExpiryApplicable" class="form-label"
-                    >Is Expiry Applicable</label
-                  >
-                  <select class="form-select{% if form_errors.is_expiry_applicable %} is-invalid{% endif %}" id="isExpiryApplicable" name="is_expiry_applicable">
-                    <option value="" disabled>-Select-</option>
-                    <option value="true" {% if form_data.is_expiry_applicable == 'true' %}selected{% endif %}>Yes</option>
-                    <option value="false" {% if form_data.is_expiry_applicable|default:'false' == 'false' %}selected{% endif %}>No</option>
-                  </select>
-                  {% if form_errors.is_expiry_applicable %}<div class="invalid-feedback d-block">{{ form_errors.is_expiry_applicable }}</div>{% endif %}
-                  <span class="field-hint"
-                    >Indicate if this attachment has an expiry date</span
-                  >
-                </div>
-                <div class="field">
-                  <label for="expiryDate" class="form-label">Expiry Date</label>
-                  <div class="input-icon-wrapper">
-                    <i class="bi bi-calendar-x"></i>
-                    <input
-                      type="date"
-                      class="form-control has-icon {% if form_errors.expiry_date %}is-invalid{% endif %}"
-                      id="expiryDate"
-                      name="expiry_date"
-                      value="{{ form_data.expiry_date|default:'' }}"
-                    />
-                  </div>
-                  {% if form_errors.expiry_date %}<div class="invalid-feedback d-block">{{ form_errors.expiry_date }}</div>{% endif %}
-                  <span class="field-hint"
-                    >Applicable only if expiry is enabled</span
-                  >
-                </div>
-                <div class="field">
-                  <label for="status" class="form-label">Status</label>
-                  <select class="form-select" id="status" disabled aria-readonly="true">
-                    <option value="" disabled>-Select status-</option>
-                    <option value="Valid" {% if is_edit_mode and editing_attachment.computed_status == 'Valid' %}selected{% endif %}>Valid</option>
-                    <option value="Expired" {% if is_edit_mode and editing_attachment.computed_status == 'Expired' %}selected{% endif %}>Expired</option>
-                    <option value="Does Not Expire" {% if is_edit_mode and editing_attachment.computed_status == 'Does Not Expire' %}selected{% endif %}>Does Not Expire</option>
-                  </select>
-                  <span class="field-hint">Derived from expiry settings</span>
+                  
                 </div>
               </div>
             </div>

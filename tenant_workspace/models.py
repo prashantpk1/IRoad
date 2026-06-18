@@ -3576,14 +3576,12 @@ class TenantShipment(models.Model):
 
     class PodType(models.TextChoices):
         DIGITAL = 'Digital', 'Digital'
-        SOFT = 'Soft', 'Soft'
-        HARD = 'Hard', 'Hard'
+        SOFT = 'Soft Copy', 'Soft Copy'
+        HARD = 'Hard Copy', 'Hard Copy'
 
     class PodStatus(models.TextChoices):
-        PENDING = 'Pending', 'Pending'
-        HARD_COPY_RECEIVED = 'Hard Copy Received', 'Hard Copy Received'
-        COMPLIANT = 'Compliant', 'Compliant'
-        NOT_COMPLIANT = 'Not Compliant', 'Not Compliant'
+        COMPLETED = 'Completed', 'Completed'
+        NOT_COMPLETED = 'Not Completed', 'Not Completed'
 
     class SourcingMode(models.TextChoices):
         IN_SOURCE = 'In-Source', 'In-Source'
@@ -3669,11 +3667,11 @@ class TenantShipment(models.Model):
         null=True,
         blank=True,
     )
-    pod_type = models.CharField(max_length=12, choices=PodType.choices, default=PodType.DIGITAL)
+    pod_type = models.CharField(max_length=20, choices=PodType.choices, default=PodType.DIGITAL)
     pod_status = models.CharField(
         max_length=20,
         choices=PodStatus.choices,
-        default=PodStatus.PENDING,
+        default=PodStatus.NOT_COMPLETED,
     )
     pod_doc_count = models.PositiveIntegerField(default=0)
     cod_amount = models.DecimalField(max_digits=12, decimal_places=2, default=0)
@@ -3797,17 +3795,8 @@ class TenantShipment(models.Model):
                     previous = TenantShipment.objects.filter(pk=self.pk).values_list(
                         'shipment_status', flat=True
                     ).first()
-                cancellable = {
-                    self.ShipmentStatus.LOADED,
-                    self.ShipmentStatus.CREATED,
-                    self.ShipmentStatus.IN_TRANSIT,
-                    self.ShipmentStatus.AT_DELIVERY,
-                    self.ShipmentStatus.POD_SUBMITTED,
-                }
-                if previous not in cancellable and previous != self.ShipmentStatus.CANCELLED:
-                    errors['shipment_status'] = [
-                        _('Cancelled is allowed only before the shipment is closed.'),
-                    ]
+                if previous == self.ShipmentStatus.CANCELLED:
+                    pass
 
         if self.order_type.upper() == 'COD':
             if self.shipment_status == self.ShipmentStatus.CLOSED and self.collection_status != self.CollectionStatus.COLLECTED:

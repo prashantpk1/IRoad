@@ -10,15 +10,21 @@ function initAttachmentPreview() {
   var openBtn = document.getElementById("iroadAttachmentPreviewOpen");
   var activeBlobUrl = "";
 
-  function fileKind(name, url) {
-    var source = (name || url || "").split("?")[0].split("#")[0];
-    var ext = source.split(".").pop().toLowerCase();
+  function fileKindFromSource(source) {
+    var normalized = (source || "").split("?")[0].split("#")[0];
+    var ext = normalized.split(".").pop().toLowerCase();
     if (["jpg", "jpeg", "png", "gif", "webp", "svg", "bmp"].indexOf(ext) >= 0) {
       return "image";
     }
     if (ext === "pdf") return "pdf";
     if (["mp4", "webm", "ogg", "mov"].indexOf(ext) >= 0) return "video";
     return "other";
+  }
+
+  function fileKind(name, url) {
+    var kind = fileKindFromSource(name);
+    if (kind !== "other") return kind;
+    return fileKindFromSource(url);
   }
 
   function revokeBlobUrl() {

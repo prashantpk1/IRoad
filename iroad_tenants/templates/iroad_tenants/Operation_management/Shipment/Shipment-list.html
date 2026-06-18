@@ -291,11 +291,6 @@
                           </a>
                         </li>
                         <li>
-                          <a class="dropdown-item" href="{% url 'iroad_tenants:tenant_operation_shipment_update' shipment.shipment_id %}">
-                            <i class="bi bi-arrow-repeat text-secondary me-2"></i>Update
-                          </a>
-                        </li>
-                        <li>
                           <a class="dropdown-item" href="{% url 'iroad_tenants:tenant_operation_shipment_edit' shipment.shipment_id %}#shipment-address-section">
                             <i class="bi bi-pin-map text-success me-2"></i>Update Address
                           </a>
@@ -317,14 +312,16 @@
                           {% endif %}
                         </li>
                         <li><hr class="dropdown-divider" /></li>
+                        {% if shipment.shipment_status != 'Cancelled' %}
                         <li>
-                          <form method="post" action="{% url 'iroad_tenants:tenant_operation_shipment_delete' shipment.shipment_id %}" onsubmit="return confirm('Delete shipment {{ shipment.shipment_no|escapejs }}?');">
+                          <form method="post" action="{% url 'iroad_tenants:tenant_operation_shipment_cancel' shipment.shipment_id %}" onsubmit="return confirm('Cancel shipment {{ shipment.shipment_no|escapejs }}? An R1 action log entry will be recorded.');">
                             {% csrf_token %}
-                            <button type="submit" class="dropdown-item text-danger">
-                              <i class="bi bi-trash3 me-2"></i>Delete
+                            <button type="submit" class="dropdown-item text-warning">
+                              <i class="bi bi-x-circle me-2"></i>Cancel
                             </button>
                           </form>
                         </li>
+                        {% endif %}
                       </ul>
                     </div>
                   </td>

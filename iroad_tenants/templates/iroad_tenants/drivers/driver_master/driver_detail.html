@@ -104,9 +104,15 @@
   <a href="{% url 'iroad_tenants:driver_master_edit' driver.driver_id %}?return_to=details" class="ch-action-btn" title="Manage linked app user in Basic Information">
     <i class="bi bi-phone-vibrate"></i> Suspend App Access
   </a>
-  <a href="{% url 'iroad_tenants:driver_master_edit' driver.driver_id %}?return_to=details" class="ch-action-btn" title="Change linked user account in Basic Information">
+  {% if driver.user_account_id_id %}
+  <a href="{% url 'iroad_tenants:tenant_users_administration_edit' driver.user_account_id_id %}#password" class="ch-action-btn" title="Open linked user profile to reset password">
     <i class="bi bi-key"></i> Reset Password
   </a>
+  {% else %}
+  <button type="button" class="ch-action-btn ch-action-btn--disabled" disabled title="No linked user account on this driver">
+    <i class="bi bi-key"></i> Reset Password
+  </button>
+  {% endif %}
 </div>
 
 <div class="cd-main-card">
@@ -316,8 +322,8 @@
                 <tr>
                   <td>{{ forloop.counter }}</td>
                   <td>
-                    {% if row.has_file %}
-                    {% include 'partials/attachment_preview_link.html' with file_url=row.file_url file_name=row.file_name label=row.file_name icon_class=row.file_icon_class link_class="dm-doc-file-link" %}
+                    {% if row.file_url %}
+                    {% include 'partials/attachment_preview_link.html' with file_url=row.file_url file_name=row.preview_file_name label=row.file_name icon_class=row.file_icon_class link_class="dm-doc-file-link" preview_title=row.preview_file_name %}
                     {% else %}
                     <span class="dm-doc-file-name">{{ row.file_name }}</span>
                     {% endif %}
@@ -343,17 +349,8 @@
                   <td>{{ a.attachment_date|date:"j M Y" }}</td>
                   <td class="text-end">
                     <div class="eal-actions-cell justify-content-end pt-0 pb-0 w-100">
-                      {% if row.has_file %}
-                      <a class="eal-row-btn" href="{{ a.attachment_file.url }}" download title="Download"><i class="bi bi-download"></i></a>
-                      {% endif %}
-                      <button
-                        type="button"
-                        class="eal-row-btn dm-att-delete-btn"
-                        title="Delete"
-                        data-delete-url="{% url 'iroad_tenants:driver_attachment_delete' driver_id=driver.driver_id attachment_id=a.attachment_id %}"
-                      >
-                        <i class="bi bi-trash"></i>
-                      </button>
+                      <a href="{% url 'iroad_tenants:driver_attachment_detail' driver_id=driver.driver_id attachment_id=a.attachment_id %}" class="eal-row-btn" title="View" aria-label="View"><i class="bi bi-eye"></i></a>
+                      <a href="{% url 'iroad_tenants:driver_attachment_edit' driver_id=driver.driver_id attachment_id=a.attachment_id %}?return_to=details" class="eal-row-btn" title="Edit" aria-label="Edit"><i class="bi bi-pencil"></i></a>
                     </div>
                   </td>
                 </tr>
@@ -406,7 +403,8 @@
                   </td>
                   <td class="text-end">
                     <div class="eal-actions-cell justify-content-end pt-0 pb-0 w-100">
-                      <a class="eal-row-btn" href="{% url 'iroad_tenants:truck_master_detail' row.truck.truck_id %}" title="View Truck"><i class="bi bi-eye"></i></a>
+                      <a href="{% url 'iroad_tenants:truck_master_detail' row.truck.truck_id %}" class="eal-row-btn" title="View" aria-label="View"><i class="bi bi-eye"></i></a>
+                      <a href="{% url 'iroad_tenants:truck_master_edit' row.truck.truck_id %}?return_to=details" class="eal-row-btn" title="Edit" aria-label="Edit"><i class="bi bi-pencil"></i></a>
                     </div>
                   </td>
                 </tr>
@@ -459,7 +457,8 @@
                   </td>
                   <td class="text-end">
                     <div class="eal-actions-cell justify-content-end pt-0 pb-0 w-100">
-                      <a class="eal-row-btn" href="{% url 'iroad_tenants:tenant_operation_shipment_detail' s.shipment_id %}" title="View shipment"><i class="bi bi-eye"></i></a>
+                      <a href="{% url 'iroad_tenants:tenant_operation_shipment_detail' s.shipment_id %}" class="eal-row-btn" title="View" aria-label="View"><i class="bi bi-eye"></i></a>
+                      <a href="{% url 'iroad_tenants:tenant_operation_shipment_edit' s.shipment_id %}" class="eal-row-btn" title="Edit" aria-label="Edit"><i class="bi bi-pencil"></i></a>
                     </div>
                   </td>
                 </tr>
@@ -492,6 +491,7 @@
                   <th>KM Covered</th>
                   <th>Movement Type</th>
                   <th>Status</th>
+                  <th class="text-end">Action</th>
                 </tr>
               </thead>
               <tbody>
@@ -527,6 +527,12 @@
                   </td>
                   <td>
                     <span class="status-badge dm-mov-{{ row.status_badge }}">{{ row.status_label }}</span>
+                  </td>
+                  <td class="text-end">
+                    <div class="eal-actions-cell justify-content-end pt-0 pb-0 w-100">
+                      <a href="{% url 'iroad_tenants:tenant_operation_truck_movement_log_detail' m.movement_id %}" class="eal-row-btn" title="View" aria-label="View"><i class="bi bi-eye"></i></a>
+                      <a href="{% url 'iroad_tenants:tenant_operation_truck_movement_log_edit' m.movement_id %}" class="eal-row-btn" title="Edit" aria-label="Edit"><i class="bi bi-pencil"></i></a>
+                    </div>
                   </td>
                 </tr>
                 {% endwith %}
@@ -568,6 +574,7 @@
                   <th class="text-end">Debit (SAR)</th>
                   <th class="text-end">Credit (SAR)</th>
                   <th class="text-end">Balance (SAR)</th>
+                  <th class="text-end">Action</th>
                 </tr>
               </thead>
               <tbody>
@@ -590,6 +597,12 @@
                   </td>
                   <td class="text-end dm-wallet-balance">
                     {% if row.balance_after is not None %}{{ row.balance_after|floatformat:2|intcomma }}{% else %}—{% endif %}
+                  </td>
+                  <td class="text-end">
+                    <div class="eal-actions-cell justify-content-end pt-0 pb-0 w-100">
+                      <a href="{% url 'iroad_tenants:driver_transaction_detail' t.transaction_id %}" class="eal-row-btn" title="View" aria-label="View"><i class="bi bi-eye"></i></a>
+                      <a href="{% url 'iroad_tenants:driver_transaction_edit' t.transaction_id %}" class="eal-row-btn" title="Edit" aria-label="Edit"><i class="bi bi-pencil"></i></a>
+                    </div>
                   </td>
                 </tr>
                 {% endwith %}
@@ -802,9 +815,24 @@
   }
   .dm-docs-table-wrap .eal-table td { vertical-align: middle; }
   .dm-doc-file-link {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    max-width: 100%;
+    min-width: 0;
     color: #0d6efd;
     text-decoration: none;
     font-weight: 500;
+  }
+  .dm-doc-file-link > i {
+    flex-shrink: 0;
+  }
+  .dm-doc-file-link .iroad-attachment-preview-label {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    min-width: 0;
+    flex: 1 1 auto;
   }
   .dm-doc-file-link:hover { color: #0a58ca; text-decoration: underline; }
   .dm-att-delete-btn {

@@ -36,6 +36,7 @@ from mobile_api.payment_collection.urls import urlpatterns as payment_collection
 from mobile_api.issues.urls import urlpatterns as issues_urlpatterns
 from mobile_api.history.urls import urlpatterns as history_urlpatterns
 from mobile_api.wallet.urls import urlpatterns as wallet_urlpatterns
+from mobile_api.empty_move.urls import urlpatterns as empty_move_urlpatterns
 
 app_name = 'mobile_api'
 
@@ -123,4 +124,4 @@ urlpatterns = [
         DashboardAPIView.as_view(),
         name='driver_dashboard',
     ),
-] + job_detail_urlpatterns + execution_urlpatterns + pod_capture_urlpatterns + hard_pod_urlpatterns + payment_collection_urlpatterns + issues_urlpatterns + history_urlpatterns + wallet_urlpatterns
+] + job_detail_urlpatterns + execution_urlpatterns + pod_capture_urlpatterns + hard_pod_urlpatterns + payment_collection_urlpatterns + issues_urlpatterns + history_urlpatterns + wallet_urlpatterns + empty_move_urlpatterns

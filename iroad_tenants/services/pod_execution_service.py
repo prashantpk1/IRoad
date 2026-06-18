@@ -19,8 +19,7 @@ class PODExecutionService:
         if new_status != TenantShipment.ShipmentStatus.DELIVERED:
             return
         compliant_statuses = {
-            TenantShipment.PodStatus.COMPLIANT,
-            TenantShipment.PodStatus.HARD_COPY_RECEIVED,
+            TenantShipment.PodStatus.COMPLETED,
         }
         if (shipment.pod_status or '') not in compliant_statuses:
             raise ValidationError(

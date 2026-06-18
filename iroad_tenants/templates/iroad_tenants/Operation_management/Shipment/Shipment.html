@@ -61,13 +61,17 @@
                   value="{{ preview_shipment_no|default:'Auto' }}"
                   readonly
                 />
-                <span class="field-hint">Auto-generated when shipment is executed</span>
+                
               </div>
               {% if shipment_is_edit %}
               <div class="field">
-                <label class="form-label">Shipment Status</label>
-                <input type="text" class="form-control" value="{% if shipment_status_display %}{{ shipment_status_display }}{% else %}{{ shipment_form_data.shipment_status|default:'-' }}{% endif %}" readonly />
-                <span class="field-hint">Updated by Operation Action Log impacts</span>
+                <label for="shipmentStatus" class="form-label">Shipment Status</label>
+                <select class="form-select {% if form_errors.shipment_status %}is-invalid{% endif %}" id="shipmentStatus" name="shipment_status">
+                  {% for value, label in shipment_status_choices %}
+                  <option value="{{ value }}" {% if shipment_form_data.shipment_status == value %}selected{% endif %}>{{ label }}</option>
+                  {% endfor %}
+                </select>
+                {% if form_errors.shipment_status %}<div class="invalid-feedback d-block">{{ form_errors.shipment_status }}</div>{% endif %}
               </div>
               <div class="field">
                 <label for="headerOrderType" class="form-label">Order Type</label>
@@ -107,7 +111,7 @@
                 >
                   <option value="" selected disabled>-Select sales report-</option>
                 </select>
-                <span class="field-hint">Lookup filtered by booking number; auto-linked when included in a Sales Invoice Report.</span>
+                
               </div>
               <div class="field">
                 <label for="salesReportStatus" class="form-label">Sales Report Status</label>
@@ -151,7 +155,7 @@
                   {% endfor %}
                 </select>
                 {% if form_errors.client_account %}<div class="invalid-feedback d-block">{{ form_errors.client_account }}</div>{% endif %}
-                <span class="field-hint">Filters confirmed bookings only</span>
+                
               </div>
               <div class="field">
                 <label for="bookingNo" class="form-label">Booking No <span class="required">*</span></label>
@@ -174,7 +178,7 @@
                   {% endfor %}
                 </select>
                 {% if form_errors.booking_no %}<div class="invalid-feedback d-block">{{ form_errors.booking_no }}</div>{% endif %}
-                <span class="field-hint">Confirmed bookings only; one shipment per line</span>
+                
               </div>
               <div class="field">
                 <label for="bookingOrderType" class="form-label">Order Type</label>
@@ -264,7 +268,7 @@
               </div>
               <div class="field">
                 <label for="bookingItemRoute" class="form-label"
-                  >Booking Item Route (list)</label
+                  >Booking Item Route</label
                 >
                 <select
                   class="form-select"
@@ -292,7 +296,7 @@
             </div>
             <div class="fields-grid cols-3">
               <div class="field">
-                <label for="podType" class="form-label">POD Type (list)</label>
+                <label for="podType" class="form-label">POD Type</label>
                 <select class="form-select {% if form_errors.pod_type %}is-invalid{% endif %}" id="podType" name="pod_type" required>
                   <option value="" {% if not shipment_form_data.pod_type %}selected{% endif %} disabled>-Select POD type-</option>
                   {% for pod_type in operation_pod_type_options %}
@@ -307,31 +311,30 @@
                 >
                 <input
                   type="number"
-                  class="form-control"
+                  class="form-control {% if form_errors.pod_doc_count %}is-invalid{% endif %}"
                   id="podDocCount"
                   name="pod_doc_count"
                   min="0"
                   value="{{ shipment_form_data.pod_doc_count|default:'' }}"
-                  readonly
+                  {% if not shipment_is_edit %}readonly{% endif %}
                 />
-                <span class="field-hint">Read-only; derived from POD docs</span>
+                {% if not shipment_is_edit %}{% endif %}
+                {% if form_errors.pod_doc_count %}<div class="invalid-feedback d-block">{{ form_errors.pod_doc_count }}</div>{% endif %}
               </div>
               <div class="field">
                 <label for="podStatus" class="form-label">POD Status</label>
                 <select
                   class="form-select {% if form_errors.pod_status %}is-invalid{% endif %}"
                   id="podStatus"
-                  name="pod_status"
-                  {% if not shipment_is_edit %}disabled aria-readonly="true"{% endif %}
+                  disabled
+                  aria-readonly="true"
                 >
                   <option value="" {% if not shipment_form_data.pod_status %}selected{% endif %} disabled>-Select POD status-</option>
                   {% for pod_status in operation_pod_status_options %}
                   <option value="{{ pod_status }}" {% if shipment_form_data.pod_status == pod_status %}selected{% endif %}>{{ pod_status }}</option>
                   {% endfor %}
                 </select>
-                {% if not shipment_is_edit %}
-                <input type="hidden" id="podStatusValue" name="pod_status" value="{{ shipment_form_data.pod_status|default:'' }}" />
-                {% endif %}
+                <input type="hidden" id="podStatusValue" name="pod_status" value="{{ shipment_form_data.pod_status|default:'Not Completed' }}" />
                 {% if form_errors.pod_status %}<div class="invalid-feedback d-block">{{ form_errors.pod_status }}</div>{% endif %}
               </div>
             </div>
@@ -349,10 +352,18 @@
                   {% if shipment_is_edit %}readonly{% endif %}
                 />
                 {% if form_errors.cod_amount %}<div class="invalid-feedback d-block">{{ form_errors.cod_amount }}</div>{% endif %}
-                <span class="field-hint">Inherited from booking line; read-only on shipment</span>
+                
               </div>
               <div class="field">
-                <label class="form-label">COD Payment Status</label>
+                <label for="collectionStatus" class="form-label">COD Payment Status</label>
+                {% if shipment_is_edit %}
+                <select class="form-select {% if form_errors.collection_status %}is-invalid{% endif %}" id="collectionStatus" name="collection_status">
+                  {% for value, label in collection_status_choices %}
+                  <option value="{{ value }}" {% if shipment_form_data.collection_status == value %}selected{% endif %}>{{ label }}</option>
+                  {% endfor %}
+                </select>
+                {% if form_errors.collection_status %}<div class="invalid-feedback d-block">{{ form_errors.collection_status }}</div>{% endif %}
+                {% else %}
                 <input
                   type="text"
                   class="form-control"
@@ -360,6 +371,7 @@
                   readonly
                 />
                 <span class="field-hint">Pending until collected via Action Log (COD)</span>
+                {% endif %}
               </div>
               <div class="field">
                 <label for="shipmentTruckDisplay" class="form-label">Truck</label>
@@ -372,7 +384,7 @@
                   readonly
                   autocomplete="off"
                 />
-                <span class="field-hint">From booking line (read-only)</span>
+                
               </div>
               <div class="field">
                 <label for="shipmentDriverDisplay" class="form-label">Driver</label>
@@ -565,7 +577,7 @@
                         />
                       </td>
                       <td class="ops-col-unit">
-                        <input type="text" class="form-control" id="cargoUnit" name="cargo_unit_1" value="{{ shipment_form_data.cargo_unit|default:'' }}" />
+                        <input type="text" class="form-control" id="cargoUnit" name="cargo_unit_1" data-no-digits="1" placeholder="e.g. PCS, Box, Pallet" value="{{ shipment_form_data.cargo_unit|default:'' }}" />
                       </td>
                       <td class="ops-col-qty">
                         <input

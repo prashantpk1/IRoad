@@ -385,10 +385,10 @@ def _build_ops_hub_data() -> dict[str, Any]:
             shipment_status=TenantShipment.ShipmentStatus.CANCELLED,
         ).count(),
         "pod_complete": stats_qs.filter(
-            pod_status=TenantShipment.PodStatus.COMPLIANT,
+            pod_status=TenantShipment.PodStatus.COMPLETED,
         ).count(),
         "pod_incomplete": stats_qs.exclude(
-            pod_status=TenantShipment.PodStatus.COMPLIANT,
+            pod_status=TenantShipment.PodStatus.COMPLETED,
         ).count(),
     }
 
@@ -487,7 +487,7 @@ def _build_ops_hub_data() -> dict[str, Any]:
                 TenantShipment.ShipmentStatus.AT_DELIVERY,
             },
         )
-        .exclude(pod_status=TenantShipment.PodStatus.COMPLIANT)
+        .exclude(pod_status=TenantShipment.PodStatus.COMPLETED)
         .order_by("-updated_at")[:6]
     )
     pending_pod_rows = [

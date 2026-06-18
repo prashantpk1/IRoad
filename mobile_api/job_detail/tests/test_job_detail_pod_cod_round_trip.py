@@ -42,7 +42,7 @@ def _shipment(
     *,
     line='Outbound',
     status=TenantShipment.ShipmentStatus.LOADED,
-    pod_status=TenantShipment.PodStatus.PENDING,
+    pod_status=TenantShipment.PodStatus.NOT_COMPLETED,
     pod_type=TenantShipment.PodType.DIGITAL,
     order_type='',
     collection_status=TenantShipment.CollectionStatus.PENDING,
@@ -66,7 +66,7 @@ def _shipment(
 class PodCodProjectionTests(TestCase):
     def test_pod_compliant_from_columns(self):
         shipment = _shipment(
-            pod_status=TenantShipment.PodStatus.COMPLIANT,
+            pod_status=TenantShipment.PodStatus.COMPLETED,
             status=TenantShipment.ShipmentStatus.DELIVERED,
         )
         flags = pod_cod_policy.derive_pod_cod_flags(shipment)
@@ -87,7 +87,7 @@ class PodCodProjectionTests(TestCase):
     def test_hard_pod_pending(self):
         shipment = _shipment(
             pod_type=TenantShipment.PodType.HARD,
-            pod_status=TenantShipment.PodStatus.PENDING,
+            pod_status=TenantShipment.PodStatus.NOT_COMPLETED,
             status=TenantShipment.ShipmentStatus.AT_DELIVERY,
         )
         self.assertTrue(pod_cod_policy.derive_hard_pod_pending(shipment))
@@ -107,7 +107,7 @@ class PodCodProjectionTests(TestCase):
         cache.shipment_logs = [log]
         mock_cache.return_value = cache
 
-        shipment = _shipment(pod_status=TenantShipment.PodStatus.PENDING)
+        shipment = _shipment(pod_status=TenantShipment.PodStatus.NOT_COMPLETED)
         ctx = JobDetailContext(
             driver=_driver(),
             tenant_schema='t',

@@ -55,6 +55,7 @@
 {% endblock %}
 
 {% block content %}
+{% include 'iroad_tenants/partials/pl_route_chip_styles.html' %}
 <!-- Page Header -->
 <div class="page-header">
   <nav aria-label="breadcrumb">
@@ -142,7 +143,7 @@
             <label class="form-label">Booking Status (DB)</label>
             <p class="detail-view-value">
               {% if booking.booking_status == 'Confirmed' %}
-              <span class="status-badge active">Active</span>
+              <span class="status-badge active">Confirmed</span>
               {% elif booking.booking_status == 'Cancelled' %}
               <span class="status-badge inactive">{{ booking.booking_status }}</span>
               {% else %}
@@ -153,10 +154,12 @@
           <div class="field">
             <label class="form-label">Operational Status</label>
             <p class="detail-view-value">
-              {% if booking_derived_status == 'Executed' %}
+              {% if booking_derived_status == 'Completed' %}
               <span class="status-badge active">{{ booking_derived_status }}</span>
-              {% elif booking_derived_status == 'Active' %}
+              {% elif booking_derived_status == 'In Progress' or booking_derived_status == 'Partially Completed' %}
               <span class="status-badge in-transit">{{ booking_derived_status }}</span>
+              {% elif booking_derived_status == 'Confirmed' %}
+              <span class="status-badge pending">{{ booking_derived_status }}</span>
               {% elif booking_derived_status == 'Cancelled' %}
               <span class="status-badge inactive">{{ booking_derived_status }}</span>
               {% else %}
@@ -176,9 +179,9 @@
           <div class="field">
             <label class="form-label">POD Status</label>
             <p class="detail-view-value">
-              {% if booking_derived_pod_status == 'Compliant' %}
+              {% if booking_derived_pod_status == 'Completed' %}
               <span class="status-badge active">{{ booking_derived_pod_status }}</span>
-              {% elif booking_derived_pod_status == 'Not Compliant' %}
+              {% elif booking_derived_pod_status == 'Not Completed' %}
               <span class="status-badge inactive">{{ booking_derived_pod_status }}</span>
               {% elif booking_derived_pod_status %}
               <span class="status-badge pending">{{ booking_derived_pod_status }}</span>
@@ -239,7 +242,9 @@
         <div class="fields-grid cols-3">
           <div class="field">
             <label class="form-label">Route</label>
-            <p class="detail-view-value">{{ booking.route_display|default:"—" }}</p>
+            <div class="detail-view-value">
+              {% include 'iroad_tenants/partials/pl_route_chip.html' with route_chip=booking_route_chip route_fallback=booking.route_display %}
+            </div>
           </div>
           <div class="field">
             <label class="form-label">Order Type</label>
@@ -337,9 +342,9 @@
           <div class="field">
             <label class="form-label">POD Status</label>
             <p class="detail-view-value">
-              {% if booking_derived_pod_status == 'Compliant' %}
+              {% if booking_derived_pod_status == 'Completed' %}
               <span class="status-badge active">{{ booking_derived_pod_status }}</span>
-              {% elif booking_derived_pod_status == 'Not Compliant' %}
+              {% elif booking_derived_pod_status == 'Not Completed' %}
               <span class="status-badge inactive">{{ booking_derived_pod_status }}</span>
               {% elif booking_derived_pod_status %}
               <span class="status-badge pending">{{ booking_derived_pod_status }}</span>
@@ -421,9 +426,9 @@
         <div class="detail-field" style="padding: 10px 0">
           <span class="detail-field-label">POD Status</span>
           <span class="detail-field-value">
-            {% if booking_derived_pod_status == 'Compliant' %}
+            {% if booking_derived_pod_status == 'Completed' %}
             <span class="status-badge active">{{ booking_derived_pod_status }}</span>
-            {% elif booking_derived_pod_status == 'Not Compliant' %}
+            {% elif booking_derived_pod_status == 'Not Completed' %}
             <span class="status-badge inactive">{{ booking_derived_pod_status }}</span>
             {% elif booking_derived_pod_status %}
             <span class="status-badge pending">{{ booking_derived_pod_status }}</span>
@@ -554,7 +559,9 @@
                   <span class="status-badge pending">{{ line.status }}</span>
                   {% endif %}
                 </td>
-                <td>{{ line.route|default:"—" }}</td>
+                <td>
+                  {% include 'iroad_tenants/partials/pl_route_chip.html' with route_chip=line.route_chip route_fallback=line.route %}
+                </td>
                 <td>{{ line.truck }}</td>
                 <td>{{ line.driver }}</td>
                 <td>{{ line.cod_amount|floatformat:2 }}</td>

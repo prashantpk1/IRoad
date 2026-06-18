@@ -102,9 +102,7 @@
                     </option>
                     {% endfor %}
                   </select>
-                  {% if client_account_locked %}
-                  <span class="field-hint">Locked to the client you opened from.</span>
-                  {% endif %}
+                  
                   {% if form_errors.client_account %}<div class="invalid-feedback d-block">{{ form_errors.client_account }}</div>{% endif %}
                 </div>
                 <div class="field">

@@ -232,8 +232,8 @@
               <div class="d-flex align-items-center gap-2 flex-wrap">
                 <i class="bi bi-paperclip"></i>
                 <span>{{ attachment.attachment_file.name|default:'' }}</span>
-                <a href="{{ attachment.attachment_file.url }}" target="_blank" rel="noopener" class="btn btn-sm btn-outline-secondary">
-                  <i class="bi bi-box-arrow-up-right"></i> View current
+                <a href="{{ attachment.attachment_file.url }}" class="btn btn-sm btn-outline-secondary" data-attachment-preview data-file-url="{{ attachment.attachment_file.url }}" data-file-name="{{ attachment.attachment_file.name|default:'' }}">
+                  <i class="bi bi-eye"></i> Preview current
                 </a>
               </div>
               <small class="text-muted d-block mt-1">Upload a new file below to replace the current file, or leave empty to keep it.</small>

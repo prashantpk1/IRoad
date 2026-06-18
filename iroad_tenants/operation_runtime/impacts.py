@@ -2,6 +2,14 @@
 
 from __future__ import annotations
 
+from iroad_tenants.status_impact_resolution import (
+    canonical_movement_status_impact_value,
+    canonical_shipment_status_impact_value,
+    is_valid_movement_status_impact,
+    is_valid_shipment_status_impact,
+    resolve_movement_status_impact as resolve_movement_status_impact_token,
+    resolve_shipment_status_impact as resolve_shipment_status_impact_token,
+)
 from tenant_workspace.models import TenantShipment, TenantTruckMovementLog
 
 
@@ -19,36 +27,29 @@ def operation_action_matches(action, *needles) -> bool:
 
 def resolve_shipment_status_impact(raw_value):
     """Map Action Master shipment_status_impact to TenantShipment.ShipmentStatus."""
-    token = (raw_value or '').strip()
-    if not token:
+    resolved = resolve_shipment_status_impact_token(raw_value)
+    if resolved is None:
         return None
-    if token in {choice[0] for choice in TenantShipment.ShipmentStatus.choices}:
-        return token
-    normalized = token.lower().replace('-', '_').replace(' ', '_')
-    alias_map = {
-        'loaded': TenantShipment.ShipmentStatus.LOADED,
-        'created': TenantShipment.ShipmentStatus.CREATED,
-        'in_transit': TenantShipment.ShipmentStatus.IN_TRANSIT,
-        'at_delivery': TenantShipment.ShipmentStatus.AT_DELIVERY,
-        'pod_submitted': TenantShipment.ShipmentStatus.POD_SUBMITTED,
-        'delivered': TenantShipment.ShipmentStatus.DELIVERED,
-        'closed': TenantShipment.ShipmentStatus.CLOSED,
-        'cancelled': TenantShipment.ShipmentStatus.CANCELLED,
-    }
-    return alias_map.get(normalized)
+    if resolved in {choice[0] for choice in TenantShipment.ShipmentStatus.choices}:
+        return resolved
+    return None
 
 
 def resolve_movement_status_impact(raw_value):
-    token = (raw_value or '').strip()
-    if not token:
+    resolved = resolve_movement_status_impact_token(raw_value)
+    if resolved is None:
         return None
-    if token in {choice[0] for choice in TenantTruckMovementLog.Status.choices}:
-        return token
-    normalized = token.lower().replace('-', '_').replace(' ', '_')
-    alias_map = {
-        'scheduled': TenantTruckMovementLog.Status.SCHEDULED,
-        'in_progress': TenantTruckMovementLog.Status.IN_PROGRESS,
-        'completed': TenantTruckMovementLog.Status.COMPLETED,
-        'cancelled': TenantTruckMovementLog.Status.CANCELLED,
-    }
-    return alias_map.get(normalized)
+    if resolved in {choice[0] for choice in TenantTruckMovementLog.Status.choices}:
+        return resolved
+    return None
+
+
+__all__ = [
+    'operation_action_matches',
+    'resolve_shipment_status_impact',
+    'resolve_movement_status_impact',
+    'canonical_shipment_status_impact_value',
+    'canonical_movement_status_impact_value',
+    'is_valid_shipment_status_impact',
+    'is_valid_movement_status_impact',
+]

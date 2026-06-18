@@ -80,24 +80,21 @@
                       readonly
                     />
                   </div>
-                  <span class="field-hint"
-                    >Auto-generated, tenant-unique. Read-only.</span
-                  >
                 </div>
                 <div class="field">
                   <label for="serviceType" class="form-label"
                     >Service Type
                     <span class="required">*</span>
                   </label>
+                  {% if is_edit_mode %}
+                  <input type="hidden" name="service_type" value="{{ form_data.service_type|default:'' }}" />
+                  {% endif %}
                   <select class="form-select{% if field_errors.service_type %} is-invalid{% endif %}" id="serviceType" name="service_type" {% if is_view_mode or is_edit_mode %}disabled{% endif %}>
                     <option value="" {% if not form_data.service_type %}selected{% endif %} disabled>-Select type-</option>
                     <option value="Service" {% if form_data.service_type == 'Service' %}selected{% endif %}>Service</option>
                     <option value="Trip" {% if form_data.service_type == 'Trip' %}selected{% endif %}>Trip</option>
                   </select>
                   {% if field_errors.service_type %}<div class="invalid-feedback d-block">{{ field_errors.service_type }}</div>{% endif %}
-                  <span class="field-hint"
-                    >Service or Trip. Cannot be changed after save.</span
-                  >
                 </div>
                 <div class="field">
                   <label for="status" class="form-label"
@@ -109,9 +106,6 @@
                     <option value="Inactive" {% if form_data.status == 'Inactive' %}selected{% endif %}>Inactive</option>
                   </select>
                   {% if field_errors.status %}<div class="invalid-feedback d-block">{{ field_errors.status }}</div>{% endif %}
-                  <span class="field-hint"
-                    >Inactive blocks new selection in transactions.</span
-                  >
                 </div>
               </div>
             </div>
@@ -130,16 +124,18 @@
                   </label>
                   <input
                     type="text"
-                    class="form-control{% if field_errors.english_name %} is-invalid{% endif %}"
+                    class="form-control eal-english{% if field_errors.english_name %} is-invalid{% endif %}"
                     id="englishName"
                     name="english_name"
                     value="{{ form_data.english_name|default:'' }}"
                     placeholder="Enter English name"
                     maxlength="200"
+                    lang="en"
+                    data-english-only="1"
                     {% if is_view_mode %}readonly{% endif %}
                   />
                   {% if field_errors.english_name %}<div class="invalid-feedback d-block">{{ field_errors.english_name }}</div>{% endif %}
-                  <span class="field-hint">Shown in lists and reports.</span>
+                  <span class="field-hint">English characters only</span>
                 </div>
                 <div class="field">
                   <label for="arabicName" class="form-label">Arabic Name</label>
@@ -157,6 +153,7 @@
                     {% if is_view_mode %}readonly{% endif %}
                   />
                   {% if field_errors.arabic_name %}<div class="invalid-feedback d-block">{{ field_errors.arabic_name }}</div>{% endif %}
+                  <span class="field-hint">Arabic characters only</span>
                 </div>
                 <div class="field">
                   <label for="category" class="form-label"
@@ -180,7 +177,6 @@
                     {% endfor %}
                   </select>
                   {% if field_errors.service_category_id %}<div class="invalid-feedback d-block">{{ field_errors.service_category_id }}</div>{% endif %}
-                  <span class="field-hint">Must reference an active service category.</span>
                 </div>
               </div>
             </div>
@@ -226,8 +222,7 @@
                   </select>
                   {% if field_errors.route_id %}<div class="invalid-feedback d-block">{{ field_errors.route_id }}</div>{% endif %}
                   <span class="field-hint"
-                    >Required for Trip. Must be active. Names may auto-fill from
-                    route.</span
+                    >Required for Trip. Must be active.</span
                   >
                 </div>
               </div>
@@ -312,7 +307,7 @@
                     </div>
                     {% if field_errors.inbound_sell_price %}<div class="invalid-feedback d-block">{{ field_errors.inbound_sell_price }}</div>{% endif %}
                     <span class="field-hint"
-                      >Inbound sell price (was Round Trip Price).</span
+                      >Inbound sell price.</span
                     >
                   </div>
               </div>

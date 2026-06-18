@@ -57,8 +57,23 @@ def operation_pod_status_options():
     return tuple(choice[0] for choice in TenantShipment.PodStatus.choices)
 
 
+def operation_pod_status_is_complete(value) -> bool:
+    """True when POD status represents a completed proof pipeline."""
+    return normalize_operation_pod_status(value, default='') == TenantShipment.PodStatus.COMPLETED
+
+
+def operation_pod_status_complete_values():
+    """Canonical stored values treated as POD-complete."""
+    return (TenantShipment.PodStatus.COMPLETED,)
+
+
+def operation_pod_status_incomplete_values():
+    """Canonical stored values treated as POD-incomplete."""
+    return (TenantShipment.PodStatus.NOT_COMPLETED,)
+
+
 def normalize_operation_pod_type(value, default=''):
-    """Canonical POD type (Digital / Soft / Hard) for all operational forms."""
+    """Canonical POD type (Digital / Soft Copy / Hard Copy) for all operational forms."""
     normalized = (value or '').strip().lower().replace('_', ' ').replace('-', ' ')
     normalized = ' '.join(normalized.split())
     if normalized in {'soft', 'soft copy', 'photo'}:
@@ -74,7 +89,7 @@ def normalize_operation_pod_type(value, default=''):
 def normalize_operation_pod_status(value, default=None):
     """Canonical POD status for all operational forms."""
     if default is None:
-        default = TenantShipment.PodStatus.PENDING
+        default = TenantShipment.PodStatus.NOT_COMPLETED
     if not value:
         return default
     stripped = (value or '').strip()
@@ -84,12 +99,14 @@ def normalize_operation_pod_status(value, default=None):
     normalized = stripped.lower().replace('_', ' ').replace('-', ' ')
     normalized = ' '.join(normalized.split())
     legacy_map = {
-        'pending': TenantShipment.PodStatus.PENDING,
-        'received': TenantShipment.PodStatus.HARD_COPY_RECEIVED,
-        'hard copy received': TenantShipment.PodStatus.HARD_COPY_RECEIVED,
-        'verified': TenantShipment.PodStatus.COMPLIANT,
-        'compliant': TenantShipment.PodStatus.COMPLIANT,
-        'not compliant': TenantShipment.PodStatus.NOT_COMPLIANT,
+        'pending': TenantShipment.PodStatus.NOT_COMPLETED,
+        'received': TenantShipment.PodStatus.NOT_COMPLETED,
+        'hard copy received': TenantShipment.PodStatus.NOT_COMPLETED,
+        'verified': TenantShipment.PodStatus.COMPLETED,
+        'compliant': TenantShipment.PodStatus.COMPLETED,
+        'completed': TenantShipment.PodStatus.COMPLETED,
+        'not compliant': TenantShipment.PodStatus.NOT_COMPLETED,
+        'not completed': TenantShipment.PodStatus.NOT_COMPLETED,
     }
     return legacy_map.get(normalized, default)
 

@@ -78,6 +78,8 @@ def build_mobile_route_block(shipment, booking=None) -> dict[str, str]:
     )
     if direction not in {'forward', 'reverse'}:
         direction = 'forward'
+    if shipment is not None and _booking_line_type(shipment) in {'backload', 'inbound'}:
+        direction = 'reverse'
 
     route_id = ''
     route_code = ''
@@ -101,9 +103,10 @@ def build_mobile_route_block(shipment, booking=None) -> dict[str, str]:
             route_display_start, route_display_end = forward_end, forward_start
         else:
             route_display_start, route_display_end = forward_start, forward_end
-        route_display = route_label
-        if not route_display and route_display_start and route_display_end:
+        if route_display_start and route_display_end:
             route_display = f'{route_display_start} — {route_display_end}'
+        else:
+            route_display = route_label
 
     if not route_display:
         route_display = str(getattr(shipment, 'route_display', '') or '').strip()
@@ -124,6 +127,13 @@ def build_mobile_route_block(shipment, booking=None) -> dict[str, str]:
             route_display_end = to_label.split(' - ', 1)[-1].strip() or to_label
 
     if not route_display and route_display_start and route_display_end:
+        route_display = f'{route_display_start} — {route_display_end}'
+    elif (
+        shipment is not None
+        and _booking_line_type(shipment) in {'backload', 'inbound'}
+        and route_display_start
+        and route_display_end
+    ):
         route_display = f'{route_display_start} — {route_display_end}'
     if not route_label:
         route_label = route_display

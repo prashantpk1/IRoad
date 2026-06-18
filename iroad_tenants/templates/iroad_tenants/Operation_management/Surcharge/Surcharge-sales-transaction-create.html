@@ -75,7 +75,7 @@
                       readonly
                     />
                   </div>
-                  <span class="field-hint">Auto-numbered and unique</span>
+                  
                 </div>
                 <div class="field">
                   <label for="trxDate" class="form-label"
@@ -106,7 +106,6 @@
                     <option value="cancelled" {% if surcharge_form_data.status == 'cancelled' %}selected{% endif %}>Cancelled</option>
                   </select>
                   {% if form_errors.status %}<div class="invalid-feedback d-block">{{ form_errors.status }}</div>{% endif %}
-                  <span class="field-hint">Draft, Confirmed, Invoiced, or Cancelled</span>
                 </div>
               </div>
             </div>
@@ -147,7 +146,6 @@
                     {% endfor %}
                   </select>
                   {% if form_errors.shipment_id %}<div class="invalid-feedback d-block">{{ form_errors.shipment_id }}</div>{% endif %}
-                  <span class="field-hint">Select shipment — auto-fills booking and client below</span>
                 </div>
                 <div class="field">
                   <label for="bookingId" class="form-label">Booking Ref</label>
@@ -158,7 +156,6 @@
                     {% endfor %}
                   </select>
                   {% if form_errors.booking_id %}<div class="invalid-feedback d-block">{{ form_errors.booking_id }}</div>{% endif %}
-                  <span class="field-hint">Defaults from shipment; you can pick another booking</span>
                 </div>
               </div>
               <div class="field">
@@ -169,7 +166,6 @@
                   <option value="{{ client.client_account_id }}" {% if surcharge_form_data.client_account_id == client.client_account_id|stringformat:'s' %}selected{% endif %}>{{ client.label }}</option>
                   {% endfor %}
                 </select>
-                <span class="field-hint">Defaults from shipment; you can pick another client</span>
                 {% if form_errors.client_account_id %}<div class="invalid-feedback d-block">{{ form_errors.client_account_id }}</div>{% endif %}
               </div>
             </div>
@@ -257,7 +253,6 @@
                     />
                   </div>
                   {% if form_errors.unit_price %}<div class="invalid-feedback d-block">{{ form_errors.unit_price }}</div>{% endif %}
-                  <span class="field-hint">Defaults from service master; required &gt; 0 when Confirmed</span>
                 </div>
                 <div class="field">
                   <label for="totalAmount" class="form-label"

@@ -50,7 +50,7 @@ def _shipment(
     *,
     pk=None,
     driver_id=None,
-    pod_status=TenantShipment.PodStatus.PENDING,
+    pod_status=TenantShipment.PodStatus.NOT_COMPLETED,
     pod_type=TenantShipment.PodType.HARD,
     status=TenantShipment.ShipmentStatus.LOADED,
 ):
@@ -345,7 +345,7 @@ class HardPodListIntegrationTests(TransactionTestCase):
                 _shipment(
                     pk=self.shipment_id,
                     driver_id=self.driver_id,
-                    pod_status=TenantShipment.PodStatus.HARD_COPY_RECEIVED,
+                    pod_status=TenantShipment.PodStatus.COMPLETED,
                 )
             ],
             driver=_driver(self.driver_id),

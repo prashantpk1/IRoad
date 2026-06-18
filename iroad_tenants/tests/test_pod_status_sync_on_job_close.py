@@ -15,24 +15,24 @@ from tenant_workspace.models import TenantShipment
 
 
 class DerivePodStatusFromShipmentRowsTests(SimpleTestCase):
-    def test_all_compliant_returns_compliant(self):
+    def test_all_completed_returns_completed(self):
         statuses = [
-            TenantShipment.PodStatus.COMPLIANT,
-            TenantShipment.PodStatus.COMPLIANT,
+            TenantShipment.PodStatus.COMPLETED,
+            TenantShipment.PodStatus.COMPLETED,
         ]
         self.assertEqual(
             derive_pod_status_from_shipment_rows(statuses),
-            TenantShipment.PodStatus.COMPLIANT,
+            TenantShipment.PodStatus.COMPLETED,
         )
 
-    def test_any_not_compliant_wins(self):
+    def test_any_not_completed_wins(self):
         statuses = [
-            TenantShipment.PodStatus.COMPLIANT,
-            TenantShipment.PodStatus.NOT_COMPLIANT,
+            TenantShipment.PodStatus.COMPLETED,
+            TenantShipment.PodStatus.NOT_COMPLETED,
         ]
         self.assertEqual(
             derive_pod_status_from_shipment_rows(statuses),
-            TenantShipment.PodStatus.NOT_COMPLIANT,
+            TenantShipment.PodStatus.NOT_COMPLETED,
         )
 
 
@@ -53,7 +53,7 @@ class AfterShipmentStatusSideEffectsPodSyncTests(SimpleTestCase):
         shipment = SimpleNamespace(
             shipment_status=TenantShipment.ShipmentStatus.CLOSED,
             booking_id='booking-1',
-            booking=SimpleNamespace(booking_id='booking-1', pod_status='Pending'),
+            booking=SimpleNamespace(booking_id='booking-1', pod_status='Not Completed'),
         )
         after_shipment_status_side_effects(shipment)
         mock_refresh.assert_called_once_with(shipment)
@@ -64,15 +64,15 @@ class AfterShipmentStatusSideEffectsPodSyncTests(SimpleTestCase):
 class SyncBookingPodStatusFromShipmentsTests(SimpleTestCase):
     @patch('tenant_workspace.models.TenantBooking')
     @patch('iroad_tenants.operation_runtime.side_effects.TenantShipment.objects')
-    def test_updates_booking_when_all_shipments_compliant(
+    def test_updates_booking_when_all_shipments_completed(
         self,
         mock_shipment_objects,
         mock_booking_model,
     ):
-        booking = SimpleNamespace(booking_id='booking-1', pk='booking-1', pod_status='Pending')
+        booking = SimpleNamespace(booking_id='booking-1', pk='booking-1', pod_status='Not Completed')
         mock_shipment_objects.filter.return_value.exclude.return_value.values_list.return_value = [
-            TenantShipment.PodStatus.COMPLIANT,
+            TenantShipment.PodStatus.COMPLETED,
         ]
         sync_booking_pod_status_from_shipments(booking)
         mock_booking_model.objects.filter.return_value.update.assert_called_once()
-        self.assertEqual(booking.pod_status, TenantShipment.PodStatus.COMPLIANT)
+        self.assertEqual(booking.pod_status, TenantShipment.PodStatus.COMPLETED)

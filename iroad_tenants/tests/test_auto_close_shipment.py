@@ -21,7 +21,7 @@ def _cod_shipment(**kwargs):
         shipment_status=TenantShipment.ShipmentStatus.DELIVERED,
         order_type='COD',
         collection_status=TenantShipment.CollectionStatus.COLLECTED,
-        pod_status=TenantShipment.PodStatus.COMPLIANT,
+        pod_status=TenantShipment.PodStatus.COMPLETED,
         pod_type=TenantShipment.PodType.HARD,
         booking=None,
         truck=None,

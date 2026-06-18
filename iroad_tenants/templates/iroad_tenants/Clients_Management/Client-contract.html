@@ -113,7 +113,6 @@
                       readonly
                     />
                   </div>
-                  <span class="field-hint">Unique contract identifier</span>
                 </div>
                 <div class="field">
                   <label for="clientAccount" class="form-label"
@@ -152,10 +151,6 @@
                   {% if form_errors.client_account %}<div class="invalid-feedback d-block">{{ form_errors.client_account }}</div>{% endif %}
                   {% if client_account_locked %}
                   <span class="field-hint">Locked to the client you opened from.</span>
-                  {% else %}
-                  <span class="field-hint">
-                    The contract will be linked to this account
-                  </span>
                   {% endif %}
                   {% endif %}
                 </div>
@@ -165,9 +160,13 @@
                     <span class="required">*</span>
                   </label>
                   <select class="form-select" id="contractStatus" disabled>
-                    <option value="" selected>Derived automatically (Upcoming / Active / Expired)</option>
+                    {% if is_edit_mode and editing_contract %}
+                    <option value="{{ editing_contract.status }}" selected>{{ editing_contract.status }}</option>
+                    {% else %}
+                    <option value="" selected disabled>-Based on validity dates-</option>
+                    {% endif %}
                   </select>
-                  <span class="field-hint">Status is derived from Start/End dates.</span>
+                  
                 </div>
               </div>
             </div>

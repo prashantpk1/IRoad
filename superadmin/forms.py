@@ -2,7 +2,13 @@ import os
 import re
 
 from django import forms
-from config.text_validators import ArabicTextFormMixin, apply_arabic_field_widgets, is_arabic_text_field
+from config.text_validators import (
+    ArabicTextFormMixin,
+    apply_arabic_field_widgets,
+    apply_english_field_widgets,
+    is_arabic_text_field,
+    is_english_text_field,
+)
 from django.core.exceptions import ValidationError
 import pytz
 
@@ -77,7 +83,17 @@ def apply_premium_styling(form):
             widget.attrs.setdefault('lang', 'ar')
             widget.attrs.setdefault('data-arabic-only', '1')
 
+        if is_english_text_field(field_name) and widget_name in {
+            'TextInput', 'Textarea',
+        }:
+            existing_classes = widget.attrs.get('class', '')
+            if 'eal-english' not in existing_classes:
+                widget.attrs['class'] = f"{existing_classes} eal-english".strip()
+            widget.attrs.setdefault('lang', 'en')
+            widget.attrs.setdefault('data-english-only', '1')
+
     apply_arabic_field_widgets(form)
+    apply_english_field_widgets(form)
 
 
 class LoginForm(forms.Form):

@@ -10,7 +10,7 @@ class BookingFieldErrorsFromMessagesTests(TestCase):
     def test_scheduling_conflict_highlights_truck_and_driver_not_booking_date(self):
         msg = (
             'Another booking is already in progress for the selected truck and driver '
-            'on this date (operational status Planned or In Execution).'
+            'on this date (operational status Confirmed or In Progress).'
         )
         field_errors = _tenant_booking_field_errors_from_messages([msg])
         self.assertIn('booking_line_truck_1', field_errors)

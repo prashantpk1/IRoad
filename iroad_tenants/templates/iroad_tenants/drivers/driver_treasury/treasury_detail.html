@@ -163,6 +163,7 @@
               <th>Type</th>
               <th>Category</th>
               <th class="text-end">Amount</th>
+              <th class="text-end">Action</th>
             </tr>
           </thead>
           <tbody>
@@ -179,10 +180,16 @@
               </td>
               <td>{{ row.transaction_category }}</td>
               <td class="text-end">{{ row.amount|floatformat:2 }}</td>
+              <td class="text-end">
+                <div class="eal-actions-cell justify-content-end pt-0 pb-0 w-100">
+                  <a href="{% url 'iroad_tenants:driver_transaction_detail' row.transaction_id %}" class="eal-row-btn" title="View" aria-label="View"><i class="bi bi-eye"></i></a>
+                  <a href="{% url 'iroad_tenants:driver_transaction_edit' row.transaction_id %}" class="eal-row-btn" title="Edit" aria-label="Edit"><i class="bi bi-pencil"></i></a>
+                </div>
+              </td>
             </tr>
             {% empty %}
             <tr>
-              <td colspan="5" class="text-center text-muted py-4">No transactions found for this treasury.</td>
+              <td colspan="6" class="text-center text-muted py-4">No transactions found for this treasury.</td>
             </tr>
             {% endfor %}
           </tbody>

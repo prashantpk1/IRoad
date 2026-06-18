@@ -156,15 +156,18 @@ class DashboardBookingSelector:
     @staticmethod
     def _auto_shipment_bootstrap_enabled() -> bool:
         """
-        Booking-only bootstrap is allowed when at least one mobile action can
-        auto-create a shipment from booking context.
+        Booking-only bootstrap is allowed when mobile job workflow actions exist.
+
+        Does not require ``auto_shipment_post`` specifically — any active mobile
+        job-scoped action is enough for the driver to see a Confirmed booking
+        before the first shipment row exists.
         """
         try:
             return TenantOperationAction.objects.filter(
                 status=TenantOperationAction.Status.ACTIVE,
-                auto_shipment_post=True,
                 mobile_visible=True,
                 admin_only=False,
+                action_scope='job',
             ).exists()
         except (DatabaseOperationForbidden, OperationalError, ProgrammingError):
             return False

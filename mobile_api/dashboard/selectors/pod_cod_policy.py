@@ -28,14 +28,12 @@ from mobile_api.hard_pod.services.custody_authority_service import (
 # Mirror ``_tenant_shipment_pod_status_is_*`` in ``iroad_tenants.views``.
 _POD_COMPLETE_STATUSES = frozenset(
     {
-        TenantShipment.PodStatus.COMPLIANT,
-        TenantShipment.PodStatus.HARD_COPY_RECEIVED,
+        TenantShipment.PodStatus.COMPLETED,
     }
 )
 _POD_PENDING_STATUSES = frozenset(
     {
-        TenantShipment.PodStatus.PENDING,
-        TenantShipment.PodStatus.NOT_COMPLIANT,
+        TenantShipment.PodStatus.NOT_COMPLETED,
     }
 )
 _TERMINAL_SHIPMENT_STATUSES = frozenset(

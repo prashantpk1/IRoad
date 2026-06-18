@@ -58,7 +58,8 @@
         <div class="fields-grid cols-2">
           <div class="field">
             <label for="roleNameEn" class="form-label">Role Name (English) <span class="required">*</span></label>
-            <div class="input-icon-wrapper"><i class="bi bi-translate"></i><input type="text" name="role_name_en" class="form-control has-icon {% if form_errors.role_name_en %}is-invalid{% endif %}" id="roleNameEn" placeholder="e.g. Finance Manager" value="{{ form_data.role_name_en|default:'' }}" {% if is_view_mode %}disabled{% endif %} /></div>
+            <div class="input-icon-wrapper"><i class="bi bi-translate"></i><input type="text" name="role_name_en" class="form-control has-icon eal-english {% if form_errors.role_name_en %}is-invalid{% endif %}" id="roleNameEn" lang="en" data-english-only="1" placeholder="e.g. Finance Manager" value="{{ form_data.role_name_en|default:'' }}" {% if is_view_mode %}disabled{% endif %} /></div>
+            <span class="field-hint">English characters only</span>
             {% if form_errors.role_name_en %}<div class="invalid-feedback d-block">{{ form_errors.role_name_en }}</div>{% endif %}
           </div>
           <div class="field">

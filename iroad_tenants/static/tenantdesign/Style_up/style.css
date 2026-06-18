@@ -4486,6 +4486,20 @@ textarea.form-control {
 .eal-table.ops-form-table .ops-col-booking-item {
   min-width: 160px;
 }
+.eal-table.ops-form-table .ops-col-truck {
+  min-width: 180px;
+}
+.eal-table.ops-form-table .ops-col-driver {
+  min-width: 200px;
+}
+.eal-table.ops-form-table .ops-col-route {
+  min-width: 320px;
+  white-space: nowrap;
+}
+.eal-table.ops-form-table #bookingLinesTable .form-select,
+.eal-table.ops-form-table #bookingLinesTable .form-control {
+  min-width: 100%;
+}
 .eal-table.ops-form-table .ops-col-cargo {
   min-width: 220px;
 }

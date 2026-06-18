@@ -74,10 +74,10 @@ def client_contract_overlap_field_errors(
 
 def client_contract_has_period_transactions(contract) -> bool:
     """True when bookings or shipments for the client fall within the contract period."""
-    from tenant_workspace.models import TenantBooking, TenantShipment
-
     if contract is None:
         return False
+
+    from tenant_workspace.models import TenantBooking, TenantShipment
     start_date = contract.start_date
     end_date = contract.end_date
     client_account_id = contract.client_account_id

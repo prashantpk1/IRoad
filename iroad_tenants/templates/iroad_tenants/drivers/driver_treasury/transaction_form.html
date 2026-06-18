@@ -64,7 +64,6 @@
           <input type="text" class="form-control" value="{{ transaction.transaction_no }}" readonly>
           {% else %}
           <input type="text" class="form-control" value="{{ code_preview }}" readonly placeholder="Auto-generated">
-          <small class="text-muted">Preview from Auto Number Configuration (no sequence consumption).</small>
           {% endif %}
         </div>
         <div class="field">
@@ -101,7 +100,6 @@
           <label class="form-label" for="{{ form.description.id_for_label }}">Description</label>
           {{ form.description }}
           {% if form.description.errors %}<div class="text-danger small">{{ form.description.errors }}</div>{% endif %}
-          <small class="text-muted">Enter a shipment number to link this entry. Wallet balance updates when you save.</small>
         </div>
       </div>
     </div>

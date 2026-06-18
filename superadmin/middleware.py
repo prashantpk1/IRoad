@@ -122,6 +122,10 @@ class SessionTimeoutMiddleware:
             # Check Redis and refresh TTL
             session_alive = refresh_admin_session(jti, timeout_minutes)
 
+            # Redis down — allow request (degraded mode, same as previous fail-safe).
+            if session_alive is None:
+                return self.get_response(request)
+
             if not session_alive:
                 # Redis key gone — session expired
                 auth_logout(request)

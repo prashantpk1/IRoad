@@ -9,6 +9,7 @@ from superadmin.models import Country
 from tenant_workspace.models import DriverMaster, TruckMaster, TruckTypeMaster
 
 from iroad_tenants.forms_tenant_address import PublicCountryChoiceField
+from iroad_tenants.fleet_operational_eligibility import organization_profile_owner_fields
 
 
 class TruckMasterForm(ArabicTextFormMixin, forms.ModelForm):
@@ -305,7 +306,18 @@ class TruckMasterForm(ArabicTextFormMixin, forms.ModelForm):
             cleaned['sourcing_mode'] = str(sm).strip()
 
         if cleaned.get('is_vendor_same_as_owner'):
-            owner_id = (cleaned.get('owner_id') or '').strip()
+            org_owner = organization_profile_owner_fields()
+            if not org_owner['owner_id'] and not org_owner['owner_name']:
+                raise ValidationError(
+                    {
+                        'is_vendor_same_as_owner': _(
+                            'Organization Profile is not configured. Complete Organization Profile first.'
+                        )
+                    }
+                )
+            cleaned['owner_id'] = org_owner['owner_id']
+            cleaned['owner_name'] = org_owner['owner_name']
+            owner_id = org_owner['owner_id']
             cleaned['vendor_account_id'] = owner_id
             if len(owner_id) > 64:
                 raise ValidationError(

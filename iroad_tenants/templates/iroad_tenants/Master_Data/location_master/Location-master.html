@@ -72,27 +72,18 @@
                     value="{{ preview_location_code|default:'' }}"
                     readonly
                   />
-                  <span class="field-hint"
-                    >Unique code used to identify this location.</span
-                  >
                 </div>
 
                 <div class="field">
                   <label for="country" class="form-label">Country</label>
                   {{ form.country }}
                   {% if form.country.errors %}<div class="text-danger small">{{ form.country.errors }}</div>{% endif %}
-                  <span class="field-hint"
-                    >Country where the location is situated.</span
-                  >
                 </div>
 
                 <div class="field">
                   <label for="province" class="form-label">Province</label>
                   {{ form.province }}
                   {% if form.province.errors %}<div class="text-danger small">{{ form.province.errors }}</div>{% endif %}
-                  <span class="field-hint"
-                    >Province, state, or region for this location.</span
-                  >
                 </div>
               </div>
 
@@ -103,9 +94,6 @@
                   >
                   {{ form.location_name_arabic }}
                   {% if form.location_name_arabic.errors %}<div class="text-danger small">{{ form.location_name_arabic.errors }}</div>{% endif %}
-                  <span class="field-hint"
-                    >Official location name in Arabic.</span
-                  >
                 </div>
 
                 <div class="field">
@@ -114,9 +102,6 @@
                   >
                   {{ form.location_name_english }}
                   {% if form.location_name_english.errors %}<div class="text-danger small">{{ form.location_name_english.errors }}</div>{% endif %}
-                  <span class="field-hint"
-                    >Official location name in English.</span
-                  >
                 </div>
 
                 <div class="field">
@@ -125,9 +110,6 @@
                   >
                   {{ form.display_label }}
                   {% if form.display_label.errors %}<div class="text-danger small">{{ form.display_label.errors }}</div>{% endif %}
-                  <span class="field-hint"
-                    >Short label used in lists and dropdowns.</span
-                  >
                 </div>
               </div>
             </div>
@@ -145,9 +127,6 @@
                   >
                   {{ form.location_type }}
                   {% if form.location_type.errors %}<div class="text-danger small">{{ form.location_type.errors }}</div>{% endif %}
-                  <span class="field-hint"
-                    >Category that best describes this location.</span
-                  >
                 </div>
 
                 <div class="field">
@@ -161,9 +140,6 @@
                   </select>
                   <input type="hidden" name="status" value="{% if is_edit %}{{ form.status.value|default:'Active' }}{% else %}Active{% endif %}" />
                   {% endif %}
-                  <span class="field-hint"
-                    >Controls whether this location is available for use.</span
-                  >
                 </div>
               </div>
 
@@ -172,10 +148,6 @@
                   <label class="form-label" for="isServiceable"
                     >Is Serviceable</label
                   >
-                  <p class="field-hint">
-                    When enabled, this location can be used for routing and
-                    service coverage.
-                  </p>
                 </div>
                 <label class="setting-toggle">
                   {{ form.is_serviceable }}

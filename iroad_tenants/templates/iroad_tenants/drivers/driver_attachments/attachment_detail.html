@@ -160,9 +160,9 @@
           <span>Back</span>
         </a>
         {% if attachment_file_url %}
-        <a href="{{ attachment_file_url }}" class="eal-btn eal-btn-outline" target="_blank" rel="noopener">
-          <i class="bi bi-box-arrow-up-right"></i>
-          <span>Open file</span>
+        <a href="{{ attachment_file_url }}" class="eal-btn eal-btn-outline" data-attachment-preview data-file-url="{{ attachment_file_url }}" data-file-name="{{ file_display_name|default:'' }}">
+          <i class="bi bi-eye"></i>
+          <span>Preview file</span>
         </a>
         {% endif %}
         <a href="{{ edit_attachment_url }}?return_to=detail" class="eal-btn eal-btn-primary">
@@ -387,15 +387,15 @@
             <a href="{{ attachment_file_download_url }}" class="btn btn-sm btn-outline-primary">
               <i class="bi bi-download"></i> Download
             </a>
-            <a href="{{ attachment_file_url }}" target="_blank" rel="noopener" class="btn btn-sm btn-outline-secondary">
-              <i class="bi bi-box-arrow-up-right"></i> Open
+            <a href="{{ attachment_file_url }}" class="btn btn-sm btn-outline-secondary" data-attachment-preview data-file-url="{{ attachment_file_url }}" data-file-name="{{ file_display_name|default:'' }}">
+              <i class="bi bi-eye"></i> Preview
             </a>
           </div>
         </div>
       </div>
       {% if is_image_file %}
       <div class="da-detail-file-preview">
-        <a href="{{ attachment_file_url }}" target="_blank" rel="noopener">
+        <a href="{{ attachment_file_url }}" data-attachment-preview data-file-url="{{ attachment_file_url }}" data-file-name="{{ file_display_name|default:'' }}">
           <img
             src="{{ attachment_file_url }}"
             alt="Attachment preview"

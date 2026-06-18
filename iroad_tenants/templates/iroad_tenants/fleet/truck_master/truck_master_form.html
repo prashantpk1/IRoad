@@ -441,6 +441,7 @@
 
 {% block extra_js %}
 {{ block.super }}
+{{ organization_owner_fields|default_if_none:"{}"|json_script:"tm-organization-owner" }}
 <script>
 (function () {
   var form = document.getElementById("truckMasterForm");
@@ -449,29 +450,37 @@
   var ownerToggle = document.getElementById("{{ form.is_vendor_same_as_owner.id_for_label }}");
   var ownerToggleLabel = form.querySelector(".js-tm-owner-toggle-label");
   var ownerIdEl = document.getElementById("{{ form.owner_id.id_for_label }}");
+  var ownerNameEl = document.getElementById("{{ form.owner_name.id_for_label }}");
   var vendorEl = document.getElementById("{{ form.vendor_account_id.id_for_label }}");
-
-  function syncVendorFromOwner() {
-    if (!vendorEl || !ownerIdEl) return;
-    if (ownerToggle && ownerToggle.checked) {
-      vendorEl.value = (ownerIdEl.value || "").trim();
-    }
-    if (ownerToggleLabel) {
-      ownerToggleLabel.textContent = ownerToggle && ownerToggle.checked ? "Yes" : "No";
-    }
+  var orgOwner = {};
+  var orgOwnerNode = document.getElementById("tm-organization-owner");
+  if (orgOwnerNode && orgOwnerNode.textContent) {
+    try { orgOwner = JSON.parse(orgOwnerNode.textContent) || {}; } catch (e) { orgOwner = {}; }
   }
 
-  if (ownerToggle) ownerToggle.addEventListener("change", syncVendorFromOwner);
-  if (ownerIdEl) {
-    ownerIdEl.addEventListener("input", function () {
-      if (ownerToggle && ownerToggle.checked) syncVendorFromOwner();
-    });
-    ownerIdEl.addEventListener("change", function () {
-      if (ownerToggle && ownerToggle.checked) syncVendorFromOwner();
-    });
+  function applyOrganizationOwnerFields() {
+    if (!ownerToggle || !ownerToggle.checked) return;
+    if (ownerIdEl) ownerIdEl.value = orgOwner.owner_id || "";
+    if (ownerNameEl) ownerNameEl.value = orgOwner.owner_name || "";
+    if (vendorEl && ownerIdEl) vendorEl.value = (ownerIdEl.value || "").trim();
   }
 
-  syncVendorFromOwner();
+  function syncOwnerFieldState() {
+    var enabled = !!(ownerToggle && ownerToggle.checked);
+    if (ownerIdEl) {
+      ownerIdEl.readOnly = enabled;
+      ownerIdEl.classList.toggle("bg-light", enabled);
+    }
+    if (ownerNameEl) {
+      ownerNameEl.readOnly = enabled;
+      ownerNameEl.classList.toggle("bg-light", enabled);
+    }
+    if (enabled) applyOrganizationOwnerFields();
+    if (ownerToggleLabel) ownerToggleLabel.textContent = enabled ? "Yes" : "No";
+  }
+
+  if (ownerToggle) ownerToggle.addEventListener("change", syncOwnerFieldState);
+  syncOwnerFieldState();
 
   var countryEl = document.getElementById("{{ form.registration_country.id_for_label }}");
   var plateEl = document.getElementById("{{ form.plate_number.id_for_label }}");

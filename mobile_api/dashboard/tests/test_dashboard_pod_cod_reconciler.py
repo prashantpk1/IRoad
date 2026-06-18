@@ -38,7 +38,7 @@ class PodCodReconcilerTests(SimpleTestCase):
     def test_compliance_drift_cod_without_log(self):
         shipment = MagicMock()
         shipment.shipment_status = TenantShipment.ShipmentStatus.DELIVERED
-        shipment.pod_status = TenantShipment.PodStatus.COMPLIANT
+        shipment.pod_status = TenantShipment.PodStatus.COMPLETED
         shipment.order_type = 'COD'
         shipment.collection_status = TenantShipment.CollectionStatus.COLLECTED
 
@@ -69,7 +69,7 @@ class PodCodReconcilerTests(SimpleTestCase):
     def test_pod_upload_log_vs_pending_column(self):
         shipment = MagicMock()
         shipment.shipment_status = TenantShipment.ShipmentStatus.AT_DELIVERY
-        shipment.pod_status = TenantShipment.PodStatus.PENDING
+        shipment.pod_status = TenantShipment.PodStatus.NOT_COMPLETED
         shipment.order_type = 'Prepaid'
         shipment.collection_status = ''
 

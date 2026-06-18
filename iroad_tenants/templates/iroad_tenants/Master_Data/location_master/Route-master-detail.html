@@ -135,7 +135,6 @@
               <span>{{ route.destination_point.display_label|default:"—" }}</span>
             </div>
           </div>
-          <span class="field-hint">{% translate "Derived from origin and destination display names (read-only)." %}</span>
         </div>
         <div class="field">
           <label class="form-label">{% translate "Route Type" %}</label>
@@ -216,7 +215,6 @@
       <div class="setting-row">
         <div class="setting-row-info">
           <label class="form-label">{% translate "Has Customs" %}</label>
-          <p class="field-hint">{% translate "Derived automatically from origin and destination countries (read-only)." %}</p>
         </div>
         <label class="setting-toggle">
           <input type="checkbox" disabled{% if route.has_customs %} checked{% endif %} />

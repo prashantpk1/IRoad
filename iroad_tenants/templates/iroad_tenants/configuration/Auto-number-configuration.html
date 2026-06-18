@@ -202,9 +202,9 @@
       <!-- <li class="form-list-item" data-form="roles-permissions">
         Roles &amp; Permissions
       </li> -->
-      <li class="form-list-item {% if auto_number_form_code == 'organization-profile' %}active{% endif %}" data-form="organization-profile">
+      <!-- <li class="form-list-item {% if auto_number_form_code == 'organization-profile' %}active{% endif %}" data-form="organization-profile">
         Organization Profile
-      </li>
+      </li> -->
 
       <li class="form-list-section">Support</li>
       <li class="form-list-item {% if auto_number_form_code == 'support-ticket-master' %}active{% endif %}" data-form="support-ticket-master">
@@ -222,7 +222,7 @@
         </div>
         <div class="form-card-header-text">
           <h2 class="form-card-title" id="autoNumberFormTitle">
-            {{ auto_number_form_label|default:'Organization Profile' }} Auto Numbering
+            {{ auto_number_form_label|default:'Client Account' }} Auto Numbering
           </h2>
       </div>
       </div>
@@ -237,7 +237,7 @@
             type="hidden"
             id="selectedFormCode"
             name="form_code"
-            value="{{ auto_number_form_code|default:'organization-profile' }}"
+            value="{{ auto_number_form_code|default:'client-account' }}"
           />
           <input
             type="hidden"

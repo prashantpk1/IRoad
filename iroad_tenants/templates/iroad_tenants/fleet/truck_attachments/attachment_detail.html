@@ -166,7 +166,7 @@
     </div>
     {% with file_name=attachment.attachment_file.name|lower %}
       {% if '.jpg' in file_name or '.jpeg' in file_name or '.png' in file_name %}
-      <a href="{{ attachment.attachment_file.url }}" target="_blank" rel="noopener">
+      <a href="{{ attachment.attachment_file.url }}" data-attachment-preview data-file-url="{{ attachment.attachment_file.url }}" data-file-name="{{ attachment.attachment_file.name }}">
         <img src="{{ attachment.attachment_file.url }}" alt="Attachment preview" style="max-width: 240px; max-height: 180px; object-fit: cover;" class="rounded border">
       </a>
       {% endif %}

@@ -148,6 +148,8 @@ from .views import (
     TenantPriceListMasterToggleStatusView,
     TenantOperationBookingAssignTruckView,
     TenantOperationBookingCancelView,
+    TenantOperationBookingItemCancelView,
+    TenantOperationBookingItemDeleteView,
     TenantOperationBookingDeleteView,
     TenantOperationBookingCreateView,
     TenantOperationBookingDetailView,
@@ -158,7 +160,7 @@ from .views import (
     TenantOperationShipmentCreateView,
     TenantOperationShipmentDetailView,
     TenantOperationShipmentEditView,
-    TenantOperationShipmentUpdateView,
+    TenantOperationShipmentCancelView,
     TenantOperationShipmentDeleteView,
     TenantOperationShipmentDocumentsListView,
     TenantOperationShipmentDocumentsCreateView,
@@ -1064,6 +1066,16 @@ urlpatterns = [
         name='tenant_operation_booking_cancel',
     ),
     path(
+        'operations/booking/<uuid:booking_id>/item/<str:line_type>/delete/',
+        TenantOperationBookingItemDeleteView.as_view(),
+        name='tenant_operation_booking_item_delete',
+    ),
+    path(
+        'operations/booking/<uuid:booking_id>/item/<str:line_type>/cancel/',
+        TenantOperationBookingItemCancelView.as_view(),
+        name='tenant_operation_booking_item_cancel',
+    ),
+    path(
         'operations/booking/<uuid:booking_id>/delete/',
         TenantOperationBookingDeleteView.as_view(),
         name='tenant_operation_booking_delete',
@@ -1159,9 +1171,9 @@ urlpatterns = [
         name='tenant_operation_shipment_edit',
     ),
     path(
-        'operations/shipment/<uuid:shipment_id>/update/',
-        TenantOperationShipmentUpdateView.as_view(),
-        name='tenant_operation_shipment_update',
+        'operations/shipment/<uuid:shipment_id>/cancel/',
+        TenantOperationShipmentCancelView.as_view(),
+        name='tenant_operation_shipment_cancel',
     ),
     path(
         'operations/shipment/<uuid:shipment_id>/delete/',

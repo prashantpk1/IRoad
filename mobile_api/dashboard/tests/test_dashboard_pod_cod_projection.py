@@ -35,7 +35,7 @@ def _mock_no_promoted_submission(mock_submission) -> None:
 def _shipment(
     *,
     order_type='Standard',
-    pod_status=TenantShipment.PodStatus.PENDING,
+    pod_status=TenantShipment.PodStatus.NOT_COMPLETED,
     pod_type=TenantShipment.PodType.DIGITAL,
     collection_status=TenantShipment.CollectionStatus.PENDING,
     shipment_status=TenantShipment.ShipmentStatus.AT_DELIVERY,
@@ -56,12 +56,12 @@ def _shipment(
 
 class PodCodPolicyTests(SimpleTestCase):
     def test_pod_pending(self):
-        shipment = _shipment(pod_status=TenantShipment.PodStatus.PENDING)
+        shipment = _shipment(pod_status=TenantShipment.PodStatus.NOT_COMPLETED)
         self.assertTrue(policy.derive_pod_pending(shipment))
         self.assertFalse(policy.derive_pod_compliant(shipment))
 
     def test_pod_compliant(self):
-        shipment = _shipment(pod_status=TenantShipment.PodStatus.COMPLIANT)
+        shipment = _shipment(pod_status=TenantShipment.PodStatus.COMPLETED)
         self.assertTrue(policy.derive_pod_compliant(shipment))
         self.assertFalse(policy.derive_pod_pending(shipment))
 
@@ -73,7 +73,7 @@ class PodCodPolicyTests(SimpleTestCase):
         ):
             shipment = _shipment(
                 pod_type=TenantShipment.PodType.HARD,
-                pod_status=TenantShipment.PodStatus.NOT_COMPLIANT,
+                pod_status=TenantShipment.PodStatus.NOT_COMPLETED,
                 shipment_status=status,
             )
             self.assertFalse(
@@ -84,7 +84,7 @@ class PodCodPolicyTests(SimpleTestCase):
     def test_hard_pod_pending(self):
         shipment = _shipment(
             pod_type=TenantShipment.PodType.HARD,
-            pod_status=TenantShipment.PodStatus.NOT_COMPLIANT,
+            pod_status=TenantShipment.PodStatus.NOT_COMPLETED,
         )
         with patch(
             'mobile_api.dashboard.selectors.pod_cod_policy.HardPodCustodyAuthorityService',
@@ -101,7 +101,7 @@ class PodCodPolicyTests(SimpleTestCase):
         """Digital A7 may have set HARD_COPY_RECEIVED before A7H — keep pending."""
         shipment = _shipment(
             pod_type=TenantShipment.PodType.HARD,
-            pod_status=TenantShipment.PodStatus.HARD_COPY_RECEIVED,
+            pod_status=TenantShipment.PodStatus.COMPLETED,
         )
         with patch(
             'mobile_api.dashboard.selectors.pod_cod_policy.HardPodCustodyAuthorityService',
@@ -118,7 +118,7 @@ class PodCodPolicyTests(SimpleTestCase):
     def test_hard_pod_not_pending_when_a7h_log_present(self):
         shipment = _shipment(
             pod_type=TenantShipment.PodType.HARD,
-            pod_status=TenantShipment.PodStatus.HARD_COPY_RECEIVED,
+            pod_status=TenantShipment.PodStatus.COMPLETED,
         )
         self.assertFalse(
             policy.derive_hard_pod_pending(
@@ -130,7 +130,7 @@ class PodCodPolicyTests(SimpleTestCase):
     def test_hard_pod_still_pending_when_compliant_without_a7h_log(self):
         shipment = _shipment(
             pod_type=TenantShipment.PodType.HARD,
-            pod_status=TenantShipment.PodStatus.COMPLIANT,
+            pod_status=TenantShipment.PodStatus.COMPLETED,
         )
         with patch(
             'mobile_api.dashboard.selectors.pod_cod_policy.HardPodCustodyAuthorityService',
@@ -175,7 +175,7 @@ class PodCodPolicyTests(SimpleTestCase):
         shipment = _shipment(
             order_type='COD',
             collection_status=TenantShipment.CollectionStatus.PENDING,
-            pod_status=TenantShipment.PodStatus.PENDING,
+            pod_status=TenantShipment.PodStatus.NOT_COMPLETED,
         )
         mock_validate.side_effect = ValidationError('blocked')
         self.assertTrue(policy.derive_delivery_blocked(shipment))
@@ -185,7 +185,7 @@ class PodCodPolicyTests(SimpleTestCase):
     )
     def test_delivery_not_blocked_when_validation_passes(self, mock_validate):
         shipment = _shipment(
-            pod_status=TenantShipment.PodStatus.COMPLIANT,
+            pod_status=TenantShipment.PodStatus.COMPLETED,
             collection_status=TenantShipment.CollectionStatus.COLLECTED,
             order_type='COD',
         )
@@ -237,7 +237,7 @@ class PodCodProjectionTests(SimpleTestCase):
 
     def test_projection_from_shipment(self):
         shipment = _shipment(
-            pod_status=TenantShipment.PodStatus.COMPLIANT,
+            pod_status=TenantShipment.PodStatus.COMPLETED,
             order_type='COD',
             collection_status=TenantShipment.CollectionStatus.COLLECTED,
         )
@@ -259,7 +259,7 @@ class PodCodProjectionTests(SimpleTestCase):
         self.assertTrue(summary['cod_collected'])
 
     def test_projection_from_booking_selection(self):
-        shipment = _shipment(pod_status=TenantShipment.PodStatus.PENDING)
+        shipment = _shipment(pod_status=TenantShipment.PodStatus.NOT_COMPLETED)
         booking = MagicMock()
         selection = DriverBookingSelectionResult(
             booking=booking,
@@ -270,7 +270,7 @@ class PodCodProjectionTests(SimpleTestCase):
         self.assertTrue(summary['pod_pending'])
 
     def test_projection_from_context(self):
-        shipment = _shipment(pod_status=TenantShipment.PodStatus.PENDING)
+        shipment = _shipment(pod_status=TenantShipment.PodStatus.NOT_COMPLETED)
         context = DriverDashboardContext(
             driver=MagicMock(),
             tenant_schema='tenant_a',

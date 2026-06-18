@@ -3,6 +3,7 @@
 {% block title %}Booking | iRoad Admin{% endblock %}
 
 {% block content %}
+{% include 'iroad_tenants/partials/pl_route_chip_styles.html' %}
 <!-- Page Header -->
       <div class="page-header">
         <nav aria-label="breadcrumb">
@@ -92,7 +93,7 @@
                     placeholder="Auto"
                     readonly
                   />
-                  <span class="field-hint">Auto-generated, unique</span>
+                  
                 </div>
                 <div class="field">
                   <label for="creationDate" class="form-label"
@@ -106,7 +107,7 @@
                     value="{{ booking_creation_date|date:'Y-m-d' }}"
                     readonly
                   />
-                  <span class="field-hint">System date (read-only)</span>
+                  
                 </div>
                 <div class="field">
                   <label for="bookingDate" class="form-label"
@@ -151,6 +152,9 @@
                     name="execution_date"
                     value="{{ booking_form_data.execution_date|default:'' }}"
                   />
+                  {% if booking_form_errors.execution_date %}
+                  <div class="invalid-feedback d-block">{{ booking_form_errors.execution_date }}</div>
+                  {% endif %}
                   <span class="field-hint" id="executionDateHint"
                     >Not scheduled: today (auto). Scheduled: pick the planned execution date.</span
                   >
@@ -187,12 +191,14 @@
                 </div>
                 <div class="field">
                   <label for="podStatus" class="form-label">POD Status</label>
-                  <select class="form-select" id="podStatus" name="pod_status">
+                  <select class="form-select" id="podStatus" disabled aria-readonly="true">
                     <option value="" disabled>-Select POD status-</option>
                     {% for pod_status in operation_pod_status_options %}
-                    <option value="{{ pod_status }}" {% if booking_form_data.pod_status|default:'Pending' == pod_status %}selected{% endif %}>{{ pod_status }}</option>
+                    <option value="{{ pod_status }}" {% if booking_form_data.pod_status|default:'Not Completed' == pod_status %}selected{% endif %}>{{ pod_status }}</option>
                     {% endfor %}
                   </select>
+                  <input type="hidden" name="pod_status" value="{{ booking_form_data.pod_status|default:'Not Completed' }}" />
+                  
                 </div>
               </div>
               <div style="display: none">
@@ -244,9 +250,6 @@
                     </option>
                     {% endfor %}
                   </select>
-                  <span class="field-hint"
-                    >Used for filtering Client Accounts</span
-                  >
                 </div>
                 <div class="field">
                   <label for="salesOrderNo" class="form-label"
@@ -273,7 +276,7 @@
                     </option>
                     {% endfor %}
                   </select>
-                  <span class="field-hint">Lookup by client account</span>
+                  
                 </div>
                 <div class="field">
                   <label for="salesOrderLine" class="form-label"
@@ -295,15 +298,14 @@
                       data-route-id="{{ service_item.route_id }}"
                       data-service-type="{{ service_item.service_type }}"
                       data-base-sell-price="{{ service_item.base_sell_price }}"
+                      data-outbound-sell-price="{{ service_item.outbound_sell_price }}"
+                      data-inbound-sell-price="{{ service_item.inbound_sell_price }}"
                       {% if booking_form_data.service_lookup == service_item.service_item_id|stringformat:'s' %}selected{% endif %}
                     >
                       {{ service_item.service_code }} - {{ service_item.english_name }}
                     </option>
                     {% endfor %}
                   </select>
-                  <span class="field-hint"
-                    >Lookup from selected price list</span
-                  >
                 </div>
               </div>
               <div class="fields-grid cols-3">
@@ -364,7 +366,7 @@
                     <option value="{{ order_type }}" {% if booking_form_data.order_type == order_type %}selected{% endif %}>{{ order_type }}</option>
                     {% endfor %}
                   </select>
-                  <span class="field-hint">List values: COD, Credit</span>
+                  
                 </div>
                 <div class="field">
                   <label for="tripTypeDisplay" class="form-label"
@@ -374,7 +376,7 @@
                     class="form-select{% if booking_form_errors.trip_type %} is-invalid{% endif %}"
                     id="tripTypeDisplay"
                     name="trip_type"
-                    {% if booking_has_active_shipment %}disabled{% endif %}
+                    {% if booking_is_edit or booking_has_active_shipment %}disabled{% endif %}
                   >
                     <option value="" selected disabled>
                       -Select trip type-
@@ -383,6 +385,10 @@
                     <option value="{{ trip_type }}" {% if booking_form_data.trip_type == trip_type %}selected{% endif %}>{{ trip_type }}</option>
                     {% endfor %}
                   </select>
+                  {% if booking_is_edit or booking_has_active_shipment %}
+                  <input type="hidden" name="trip_type" value="{{ booking_form_data.trip_type }}" />
+                  {% endif %}
+                  
                 </div>
               </div>
               <div class="fields-grid cols-3">
@@ -424,7 +430,7 @@
                     </option>
                     {% endfor %}
                   </select>
-                  <span class="field-hint">Lookup filtered by booking; auto-linked when included in a Sales Invoice Report.</span>
+                  
                 </div>
                 <div class="field">
                   <label for="salesReportStatus" class="form-label">Sales Report Status</label>
@@ -442,9 +448,14 @@
                     <option value="{{ status }}" {% if operation_sales_report.sales_report_status == status %}selected{% endif %}>{{ status }}</option>
                     {% endfor %}
                   </select>
-                  <span class="field-hint">Pending · Submitted · Invoiced (derived).</span>
+                  
                 </div>
               </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Section 5: Address -->
         <div class="form-card" data-section="5">
           <div class="form-card-header">
             <div class="form-card-icon amber">
@@ -573,32 +584,42 @@
             </div>
             <div class="form-card-header-text">
               <h2 class="form-card-title">Booking Lines</h2>
+              {% if booking_derived_status %}
+              <p class="form-card-subtitle mb-0">
+                Booking status
+                <strong>{{ booking_derived_status }}</strong>
+                <span class="text-muted">— updates automatically from line states</span>
+              </p>
+              {% endif %}
             </div>
           </div>
           <div class="form-card-body">
             <div class="eal-table-card">
               <div class="eal-table-wrap">
                 <table
-                  class="eal-table"
+                  class="eal-table ops-form-table"
                   id="bookingLinesTable"
                   data-static-view="true"
                 >
                   <thead>
                     <tr>
-                      <th>SN</th>
+                      <th class="ops-col-sn">SN</th>
                       <th>Code</th>
-                      <th>Type</th>
+                      <th class="ops-col-booking-item">Type</th>
                       <th>Status</th>
-                      <th>Route</th>
-                      <th>Truck</th>
-                      <th>Driver</th>
+                      <th class="ops-col-route">Route</th>
+                      <th class="ops-col-truck">Truck</th>
+                      <th class="ops-col-driver">Driver</th>
                       <th class="cod-col">COD Amount</th>
                       <th>POD Doc Count</th>
+                      {% if booking_is_edit %}
+                      <th>Action</th>
+                      {% endif %}
                     </tr>
                   </thead>
                   <tbody>
                     <tr>
-                      <td colspan="9" class="text-center text-muted py-3">
+                      <td colspan="{% if booking_is_edit %}10{% else %}9{% endif %}" class="text-center text-muted py-3">
                         Select service and trip type to auto-generate booking lines.
                       </td>
                     </tr>
@@ -680,8 +701,9 @@
                           class="form-control cargo-unit-input{% if booking_form_errors.cargo_unit_1 %} is-invalid{% endif %}"
                           name="cargo_unit_1"
                           maxlength="50"
-                          placeholder="e.g. PCS, Ton, Box"
+                          placeholder="e.g. PCS, Box, Pallet"
                           autocomplete="off"
+                          data-no-digits="1"
                           value="{{ booking_form_data.cargo_unit_1|default:'' }}"
                         />
                       </td>
@@ -764,11 +786,7 @@
                   {% if booking and booking.booking_attachment %}
                   <p class="mb-2 small">
                     Current:
-                    <a
-                      href="{{ booking.booking_attachment.url }}"
-                      target="_blank"
-                      rel="noopener"
-                    >{{ booking.booking_attachment.name|cut:"booking_attachments/" }}</a>
+                    {% include 'partials/attachment_preview_link.html' with file_url=booking.booking_attachment.url file_name=booking.booking_attachment.name label=booking.booking_attachment.name|cut:"booking_attachments/" %}
                   </p>
                   {% endif %}
                   <input
@@ -843,7 +861,7 @@
               <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
             <div class="modal-body">
-              Cancel <strong>{{ preview_booking_no }}</strong>? This is only allowed when no shipment has been created (R3).
+              Cancel <strong>{{ preview_booking_no }}</strong>? Allowed when no shipment is active (cancelled-only shipments are OK). An R3 action log entry will be recorded.
             </div>
             <div class="modal-footer">
               <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Keep booking</button>
@@ -864,6 +882,20 @@
 {{ booking_service_sell_overrides|json_script:"booking-service-sell-overrides" }}
 {{ booking_trip_sell_overrides|json_script:"booking-trip-sell-overrides" }}
 {{ booking_line_status_values|json_script:"booking-line-status-values" }}
+{{ booking_line_actions|default:"{}"|json_script:"booking-line-actions" }}
+<script>
+      window.__bookingItemActionUrls = {
+        delete: {
+          Outbound: "{% if booking_is_edit %}{% url 'iroad_tenants:tenant_operation_booking_item_delete' booking.booking_id 'Outbound' %}{% endif %}",
+          Backload: "{% if booking_is_edit %}{% url 'iroad_tenants:tenant_operation_booking_item_delete' booking.booking_id 'Backload' %}{% endif %}"
+        },
+        cancel: {
+          Outbound: "{% if booking_is_edit %}{% url 'iroad_tenants:tenant_operation_booking_item_cancel' booking.booking_id 'Outbound' %}{% endif %}",
+          Backload: "{% if booking_is_edit %}{% url 'iroad_tenants:tenant_operation_booking_item_cancel' booking.booking_id 'Backload' %}{% endif %}"
+        }
+      };
+      window.__bookingIsEdit = {{ booking_is_edit|yesno:"true,false" }};
+</script>
 <script>
       (function () {
         var sourcing = document.getElementById("sourcingMode");
@@ -1122,9 +1154,18 @@
             podDocs: "{{ booking_form_data.booking_line_pod_doc_count_2|default:''|escapejs }}",
           },
         };
+        var savedSellPriceFromServer = "{{ booking_form_data.sell_price|default:''|escapejs }}";
+        var validationBannerEl = document.getElementById("bookingValidationBanner");
+        var hasServerValidationErrors = Boolean(
+          document.getElementById("booking-form-errors-data")
+          || (validationBannerEl && !validationBannerEl.classList.contains("d-none"))
+        );
         var serviceSellOverrides = {};
         var tripSellOverrides = {};
         var bookingLineStatusValues = {};
+        var bookingLineActions = {};
+        var bookingItemActionUrls = window.__bookingItemActionUrls || { delete: {}, cancel: {} };
+        var bookingIsEdit = Boolean(window.__bookingIsEdit);
         try {
           serviceSellOverrides = JSON.parse(
             document.getElementById("booking-service-sell-overrides").textContent || "{}",
@@ -1134,6 +1175,9 @@
           );
           bookingLineStatusValues = JSON.parse(
             document.getElementById("booking-line-status-values").textContent || "{}",
+          );
+          bookingLineActions = JSON.parse(
+            document.getElementById("booking-line-actions").textContent || "{}",
           );
         } catch (e) {}
         var currentBookingLineTypes = [];
@@ -1215,7 +1259,9 @@
             applyServiceFilter(previousService);
             deriveSellPrice();
           } else if (priceListSelect.selectedIndex <= 0 && sellPriceInput) {
-            sellPriceInput.value = "";
+            if (!(hasServerValidationErrors && savedSellPriceFromServer)) {
+              sellPriceInput.value = "";
+            }
           }
           applyRouteFilter(restoreSavedBookingLookups ? savedRouteLookup : "");
         }
@@ -1237,7 +1283,9 @@
               .split(",")
               .map(function (x) { return x.trim(); })
               .filter(Boolean);
-            var isVisible = selectedPriceListId && linked.indexOf(selectedPriceListId) !== -1;
+            var serviceType = (opt.getAttribute("data-service-type") || "").trim();
+            var isTripService = serviceType === "Trip";
+            var isVisible = selectedPriceListId && linked.indexOf(selectedPriceListId) !== -1 && isTripService;
             opt.hidden = !isVisible;
             if (isVisible) visibleCount += 1;
           });
@@ -1259,7 +1307,7 @@
             deriveSellPrice();
           } else if (serviceSelect.selectedIndex <= 0) {
             applyRouteFilter(restoreSavedBookingLookups ? savedRouteLookup : "");
-            if (sellPriceInput) {
+            if (sellPriceInput && !(hasServerValidationErrors && savedSellPriceFromServer)) {
               sellPriceInput.value = "";
             }
           }
@@ -1401,7 +1449,7 @@
           var html = "<option value='' disabled" + (!selectedValue ? " selected" : "") + ">" + placeholder + "</option>";
           options.forEach(function (opt) {
             var selected = selectedValue && String(opt.value) === String(selectedValue) ? " selected" : "";
-            html += "<option value='" + opt.value + "'" + selected + ">" + opt.label + "</option>";
+            html += "<option value='" + escapeHtmlAttr(opt.value) + "'" + selected + ">" + escapeHtmlAttr(opt.label) + "</option>";
           });
           return html;
         }
@@ -1416,6 +1464,12 @@
         }
 
         function pickBookingLineField(previousValues, savedValues, field) {
+          if (hasServerValidationErrors) {
+            var posted = savedValues ? savedValues[field] : "";
+            if (posted !== undefined && posted !== null && String(posted).length > 0) {
+              return posted;
+            }
+          }
           var previous = previousValues ? previousValues[field] : "";
           if (previous !== undefined && previous !== null && String(previous).length > 0) {
             return previous;
@@ -1425,6 +1479,42 @@
             return saved;
           }
           return "";
+        }
+
+        function restorePostedSellPrice() {
+          if (!hasServerValidationErrors || !sellPriceInput || !savedSellPriceFromServer) return;
+          if (!sellPriceInput.value || parseCodAmount(sellPriceInput.value) <= 0) {
+            sellPriceInput.value = savedSellPriceFromServer;
+          }
+        }
+
+        function restorePostedCodAmounts() {
+          if (!hasServerValidationErrors || !isCodBooking()) return;
+          var tbody = getBookingLinesTbody();
+          if (!tbody) return;
+          ["1", "2"].forEach(function (lineNo) {
+            var savedCod = (selectedBookingLineValues[lineNo] || {}).cod;
+            if (!savedCod || String(savedCod).trim() === "") return;
+            var codInput = tbody.querySelector("input[name='booking_line_cod_amount_" + lineNo + "']");
+            if (!codInput) return;
+            if (!codInput.value || parseCodAmount(codInput.value) <= 0) {
+              codInput.value = formatCodAmount(savedCod);
+              codInput.dataset.userEdited = "1";
+            }
+          });
+          setCodInputReadOnlyState();
+        }
+
+        function restorePostedBookingAmounts() {
+          restorePostedSellPrice();
+          restorePostedCodAmounts();
+        }
+
+        function hasPostedCodAmounts() {
+          return ["1", "2"].some(function (lineNo) {
+            var savedCod = (selectedBookingLineValues[lineNo] || {}).cod;
+            return savedCod !== undefined && savedCod !== null && String(savedCod).trim() !== "";
+          });
         }
 
         function getBookingSourcingMode() {
@@ -1439,6 +1529,66 @@
             return truckMode === "Out-Source";
           }
           return truckMode === "In-Source";
+        }
+
+        function escapeHtmlText(value) {
+          return escapeHtmlAttr(value);
+        }
+
+        function parseRouteEndpoints(routeLabel) {
+          var text = (routeLabel || "").trim();
+          if (!text || text === "-") {
+            return { origin: "", destination: "", title: "" };
+          }
+          var parts = text.split(/\s+To\s+/i);
+          if (parts.length >= 2) {
+            return {
+              origin: parts[0].trim(),
+              destination: parts.slice(1).join(" To ").trim(),
+              title: text,
+            };
+          }
+          return { origin: text, destination: "", title: text };
+        }
+
+        function bookingLineRouteArrowVariant(lineType, routeDirection) {
+          if ((lineType || "").trim() === "Backload") {
+            return "inbound";
+          }
+          if ((routeDirection || "").trim().toLowerCase() === "reverse") {
+            return "inbound";
+          }
+          return "outbound";
+        }
+
+        function buildRouteChipHtml(origin, destination, arrowVariant, title) {
+          if (!origin && !destination) {
+            return "<span class='text-muted'>&mdash;</span>";
+          }
+          var variant = arrowVariant || "outbound";
+          var arrowClass = "pl-route-arrow pl-route-arrow--" + variant;
+          var arrowInner = variant === "round"
+            ? "<i class='bi bi-arrow-right pl-route-arrow-out'></i><i class='bi bi-arrow-left pl-route-arrow-in'></i>"
+            : "<i class='bi bi-arrow-right'></i>";
+          if (variant === "round") {
+            arrowClass += " pl-route-arrow--stacked";
+          }
+          return "<div class='pl-route-chip' title='" + escapeHtmlAttr(title || (origin + " — " + destination)) + "'>"
+            + "<span>" + escapeHtmlText(origin) + "</span>"
+            + "<span class='" + arrowClass + "' aria-hidden='true'>" + arrowInner + "</span>"
+            + "<span>" + escapeHtmlText(destination || "") + "</span>"
+            + "</div>";
+        }
+
+        function buildBookingLineRouteCell(lineType, routeLabel, routeDirection) {
+          var endpoints = parseRouteEndpoints(routeLabel);
+          var arrowVariant = bookingLineRouteArrowVariant(lineType, routeDirection);
+          return buildRouteChipHtml(
+            endpoints.origin,
+            endpoints.destination,
+            arrowVariant,
+            endpoints.title,
+          );
         }
 
         function filteredTruckOptions() {
@@ -1576,8 +1726,13 @@
               addFieldError("cargo_weight_1", "Cargo weight cannot be negative.");
             }
             var cargoUnit = formEl.querySelector("input[name='cargo_unit_1']");
-            if (cargoUnit && !(cargoUnit.value || "").trim()) {
-              addFieldError("cargo_unit_1", "Cargo unit is required before confirming a booking.");
+            if (cargoUnit) {
+              var unitValue = (cargoUnit.value || "").trim();
+              if (!unitValue) {
+                addFieldError("cargo_unit_1", "Cargo unit is required before confirming a booking.");
+              } else if (/\d/.test(unitValue)) {
+                addFieldError("cargo_unit_1", "Cargo unit must not contain numbers.");
+              }
             }
           }
 
@@ -1764,27 +1919,46 @@
         function applyCodAmountDefaults(tbody, previousLineValues, options) {
           options = options || {};
           if (!tbody) return;
+
+          if (options.preservePosted && hasServerValidationErrors && hasPostedCodAmounts()) {
+            restorePostedCodAmounts();
+            return;
+          }
+
           var codInputs = tbody.querySelectorAll(".booking-line-cod-input");
           if (!codInputs.length) return;
 
           if (!isCodBooking()) {
-            codInputs.forEach(function (input) {
-              input.value = "";
-              input.readOnly = false;
-              delete input.dataset.userEdited;
-            });
+            if (!hasServerValidationErrors || !hasPostedCodAmounts()) {
+              codInputs.forEach(function (input) {
+                input.value = "";
+                input.readOnly = false;
+                delete input.dataset.userEdited;
+              });
+            }
             return;
           }
 
+          restorePostedSellPrice();
           var sellPrice = getSellPriceAmount();
           var line1Input = tbody.querySelector("input[name='booking_line_cod_amount_1']");
-          if (!line1Input || sellPrice <= 0) return;
+          if (!line1Input || sellPrice <= 0) {
+            if (hasServerValidationErrors) {
+              restorePostedCodAmounts();
+            }
+            return;
+          }
 
           var previousFirstCod = ((previousLineValues || {})["1"] || {}).cod || "";
           var line1Value = (line1Input.value || previousFirstCod || "").trim();
           var line2Input = tbody.querySelector("input[name='booking_line_cod_amount_2']");
           var userEdited = line1Input.dataset.userEdited === "1";
           var savedSplit = hasSavedCodSplit(tbody);
+
+          if (hasServerValidationErrors && hasPostedCodAmounts()) {
+            restorePostedCodAmounts();
+            return;
+          }
 
           if (isRoundTripBooking()) {
             if ((options.resetFirstLine && !userEdited && !savedSplit) || !line1Value) {
@@ -1809,6 +1983,10 @@
         function syncCodAmountsAfterSellPriceChange() {
           var tbody = getBookingLinesTbody();
           if (!tbody) return;
+          if (hasServerValidationErrors && hasPostedCodAmounts()) {
+            restorePostedCodAmounts();
+            return;
+          }
           var line1Input = tbody.querySelector("input[name='booking_line_cod_amount_1']");
           var preserveSplit = Boolean(
             line1Input
@@ -1870,11 +2048,13 @@
           var tripType = tripTypeSelect ? (tripTypeSelect.value || "") : "";
           var selectedRouteText = "";
           var reverseRouteText = "";
+          var selectedRouteDirection = "forward";
           if (routeSelect && routeSelect.selectedIndex > 0) {
             var selectedRouteOpt = routeSelect.options[routeSelect.selectedIndex];
             var forwardLabel = (selectedRouteOpt.getAttribute("data-forward-label") || "").trim();
             var reverseLabel = (selectedRouteOpt.getAttribute("data-reverse-label") || "").trim();
             var direction = (selectedRouteOpt.getAttribute("data-direction") || "forward").trim();
+            selectedRouteDirection = direction || "forward";
             if (direction === "reverse") {
               selectedRouteText = reverseLabel || selectedRouteOpt.textContent.trim();
               reverseRouteText = forwardLabel || selectedRouteText;
@@ -1886,9 +2066,33 @@
           currentBookingLineTypes = tripType === "Round" ? ["Outbound", "Backload"] : (tripType ? ["Outbound"] : []);
           updateBookingLineSelectors();
           if (!currentBookingLineTypes.length) {
-            tbody.innerHTML = "<tr><td colspan='9' class='text-center text-muted py-3'>Select service and trip type to auto-generate booking lines.</td></tr>";
+            tbody.innerHTML = "<tr><td colspan='" + (bookingIsEdit ? "10" : "9") + "' class='text-center text-muted py-3'>Select service and trip type to auto-generate booking lines.</td></tr>";
             return;
           }
+
+        function buildBookingLineActionsCell(lineType) {
+          if (!bookingIsEdit) return "";
+          var flags = bookingLineActions[lineType] || {};
+          var csrfInput = document.querySelector("input[name='csrfmiddlewaretoken']");
+          var csrfToken = csrfInput ? csrfInput.value : "";
+          var html = "<td class='text-nowrap'>";
+          if (flags.can_delete && bookingItemActionUrls.delete[lineType]) {
+            html += "<form method='post' action='" + bookingItemActionUrls.delete[lineType] + "' class='d-inline' onsubmit=\"return confirm('Delete this booking item? Trip type will become One-Way.');\">"
+              + "<input type='hidden' name='csrfmiddlewaretoken' value='" + escapeHtmlAttr(csrfToken) + "' />"
+              + "<button type='submit' class='btn btn-sm btn-outline-danger' title='Delete item'><i class='bi bi-trash3'></i></button>"
+              + "</form>";
+          } else if (flags.can_cancel && bookingItemActionUrls.cancel[lineType]) {
+            html += "<form method='post' action='" + bookingItemActionUrls.cancel[lineType] + "' class='d-inline' onsubmit=\"return confirm('Cancel this booking item? Trip type will become One-Way.');\">"
+              + "<input type='hidden' name='csrfmiddlewaretoken' value='" + escapeHtmlAttr(csrfToken) + "' />"
+              + "<button type='submit' class='btn btn-sm btn-outline-warning' title='Cancel item'><i class='bi bi-x-circle'></i></button>"
+              + "</form>";
+          } else {
+            html += "<span class='text-muted'>—</span>";
+          }
+          html += "</td>";
+          return html;
+        }
+
           var rowsHtml = "";
           currentBookingLineTypes.forEach(function (lineType, idx) {
             var lineNo = String(idx + 1);
@@ -1901,25 +2105,31 @@
             var routeLabelForLine = selectedRouteText || "-";
             var headerStatus = bookingStatus ? bookingStatus.value : "Draft";
             var statusLabelForLine = bookingLineStatusValues[lineType]
-              || (headerStatus === "Confirmed" ? "Planned" : "Draft");
+              || (headerStatus === "Confirmed" ? "Confirmed" : "Draft");
             if (tripType === "Round" && lineType === "Backload") {
               routeLabelForLine = reverseRouteText || selectedRouteText || "-";
             }
+            var routeCellHtml = buildBookingLineRouteCell(
+              lineType,
+              routeLabelForLine,
+              tripType === "Round" && lineType === "Backload" ? "reverse" : selectedRouteDirection,
+            );
             rowsHtml += "<tr>"
               + "<td>" + (idx + 1) + "</td>"
               + "<td>" + lineType.substring(0, 2).toUpperCase() + "-" + String(idx + 1).padStart(3, "0") + "</td>"
               + "<td>" + lineType + "</td>"
               + "<td><span class='status-badge status-active'>" + statusLabelForLine + "</span></td>"
-              + "<td>" + routeLabelForLine + "</td>"
-              + "<td><select class='form-select form-select-sm booking-line-truck-select' name='booking_line_truck_" + lineNo + "'>" + buildOptionsHtml(filteredTruckOptions(), "-Select truck-", truckValue) + "</select></td>"
-              + "<td><select class='form-select form-select-sm booking-line-driver-select' name='booking_line_driver_" + lineNo + "'>" + buildOptionsHtml(driverOptions, "-Select driver-", driverValue) + "</select></td>"
+              + "<td class='ops-col-route'>" + routeCellHtml + "</td>"
+              + "<td><select class='form-select booking-line-truck-select' name='booking_line_truck_" + lineNo + "'>" + buildOptionsHtml(filteredTruckOptions(), "-Select truck-", truckValue) + "</select></td>"
+              + "<td><select class='form-select booking-line-driver-select' name='booking_line_driver_" + lineNo + "'>" + buildOptionsHtml(driverOptions, "-Select driver-", driverValue) + "</select></td>"
               + "<td class='cod-col'><input type='text' inputmode='decimal' autocomplete='off' name='booking_line_cod_amount_" + lineNo + "' class='form-control form-control-sm booking-line-cod-input' placeholder='0.00' value='" + escapeHtmlAttr(codValue) + "' /></td>"
               + "<td><input type='number' min='0' name='booking_line_pod_doc_count_" + lineNo + "' class='form-control form-control-sm booking-line-pod-doc-input' value='" + escapeHtmlAttr(podValue) + "' /></td>"
+              + buildBookingLineActionsCell(lineType)
               + "</tr>";
           });
           tbody.innerHTML = rowsHtml;
           applyBookingLineValues(tbody, previousLineValues);
-          applyCodAmountDefaults(tbody, previousLineValues);
+          applyCodAmountDefaults(tbody, previousLineValues, { preservePosted: hasServerValidationErrors });
           setCodInputReadOnlyState();
           syncBookingForeignKeyFields();
         }
@@ -1934,21 +2144,41 @@
             selectedService = serviceSelect.value || "";
           }
           if (!selectedPriceList || !selectedService) {
-            sellPriceInput.value = "";
+            restorePostedSellPrice();
             return;
           }
           var selectedServiceOption = serviceSelect.options[serviceSelect.selectedIndex];
           var serviceType = selectedServiceOption ? (selectedServiceOption.getAttribute("data-service-type") || "") : "";
           var baseSell = selectedServiceOption ? (selectedServiceOption.getAttribute("data-base-sell-price") || "") : "";
+          var outboundBase = selectedServiceOption ? (selectedServiceOption.getAttribute("data-outbound-sell-price") || "") : "";
+          var inboundBase = selectedServiceOption ? (selectedServiceOption.getAttribute("data-inbound-sell-price") || "") : "";
           var resolved = "";
           if (serviceType === "Trip") {
-            // Trip header sell price is the service item base price (same as Price List "Sell Price").
-            resolved = baseSell || "";
+            var tripPrices = ((tripSellOverrides[selectedPriceList] || {})[selectedService]) || {};
+            var routeDirection = "forward";
+            if (routeSelect && routeSelect.selectedIndex > 0) {
+              var routeOpt = routeSelect.options[routeSelect.selectedIndex];
+              routeDirection = (routeOpt.getAttribute("data-direction") || "forward").trim();
+            }
+            if (tripType === "Round") {
+              resolved = tripPrices.sell || baseSell || "";
+            } else if (routeDirection === "reverse") {
+              resolved = tripPrices.inbound || inboundBase || baseSell || "";
+            } else {
+              resolved = tripPrices.outbound || outboundBase || baseSell || "";
+            }
           } else {
             resolved = ((serviceSellOverrides[selectedPriceList] || {})[selectedService]) || baseSell || "";
           }
+          if (!resolved && hasServerValidationErrors && savedSellPriceFromServer) {
+            resolved = savedSellPriceFromServer;
+          }
           sellPriceInput.value = resolved;
-          syncCodAmountsAfterSellPriceChange();
+          if (hasServerValidationErrors && hasPostedCodAmounts()) {
+            restorePostedCodAmounts();
+          } else {
+            syncCodAmountsAfterSellPriceChange();
+          }
         }
 
         function getSelectedServiceOption() {
@@ -2065,7 +2295,10 @@
             });
           }
           if (routeSelect) {
-            routeSelect.addEventListener("change", rebuildBookingLines);
+            routeSelect.addEventListener("change", function () {
+              rebuildBookingLines();
+              deriveSellPrice();
+            });
           }
           applyAddressAndCargoFilter();
           if (clientAccountSelect.value) {
@@ -2075,7 +2308,8 @@
           } else if (tripTypeSelect && tripTypeSelect.value) {
             rebuildBookingLines();
           }
-          if (bookingLinesTable) {
+          restorePostedBookingAmounts();
+          if (bookingLinesTable && !(hasServerValidationErrors && hasPostedCodAmounts())) {
             syncCodAmountFields();
           }
           var serverErrorsEl = document.getElementById("booking-form-errors-data");
@@ -2108,7 +2342,7 @@
               }
             }
             if (bookingStatusDisplay) {
-              bookingStatusDisplay.textContent = isConfirm ? "Active" : "Draft";
+              bookingStatusDisplay.textContent = isConfirm ? "Confirmed" : "Draft";
             }
             if (!validateBookingBeforeSubmit(isConfirm)) {
               event.preventDefault();
@@ -2118,11 +2352,13 @@
         document.addEventListener("change", function (event) {
           if (!event.target) return;
           if (event.target.matches(".booking-line-truck-select")) {
+            event.target.classList.remove("is-invalid");
             syncDriverFromTruckSelect(event.target);
             syncBookingForeignKeyFields();
             return;
           }
           if (event.target.matches(".booking-line-driver-select")) {
+            event.target.classList.remove("is-invalid");
             syncTruckFromDriverSelect(event.target);
             syncBookingForeignKeyFields();
             return;

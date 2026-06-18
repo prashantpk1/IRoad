@@ -288,7 +288,7 @@
                       readonly
                     />
                   </div>
-                  <span class="field-hint">Auto-generated (REC- prefix), immutable</span>
+                  
                 </div>
                 <div class="field">
                   <label for="recordDate" class="form-label"
@@ -334,10 +334,9 @@
                         class="shipment-doc-lookup-option"
                         data-booking-id="{{ booking.booking_id }}"
                         data-booking-no="{{ booking.booking_no }}"
-                        data-booking-item="{{ booking.booking_item }}"
                       >
                         <span class="shipment-doc-lookup-code">{{ booking.booking_no }}</span>
-                        <span class="shipment-doc-lookup-meta">{{ booking.booking_item|default:'No booking item' }}</span>
+                        <span class="shipment-doc-lookup-meta">{{ booking.booking_item_summary|default:'No booking item' }}</span>
                       </button>
                       {% empty %}
                       <div class="shipment-doc-lookup-empty">No shipment bookings available.</div>
@@ -345,7 +344,7 @@
                     </div>
                   </div>
                   {% if shipment_document_form_errors.booking_id %}<div class="invalid-feedback d-block">{{ shipment_document_form_errors.booking_id }}</div>{% endif %}
-                  <span class="field-hint">Must match the selected shipment’s booking</span>
+                  
                 </div>
               </div>
               <div class="fields-grid cols-3">
@@ -354,19 +353,28 @@
                     >Booking Item
                     <span class="required">*</span>
                   </label>
-                  <div class="input-icon-field">
-                    <i class="bi bi-search"></i>
-                    <input
-                      type="text"
-                      class="form-control has-icon"
-                      id="bookingItem"
-                      value="{{ shipment_document_form_data.booking_item|default:'' }}"
-                      placeholder="Filled from shipment line (read-only)"
-                      readonly
-                    />
-                  </div>
+                  <select
+                    class="form-select {% if shipment_document_form_errors.booking_item %}is-invalid{% endif %}"
+                    id="bookingItem"
+                    name="booking_item"
+                    required
+                  >
+                    <option value="" {% if not shipment_document_form_data.booking_item %}selected{% endif %} disabled>
+                      - Select booking item -
+                    </option>
+                    {% for item in shipment_document_booking_item_options %}
+                    <option
+                      value="{{ item.booking_item }}"
+                      data-booking-id="{{ item.booking_id }}"
+                      data-booking-no="{{ item.booking_no }}"
+                      {% if shipment_document_form_data.booking_id == item.booking_id and shipment_document_form_data.booking_item == item.booking_item %}selected{% elif not shipment_document_form_data.booking_id and shipment_document_form_data.booking_item == item.booking_item %}selected{% endif %}
+                    >
+                      {{ item.booking_item }}
+                    </option>
+                    {% endfor %}
+                  </select>
                   {% if shipment_document_form_errors.booking_item %}<div class="invalid-feedback d-block">{{ shipment_document_form_errors.booking_item }}</div>{% endif %}
-                  <span class="field-hint">Derived from shipment — not saved separately</span>
+                  
                 </div>
                 <div class="field">
                   <label for="shipmentRef" class="form-label"
@@ -390,7 +398,7 @@
                     {% endfor %}
                   </select>
                   {% if shipment_document_form_errors.shipment_id %}<div class="invalid-feedback d-block">{{ shipment_document_form_errors.shipment_id }}</div>{% endif %}
-                  <span class="field-hint">Required anchor — one document record per shipment + type</span>
+                  
                 </div>
                 <div class="field">
                   <label for="documentType" class="form-label"
@@ -413,7 +421,7 @@
                     <option value="Custom Dec." {% if shipment_document_form_data.document_type == 'Custom Dec.' %}selected{% endif %}>Custom Dec.</option>
                   </select>
                   {% if shipment_document_form_errors.document_type %}<div class="invalid-feedback d-block">{{ shipment_document_form_errors.document_type }}</div>{% endif %}
-                  <span class="field-hint">POD compliance follows Is Delivery Note?, not type alone</span>
+                  
                 </div>
               </div>
             </div>
@@ -439,7 +447,7 @@
                     placeholder="e.g. DN-1020"
                     required
                   />
-                  <span class="field-hint">Physical paper reference number</span>
+                  
                   {% if shipment_document_form_errors.document_ref_no %}<div class="invalid-feedback d-block">{{ shipment_document_form_errors.document_ref_no }}</div>{% endif %}
                 </div>
                 <div class="field">
@@ -464,7 +472,7 @@
                   <div class="setting-row" style="padding-top: 2rem">
                     <div class="setting-row-info">
                       <label class="form-label mb-0">Is Delivery Note?</label>
-                      <span class="field-hint d-block">If Yes, this document gates POD compliance and updates shipment POD doc count</span>
+                      
                     </div>
                     <label class="setting-toggle">
                       <input type="checkbox" id="isDeliveryNote" name="is_delivery_note" {% if shipment_document_form_data.is_delivery_note %}checked{% endif %} />
@@ -498,7 +506,7 @@
                   {% if shipment_document_form_errors.physical_location %}
                   <div class="invalid-feedback d-block">{{ shipment_document_form_errors.physical_location }}</div>
                   {% endif %}
-                  <span class="field-hint">Header custody location; changing this updates all page lines below.</span>
+                  
                 </div>
               </div>
             </div>
@@ -526,7 +534,7 @@
                     />
                   </div>
                   {% if shipment_document_form_errors.page_count %}<div class="invalid-feedback d-block">{{ shipment_document_form_errors.page_count }}</div>{% endif %}
-                  <span class="field-hint">From booking POD doc count on the shipment; matches page rows below</span>
+                  
                 </div>
                 <div class="field">
                   <label for="status" class="form-label">Status</label>
@@ -538,7 +546,7 @@
                     <option value="Rejected" {% if shipment_document_form_data.status == 'Rejected' %}selected{% endif %}>Rejected</option>
                   </select>
                   {% if shipment_document_form_errors.status %}<div class="invalid-feedback d-block">{{ shipment_document_form_errors.status }}</div>{% endif %}
-                  <span class="field-hint">Draft = mutable; Verified counts for DN compliance; Rejected requires notes</span>
+                  
                 </div>
               </div>
               <div class="fields-grid cols-1">
@@ -633,216 +641,229 @@
 
       {{ shipment_document_line_rows|json_script:"shipment-document-line-rows" }}
       {{ shipment_document_physical_location_options|json_script:"shipment-document-physical-locations" }}
-      <script>
-        (function () {
-          var shipmentSelect = document.getElementById("shipmentRef");
-          var bookingIdInput = document.getElementById("bookingId");
-          var bookingNoInput = document.getElementById("bookingNo");
-          var bookingNoMenu = document.getElementById("bookingNoOptions");
-          var bookingItemInput = document.getElementById("bookingItem");
-          var linkageSyncLock = false;
-          var suppressBookingInput = false;
-          var bookingLookupTimer = null;
-
-          function selectedOption(selectEl) {
-            if (!selectEl || selectEl.selectedIndex < 0) return null;
-            return selectEl.options[selectEl.selectedIndex];
-          }
-
-          function findBookingOption(bookingNo) {
-            var normalized = String(bookingNo || "").trim().toLowerCase();
-            if (!bookingNoMenu || !normalized) return null;
-            var options = bookingNoMenu.querySelectorAll("[data-booking-no]");
-            for (var i = 0; i < options.length; i += 1) {
-              if (String(options[i].getAttribute("data-booking-no") || "").trim().toLowerCase() === normalized) {
-                return options[i];
-              }
-            }
-            return null;
-          }
-
-          function hideBookingMenu() {
-            if (bookingNoMenu) bookingNoMenu.classList.remove("show");
-          }
-
-          function filterBookingMenu() {
-            if (!bookingNoMenu || !bookingNoInput) return;
-            var term = String(bookingNoInput.value || "").trim().toLowerCase();
-            var options = bookingNoMenu.querySelectorAll(".shipment-doc-lookup-option");
-            var visibleCount = 0;
-            Array.prototype.forEach.call(options, function (option) {
-              var bookingNo = String(option.getAttribute("data-booking-no") || "").toLowerCase();
-              var bookingItem = String(option.getAttribute("data-booking-item") || "").toLowerCase();
-              var isVisible = !term || bookingNo.indexOf(term) !== -1 || bookingItem.indexOf(term) !== -1;
-              option.hidden = !isVisible;
-              if (isVisible) visibleCount += 1;
-            });
-            bookingNoMenu.classList.toggle("show", visibleCount > 0);
-          }
-
-          function showAllShipments() {
-            if (!shipmentSelect) return;
-            Array.prototype.forEach.call(shipmentSelect.options, function (opt, index) {
-              if (index === 0) {
-                opt.hidden = false;
-                opt.disabled = false;
-                return;
-              }
-              opt.hidden = false;
-              opt.disabled = false;
-            });
-          }
-
-          function filterShipmentsForBooking(bookingNo) {
-            if (!shipmentSelect) return [];
-            var matched = [];
-            Array.prototype.forEach.call(shipmentSelect.options, function (opt, index) {
-              if (index === 0) {
-                opt.hidden = false;
-                opt.disabled = false;
-                return;
-              }
-              var isMatch = bookingNo && opt.getAttribute("data-booking-no") === bookingNo;
-              opt.hidden = !isMatch;
-              opt.disabled = !isMatch;
-              if (isMatch) matched.push(opt);
-            });
-            return matched;
-          }
-
-          function applyBookingLookup() {
-            if (linkageSyncLock) return;
-            linkageSyncLock = true;
-            try {
-              var typedBookingNo = bookingNoInput ? String(bookingNoInput.value || "").trim() : "";
-              var bookingOpt = findBookingOption(typedBookingNo);
-              var bookingNo = bookingOpt ? bookingOpt.getAttribute("data-booking-no") || "" : typedBookingNo;
-              var bookingItem = bookingOpt ? bookingOpt.getAttribute("data-booking-item") || "" : "";
-              if (bookingIdInput) {
-                bookingIdInput.value = bookingOpt ? bookingOpt.getAttribute("data-booking-id") || "" : "";
-              }
-              if (bookingItemInput) bookingItemInput.value = bookingItem;
-              if (!shipmentSelect) return;
-
-              var matched = filterShipmentsForBooking(bookingNo);
-              var selectedShipment = selectedOption(shipmentSelect);
-              var needsAutoSelect = (
-                !selectedShipment ||
-                !selectedShipment.value ||
-                selectedShipment.hidden ||
-                selectedShipment.disabled ||
-                selectedShipment.getAttribute("data-booking-no") !== bookingNo
-              );
-              var previousShipmentId = shipmentSelect.value || "";
-              if (needsAutoSelect) {
-                shipmentSelect.value = matched.length ? matched[0].value : "";
-                selectedShipment = selectedOption(shipmentSelect);
-              }
-              if (bookingItemInput && selectedShipment && selectedShipment.value) {
-                bookingItemInput.value = selectedShipment.getAttribute("data-booking-item") || bookingItem;
-              }
-              if (
-                shipmentSelect.value &&
-                shipmentSelect.value !== previousShipmentId &&
-                typeof window.syncShipmentDocumentPageCount === "function"
-              ) {
-                window.syncShipmentDocumentPageCount();
-              }
-            } finally {
-              linkageSyncLock = false;
-            }
-          }
-
-          function syncBookingFromShipment() {
-            if (linkageSyncLock) return;
-            linkageSyncLock = true;
-            try {
-              var shipmentOpt = selectedOption(shipmentSelect);
-              if (!shipmentOpt || !shipmentOpt.value) return;
-              var bookingNo = shipmentOpt.getAttribute("data-booking-no") || "";
-              if (bookingNoInput && bookingNoInput.value !== bookingNo) {
-                suppressBookingInput = true;
-                bookingNoInput.value = bookingNo;
-                suppressBookingInput = false;
-              }
-              if (bookingIdInput) {
-                bookingIdInput.value = shipmentOpt.getAttribute("data-booking-id") || "";
-              }
-              if (bookingItemInput) {
-                bookingItemInput.value = shipmentOpt.getAttribute("data-booking-item") || "";
-              }
-              filterShipmentsForBooking(bookingNo);
-            } finally {
-              linkageSyncLock = false;
-            }
-          }
-
-          if (bookingNoInput) {
-            bookingNoInput.addEventListener("input", function () {
-              if (suppressBookingInput) return;
-              filterBookingMenu();
-              if (bookingLookupTimer) window.clearTimeout(bookingLookupTimer);
-              bookingLookupTimer = window.setTimeout(applyBookingLookup, 200);
-            });
-            bookingNoInput.addEventListener("focus", filterBookingMenu);
-            bookingNoInput.addEventListener("change", function () {
-              applyBookingLookup();
-              hideBookingMenu();
-            });
-            if (bookingIdInput && bookingIdInput.value) {
-              applyBookingLookup();
-            } else if (shipmentSelect && shipmentSelect.value) {
-              syncBookingFromShipment();
-            } else {
-              showAllShipments();
-            }
-          } else {
-            showAllShipments();
-          }
-
-          if (bookingNoMenu && bookingNoInput) {
-            bookingNoMenu.addEventListener("mousedown", function (event) {
-              var option = event.target.closest(".shipment-doc-lookup-option");
-              if (!option) return;
-              event.preventDefault();
-              bookingNoInput.value = option.getAttribute("data-booking-no") || "";
-              if (bookingIdInput) {
-                bookingIdInput.value = option.getAttribute("data-booking-id") || "";
-              }
-              if (bookingItemInput) {
-                bookingItemInput.value = option.getAttribute("data-booking-item") || "";
-              }
-              applyBookingLookup();
-              hideBookingMenu();
-            });
-            document.addEventListener("mousedown", function (event) {
-              if (
-                bookingNoMenu.contains(event.target) ||
-                (bookingNoInput && bookingNoInput.contains(event.target))
-              ) {
-                return;
-              }
-              hideBookingMenu();
-            });
-          }
-
-          if (shipmentSelect) {
-            shipmentSelect.addEventListener("change", function () {
-              syncBookingFromShipment();
-              if (typeof window.syncShipmentDocumentPageCount === "function") {
-                window.syncShipmentDocumentPageCount();
-              }
-            });
-            if (shipmentSelect.value) {
-              syncBookingFromShipment();
-            }
-          }
-
-        })();
-      </script>
 {% endblock %}
 
 {% block extra_js %}
+{% load static %}
+<script src="{% static 'tenantdesign/Javascript/booking_linkage_cascade.js' %}?v=20260619-cascade"></script>
+<script>
+  (function () {
+    var linkage = window.IRoadBookingLinkage || {};
+    var shipmentSelect = document.getElementById("shipmentRef");
+    var bookingIdInput = document.getElementById("bookingId");
+    var bookingNoInput = document.getElementById("bookingNo");
+    var bookingNoMenu = document.getElementById("bookingNoOptions");
+    var bookingItemSelect = document.getElementById("bookingItem");
+    var linkageSyncLock = false;
+    var suppressBookingInput = false;
+    var bookingLookupTimer = null;
+
+    function getBookingId() {
+      return bookingIdInput ? String(bookingIdInput.value || "").trim() : "";
+    }
+
+    function getBookingNo() {
+      return bookingNoInput ? String(bookingNoInput.value || "").trim() : "";
+    }
+
+    function findBookingOption(bookingNo) {
+      var normalized = String(bookingNo || "").trim().toLowerCase();
+      if (!bookingNoMenu || !normalized) return null;
+      var options = bookingNoMenu.querySelectorAll("[data-booking-no]");
+      for (var i = 0; i < options.length; i += 1) {
+        if (String(options[i].getAttribute("data-booking-no") || "").trim().toLowerCase() === normalized) {
+          return options[i];
+        }
+      }
+      return null;
+    }
+
+    function hideBookingMenu() {
+      if (bookingNoMenu) bookingNoMenu.classList.remove("show");
+    }
+
+    function filterBookingMenu() {
+      if (!bookingNoMenu || !bookingNoInput) return;
+      var term = String(bookingNoInput.value || "").trim().toLowerCase();
+      var options = bookingNoMenu.querySelectorAll(".shipment-doc-lookup-option");
+      var visibleCount = 0;
+      Array.prototype.forEach.call(options, function (option) {
+        var bookingNo = String(option.getAttribute("data-booking-no") || "").toLowerCase();
+        var bookingMeta = String(option.querySelector(".shipment-doc-lookup-meta")?.textContent || "").toLowerCase();
+        var isVisible = !term || bookingNo.indexOf(term) !== -1 || bookingMeta.indexOf(term) !== -1;
+        option.hidden = !isVisible;
+        if (isVisible) visibleCount += 1;
+      });
+      bookingNoMenu.classList.toggle("show", visibleCount > 0);
+    }
+
+    function notifyShipmentChanged(previousShipmentId) {
+      if (
+        shipmentSelect &&
+        shipmentSelect.value &&
+        shipmentSelect.value !== previousShipmentId &&
+        typeof window.syncShipmentDocumentPageCount === "function"
+      ) {
+        window.syncShipmentDocumentPageCount();
+      }
+    }
+
+    function runCascade(options) {
+      if (!linkage.runLinkageCascade) return null;
+      var previousShipmentId = shipmentSelect ? shipmentSelect.value || "" : "";
+      var result = linkage.runLinkageCascade({
+        bookingId: options.bookingId != null ? options.bookingId : getBookingId(),
+        bookingNo: options.bookingNo != null ? options.bookingNo : getBookingNo(),
+        bookingItemSelect: bookingItemSelect,
+        shipmentSelect: shipmentSelect,
+        recordSelects: [],
+        preserveBookingItem: options.preserveBookingItem === true,
+        preserveShipment: options.preserveShipment === true,
+        autoSelectSingleShipment: options.autoSelectSingleShipment !== false,
+      });
+      notifyShipmentChanged(previousShipmentId);
+      return result;
+    }
+
+    function applyBookingLookup() {
+      if (linkageSyncLock) return;
+      linkageSyncLock = true;
+      try {
+        var typedBookingNo = getBookingNo();
+        var bookingOpt = findBookingOption(typedBookingNo);
+        var bookingNo = bookingOpt ? bookingOpt.getAttribute("data-booking-no") || "" : typedBookingNo;
+        if (bookingIdInput) {
+          bookingIdInput.value = bookingOpt ? bookingOpt.getAttribute("data-booking-id") || "" : "";
+        }
+        runCascade({
+          bookingId: getBookingId(),
+          bookingNo: bookingNo,
+          preserveBookingItem: false,
+          preserveShipment: false,
+        });
+      } finally {
+        linkageSyncLock = false;
+      }
+    }
+
+    function syncFromBookingItem() {
+      if (linkageSyncLock || !bookingItemSelect) return;
+      linkageSyncLock = true;
+      try {
+        var itemOption = linkage.selectedOption ? linkage.selectedOption(bookingItemSelect) : null;
+        if (itemOption && itemOption.value) {
+          var itemBookingNo = itemOption.getAttribute("data-booking-no") || "";
+          var itemBookingId = itemOption.getAttribute("data-booking-id") || "";
+          if (itemBookingNo && bookingNoInput) bookingNoInput.value = itemBookingNo;
+          if (itemBookingId && bookingIdInput) bookingIdInput.value = itemBookingId;
+        }
+        runCascade({
+          bookingId: getBookingId(),
+          bookingNo: getBookingNo(),
+          preserveBookingItem: true,
+          preserveShipment: false,
+        });
+      } finally {
+        linkageSyncLock = false;
+      }
+    }
+
+    function syncBookingFromShipment() {
+      if (linkageSyncLock) return;
+      linkageSyncLock = true;
+      try {
+        var shipmentOpt = linkage.selectedOption ? linkage.selectedOption(shipmentSelect) : null;
+        if (!shipmentOpt || !shipmentOpt.value) {
+          runCascade({ preserveBookingItem: true, preserveShipment: true });
+          return;
+        }
+        var bookingNo = shipmentOpt.getAttribute("data-booking-no") || "";
+        if (bookingNoInput && bookingNoInput.value !== bookingNo) {
+          suppressBookingInput = true;
+          bookingNoInput.value = bookingNo;
+          suppressBookingInput = false;
+        }
+        if (bookingIdInput) {
+          bookingIdInput.value = shipmentOpt.getAttribute("data-booking-id") || "";
+        }
+        var shipmentBookingItem = shipmentOpt.getAttribute("data-booking-item") || "";
+        if (bookingItemSelect && shipmentBookingItem) {
+          linkage.ensureSelectOption(bookingItemSelect, shipmentBookingItem, shipmentBookingItem, {
+            "data-booking-id": shipmentOpt.getAttribute("data-booking-id") || "",
+            "data-booking-no": bookingNo,
+          });
+          bookingItemSelect.value = shipmentBookingItem;
+        }
+        runCascade({
+          bookingId: getBookingId(),
+          bookingNo: getBookingNo(),
+          preserveBookingItem: true,
+          preserveShipment: true,
+        });
+      } finally {
+        linkageSyncLock = false;
+      }
+    }
+
+    if (bookingNoInput) {
+      bookingNoInput.addEventListener("input", function () {
+        if (suppressBookingInput) return;
+        filterBookingMenu();
+        if (bookingLookupTimer) window.clearTimeout(bookingLookupTimer);
+        bookingLookupTimer = window.setTimeout(applyBookingLookup, 200);
+      });
+      bookingNoInput.addEventListener("focus", filterBookingMenu);
+      bookingNoInput.addEventListener("change", function () {
+        applyBookingLookup();
+        hideBookingMenu();
+      });
+    }
+
+    if (bookingNoMenu && bookingNoInput) {
+      bookingNoMenu.addEventListener("mousedown", function (event) {
+        var option = event.target.closest(".shipment-doc-lookup-option");
+        if (!option) return;
+        event.preventDefault();
+        bookingNoInput.value = option.getAttribute("data-booking-no") || "";
+        if (bookingIdInput) {
+          bookingIdInput.value = option.getAttribute("data-booking-id") || "";
+        }
+        applyBookingLookup();
+        hideBookingMenu();
+      });
+      document.addEventListener("mousedown", function (event) {
+        if (
+          bookingNoMenu.contains(event.target) ||
+          (bookingNoInput && bookingNoInput.contains(event.target))
+        ) {
+          return;
+        }
+        hideBookingMenu();
+      });
+    }
+
+    if (bookingItemSelect) {
+      bookingItemSelect.addEventListener("change", syncFromBookingItem);
+    }
+
+    if (shipmentSelect) {
+      shipmentSelect.addEventListener("change", function () {
+        syncBookingFromShipment();
+        if (typeof window.syncShipmentDocumentPageCount === "function") {
+          window.syncShipmentDocumentPageCount();
+        }
+      });
+    }
+
+    if (getBookingId() || getBookingNo()) {
+      runCascade({ preserveBookingItem: true, preserveShipment: true });
+    } else if (shipmentSelect && shipmentSelect.value) {
+      syncBookingFromShipment();
+    } else {
+      runCascade({ preserveBookingItem: false, preserveShipment: false });
+    }
+  })();
+</script>
 <script>
   (function () {
     var form = document.getElementById("shipmentDocumentForm");

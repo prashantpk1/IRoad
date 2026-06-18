@@ -25,7 +25,7 @@ def _booking(**kwargs):
         trip_type='Round',
         order_type='Credit',
         pod_type=TenantShipment.PodType.HARD,
-        pod_status=TenantShipment.PodStatus.PENDING,
+        pod_status=TenantShipment.PodStatus.NOT_COMPLETED,
         booking_line_pod_doc_count=2,
         booking_line_backload_pod_doc_count=2,
         booking_line_cod_amount=Decimal('200'),

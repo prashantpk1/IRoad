@@ -56,9 +56,9 @@
           <span>Back to List</span>
         </a>
         {% if contract_file_url %}
-        <a href="{{ contract_file_url }}" class="eal-btn eal-btn-outline" target="_blank" rel="noopener">
-          <i class="bi bi-box-arrow-up-right"></i>
-          <span>Open File</span>
+        <a href="{{ contract_file_url }}" class="eal-btn eal-btn-outline" data-attachment-preview data-file-url="{{ contract_file_url }}" data-file-name="{{ contract.contract_file_name|default:'' }}">
+          <i class="bi bi-eye"></i>
+          <span>Preview file</span>
         </a>
         {% endif %}
         <a href="{{ edit_contract_url }}" class="eal-btn eal-btn-primary">

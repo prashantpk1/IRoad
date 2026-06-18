@@ -38,8 +38,7 @@ def reconcile_hard_pod_row(
     hard_pod_log = bool(log_evidence.get('hard_pod_log'))
     pod_status = (getattr(shipment, 'pod_status', None) or '').strip()
     portal_complete = pod_status in {
-        TenantShipment.PodStatus.COMPLIANT,
-        TenantShipment.PodStatus.HARD_COPY_RECEIVED,
+        TenantShipment.PodStatus.COMPLETED,
     }
     portal_location = (portal_pod.get('physical_location') or '').strip()
 

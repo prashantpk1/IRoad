@@ -497,21 +497,21 @@
                                 Authentication
                             </h3>
                             <div class="fields-grid cols-2">
-                                <div class="field">
-                                    <label for="password" class="form-label">Password
-                                        <span class="required">*</span>
+                                <div class="field" id="password">
+                                    <label for="passwordInput" class="form-label">Password
+                                        {% if not is_edit_mode %}<span class="required">*</span>{% endif %}
                                     </label>
                                     <div class="d-flex align-items-stretch gap-2">
                                         <div class="flex-grow-1 password-input-wrapper">
                                             <i class="bi bi-lock password-lock-inside"></i>
-                                            <input type="password" class="form-control {% if form_errors.password %}is-invalid{% endif %}" id="password" name="password" placeholder="••••••••" autocomplete="new-password" {% if is_edit_mode %}disabled{% else %}required{% endif %}/>
+                                            <input type="password" class="form-control {% if form_errors.password %}is-invalid{% endif %}" id="passwordInput" name="password" placeholder="{% if is_edit_mode %}Enter new password (optional){% else %}••••••••{% endif %}" autocomplete="new-password" {% if is_effective_readonly %}disabled{% elif not is_edit_mode %}required{% endif %}/>
                                             <button
                                               type="button"
                                               class="password-toggle-inside"
                                               id="togglePasswordBtn"
                                               title="Show password"
                                               aria-label="Show password"
-                                              {% if is_edit_mode %}disabled{% endif %}
+                                              {% if is_effective_readonly %}disabled{% endif %}
                                             >
                                               <i class="bi bi-eye"></i>
                                             </button>
@@ -521,13 +521,13 @@
                                           class="btn btn-outline-secondary"
                                           id="generatePasswordBtn"
                                           title="Generate random password"
-                                          {% if is_edit_mode %}disabled{% endif %}
+                                          {% if is_effective_readonly %}disabled{% endif %}
                                         >
                                           <i class="bi bi-shuffle me-1"></i>Generate
                                         </button>
                                     </div>
                                     {% if form_errors.password %}<div class="invalid-feedback d-block">{{ form_errors.password }}</div>{% endif %}
-                                    <span class="field-hint">{% if is_edit_mode %}Password can only be set when creating a new user.{% else %}Min 8 chars, number &amp; special char. Temporary password expires in 24 hours.{% endif %}</span>
+                                    <span class="field-hint">{% if is_edit_mode %}Leave blank to keep the current password. Min 8 chars when changing.{% else %}Min 8 chars, number &amp; special char. Temporary password expires in 24 hours.{% endif %}</span>
                                 </div>
                                 <div class="field">
                                     <label class="form-label d-block mb-2">Account Status</label>
@@ -634,7 +634,7 @@
     roleCheckboxes.forEach((cb) => cb.addEventListener("change", updateSelectedRoles));
     updateSelectedRoles();
 
-    const passwordInput = document.getElementById("password");
+    const passwordInput = document.getElementById("passwordInput");
     const generateBtn = document.getElementById("generatePasswordBtn");
     const togglePasswordBtn = document.getElementById("togglePasswordBtn");
     if (!passwordInput || !generateBtn || !togglePasswordBtn) return;
@@ -674,6 +674,11 @@
       passwordInput.dispatchEvent(new Event("input", { bubbles: true }));
       passwordInput.dispatchEvent(new Event("change", { bubbles: true }));
     });
+
+    if (window.location.hash === "#password" && passwordInput) {
+      passwordInput.scrollIntoView({ behavior: "smooth", block: "center" });
+      passwordInput.focus();
+    }
   });
 </script>
 {% endif %}

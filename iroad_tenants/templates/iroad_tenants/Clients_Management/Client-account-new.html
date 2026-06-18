@@ -73,7 +73,7 @@
                     value="{{ form_data.account_no|default:'' }}"
                     readonly
                   />
-                  <span class="field-hint">Auto-number, unique per tenant</span>
+                  
                 </div>
                 <div class="field">
                   <label for="clientType" class="form-label"
@@ -103,7 +103,7 @@
                     value="{{ form_data.created_at|default:'' }}"
                     readonly
                   />
-                  <span class="field-hint">Set on save</span>
+                  
                 </div>
                 <div class="field client-account-individual-section" id="clientAccountIndividualSection">
                   <label for="nationalId" class="form-label">
@@ -184,13 +184,16 @@
                   </label>
                   <input
                     type="text"
-                    class="form-control {% if form_errors.name_english %}is-invalid{% endif %}"
+                    class="form-control eal-english {% if form_errors.name_english %}is-invalid{% endif %}"
                     id="nameEnglish"
                     name="name_english"
                     placeholder="Enter name in English"
                     value="{{ form_data.name_english|default:'' }}"
+                    lang="en"
+                    data-english-only="1"
                     required
                   />
+                  <span class="field-hint">English characters only</span>
                   {% if form_errors.name_english %}<div class="invalid-feedback d-block">{{ form_errors.name_english }}</div>{% endif %}
                 </div>
                 <div class="field">
@@ -228,7 +231,7 @@
                     {% endfor %}
                   </select>
                   {% if form_errors.preferred_currency %}<div class="invalid-feedback d-block">{{ form_errors.preferred_currency }}</div>{% endif %}
-                  <span class="field-hint">From Currency Master</span>
+                  
                 </div>
               </div>
             </div>
@@ -343,7 +346,7 @@
                     <option value="OM" {% if form_data.country == 'OM' %}selected{% endif %}>Oman</option>
                   </select>
                   {% if form_errors.country %}<div class="invalid-feedback d-block">{{ form_errors.country }}</div>{% endif %}
-                  <span class="field-hint">From Country Master</span>
+                  
                 </div>
               </div>
             </div>
@@ -379,13 +382,16 @@
                   >
                   <input
                     type="text"
-                    class="form-control {% if form_errors.commercial_registration_no %}is-invalid{% endif %}"
+                    class="form-control eal-digits {% if form_errors.commercial_registration_no %}is-invalid{% endif %}"
                     id="commercialRegistrationNo"
                     name="commercial_registration_no"
                     placeholder="Enter CR number"
                     value="{{ form_data.commercial_registration_no|default:'' }}"
+                    inputmode="numeric"
+                    data-digits-only="1"
                     {% if form_data.client_type == 'Business' %}required{% endif %}
                   />
+                  {# <span class="field-hint">Numbers only</span> #}
                   {% if form_errors.commercial_registration_no %}<div class="invalid-feedback d-block">{{ form_errors.commercial_registration_no }}</div>{% endif %}
                 </div>
                 <div class="field">
@@ -394,13 +400,16 @@
                   >
                   <input
                     type="text"
-                    class="form-control {% if form_errors.tax_registration_no %}is-invalid{% endif %}"
+                    class="form-control eal-digits {% if form_errors.tax_registration_no %}is-invalid{% endif %}"
                     id="taxRegistrationNo"
                     name="tax_registration_no"
                     placeholder="Enter tax registration number"
                     value="{{ form_data.tax_registration_no|default:'' }}"
+                    inputmode="numeric"
+                    data-digits-only="1"
                     {% if form_data.client_type == 'Business' %}required{% endif %}
                   />
+                  {# <span class="field-hint">Numbers only</span> #}
                   {% if form_errors.tax_registration_no %}<div class="invalid-feedback d-block">{{ form_errors.tax_registration_no }}</div>{% endif %}
                 </div>
               </div>

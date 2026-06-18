@@ -206,7 +206,7 @@
               <span class="cd-field-label">Plate Image</span>
               <div class="cd-field-value mt-2">
                 {% if truck.plate_image %}
-                <a href="{{ truck.plate_image.url }}" target="_blank" rel="noopener" class="tm-media-link">
+                <a href="{{ truck.plate_image.url }}" class="tm-media-link" data-attachment-preview data-file-url="{{ truck.plate_image.url }}" data-file-name="{{ truck.plate_image.name|default:'Plate image' }}">
                   <img src="{{ truck.plate_image.url }}" alt="Plate image" class="tm-media-thumb" />
                 </a>
                 {% else %}
@@ -220,7 +220,7 @@
               <span class="cd-field-label">Vehicle Registration Image</span>
               <div class="cd-field-value mt-2">
                 {% if truck.vehicle_registration_image %}
-                <a href="{{ truck.vehicle_registration_image.url }}" target="_blank" rel="noopener" class="tm-media-link">
+                <a href="{{ truck.vehicle_registration_image.url }}" class="tm-media-link" data-attachment-preview data-file-url="{{ truck.vehicle_registration_image.url }}" data-file-name="{{ truck.vehicle_registration_image.name|default:'Vehicle registration' }}">
                   <img src="{{ truck.vehicle_registration_image.url }}" alt="Vehicle registration" class="tm-media-thumb" />
                 </a>
                 {% else %}
@@ -251,7 +251,7 @@
               <div class="cd-field-value mt-2 d-flex flex-wrap gap-3">
                 {% if truck_images %}
                   {% for img in truck_images %}
-                  <a href="{{ img.image.url }}" target="_blank" rel="noopener" class="tm-media-link">
+                  <a href="{{ img.image.url }}" class="tm-media-link" data-attachment-preview data-file-url="{{ img.image.url }}" data-file-name="{{ img.image.name|default:'Truck image' }}">
                     <img src="{{ img.image.url }}" alt="Truck image" class="tm-media-thumb tm-media-thumb--truck" />
                   </a>
                   {% endfor %}
@@ -351,7 +351,7 @@
                   </td>
                   <td>
                     {% if row.has_file %}
-                    {% include 'partials/attachment_preview_link.html' with file_url=row.file_url file_name=row.file_name label=row.file_name icon_class=row.file_icon_class link_class="tm-doc-file" %}
+                    {% include 'partials/attachment_preview_link.html' with file_url=row.file_url file_name=row.file_name label=row.file_name icon_class=row.file_icon_class link_class="tm-doc-file" preview_title=row.file_name %}
                     {% else %}
                     <span class="text-muted">—</span>
                     {% endif %}
@@ -361,19 +361,8 @@
                   </td>
                   <td class="text-end">
                     <div class="eal-actions-cell justify-content-end pt-0 pb-0 w-100">
-                      {% if row.has_file %}
-                      <a class="eal-row-btn" href="{{ a.attachment_file.url }}" target="_blank" rel="noopener" download title="Download">
-                        <i class="bi bi-download"></i>
-                      </a>
-                      {% endif %}
-                      <button
-                        type="button"
-                        class="eal-row-btn tm-doc-delete-btn tm-detail-doc-delete"
-                        title="Delete"
-                        data-delete-url="{% url 'iroad_tenants:truck_attachment_delete' truck.truck_id a.attachment_id %}"
-                      >
-                        <i class="bi bi-trash"></i>
-                      </button>
+                      <a href="{% url 'iroad_tenants:truck_attachment_detail' truck_id=truck.truck_id attachment_id=a.attachment_id %}" class="eal-row-btn" title="View" aria-label="View"><i class="bi bi-eye"></i></a>
+                      <a href="{% url 'iroad_tenants:truck_attachment_edit' truck_id=truck.truck_id attachment_id=a.attachment_id %}?return_to=details&amp;tab=documents" class="eal-row-btn" title="Edit" aria-label="Edit"><i class="bi bi-pencil"></i></a>
                     </div>
                   </td>
                 </tr>
@@ -425,9 +414,10 @@
                     {% endif %}
                   </td>
                   <td class="text-end">
-                    <a class="btn btn-sm btn-outline-secondary" href="{% url 'iroad_tenants:driver_master_detail' row.driver.driver_id %}" title="View Driver">
-                      <i class="bi bi-eye"></i>
-                    </a>
+                    <div class="eal-actions-cell justify-content-end pt-0 pb-0 w-100">
+                      <a href="{% url 'iroad_tenants:driver_master_detail' row.driver.driver_id %}" class="eal-row-btn" title="View" aria-label="View"><i class="bi bi-eye"></i></a>
+                      <a href="{% url 'iroad_tenants:driver_master_edit' row.driver.driver_id %}?return_to=details" class="eal-row-btn" title="Edit" aria-label="Edit"><i class="bi bi-pencil"></i></a>
+                    </div>
                   </td>
                 </tr>
                 {% endfor %}
@@ -491,7 +481,8 @@
                   </td>
                   <td class="text-end">
                     <div class="eal-actions-cell justify-content-end pt-0 pb-0 w-100">
-                      <a class="eal-row-btn" href="{% url 'iroad_tenants:tenant_operation_shipment_list' %}" title="Open shipment list"><i class="bi bi-eye"></i></a>
+                      <a href="{% url 'iroad_tenants:tenant_operation_shipment_detail' s.shipment_id %}" class="eal-row-btn" title="View" aria-label="View"><i class="bi bi-eye"></i></a>
+                      <a href="{% url 'iroad_tenants:tenant_operation_shipment_edit' s.shipment_id %}" class="eal-row-btn" title="Edit" aria-label="Edit"><i class="bi bi-pencil"></i></a>
                     </div>
                   </td>
                 </tr>
@@ -559,7 +550,8 @@
                   </td>
                   <td class="text-end">
                     <div class="eal-actions-cell justify-content-end pt-0 pb-0 w-100">
-                      <a class="eal-row-btn" href="{% url 'iroad_tenants:tenant_operation_truck_movement_log_detail' m.movement_id %}" title="View movement"><i class="bi bi-eye"></i></a>
+                      <a href="{% url 'iroad_tenants:tenant_operation_truck_movement_log_detail' m.movement_id %}" class="eal-row-btn" title="View" aria-label="View"><i class="bi bi-eye"></i></a>
+                      <a href="{% url 'iroad_tenants:tenant_operation_truck_movement_log_edit' m.movement_id %}" class="eal-row-btn" title="Edit" aria-label="Edit"><i class="bi bi-pencil"></i></a>
                     </div>
                   </td>
                 </tr>
@@ -842,6 +834,8 @@
   }
   .tm-doc-table-grid {
     min-width: 960px;
+    table-layout: fixed;
+    width: 100%;
   }
   .tm-doc-table .eal-table thead th {
     font-size: 11px;
@@ -872,12 +866,16 @@
   }
   .tm-doc-table .eal-table th:nth-child(6),
   .tm-doc-table .eal-table td:nth-child(6) {
-    min-width: 150px;
+    width: 18%;
+    min-width: 140px;
     max-width: 200px;
+    overflow: hidden;
   }
   .tm-doc-table .eal-table th:nth-child(7),
   .tm-doc-table .eal-table td:nth-child(7) {
-    min-width: 90px;
+    width: 96px;
+    min-width: 96px;
+    white-space: nowrap;
   }
   .tm-doc-table .eal-table th:last-child,
   .tm-doc-table .eal-table td:last-child {
@@ -907,14 +905,20 @@
     display: inline-flex;
     align-items: center;
     gap: 4px;
-    max-width: 180px;
+    width: 100%;
+    max-width: 100%;
     min-width: 0;
   }
+  .tm-doc-file > i {
+    flex-shrink: 0;
+  }
+  .tm-doc-file .iroad-attachment-preview-label,
   .tm-doc-file-name {
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
     min-width: 0;
+    flex: 1 1 auto;
   }
   .tm-doc-expiry { font-weight: 700; }
   .tm-doc-expiry--danger { color: #ef4444; }

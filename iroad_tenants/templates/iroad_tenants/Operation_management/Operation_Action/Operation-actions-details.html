@@ -151,15 +151,15 @@
               <div class="fields-grid cols-3" style="margin-top: 20px">
                 <div class="field">
                   <label class="form-label">Booking Status Impact</label>
-                  <p class="detail-view-value">{{ operation_action.booking_status_impact|default:'-' }}</p>
+                  <p class="detail-view-value">{{ operation_action.booking_status_impact|default:operation_action_status_impact_do_nothing_label|default:"Do Nothing" }}</p>
                 </div>
                 <div class="field">
                   <label class="form-label">Shipment Status Impact</label>
-                  <p class="detail-view-value">{{ operation_action.shipment_status_impact|default:'-' }}</p>
+                  <p class="detail-view-value">{{ operation_action.shipment_status_impact|default:operation_action_status_impact_do_nothing_label|default:"Do Nothing" }}</p>
                 </div>
                 <div class="field">
                   <label class="form-label">Movement Status Impact</label>
-                  <p class="detail-view-value">{{ operation_action.movement_status_impact|default:'-' }}</p>
+                  <p class="detail-view-value">{{ operation_action.movement_status_impact|default:operation_action_status_impact_do_nothing_label|default:"Do Nothing" }}</p>
                 </div>
               </div>
             </div>

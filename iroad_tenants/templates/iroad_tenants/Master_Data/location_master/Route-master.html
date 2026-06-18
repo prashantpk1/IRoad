@@ -69,16 +69,12 @@
                 <div class="field">
                   <label for="routeCode" class="form-label">{% translate "Route Code" %}</label>
                   <input type="text" class="form-control" id="routeCode" value="{{ preview_route_code|default:'' }}" readonly />
-                  <span class="field-hint">{% translate "Unique code used to identify this route." %}</span>
                 </div>
 
                 <div class="field">
                   <label for="routeType" class="form-label">Route Type</label>
                   {{ form.route_type }}
                   {% if form.route_type.errors %}<div class="text-danger small">{{ form.route_type.errors }}</div>{% endif %}
-                  <span class="field-hint"
-                    >Category that best describes this route.</span
-                  >
                 </div>
               </div>
 
@@ -89,7 +85,6 @@
                   >
                   {{ form.origin_point }}
                   {% if form.origin_point.errors %}<div class="text-danger small">{{ form.origin_point.errors }}</div>{% endif %}
-                  <span class="field-hint">Starting point of this route.</span>
                 </div>
 
                 <div class="field">
@@ -98,16 +93,12 @@
                   >
                   {{ form.destination_point }}
                   {% if form.destination_point.errors %}<div class="text-danger small">{{ form.destination_point.errors }}</div>{% endif %}
-                  <span class="field-hint">Ending point of this route.</span>
                 </div>
 
                 <div class="field">
                   <label for="status" class="form-label">Status</label>
                   {{ form.status }}
                   {% if form.status.errors %}<div class="text-danger small">{{ form.status.errors }}</div>{% endif %}
-                  <span class="field-hint"
-                    >Controls whether this route is available for booking.</span
-                  >
                 </div>
               </div>
             </div>
@@ -165,9 +156,6 @@
                   <label class="form-label" for="hasCustomsDerived">{% translate "Has Customs" %}</label>
                   <p class="field-hint">
                     {% translate "When enabled, origin and destination are in the same country." %}
-                  </p>
-                  <p class="field-hint small text-muted mb-0">
-                    {% translate "Derived automatically from origin and destination countries (read-only)." %}
                   </p>
                 </div>
                 <label class="setting-toggle">

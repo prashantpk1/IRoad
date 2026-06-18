@@ -136,7 +136,7 @@
       <div class="field-group">
         <h3 class="field-group-title"><i class="bi bi-layout-text-sidebar-reverse"></i> Header Section</h3>
         <div class="fields-grid cols-3">
-          <div class="field"><label class="form-label">Report No</label>{{ report_form.report_no }}<span class="field-hint">Auto-generated, read-only</span></div>
+          <div class="field"><label class="form-label">Report No</label>{{ report_form.report_no }}</div>
           <div class="field"><label class="form-label">Report Date <span class="required">*</span></label>{{ report_form.report_date }}</div>
           <div class="field">
             <label class="form-label">Report Update Date (date-time)</label>
@@ -158,7 +158,7 @@
             {{ report_form.client }}
             {% endif %}
           </div>
-          <div class="field"><label class="form-label">Currency</label>{{ report_form.currency }}<span class="field-hint">Auto fill use SAR</span></div>
+          <div class="field"><label class="form-label">Currency</label>{{ report_form.currency }}</div>
         </div>
         <div class="fields-grid cols-2">
           <div class="field"><label class="form-label">Freight Total</label>{{ report_form.total_freight_amount }}</div>
@@ -558,7 +558,7 @@
     var podNode = document.getElementById("sir-pod-status-options");
     podStatusOptions = podNode ? JSON.parse(podNode.textContent || "[]") : [];
   } catch (e) {
-    podStatusOptions = ["Pending", "Hard Copy Received", "Compliant", "Not Compliant"];
+    podStatusOptions = ["Completed", "Not Completed"];
   }
 
   function safeText(v) { return (v === null || v === undefined || v === "") ? "—" : String(v); }

@@ -556,9 +556,9 @@
 
                 <span>{{ attachment.attachment_file.name|slice:"20:" }}</span>
 
-                <a href="{{ attachment.attachment_file.url }}" target="_blank" class="btn btn-sm btn-outline-secondary">
+                <a href="{{ attachment.attachment_file.url }}" class="btn btn-sm btn-outline-secondary" data-attachment-preview data-file-url="{{ attachment.attachment_file.url }}" data-file-name="{{ attachment.attachment_file.name|default:'' }}">
 
-                  <i class="bi bi-download"></i> View Current
+                  <i class="bi bi-eye"></i> Preview current
 
                 </a>
 

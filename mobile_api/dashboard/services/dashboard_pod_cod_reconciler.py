@@ -61,8 +61,7 @@ def _detect_compliance_drift(
     if evidence['pod_uploaded'] and column_flags.get('pod_pending'):
         reasons.append('pod_uploaded_log_but_column_pending')
     if pod_status in {
-        TenantShipment.PodStatus.COMPLIANT,
-        TenantShipment.PodStatus.HARD_COPY_RECEIVED,
+        TenantShipment.PodStatus.COMPLETED,
     } and not evidence['pod_uploaded']:
         reasons.append('pod_compliant_column_without_upload_log')
 

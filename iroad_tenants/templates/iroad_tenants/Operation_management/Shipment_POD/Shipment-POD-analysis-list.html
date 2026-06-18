@@ -175,7 +175,7 @@
                 <td>{{ row.page_count }}</td>
                 <td>{{ row.user_label }}</td>
                 <td><span class="status-badge in-transit">{{ row.pod_type|title }} Copy</span></td>
-                <td><span class="status-badge {% if row.pod_status == 'Compliant' %}active{% else %}pending{% endif %}">{{ row.pod_status }}</span></td>
+                <td><span class="status-badge {% if row.pod_status == 'Completed' %}active{% else %}pending{% endif %}">{{ row.pod_status }}</span></td>
                 <td>
                   <div class="dropdown eal-actions-cell">
                     <button class="eal-row-btn" type="button" data-bs-toggle="dropdown" aria-expanded="false" title="Actions">

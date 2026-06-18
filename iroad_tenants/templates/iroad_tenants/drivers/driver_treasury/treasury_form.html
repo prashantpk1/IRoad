@@ -58,17 +58,15 @@
           <input type="text" class="form-control" value="{{ treasury.treasury_code }}" readonly>
           {% else %}
           <input type="text" class="form-control" value="{{ code_preview }}" readonly placeholder="Auto-number">
-          <small class="text-muted">Preview from Auto Number Configuration (no sequence consumption).</small>
           {% endif %}
         </div>
         <div class="field">
           <label class="form-label" for="{{ form.driver.id_for_label }}">Driver <span class="required">*</span></label>
           {{ form.driver }}
           {% if form.driver.errors %}<div class="text-danger small">{{ form.driver.errors }}</div>{% endif %}
-          <small class="text-muted">Only Active drivers are shown.</small>
         </div>
         <div class="field">
-          <label class="form-label" for="{{ form.status.id_for_label }}">Status (list) <span class="required">*</span></label>
+          <label class="form-label" for="{{ form.status.id_for_label }}">Status <span class="required">*</span></label>
           {{ form.status }}
           {% if form.status.errors %}<div class="text-danger small">{{ form.status.errors }}</div>{% endif %}
         </div>

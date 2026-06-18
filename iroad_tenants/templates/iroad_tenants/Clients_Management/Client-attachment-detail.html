@@ -71,9 +71,9 @@
           <span>Back</span>
         </a>
         {% if attachment_file_url %}
-        <a href="{{ attachment_file_url }}" class="eal-btn eal-btn-outline" target="_blank" rel="noopener">
-          <i class="bi bi-box-arrow-up-right"></i>
-          <span>Open file</span>
+        <a href="{{ attachment_file_url }}" class="eal-btn eal-btn-outline" data-attachment-preview data-file-url="{{ attachment_file_url }}" data-file-name="{{ attachment.file_name|default:attachment.attachment_file_title|default:'' }}">
+          <i class="bi bi-eye"></i>
+          <span>Preview file</span>
         </a>
         {% endif %}
         <a href="{{ edit_attachment_url }}" class="eal-btn eal-btn-primary">

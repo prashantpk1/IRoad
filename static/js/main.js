@@ -12,6 +12,8 @@ document.addEventListener("DOMContentLoaded", function () {
       initTimeValidation,
       initFormValidation,
       initArabicTextInputs,
+      initEnglishTextInputs,
+      initDigitsOnlyInputs,
       initConfirmForms,
       initUserProfile,
       initNotificationPanel,
@@ -493,6 +495,118 @@ function initArabicTextInputs(root) {
   }
   var scope = root && root.querySelectorAll ? root : document;
   scope.querySelectorAll(ARABIC_TEXT_INPUT_SELECTOR).forEach(bindArabicTextInput);
+}
+
+/* ============================================
+   English-only text inputs
+   ============================================ */
+var ENGLISH_TEXT_INPUT_SELECTOR =
+  'input.eal-english, textarea.eal-english, input[data-english-only], textarea[data-english-only]';
+
+var ENGLISH_TEXT_DISALLOWED_RE = /[^A-Za-z\s\-'.]/g;
+
+function sanitizeEnglishTextInput(value) {
+  return String(value || "").replace(ENGLISH_TEXT_DISALLOWED_RE, "");
+}
+
+function bindEnglishTextInput(input) {
+  if (!input || input.dataset.englishBound === "1") return;
+  input.dataset.englishBound = "1";
+  if (!input.getAttribute("lang")) input.setAttribute("lang", "en");
+
+  function applySanitizedValue(nextValue) {
+    if (input.value !== nextValue) {
+      input.value = nextValue;
+    }
+  }
+
+  input.addEventListener("input", function () {
+    applySanitizedValue(sanitizeEnglishTextInput(input.value));
+  });
+
+  input.addEventListener("paste", function (event) {
+    event.preventDefault();
+    var pasted = "";
+    if (event.clipboardData) {
+      pasted = event.clipboardData.getData("text");
+    } else if (window.clipboardData) {
+      pasted = window.clipboardData.getData("Text");
+    }
+    var start = input.selectionStart;
+    var end = input.selectionEnd;
+    if (start == null || end == null) {
+      applySanitizedValue(sanitizeEnglishTextInput((input.value || "") + pasted));
+      return;
+    }
+    var merged =
+      (input.value || "").slice(0, start) +
+      pasted +
+      (input.value || "").slice(end);
+    applySanitizedValue(sanitizeEnglishTextInput(merged));
+    var caret = start + sanitizeEnglishTextInput(pasted).length;
+    if (typeof input.setSelectionRange === "function") {
+      input.setSelectionRange(caret, caret);
+    }
+  });
+}
+
+function initEnglishTextInputs(root) {
+  var scope = root && root.querySelectorAll ? root : document;
+  scope.querySelectorAll(ENGLISH_TEXT_INPUT_SELECTOR).forEach(bindEnglishTextInput);
+}
+
+/* ============================================
+   Digits-only text inputs
+   ============================================ */
+var DIGITS_ONLY_INPUT_SELECTOR = 'input[data-digits-only], textarea[data-digits-only]';
+
+function sanitizeDigitsOnlyInput(value) {
+  return String(value || "").replace(/\D/g, "");
+}
+
+function bindDigitsOnlyInput(input) {
+  if (!input || input.dataset.digitsBound === "1") return;
+  input.dataset.digitsBound = "1";
+
+  function applySanitizedValue(nextValue) {
+    if (input.value !== nextValue) {
+      input.value = nextValue;
+    }
+  }
+
+  input.addEventListener("input", function () {
+    applySanitizedValue(sanitizeDigitsOnlyInput(input.value));
+  });
+
+  input.addEventListener("paste", function (event) {
+    event.preventDefault();
+    var pasted = "";
+    if (event.clipboardData) {
+      pasted = event.clipboardData.getData("text");
+    } else if (window.clipboardData) {
+      pasted = window.clipboardData.getData("Text");
+    }
+    var start = input.selectionStart;
+    var end = input.selectionEnd;
+    if (start == null || end == null) {
+      applySanitizedValue(sanitizeDigitsOnlyInput((input.value || "") + pasted));
+      return;
+    }
+    var merged =
+      (input.value || "").slice(0, start) +
+      pasted +
+      (input.value || "").slice(end);
+    applySanitizedValue(sanitizeDigitsOnlyInput(merged));
+    var caret = start + sanitizeDigitsOnlyInput(pasted).length;
+    if (typeof input.setSelectionRange === "function") {
+      input.setSelectionRange(caret, caret);
+    }
+  });
+}
+
+function initDigitsOnlyInputs(root) {
+  var scope = root && root.querySelectorAll ? root : document;
+  scope.querySelectorAll(DIGITS_ONLY_INPUT_SELECTOR).forEach(bindDigitsOnlyInput);
 }
 
 /* ============================================

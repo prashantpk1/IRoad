@@ -35,19 +35,23 @@
             <h1 class="page-title">{% if is_view %}Price List Details{% elif is_edit %}Edit Price List{% else %}Create Price List{% endif %}</h1>
             <!-- <p class="page-subtitle">{% if is_view %}View complete price list header and item lines.{% elif is_edit %}Update the price list header and item lines, then save.{% else %}Fill in the details below to register a new price list in the system.{% endif %}</p> -->
           </div>
-          {% if not is_view %}
           <div class="page-header-right">
             <a href="{% url 'iroad_tenants:tenant_price_list_master_list' %}" class="btn btn-outline-secondary">
               <i class="bi bi-arrow-left"></i> Back
             </a>
+            {% if is_view %}
+            <a href="{% url 'iroad_tenants:tenant_price_list_master_edit' detail_price_list_id %}" class="btn btn-primary ms-2">
+              <i class="bi bi-pencil"></i> Edit Price List
+            </a>
+            {% endif %}
           </div>
-          {% endif %}
         </div>
       </div>
 
       <form id="priceListForm" method="post" action="{% if is_view %}#{% elif is_edit %}{% url 'iroad_tenants:tenant_price_list_master_edit' edit_price_list_id %}{% else %}{% url 'iroad_tenants:tenant_price_list_master_create' %}{% endif %}">
         {% csrf_token %}
         <input type="hidden" id="linePayload" name="line_payload" value="{{ form_data.line_payload|default:''|escape }}" />
+        <script type="application/json" id="priceListLinePayloadJson">{{ form_data.line_payload|default:"[]"|safe }}</script>
         <div class="form-card" data-section="1">
           <div class="form-card-header">
             <div class="form-card-icon blue"><i class="bi bi-info-circle"></i></div>
@@ -65,17 +69,18 @@
                     <i class="bi bi-hash"></i>
                     <input type="text" class="form-control has-icon" id="priceListCode" value="{{ preview_price_list_code|default:'' }}" readonly />
                   </div>
-                  <span class="field-hint">Unique price list identifier</span>
                 </div>
                 <div class="field">
                   <label for="priceListNameEn" class="form-label">Price List Name (English) <span class="required">*</span></label>
-                  <input type="text" class="form-control" id="priceListNameEn" name="price_list_name" value="{{ form_data.price_list_name|default:'' }}" placeholder="Enter English name" {% if is_view %}readonly{% endif %} />
+                  <input type="text" class="form-control eal-english" id="priceListNameEn" name="price_list_name" value="{{ form_data.price_list_name|default:'' }}" placeholder="Enter English name" lang="en" data-english-only="1" {% if is_view %}readonly{% endif %} />
                   {% if field_errors.price_list_name %}<span class="text-danger small">{{ field_errors.price_list_name }}</span>{% endif %}
-                  <span class="field-hint">Shown in lists and reports</span>
+                  <span class="field-hint">English characters only</span>
                 </div>
                 <div class="field">
                   <label for="priceListNameAr" class="form-label">Price List Name (Arabic)</label>
-                  <input type="text" class="form-control eal-arabic" id="priceListNameAr" name="price_list_name_ar" placeholder="الاسم العربي" dir="rtl" lang="ar" data-arabic-only="1" {% if is_view %}readonly{% endif %} />
+                  <input type="text" class="form-control eal-arabic" id="priceListNameAr" name="price_list_name_ar" placeholder="الاسم العربي" dir="rtl" lang="ar" data-arabic-only="1" value="{{ form_data.price_list_name_ar|default:'' }}" {% if is_view %}readonly{% endif %} />
+                  {% if field_errors.price_list_name_ar %}<span class="text-danger small">{{ field_errors.price_list_name_ar }}</span>{% endif %}
+                  <span class="field-hint">Arabic characters only</span>
                 </div>
               </div>
             </div>
@@ -94,7 +99,6 @@
                     {% endfor %}
                   </select>
                   {% if field_errors.client_account_id %}<span class="text-danger small">{{ field_errors.client_account_id }}</span>{% endif %}
-                  <span class="field-hint">Client this price list applies to.</span>
                 </div>
                 {% if is_edit or is_view %}
                 <div class="field">
@@ -215,30 +219,20 @@
           </div>
         </div>
 
+        {% if not is_view %}
         <div class="form-actions-bar">
           <div class="form-actions-left">
-            {% if is_view %}
-            <a href="{% url 'iroad_tenants:tenant_price_list_master_list' %}" class="btn btn-outline-secondary">
-              <i class="bi bi-arrow-left"></i> {% translate "Back" %}
-            </a>
-            {% else %}
             <button type="reset" class="btn btn-outline-secondary">
               <i class="bi bi-arrow-counterclockwise"></i> Reset Form
             </button>
-            {% endif %}
           </div>
           <div class="form-actions-right">
-            {% if is_view %}
-            <a href="{% url 'iroad_tenants:tenant_price_list_master_edit' detail_price_list_id %}" class="btn btn-primary">
-              <i class="bi bi-pencil"></i> Edit Price List
-            </a>
-            {% else %}
             <button type="submit" class="btn btn-primary">
               <i class="bi bi-check-circle"></i> {% if is_edit %}Update Price List{% else %}Save Price List{% endif %}
             </button>
-            {% endif %}
           </div>
         </div>
+        {% endif %}
       </form>
 {% endblock %}
 
@@ -330,7 +324,44 @@
       return items.find(function (item) { return item.id === serviceItemId; }) || null;
     }
 
+    function restorePersistedLinePrices(row) {
+      if (!row || row.dataset.persistedLine !== "1") return;
+      const sell = row.querySelector(".pl-sell");
+      const outSell = row.querySelector(".pl-out-sell");
+      const inSell = row.querySelector(".pl-in-sell");
+      if (sell && row.dataset.persistedSell != null) sell.value = row.dataset.persistedSell;
+      if (outSell && row.dataset.persistedOutbound != null) outSell.value = row.dataset.persistedOutbound;
+      if (inSell && row.dataset.persistedInbound != null) inSell.value = row.dataset.persistedInbound;
+    }
+
+    function markPersistedLineRow(row, line) {
+      if (!row || !line) return;
+      const sid = line && line.service_item_id != null ? String(line.service_item_id).trim() : "";
+      row.dataset.persistedLine = "1";
+      row.dataset.loadedServiceId = sid;
+      const lineSell = line && line.sell_price != null && String(line.sell_price) !== "" ? String(line.sell_price) : "";
+      const lineOutbound = line && line.outbound_sell_price != null && String(line.outbound_sell_price) !== "" ? String(line.outbound_sell_price) : "";
+      const lineInbound = line && line.inbound_sell_price != null && String(line.inbound_sell_price) !== "" ? String(line.inbound_sell_price) : "";
+      row.dataset.persistedSell = lineSell;
+      row.dataset.persistedOutbound = lineOutbound;
+      row.dataset.persistedInbound = lineInbound;
+    }
+
+    function clearPersistedLineRow(row) {
+      if (!row) return;
+      delete row.dataset.persistedLine;
+      delete row.dataset.loadedServiceId;
+      delete row.dataset.persistedSell;
+      delete row.dataset.persistedOutbound;
+      delete row.dataset.persistedInbound;
+    }
+
     function applySellPriceFromServiceItem(row) {
+      if (!row) return;
+      if (row.dataset.persistedLine === "1") {
+        restorePersistedLinePrices(row);
+        return;
+      }
       const typeSel = row.querySelector(".pl-service-type");
       const svcSel = row.querySelector('select[aria-label="Service Item"]');
       const sell = row.querySelector(".pl-sell");
@@ -403,6 +434,7 @@
       const delBtn = row.querySelector(".pl-del");
       const dupBtn = row.querySelector(".pl-dup");
       if (typeSel) typeSel.addEventListener("change", function () {
+        clearPersistedLineRow(row);
         row.querySelectorAll(".pl-sell, .pl-out-sell, .pl-in-sell").forEach(function (input) {
           if (input) input.value = "";
         });
@@ -412,15 +444,24 @@
         updateTotals();
       });
       if (svcSel) svcSel.addEventListener("change", function () {
+        var previousId = row.dataset.loadedServiceId || "";
+        var nextId = String(svcSel.value || "").trim();
+        if (previousId && nextId && previousId === nextId) {
+          restorePersistedLinePrices(row);
+          return;
+        }
         row.querySelectorAll(".pl-sell, .pl-out-sell, .pl-in-sell").forEach(function (input) {
           if (input) input.value = "";
         });
+        clearPersistedLineRow(row);
+        row.dataset.loadedServiceId = nextId;
         updateTripRouteFromService(row);
         applySellPriceFromServiceItem(row);
       });
       if (delBtn) delBtn.addEventListener("click", function () { row.remove(); renumber(); updateTotals(); });
       if (dupBtn) dupBtn.addEventListener("click", function () {
         const clone = row.cloneNode(true);
+        clearPersistedLineRow(clone);
         tbody.insertBefore(clone, row.nextSibling);
         wireRow(clone);
         applyTripVisibility(clone);
@@ -430,6 +471,7 @@
       populateServiceItems(row, true);
       applyTripVisibility(row);
       updateTripRouteFromService(row);
+      restorePersistedLinePrices(row);
     }
 
     function applyLinePayloadToRow(row, line) {
@@ -440,6 +482,7 @@
       const inSell = row.querySelector(".pl-in-sell");
       const lt = (line && line.line_type) === "Trip" ? "Trip" : "Service";
       if (typeSel) typeSel.value = lt;
+      applyTripVisibility(row);
       populateServiceItems(row, false);
       const sid = line && line.service_item_id != null ? String(line.service_item_id).trim() : "";
       if (svcSel && sid) svcSel.value = sid;
@@ -449,9 +492,17 @@
       }
       if (outSell) outSell.value = line && line.outbound_sell_price != null && String(line.outbound_sell_price) !== "" ? String(line.outbound_sell_price) : "";
       if (inSell) inSell.value = line && line.inbound_sell_price != null && String(line.inbound_sell_price) !== "" ? String(line.inbound_sell_price) : "";
+      markPersistedLineRow(row, line);
     }
 
     function parseInitialLinePayload() {
+      const jsonEl = document.getElementById("priceListLinePayloadJson");
+      if (jsonEl && jsonEl.textContent && jsonEl.textContent.trim()) {
+        try {
+          const parsed = JSON.parse(jsonEl.textContent.trim());
+          if (Array.isArray(parsed) && parsed.length) return parsed;
+        } catch (e) {}
+      }
       const raw = (linePayloadEl && linePayloadEl.value && linePayloadEl.value.trim()) || "";
       if (!raw) return null;
       try {

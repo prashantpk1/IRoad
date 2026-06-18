@@ -20,7 +20,11 @@ from iroad_tenants.tenant_system_config import (
     resolve_tenant_system_config,
 )
 from superadmin.models import TenantProfile
-from superadmin.redis_helpers import get_tenant_session
+from superadmin.redis_helpers import (
+    get_tenant_session_for_request,
+    refresh_and_get_tenant_session,
+    stash_tenant_session_on_request,
+)
 from superadmin.tenant_portal_auth import get_tenant_portal_cookie_payload
 
 
@@ -94,7 +98,11 @@ class TenantSubscriptionGateMiddleware:
         if tenant is None or tenant.account_status != 'Active':
             return self.get_response(request)
 
-        session_data = get_tenant_session(str(tenant.tenant_id), str(tenant_jti)) or {}
+        session_data = get_tenant_session_for_request(
+            request,
+            str(tenant.tenant_id),
+            str(tenant_jti),
+        ) or {}
         if not tenant_portal_is_owner_admin(session_data, tenant):
             return self.get_response(request)
 

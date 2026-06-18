@@ -29,9 +29,43 @@ def _redis_socket_timeout():
     return max(1, int(getattr(settings, 'REDIS_SOCKET_TIMEOUT', 5)))
 
 
+def redis_is_enabled():
+    """When False, Redis calls return fallbacks immediately (local dev without Redis)."""
+    return bool(getattr(settings, 'REDIS_ENABLED', True))
+
+
 def is_redis_circuit_open():
     """True when recent Redis failures triggered the circuit breaker."""
+    if not redis_is_enabled():
+        return True
     return time.monotonic() < _redis_unavailable_until
+
+
+def open_redis_circuit():
+    """Mark Redis unavailable so callers fail fast without socket timeouts."""
+    global _redis_unavailable_until
+    _redis_unavailable_until = time.monotonic() + _redis_circuit_seconds()
+
+
+def probe_redis_at_startup():
+    """
+    Ping Redis once when Django starts. If unreachable, open the circuit breaker
+    immediately so the first page load does not wait on connect timeouts.
+    """
+    if not redis_is_enabled():
+        open_redis_circuit()
+        logger.info('REDIS_ENABLED is False; Redis session storage skipped.')
+        return False
+    if redis_health_check():
+        logger.debug('Redis startup probe succeeded.')
+        return True
+    open_redis_circuit()
+    logger.warning(
+        'Redis is not reachable at %s. Session storage is in degraded mode until '
+        'Redis is started (or set REDIS_ENABLED=False in .env for local dev).',
+        getattr(settings, 'REDIS_URL', 'redis://127.0.0.1:6379/0'),
+    )
+    return False
 
 
 def redis_safe_get(key):
@@ -122,6 +156,8 @@ def reset_redis_client():
 def _redis_call(action, fallback=None):
     """Run a Redis operation; return fallback when Redis is unavailable."""
     global _redis_unavailable_until
+    if not redis_is_enabled():
+        return fallback
     now = time.monotonic()
     if now < _redis_unavailable_until:
         return fallback
@@ -192,28 +228,34 @@ def create_admin_session(admin_user, ip_address, user_agent, timeout_minutes):
 def refresh_admin_session(jti, timeout_minutes):
     """
     Refresh TTL and update last_activity on every request.
-    Returns True if session exists, False if expired/not found.
+    Returns True if session exists, False if expired/not found, None if Redis is down.
     """
-    client = get_redis_client()
-    key = f'admin:session:{jti}'
-    data = client.get(key)
+    def _refresh():
+        client = get_redis_client()
+        key = f'admin:session:{jti}'
+        data = client.get(key)
+        if not data:
+            return False
+        session_data = json.loads(data)
+        session_data['last_activity'] = timezone.now().isoformat()
+        ttl_seconds = timeout_minutes * 60
+        client.setex(key, ttl_seconds, json.dumps(session_data))
+        return True
 
-    if not data:
-        return False
-
-    session_data = json.loads(data)
-    session_data['last_activity'] = timezone.now().isoformat()
-    ttl_seconds = timeout_minutes * 60
-    client.setex(key, ttl_seconds, json.dumps(session_data))
-    return True
+    _refresh.__name__ = 'refresh_admin_session'
+    return _redis_call(_refresh, fallback=None)
 
 
 def get_admin_session(jti):
     """Get session data by JTI. Returns dict or None."""
-    client = get_redis_client()
-    key = f'admin:session:{jti}'
-    data = client.get(key)
-    return json.loads(data) if data else None
+    def _fetch():
+        client = get_redis_client()
+        key = f'admin:session:{jti}'
+        data = client.get(key)
+        return json.loads(data) if data else None
+
+    _fetch.__name__ = 'get_admin_session'
+    return _redis_call(_fetch, fallback=None)
 
 
 def revoke_admin_session(jti):
@@ -364,21 +406,37 @@ def create_tenant_session(
 
 
 def refresh_tenant_session(tenant_id, jti, timeout_minutes):
+    status, _data = refresh_and_get_tenant_session(tenant_id, jti, timeout_minutes)
+    return status
+
+
+def refresh_and_get_tenant_session(tenant_id, jti, timeout_minutes):
+    """
+    Refresh TTL and return session payload in one Redis round trip.
+
+    Returns ``(status, session_data)`` where *status* is:
+    - ``True`` — session found and refreshed
+    - ``False`` — session missing / expired
+    - ``None`` — Redis unavailable (caller may fall back to JWT)
+    """
+
     def _refresh():
         client = get_redis_client()
         key = f'tenant:{tenant_id}:session:{jti}'
         data = client.get(key)
         if not data:
-            return False
+            return (False, None)
         session_data = json.loads(data)
         session_data['last_activity'] = timezone.now().isoformat()
         ttl_seconds = max(60, int(timeout_minutes) * 60)
         client.setex(key, ttl_seconds, json.dumps(session_data))
-        return True
+        return (True, session_data)
 
-    _refresh.__name__ = 'refresh_tenant_session'
-    # None = Redis unavailable (caller may fall back to JWT). False = session missing.
-    return _redis_call(_refresh, fallback=None)
+    _refresh.__name__ = 'refresh_and_get_tenant_session'
+    result = _redis_call(_refresh, fallback=(None, None))
+    if result is None:
+        return (None, None)
+    return result
 
 
 def revoke_tenant_session_key(tenant_id, jti):
@@ -480,3 +538,43 @@ def get_tenant_session(tenant_id, jti):
 
     _fetch.__name__ = 'get_tenant_session'
     return _redis_call(_fetch, fallback=None)
+
+
+_TENANT_SESSION_REQUEST_CACHE_ATTR = '_iroad_tenant_session_cache'
+
+
+def stash_tenant_session_on_request(request, tenant_id, jti, session_data):
+    """Cache tenant session on the request to avoid duplicate Redis reads per page."""
+    if request is None:
+        return
+    setattr(
+        request,
+        _TENANT_SESSION_REQUEST_CACHE_ATTR,
+        {
+            'tenant_id': str(tenant_id or '').strip(),
+            'jti': str(jti or '').strip(),
+            'data': session_data,
+        },
+    )
+
+
+def get_tenant_session_for_request(request, tenant_id, jti):
+    """
+    Return tenant session data, reusing a per-request cache when available.
+    Falls back to ``get_tenant_session`` (circuit-breaker aware).
+    """
+    if not tenant_id or not jti:
+        return None
+    tid = str(tenant_id).strip()
+    token = str(jti).strip()
+    if request is not None:
+        cached = getattr(request, _TENANT_SESSION_REQUEST_CACHE_ATTR, None)
+        if (
+            isinstance(cached, dict)
+            and cached.get('tenant_id') == tid
+            and cached.get('jti') == token
+        ):
+            return cached.get('data')
+    data = get_tenant_session(tid, token)
+    stash_tenant_session_on_request(request, tid, token, data)
+    return data

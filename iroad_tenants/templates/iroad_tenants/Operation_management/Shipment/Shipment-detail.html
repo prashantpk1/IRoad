@@ -51,10 +51,15 @@
           <i class="bi bi-printer"></i>
           <span>Print</span>
         </a>
-        <a href="{{ update_shipment_url }}" class="eal-btn eal-btn-outline">
-          <i class="bi bi-arrow-repeat"></i>
-          <span>Update</span>
-        </a>
+        {% if can_cancel_shipment %}
+        <form method="post" action="{{ cancel_shipment_url }}" class="d-inline" onsubmit="return confirm('Cancel shipment {{ shipment.shipment_no|escapejs }}? An R1 action log entry will be recorded.');">
+          {% csrf_token %}
+          <button type="submit" class="eal-btn eal-btn-outline text-warning">
+            <i class="bi bi-x-circle"></i>
+            <span>Cancel</span>
+          </button>
+        </form>
+        {% endif %}
         <a href="{{ edit_shipment_url }}" class="eal-btn eal-btn-primary">
           <i class="bi bi-pencil-square"></i>
           <span>Edit</span>
@@ -244,7 +249,7 @@
           <div class="field">
             <label class="form-label">POD Status</label>
             <p class="detail-view-value">
-              {% if shipment.pod_status == 'Compliant' %}
+              {% if shipment.pod_status == 'Completed' %}
               <span class="status-badge active">{{ shipment.pod_status }}</span>
               {% else %}
               <span class="status-badge pending">{{ shipment.pod_status|default:"—" }}</span>
@@ -396,7 +401,7 @@
         <div class="detail-field" style="padding: 10px 0">
           <span class="detail-field-label">POD Status</span>
           <span class="detail-field-value">
-            {% if shipment.pod_status == 'Compliant' %}
+            {% if shipment.pod_status == 'Completed' %}
             <span class="status-badge active">{{ shipment.pod_status }}</span>
             {% else %}
             <span class="status-badge pending">{{ shipment.pod_status|default:"—" }}</span>

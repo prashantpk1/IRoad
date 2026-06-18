@@ -1,7 +1,7 @@
 from django.utils import timezone
 from django.conf import settings
 
-from superadmin.redis_helpers import get_tenant_session
+from superadmin.redis_helpers import get_tenant_session_for_request
 from superadmin.tenant_portal_auth import get_tenant_portal_cookie_payload
 from iroad_tenants.tenant_dashboard_search import build_dashboard_search_routes
 from iroad_tenants.tenant_notifications import (
@@ -92,7 +92,11 @@ def tenant_in_app_notifications(request):
             'tenant_notification_unread_count': 0,
         }
 
-    session_data = get_tenant_session(str(tenant_id), str(tenant_jti)) or {}
+    session_data = get_tenant_session_for_request(
+        request,
+        str(tenant_id),
+        str(tenant_jti),
+    ) or {}
     reference_id = str(session_data.get('reference_id') or '').strip()
     recipient_key, tenant_user_id = resolve_recipient_from_session(
         tenant_id=str(tenant_id),
