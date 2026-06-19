@@ -193,16 +193,9 @@ class OperationActionFormTests(unittest.TestCase):
         self.assertNotIn('sequence_number', errors)
         self.assertEqual(sequence_number, 1)
 
-    def test_apply_confirmed_sequence_swap_on_edit_exchanges_impact_with_peer(self):
+    def test_apply_confirmed_sequence_swap_on_edit_moves_peer_to_previous_slot(self):
         peer = MagicMock()
         peer.sequence_number = 1
-        peer.auto_movement_post = False
-        peer.auto_shipment_post = True
-        peer.auto_pod_post = False
-        peer.hard_copy_collection = False
-        peer.booking_status_impact = ''
-        peer.shipment_status_impact = ''
-        peer.movement_status_impact = ''
         current = MagicMock()
         current.sequence_number = 2
 
@@ -210,11 +203,6 @@ class OperationActionFormTests(unittest.TestCase):
             'sequence_category': 'job',
             'auto_movement_post': True,
             'auto_shipment_post': False,
-            'auto_pod_post': False,
-            'hard_copy_collection': False,
-            'booking_status_impact': '',
-            'shipment_status_impact': '',
-            'movement_status_impact': '',
         }
 
         apply_confirmed_sequence_swap(
@@ -224,37 +212,23 @@ class OperationActionFormTests(unittest.TestCase):
         )
 
         self.assertEqual(peer.sequence_number, 2)
-        self.assertTrue(peer.auto_movement_post)
-        self.assertFalse(peer.auto_shipment_post)
-        self.assertFalse(form_data['auto_movement_post'])
-        self.assertTrue(form_data['auto_shipment_post'])
-        peer.save.assert_called_once()
+        self.assertTrue(form_data['auto_movement_post'])
+        self.assertFalse(form_data['auto_shipment_post'])
+        peer.save.assert_called_once_with(update_fields=['sequence_number', 'updated_at'])
 
     @patch('iroad_tenants.operation_action_form.next_sequence_slot')
-    def test_apply_confirmed_sequence_swap_on_create_exchanges_impact_and_moves_peer(
+    def test_apply_confirmed_sequence_swap_on_create_moves_peer_to_next_slot(
         self,
         mock_next_slot,
     ):
         mock_next_slot.return_value = 3
         peer = MagicMock()
         peer.sequence_number = 1
-        peer.auto_movement_post = True
-        peer.auto_shipment_post = False
-        peer.auto_pod_post = False
-        peer.hard_copy_collection = False
-        peer.booking_status_impact = ''
-        peer.shipment_status_impact = ''
-        peer.movement_status_impact = ''
 
         form_data = {
             'sequence_category': 'job',
             'auto_movement_post': False,
             'auto_shipment_post': True,
-            'auto_pod_post': False,
-            'hard_copy_collection': False,
-            'booking_status_impact': '',
-            'shipment_status_impact': '',
-            'movement_status_impact': '',
         }
 
         apply_confirmed_sequence_swap(
@@ -264,12 +238,10 @@ class OperationActionFormTests(unittest.TestCase):
         )
 
         self.assertEqual(peer.sequence_number, 3)
-        self.assertFalse(peer.auto_movement_post)
-        self.assertTrue(peer.auto_shipment_post)
-        self.assertTrue(form_data['auto_movement_post'])
-        self.assertFalse(form_data['auto_shipment_post'])
+        self.assertFalse(form_data['auto_movement_post'])
+        self.assertTrue(form_data['auto_shipment_post'])
         mock_next_slot.assert_called_once()
-        peer.save.assert_called_once()
+        peer.save.assert_called_once_with(update_fields=['sequence_number', 'updated_at'])
 
 
 if __name__ == '__main__':    unittest.main()

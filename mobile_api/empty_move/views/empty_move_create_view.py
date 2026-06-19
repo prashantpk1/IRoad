@@ -37,9 +37,10 @@ class EmptyMoveCreateAPIView(MobileAPIView):
     """
     Create an empty truck movement from the driver app (On Call mode).
 
-    Does not require Google Maps — ``from_location_id`` / ``to_location_id`` are
-    tenant location master UUIDs. Optional ``latitude`` / ``longitude`` are
-    attached to EM1 when ``auto_start`` is true (default).
+    Does not require Google Maps Geocoding — ``from_location_id`` / ``to_location_id``
+    are tenant location master UUIDs. Optional ``from_latitude`` / ``from_longitude``
+    and ``to_latitude`` / ``to_longitude`` stamp the TML route map links; start GPS
+    is always attached to EM1, which fires automatically on create.
     """
 
     permission_classes = [IsMobileAuthenticated, IsDriver, HasViewMobileCapability]

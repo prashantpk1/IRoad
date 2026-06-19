@@ -332,14 +332,11 @@ def operation_action_sequence_registry() -> dict:
 
 def apply_confirmed_sequence_swap(*, peer, current_action, form_data: dict) -> None:
     """
-    Before saving the current action, move the conflicting peer out of the slot and
-    exchange Operation Impact settings between the form and the peer record.
-    Edit: peer receives the current action's previous sequence number.
+    Before saving the current action, move the conflicting peer out of the slot.
+    Edit: peer receives the current action's previous sequence number (pairwise swap).
     Create: peer moves to the next free sequence slot.
     """
     category = (form_data.get('sequence_category') or '').strip()
-    peer_old_impact = operation_impact_snapshot(peer)
-    form_impact = operation_impact_from_form(form_data)
 
     if current_action is not None:
         peer.sequence_number = int(current_action.sequence_number or 1)
@@ -349,11 +346,7 @@ def apply_confirmed_sequence_swap(*, peer, current_action, form_data: dict) -> N
             exclude_action_ids=[peer.pk],
         )
 
-    for field in OPERATION_IMPACT_FIELDS:
-        setattr(peer, field, form_impact[field])
-        form_data[field] = peer_old_impact[field]
-
-    peer.save(update_fields=['sequence_number', *OPERATION_IMPACT_FIELDS, 'updated_at'])
+    peer.save(update_fields=['sequence_number', 'updated_at'])
 
 
 def validate_sequence_number_placement(
@@ -375,8 +368,7 @@ def validate_sequence_number_placement(
     if peer and not confirm_swap:
         return (
             f'Sequence {sequence_number} is already used by '
-            f'"{peer.english_label}". Confirm swap to exchange sequence '
-            f'and operation impact.'
+            f'"{peer.english_label}". Confirm swap to exchange sequence numbers.'
         )
 
     if peer and confirm_swap:

@@ -16,6 +16,83 @@ from tenant_workspace.models import TenantShipment, TenantTruckMovementLog
 VALID_EMPTY_MOVE_REASONS = frozenset({'reposition', 'maintenance', 'noLoad'})
 
 
+def apply_movement_route_map_links(
+    movement,
+    *,
+    from_latitude: str = '',
+    from_longitude: str = '',
+    to_latitude: str = '',
+    to_longitude: str = '',
+) -> None:
+    """Persist planned route GPS on the truck movement log (TML map-link fields)."""
+    if movement is None:
+        return
+    from iroad_tenants.fleet_gps_tracking import build_google_maps_link
+
+    update_fields: list[str] = []
+    from_link = build_google_maps_link(
+        (from_latitude or '').strip(),
+        (from_longitude or '').strip(),
+    )
+    to_link = build_google_maps_link(
+        (to_latitude or '').strip(),
+        (to_longitude or '').strip(),
+    )
+    if from_link and not (getattr(movement, 'from_location_map_link', '') or '').strip():
+        movement.from_location_map_link = from_link[:500]
+        update_fields.append('from_location_map_link')
+    if to_link and not (getattr(movement, 'to_location_map_link', '') or '').strip():
+        movement.to_location_map_link = to_link[:500]
+        update_fields.append('to_location_map_link')
+    if update_fields:
+        update_fields.append('updated_at')
+        movement.save(update_fields=update_fields)
+
+
+def sync_movement_route_evidence_from_action_log(action_log) -> None:
+    """
+    Copy mobile GPS evidence from an action log row onto the linked TML.
+
+    EM1 (Start) stamps ``from_location_map_link``; EM3/EM4 stamp ``to_location_map_link``.
+    Action Log from/to labels still resolve via ``truck_movement`` location masters.
+    """
+    movement = getattr(action_log, 'truck_movement', None)
+    action = getattr(action_log, 'operation_action', None)
+    if movement is None or action is None or getattr(action_log, 'shipment_id', None):
+        return
+
+    from iroad_tenants.fleet_gps_tracking import build_google_maps_link
+    from iroad_tenants.operation_runtime.movement_state_machine import (
+        is_movement_arrived_action,
+        is_movement_complete_action,
+        is_movement_start_action,
+    )
+
+    lat = (getattr(action_log, 'latitude', '') or '').strip()
+    lng = (getattr(action_log, 'longitude', '') or '').strip()
+    map_link = (getattr(action_log, 'map_link', '') or '').strip()
+    if not map_link:
+        map_link = build_google_maps_link(lat, lng)
+    if not map_link:
+        return
+
+    update_fields: list[str] = []
+    if is_movement_start_action(action) and not (
+        getattr(movement, 'from_location_map_link', '') or ''
+    ).strip():
+        movement.from_location_map_link = map_link[:500]
+        update_fields.append('from_location_map_link')
+    elif (
+        is_movement_arrived_action(action) or is_movement_complete_action(action)
+    ) and not (getattr(movement, 'to_location_map_link', '') or '').strip():
+        movement.to_location_map_link = map_link[:500]
+        update_fields.append('to_location_map_link')
+
+    if update_fields:
+        update_fields.append('updated_at')
+        movement.save(update_fields=update_fields)
+
+
 def auto_complete_loaded_movement_for_shipment(shipment):
     """Complete open Loaded movement when shipment is Delivered."""
     if shipment is None:

@@ -1,8 +1,9 @@
 """
 Create driver-initiated empty truck movements (On Call mode).
 
-No Google Maps required — locations are tenant master UUIDs; optional lat/long
-are stored on the first workflow action (EM1) when ``auto_start`` is true.
+Locations are tenant master UUIDs; mobile GPS (from/to latitude & longitude)
+is stored on the TML map-link fields and on the EM1 action log. EM1 always
+fires automatically when the empty move is created.
 """
 from __future__ import annotations
 
@@ -15,7 +16,10 @@ from django.utils.translation import gettext_lazy as _
 from django_tenants.utils import schema_context
 
 from iroad_tenants.operation_runtime.constants import SOURCE_CHANNEL_MOBILE_DRIVER
-from iroad_tenants.operation_runtime.movement_ops import birth_empty_move_for_driver
+from iroad_tenants.operation_runtime.movement_ops import (
+    apply_movement_route_map_links,
+    birth_empty_move_for_driver,
+)
 from iroad_tenants.services.action_execution_service import ActionExecutionService
 from mobile_api.dashboard.selectors.dashboard_booking_selector import (
     DashboardBookingSelector,
@@ -122,6 +126,21 @@ def _assert_on_call_state(driver: Any, *, tenant_schema: str) -> None:
         )
 
 
+def _coord_str(value: Any) -> str:
+    if value is None:
+        return ''
+    return str(value).strip()[:32]
+
+
+def _resolve_start_gps(payload: Mapping[str, Any]) -> tuple[str, str]:
+    """Prefer explicit from_* coords; fall back to legacy latitude/longitude."""
+    from_lat = _coord_str(payload.get('from_latitude'))
+    from_lng = _coord_str(payload.get('from_longitude'))
+    if from_lat and from_lng:
+        return from_lat, from_lng
+    return _coord_str(payload.get('latitude')), _coord_str(payload.get('longitude'))
+
+
 def _project_movement_response(
     movement: Any,
     *,
@@ -150,7 +169,7 @@ def _project_movement_response(
 
 
 class EmptyMoveCreateService:
-    """Create empty move rows and optionally fire EM1 (Start Movement)."""
+    """Create empty move rows and always fire EM1 (Start Movement)."""
 
     def create_empty_move(
         self,
@@ -179,7 +198,6 @@ class EmptyMoveCreateService:
                 message_key='mobile.auth.driver_inactive',
             )
 
-        auto_start = bool(payload.get('auto_start', True))
         notes = str(payload.get('notes') or '').strip()
         client_action_id = str(payload.get('client_action_id') or '').strip()
 
@@ -201,6 +219,8 @@ class EmptyMoveCreateService:
             movement_date = payload.get('movement_date') or timezone.localdate()
             created_by = _driver_label(driver)
 
+            start_lat, start_lng = _resolve_start_gps(payload)
+
             with transaction.atomic():
                 movement = birth_empty_move_for_driver(
                     driver=driver,
@@ -212,22 +232,27 @@ class EmptyMoveCreateService:
                     notes=notes,
                     created_by_label=created_by,
                 )
+                apply_movement_route_map_links(
+                    movement,
+                    from_latitude=start_lat,
+                    from_longitude=start_lng,
+                    to_latitude=_coord_str(payload.get('to_latitude')),
+                    to_longitude=_coord_str(payload.get('to_longitude')),
+                )
 
-                workflow_started = False
-                if auto_start:
-                    workflow_started = self._auto_start_movement(
-                        movement=movement,
-                        driver=driver,
-                        tenant_user=tenant_user,
-                        truck=truck,
-                        tenant_schema=schema,
-                        jwt_payload=jwt_payload or {},
-                        notes=notes,
-                        client_action_id=client_action_id,
-                        latitude=payload.get('latitude'),
-                        longitude=payload.get('longitude'),
-                    )
-                    movement.refresh_from_db()
+                workflow_started = self._auto_start_movement(
+                    movement=movement,
+                    driver=driver,
+                    tenant_user=tenant_user,
+                    truck=truck,
+                    tenant_schema=schema,
+                    jwt_payload=jwt_payload or {},
+                    notes=notes,
+                    client_action_id=client_action_id,
+                    latitude=start_lat or None,
+                    longitude=start_lng or None,
+                )
+                movement.refresh_from_db()
 
                 movement = (
                     TenantTruckMovementLog.objects.select_related(

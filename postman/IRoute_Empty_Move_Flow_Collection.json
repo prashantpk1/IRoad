@@ -2,7 +2,7 @@
   "info": {
     "_postman_id": "b2c3d4e5-f6a7-8901-bcde-f12345678901",
     "name": "IRoute — Driver Empty Move Flow",
-    "description": "HOW TO USE THIS COLLECTION:\n1. Set driver_email, driver_password, tenant_id in collection variables.\n2. Run Request 01 Login first.\n3. Run Request 02 Dashboard — if current_empty_move exists movement_job_id is saved.\n4. If no empty move exists: an empty move record must first be created \n   (typically via driver app On Call mode or admin desktop assignment).\n   Then refresh dashboard to get movement_job_id.\n5. Run steps 03 through 06 in order.\n6. Cancel (Step 07) is only valid before Step 05 fires.\n7. action_codes for empty move actions must be verified against \n   Action Master database rows where scope=On_Call and category=Empty_Move.\n   The exact codes depend on your Action Master seed data from Prompt 1.\n\nComplete empty move flow for driver between jobs.\nEmpty move = truck movement with no cargo, no booking.\nThree reasons: Return, Maintenance, Repositioning.\njob_type is 'movement' for all empty move calls.\nUse {{base_url}} variable = http://127.0.0.1:8000/api/v1/mobile\nUse {{access_token}} variable = filled by login.\nUse {{movement_job_id}} variable = filled after dashboard call.",
+    "description": "EMPTY MOVE FLOW\n\n1. Login (01)\n2. Dashboard (02)\n3. List Locations (02a) — auto-fills pickup_location_id + delivery_location_id UUIDs\n4. Create Empty Move (02b) — auto EM1\n5. Job Detail (03) → EM2 → EM3 → EM4\n\nMobile must use location_id UUID from 02a — NOT map numeric IDs like 286471198.",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
   "variable": [
@@ -45,6 +45,71 @@
     {
       "key": "workflow_version",
       "value": ""
+    },
+    {
+      "key": "from_location_id",
+      "value": "",
+      "description": "DEPRECATED — use pickup_location_id (UUID)"
+    },
+    {
+      "key": "to_location_id",
+      "value": "",
+      "description": "DEPRECATED — use delivery_location_id (UUID)"
+    },
+    {
+      "key": "pickup_location_id",
+      "value": "",
+      "description": "REQUIRED UUID — Tenant Location Master (Pickup / from). NOT map place numeric ID."
+    },
+    {
+      "key": "delivery_location_id",
+      "value": "",
+      "description": "REQUIRED UUID — Tenant Location Master (Delivery / to). NOT map place numeric ID."
+    },
+    {
+      "key": "empty_move_reason",
+      "value": "maintenance",
+      "description": "reposition | maintenance | noLoad"
+    },
+    {
+      "key": "empty_move_notes",
+      "value": "Empty move from mobile",
+      "description": "Optional notes (max 5000 chars)"
+    },
+    {
+      "key": "pickup_location_search",
+      "value": "jeddah",
+      "description": "02a: match pickup by label (e.g. jeddah)"
+    },
+    {
+      "key": "delivery_location_search",
+      "value": "makkah",
+      "description": "02a: match delivery by label (e.g. makkah)"
+    },
+    {
+      "key": "location_search",
+      "value": "",
+      "description": "02a optional API search filter (empty = all)"
+    },
+    {
+      "key": "pickup_latitude",
+      "value": "21.5433",
+      "description": "Pickup (from) — Jeddah"
+    },
+    {
+      "key": "pickup_longitude",
+      "value": "39.1728",
+      "description": "Pickup (from) — Jeddah"
+    },
+    {
+      "key": "delivery_latitude",
+      "value": "21.3891",
+      "description": "Delivery (to) — Makkah"
+    },
+    {
+      "key": "delivery_longitude",
+      "value": "39.8579",
+      "description": "Delivery (to) — Makkah"
     }
   ],
   "item": [
@@ -153,7 +218,7 @@
           }
         ],
         "url": "{{base_url}}/driver/dashboard/",
-        "description": "STEP 2 — CHECK DASHBOARD FOR CURRENT STATE.\nIf driver is between jobs (On Call mode) no active_job will appear.\nLook at data.current_empty_move for any active empty move.\nIf current_empty_move exists save its job_id as movement_job_id.\nEmpty move job_type is 'movement' (not 'shipment').\nIf no empty move exists driver needs to start one via A_EMPTY_START action.\nDashboard shows driver mode: Job / On Call / Offline."
+        "description": "If no empty move exists, run 02a List Locations then 02b Create Empty Move."
       },
       "event": [
         {
@@ -174,6 +239,117 @@
       ]
     },
     {
+      "name": "02a — List Empty Move Locations (get UUIDs)",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{access_token}}"
+          },
+          {
+            "key": "Accept",
+            "value": "application/json"
+          },
+          {
+            "key": "Accept-Language",
+            "value": "en"
+          }
+        ],
+        "url": "{{base_url}}/driver/empty-moves/locations/?search={{location_search}}&limit=50",
+        "description": "GET location UUIDs for pickup/delivery pickers.\n\nRun this BEFORE 02b. Test script auto-sets:\n  pickup_location_id   (matches pickup_location_search, default jeddah)\n  delivery_location_id (matches delivery_location_search, default makkah)\n\nMobile app must use location_id from this API — NOT map numeric place IDs."
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "var resp = pm.response.json();",
+              "pm.test('Status code is 200', function () { pm.response.to.have.status(200); });",
+              "var locs = (resp.data && resp.data.locations) || [];",
+              "pm.test('At least one location returned', function () { pm.expect(locs.length).to.be.above(0); });",
+              "function pickLocation(term) {",
+              "    var needle = (term || '').trim().toLowerCase();",
+              "    if (!needle) return null;",
+              "    for (var i = 0; i < locs.length; i++) {",
+              "        var loc = locs[i] || {};",
+              "        var hay = ((loc.label || '') + ' ' + (loc.display_name || '') + ' ' + (loc.province || '')).toLowerCase();",
+              "        if (hay.indexOf(needle) >= 0) return loc.location_id;",
+              "    }",
+              "    return null;",
+              "}",
+              "var pickupSearch = pm.collectionVariables.get('pickup_location_search') || 'jeddah';",
+              "var deliverySearch = pm.collectionVariables.get('delivery_location_search') || 'makkah';",
+              "var pickupId = pickLocation(pickupSearch) || (locs[0] && locs[0].location_id);",
+              "var deliveryId = pickLocation(deliverySearch) || (locs[1] && locs[1].location_id) || pickupId;",
+              "if (pickupId) pm.collectionVariables.set('pickup_location_id', pickupId);",
+              "if (deliveryId) pm.collectionVariables.set('delivery_location_id', deliveryId);",
+              "console.log('pickup_location_id=', pickupId);",
+              "console.log('delivery_location_id=', deliveryId);"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "02b — Create Empty Move (auto EM1 + GPS)",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{access_token}}"
+          },
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          },
+          {
+            "key": "Accept",
+            "value": "application/json"
+          },
+          {
+            "key": "Accept-Language",
+            "value": "en"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"empty_move_reason\": \"{{empty_move_reason}}\",\n  \"from_location_id\": \"{{pickup_location_id}}\",\n  \"to_location_id\": \"{{delivery_location_id}}\",\n  \"from_latitude\": {{pickup_latitude}},\n  \"from_longitude\": {{pickup_longitude}},\n  \"to_latitude\": {{delivery_latitude}},\n  \"to_longitude\": {{delivery_longitude}},\n  \"client_action_id\": \"em-create-{{$guid}}\",\n  \"notes\": \"{{empty_move_notes}}\"\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        },
+        "url": "{{base_url}}/driver/empty-moves/",
+        "description": "POST /driver/empty-moves/ — creates TML + auto EM1.\n\nPREREQUISITE: Run 02a first to set pickup_location_id and delivery_location_id.\n\nfrom_location_id / to_location_id must be UUIDs from 02a (not map numeric IDs).\nGPS fields are mobile device coordinates."
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "var resp = pm.response.json();",
+              "pm.test(\"Status code is 201\", function () { pm.response.to.have.status(201); });",
+              "if (resp.status === 1 && resp.data && resp.data.empty_move) {",
+              "    var em = resp.data.empty_move;",
+              "    pm.collectionVariables.set(\"movement_job_id\", em.movement_id || em.job_id);",
+              "    pm.test(\"Empty move created\", function() {",
+              "        pm.expect(em.movement_no).to.exist;",
+              "    });",
+              "    if (em.workflow_started) {",
+              "        pm.test(\"EM1 auto-started\", function() { pm.expect(em.workflow_started).to.eql(true); });",
+              "    }",
+              "}"
+            ]
+          }
+        }
+      ]
+    },
+    {
       "name": "03 — Empty Move Job Detail (Current State)",
       "request": {
         "method": "GET",
@@ -184,7 +360,7 @@
           }
         ],
         "url": "{{base_url}}/driver/jobs/movement/{{movement_job_id}}/",
-        "description": "STEP 3 — GET DETAIL OF THE EMPTY MOVE RECORD.\nURL uses job_type = 'movement' (hardcoded for empty moves).\nUses movement_job_id from dashboard response.\nResponse shows: movement reason, from/to location, current status.\nStatus will be Scheduled before start, In Progress during, Completed after.\nNo Booking or Shipment linked to this record.\nNo cargo, no client, no commercial obligation.\nThis is pure asset movement for fleet tracking.\n\nIMPORTANT: Call this before the first empty-move execute request. It saves content_hash and workflow_version to collection variables automatically."
+        "description": "GET empty move detail after 02b create.\nEM1 is already fired — status should be In Progress.\nSaves content_hash and workflow_version for EM2+ execute calls.\nAssert allowed actions include EM2 (not EM1)."
       },
       "event": [
         {
@@ -208,7 +384,13 @@
               "            pm.expect(resp.data.sync_metadata.content_hash).to.exist;",
               "        }",
               "    );",
-              "}"
+              "}",
+              "pm.test(\"Allowed actions contains EM2 (EM1 already auto-fired)\", function() {",
+              "    var allowed = (resp.data && resp.data.workflow && resp.data.workflow.allowed_actions) || [];",
+              "    var codes = allowed.map(function(a) { return a.action_code; });",
+              "    pm.expect(codes).to.include(\"EM2\");",
+              "    pm.expect(codes).to.not.include(\"EM1\");",
+              "});"
             ]
           }
         }
@@ -229,7 +411,7 @@
       }
     },
     {
-      "name": "05 — Execute EM1 Start Movement",
+      "name": "05 — Execute EM2 Depart Empty",
       "request": {
         "method": "POST",
         "header": [
@@ -244,86 +426,7 @@
         ],
         "body": {
           "mode": "raw",
-          "raw": "{\n  \"client_action_id\": \"em-start-{{$guid}}\",\n  \"workflow_version\": \"{{workflow_version}}\",\n  \"content_hash\": \"{{content_hash}}\",\n  \"latitude\": 24.7136,\n  \"longitude\": 46.6753,\n  \"notes\": \"Starting empty move — returning to base\"\n}",
-          "options": {
-            "raw": {
-              "language": "json"
-            }
-          }
-        },
-        "url": "{{base_url}}/driver/jobs/movement/{{movement_job_id}}/actions/EM1/execute/",
-        "description": "Fires EM1 action to transition Truck Movement Log status Scheduled -> In Progress."
-      },
-      "event": [
-        {
-          "listen": "test",
-          "script": {
-            "type": "text/javascript",
-            "exec": [
-              "var resp = pm.response.json();",
-              "pm.test(\"Status code is 200\", function () { pm.response.to.have.status(200); });",
-              "if (resp.status === 1 && resp.data && resp.data.sync_metadata) {",
-              "    pm.collectionVariables.set(\"content_hash\", resp.data.sync_metadata.content_hash);",
-              "    pm.collectionVariables.set(\"workflow_version\", resp.data.sync_metadata.workflow_version);",
-              "    pm.test(\"Sync hash updated from empty move execute\", function() { pm.expect(resp.data.sync_metadata.content_hash).to.exist; });",
-              "}"
-            ]
-          }
-        }
-      ]
-    },
-    {
-      "name": "05a — Refresh Job Detail (Post EM1)",
-      "request": {
-        "method": "GET",
-        "header": [
-          {
-            "key": "Authorization",
-            "value": "Bearer {{access_token}}"
-          }
-        ],
-        "url": "{{base_url}}/driver/jobs/movement/{{movement_job_id}}/",
-        "description": "Refresh state and assert allowed actions contain EM2."
-      },
-      "event": [
-        {
-          "listen": "test",
-          "script": {
-            "type": "text/javascript",
-            "exec": [
-              "var resp = pm.response.json();",
-              "pm.test(\"Status code is 200\", function () { pm.response.to.have.status(200); });",
-              "if (resp.data && resp.data.sync_metadata) {",
-              "    pm.collectionVariables.set(\"content_hash\", resp.data.sync_metadata.content_hash);",
-              "    pm.collectionVariables.set(\"workflow_version\", resp.data.sync_metadata.workflow_version);",
-              "}",
-              "pm.test(\"Allowed actions contains EM2\", function() {",
-              "    var allowed = (resp.data && resp.data.workflow && resp.data.workflow.allowed_actions) || [];",
-              "    var codes = allowed.map(function(a) { return a.action_code; });",
-              "    pm.expect(codes).to.include(\"EM2\");",
-              "});"
-            ]
-          }
-        }
-      ]
-    },
-    {
-      "name": "05b — Execute EM2 Depart Empty",
-      "request": {
-        "method": "POST",
-        "header": [
-          {
-            "key": "Authorization",
-            "value": "Bearer {{access_token}}"
-          },
-          {
-            "key": "Content-Type",
-            "value": "application/json"
-          }
-        ],
-        "body": {
-          "mode": "raw",
-          "raw": "{\n  \"client_action_id\": \"em-depart-{{$guid}}\",\n  \"workflow_version\": \"{{workflow_version}}\",\n  \"content_hash\": \"{{content_hash}}\",\n  \"latitude\": 24.7136,\n  \"longitude\": 46.6753,\n  \"notes\": \"Departing empty\"\n}",
+          "raw": "{\n  \"client_action_id\": \"em-depart-{{$guid}}\",\n  \"workflow_version\": \"{{workflow_version}}\",\n  \"content_hash\": \"{{content_hash}}\",\n  \"latitude\": {{pickup_latitude}},\n  \"longitude\": {{pickup_longitude}},\n  \"notes\": \"Departing empty from Pickup (Jeddah)\"\n}",
           "options": {
             "raw": {
               "language": "json"
@@ -402,7 +505,7 @@
         ],
         "body": {
           "mode": "raw",
-          "raw": "{\n  \"client_action_id\": \"em-arrive-{{$guid}}\",\n  \"workflow_version\": \"{{workflow_version}}\",\n  \"content_hash\": \"{{content_hash}}\",\n  \"latitude\": 24.6877,\n  \"longitude\": 46.7219,\n  \"notes\": \"Arriving empty\"\n}",
+          "raw": "{\n  \"client_action_id\": \"em-arrive-{{$guid}}\",\n  \"workflow_version\": \"{{workflow_version}}\",\n  \"content_hash\": \"{{content_hash}}\",\n  \"latitude\": {{delivery_latitude}},\n  \"longitude\": {{delivery_longitude}},\n  \"notes\": \"Arriving at Delivery (Makkah)\"\n}",
           "options": {
             "raw": {
               "language": "json"
@@ -481,7 +584,7 @@
         ],
         "body": {
           "mode": "raw",
-          "raw": "{\n  \"client_action_id\": \"em-complete-{{$guid}}\",\n  \"workflow_version\": \"{{workflow_version}}\",\n  \"content_hash\": \"{{content_hash}}\",\n  \"latitude\": 24.6877,\n  \"longitude\": 46.7219,\n  \"notes\": \"Arrived at destination — empty move complete\"\n}",
+          "raw": "{\n  \"client_action_id\": \"em-complete-{{$guid}}\",\n  \"workflow_version\": \"{{workflow_version}}\",\n  \"content_hash\": \"{{content_hash}}\",\n  \"latitude\": {{delivery_latitude}},\n  \"longitude\": {{delivery_longitude}},\n  \"notes\": \"Complete empty move at Delivery (Makkah)\"\n}",
           "options": {
             "raw": {
               "language": "json"

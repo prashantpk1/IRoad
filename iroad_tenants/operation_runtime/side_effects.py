@@ -720,6 +720,11 @@ def apply_execution_side_effects(action_log, *, created_by_label='') -> None:
             truck_movement,
             stage=derive_movement_execution_stage(truck_movement),
         )
+        from iroad_tenants.operation_runtime.movement_ops import (
+            sync_movement_route_evidence_from_action_log,
+        )
+
+        sync_movement_route_evidence_from_action_log(action_log)
 
     if shipment is not None:
         apply_hard_copy_pod_type_if_needed(shipment=shipment, action=action)

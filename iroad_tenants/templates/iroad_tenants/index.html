@@ -1,4 +1,5 @@
 {% extends 'iroad_tenants/base.html' %}
+{% load static %}
 
 {% block title %}Dashboard{% endblock %}
 
@@ -330,46 +331,29 @@
           <div class="surveillance-content">
             <!-- LIVE MAP PANE -->
             <div class="surv-pane active" data-surv-pane="live-map">
-              <div class="map-container">
+              <div class="map-container fleet-gps-map-wrap">
                 <iframe
-                  src="https://www.google.com/maps/embed?pb=!1m14!1m12!1m3!1d14408.825227749005!2d46.6753!3d24.7136!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!5e0!3m2!1sen!2ssa!4v1714000000000!5m2!1sen!2ssa"
-                  width="100%"
-                  height="100%"
-                  style="border: 0"
-                  allowfullscreen=""
+                  id="fleet-live-map"
+                  class="fleet-gps-map-canvas"
+                  title="Live fleet map"
                   loading="lazy"
                   referrerpolicy="no-referrer-when-downgrade"
+                  src="https://maps.google.com/maps?q={{ tenant_dashboard.fleet_gps.default_center.lat }},{{ tenant_dashboard.fleet_gps.default_center.lng }}&z=6&hl=en&output=embed"
+                  style="border: 0"
+                  allowfullscreen
                 ></iframe>
-
-                <div class="map-overlay-layer"></div>
-
-                <!-- Overlays -->
-                <div class="map-marker" style="top: 30%; left: 35%">
-                  <div class="marker-label">
-                    <i class="bi bi-truck"></i> 1234 ABC
-                  </div>
-                  <div class="marker-pin blue"></div>
-                </div>
-                <div class="map-marker" style="top: 25%; left: 65%">
-                  <div class="marker-label">
-                    <i class="bi bi-truck"></i> 7788 DMM
-                  </div>
-                  <div class="marker-pin blue"></div>
-                </div>
-                <div class="map-marker" style="top: 45%; left: 55%">
-                  <div class="marker-label">
-                    <i class="bi bi-truck"></i> 9901 KSA
-                  </div>
-                  <div class="marker-pin blue"></div>
-                </div>
-                <div
-                  class="map-marker orange-marker"
-                  style="top: 60%; left: 20%"
+                <a
+                  id="fleet-live-open-maps"
+                  class="fleet-gps-open-maps"
+                  href="https://maps.google.com/?q=24.7136,46.6753"
+                  target="_blank"
+                  rel="noopener"
                 >
-                  <div class="marker-label border-orange">
-                    <i class="bi bi-truck"></i> 4422 JED
-                  </div>
-                  <div class="marker-pin orange"></div>
+                  <i class="bi bi-box-arrow-up-right"></i> Open in Maps
+                </a>
+                <div id="fleet-live-empty" class="fleet-gps-empty{% if tenant_dashboard.fleet_gps.live_markers %} d-none{% endif %}">
+                  <i class="bi bi-geo-alt"></i>
+                  <p>No live GPS positions yet. Driver actions with latitude/longitude from the mobile app will appear here.</p>
                 </div>
               </div>
             </div>
@@ -378,142 +362,99 @@
             <div class="surv-pane" data-surv-pane="detailed-tracking">
               <div class="detailed-layout">
                 <!-- LEFT SIDE -->
-                <div class="detailed-sidebar">
+                <div class="detailed-sidebar" id="fleet-detail-sidebar">
+                  {% with track=tenant_dashboard.fleet_gps.featured_track %}
                   <div class="det-subtitle">CURRENT SHIPMENT DETAIL</div>
-                  <div class="det-title">#TRP-2026-1284</div>
-                  <div class="det-statuses">
-                    <span class="badge-status in-transit">IN TRANSIT</span>
-                    <span class="badge-status on-time">ON TIME</span>
+                  <div class="det-title" id="fleet-detail-shipment-no">{% if track %}#{{ track.shipment_no }}{% else %}—{% endif %}</div>
+                  <div class="det-statuses" id="fleet-detail-statuses">
+                    {% if track %}
+                    <span class="badge-status in-transit">{{ track.shipment_status }}</span>
+                    {% if track.on_time %}<span class="badge-status on-time">ON TIME</span>{% endif %}
+                    {% else %}
+                    <span class="badge-status pending">NO ACTIVE TRACK</span>
+                    {% endif %}
                   </div>
 
                   <div class="det-route">
                     <div class="route-point">
                       <div class="route-lbl">DEPARTURE</div>
-                      <div class="route-city">Riyadh Hub</div>
-                      <div class="route-time">05/04/2026 - 08:00 AM</div>
+                      <div class="route-city" id="fleet-detail-departure">{% if track %}{{ track.departure_label }}{% else %}—{% endif %}</div>
+                      <div class="route-time" id="fleet-detail-departure-time">{% if track %}{{ track.departure_time }}{% else %}—{% endif %}</div>
                     </div>
                     <div class="route-point text-end">
                       <div class="route-lbl">ARRIVAL (EST)</div>
-                      <div class="route-city">Dammam Port</div>
-                      <div class="route-time">05/04/2026 - 14:30 PM</div>
+                      <div class="route-city" id="fleet-detail-arrival">{% if track %}{{ track.arrival_label }}{% else %}—{% endif %}</div>
+                      <div class="route-time" id="fleet-detail-arrival-time">{% if track %}{{ track.arrival_time }}{% else %}—{% endif %}</div>
                     </div>
                   </div>
 
                   <div class="driver-card">
-                    <div class="driver-avatar dark">KR</div>
+                    <div class="driver-avatar dark" id="fleet-detail-driver-initials">{% if track %}{{ track.driver_initials }}{% else %}—{% endif %}</div>
                     <div class="driver-details">
-                      <div class="driver-name">Khalid Al-Rashidi</div>
-                      <div class="driver-plate">PLATE: 22101 ر ب ا</div>
+                      <div class="driver-name" id="fleet-detail-driver-name">{% if track %}{{ track.driver_name }}{% else %}—{% endif %}</div>
+                      <div class="driver-plate" id="fleet-detail-driver-plate">{% if track %}PLATE: {{ track.driver_plate }}{% else %}PLATE: —{% endif %}</div>
                     </div>
                     <i class="bi bi-telephone-fill text-primary"></i>
                   </div>
 
                   <div class="shipment-history">
                     <div class="hist-title">SHIPMENT HISTORY</div>
-                    <div class="hist-timeline">
-                      <div class="timeline-item completed">
-                        <div class="tl-icon"><i class="bi bi-check2"></i></div>
-                        <div class="tl-content">
-                          <div class="tl-head">
-                            <span class="tl-name">Pickup Complete</span>
-                            <span class="tl-time">08:15 AM</span>
+                    <div class="hist-timeline" id="fleet-detail-history">
+                      {% if track %}
+                        {% for item in track.history %}
+                        <div class="timeline-item {% if item.state == 'current' %}current{% else %}completed{% endif %}">
+                          <div class="tl-icon">
+                            {% if item.state == 'current' %}<i class="bi bi-truck"></i>{% else %}<i class="bi bi-check2"></i>{% endif %}
                           </div>
-                          <div class="tl-desc">Riyadh Industrial City</div>
-                        </div>
-                      </div>
-                      <div class="timeline-item current">
-                        <div class="tl-icon"><i class="bi bi-truck"></i></div>
-                        <div class="tl-content">
-                          <div class="tl-head">
-                            <span class="tl-name">Currently in Transit</span>
-                            <span class="tl-time">11:30 AM</span>
+                          <div class="tl-content">
+                            <div class="tl-head">
+                              <span class="tl-name">{{ item.title }}</span>
+                              <span class="tl-time">{{ item.time }}</span>
+                            </div>
+                            <div class="tl-desc">{{ item.description }}</div>
                           </div>
-                          <div class="tl-desc">Near Hofuf Interchange</div>
                         </div>
-                      </div>
+                        {% empty %}
+                        <div class="text-muted small">No action history with GPS yet.</div>
+                        {% endfor %}
+                      {% else %}
+                        <div class="text-muted small">Select an in-transit shipment with driver GPS logs.</div>
+                      {% endif %}
                     </div>
                   </div>
+                  {% endwith %}
                 </div>
 
                 <!-- RIGHT SIDE: MAP -->
                 <div class="detailed-map-area">
-                  <!-- Search bar over map -->
                   <div class="map-search-bar">
-                    <input type="text" value="SHP-2026-1284" disabled />
+                    <input
+                      type="text"
+                      id="fleet-detail-search"
+                      value="{% if tenant_dashboard.fleet_gps.featured_track %}{{ tenant_dashboard.fleet_gps.featured_track.shipment_no }}{% else %}No shipment{% endif %}"
+                      disabled
+                    />
                     <i class="bi bi-search search-icon"></i>
                   </div>
 
-                  <div class="map-container">
+                  <div class="map-container fleet-gps-map-wrap">
                     <iframe
-                      src="https://www.google.com/maps/embed?pb=!1m14!1m12!1m3!1d463325.2934005934!2d48.5!3d25.5!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!5e0!3m2!1sen!2ssa!4v1714000000000!5m2!1sen!2ssa"
-                      width="100%"
-                      height="100%"
-                      style="border: 0"
-                      allowfullscreen=""
+                      id="fleet-detail-map"
+                      class="fleet-gps-map-canvas"
+                      title="Shipment route map"
                       loading="lazy"
+                      referrerpolicy="no-referrer-when-downgrade"
+                      src="https://maps.google.com/maps?q={{ tenant_dashboard.fleet_gps.default_center.lat }},{{ tenant_dashboard.fleet_gps.default_center.lng }}&z=6&hl=en&output=embed"
+                      style="border: 0"
+                      allowfullscreen
                     ></iframe>
-
-                    <div class="map-overlay-layer"></div>
-
-                    <!-- Trajectory Graphic Overlay -->
-                    <svg
-                      class="trajectory-svg"
-                      width="100%"
-                      height="100%"
-                      viewBox="0 0 800 400"
-                      preserveAspectRatio="none"
-                      style="
-                        position: absolute;
-                        top: 0;
-                        left: 0;
-                        pointer-events: none;
-                      "
-                    >
-                      <path
-                        d="M 200,350 Q 500,100 700,200"
-                        fill="none"
-                        stroke="#8b5cf6"
-                        stroke-width="4"
-                        stroke-dasharray="8 8"
-                      />
-
-                      <!-- Start Dot -->
-                      <circle
-                        cx="200"
-                        cy="350"
-                        r="8"
-                        fill="#5051f9"
-                        stroke="#fff"
-                        stroke-width="3"
-                      />
-                      <!-- End Dot -->
-                      <circle
-                        cx="700"
-                        cy="200"
-                        r="10"
-                        fill="#ef4444"
-                        stroke="#fff"
-                        stroke-width="3"
-                      />
-
-                      <!-- Current Location marker -->
-                      <circle
-                        cx="560"
-                        cy="155"
-                        r="12"
-                        fill="#5051f9"
-                        fill-opacity="0.3"
-                      />
-                      <circle cx="560" cy="155" r="6" fill="#5051f9" />
-                    </svg>
-
-                    <!-- Hover label for current location -->
-                    <div
-                      class="location-popup"
-                      style="top: calc(39%); left: calc(63%)"
-                    >
-                      <div class="popup-speed">85 <span>km/h</span></div>
-                      <div class="popup-heading">HEADING<br />EAST</div>
+                    <div id="fleet-detail-popup" class="location-popup d-none">
+                      <div class="popup-speed" id="fleet-detail-speed">—</div>
+                      <div class="popup-heading" id="fleet-detail-heading">LIVE<br />TRACK</div>
+                    </div>
+                    <div id="fleet-detail-empty" class="fleet-gps-empty{% if tenant_dashboard.fleet_gps.featured_track %} d-none{% endif %}">
+                      <i class="bi bi-signpost-split"></i>
+                      <p>No shipment route to display yet.</p>
                     </div>
                   </div>
                 </div>
@@ -2727,4 +2668,14 @@
     </main>
 
 
+{% endblock %}
+
+{% block extra_js %}
+{{ tenant_dashboard.fleet_gps|json_script:"fleet-gps-data" }}
+<script type="application/json" id="fleet-gps-meta">
+{
+  "refreshUrl": "{{ fleet_gps_refresh_url|escapejs }}"
+}
+</script>
+<script src="{% static 'tenantdesign/Javascript/fleet-gps-map.js' %}?v=20260619e"></script>
 {% endblock %}

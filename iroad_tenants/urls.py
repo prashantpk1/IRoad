@@ -93,6 +93,7 @@ from .views import (
     TenantSupportTicketExportView,
     TenantSupportTicketListView,
     TenantDashboardView,
+    TenantDashboardFleetGpsView,
     TenantDashboardSearchView,
     TenantDashboardSearchResultsView,
     TenantUsersAdministrationDeleteView,
@@ -235,6 +236,11 @@ app_name = 'iroad_tenants'
 
 urlpatterns = [
     path('dashboard/', TenantDashboardView.as_view(), name='tenant_dashboard'),
+    path(
+        'dashboard/fleet-gps/',
+        TenantDashboardFleetGpsView.as_view(),
+        name='tenant_dashboard_fleet_gps',
+    ),
     path(
         'dashboard/search/',
         TenantDashboardSearchView.as_view(),

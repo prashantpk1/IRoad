@@ -198,6 +198,14 @@ class ActionExecutionService:
         log_date = log_date or timezone.now()
         log_no, log_sequence = cls._allocate_log_no()
 
+        latitude = (latitude or '').strip()
+        longitude = (longitude or '').strip()
+        map_link = (map_link or '').strip()
+        if latitude and longitude and not map_link.lower().startswith(('http://', 'https://')):
+            from iroad_tenants.fleet_gps_tracking import build_google_maps_link
+
+            map_link = build_google_maps_link(latitude, longitude, map_link)
+
         action_log = TenantOperationActionLog(
             log_no=log_no,
             idempotency_key=(normalized_key or None),
@@ -213,9 +221,9 @@ class ActionExecutionService:
             truck=truck,
             driver=driver,
             truck_movement=movement,
-            latitude=(latitude or '')[:32],
-            longitude=(longitude or '')[:32],
-            map_link=(map_link or '')[:500],
+            latitude=latitude[:32],
+            longitude=longitude[:32],
+            map_link=map_link[:500],
             created_by=tenant_user,
             created_by_label=(created_by_label or '')[:200],
         )

@@ -2548,6 +2548,89 @@ form.fih-search-box {
   height: 100%;
 }
 
+.surv-pane.active .map-container.fleet-gps-map-wrap {
+  min-height: 500px;
+  height: 500px;
+}
+
+.surv-pane.active .fleet-gps-map-canvas {
+  width: 100%;
+  min-height: 500px;
+  height: 500px;
+  border: 0;
+  display: block;
+}
+
+.fleet-gps-map-canvas .gm-style,
+.fleet-gps-map-canvas .gm-style > div {
+  z-index: 1;
+}
+
+.fleet-gps-map-wrap {
+  background: #e2e8f0;
+}
+
+.fleet-gps-open-maps {
+  position: absolute;
+  top: 12px;
+  left: 12px;
+  z-index: 12;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 12px;
+  border-radius: 8px;
+  background: #fff;
+  border: 1px solid var(--border-light);
+  color: var(--text-dark);
+  font-size: 12px;
+  font-weight: 600;
+  text-decoration: none;
+  box-shadow: 0 2px 8px rgba(15, 23, 42, 0.08);
+}
+
+.fleet-gps-open-maps:hover {
+  color: var(--primary-color);
+}
+
+.fleet-gps-empty {
+  position: absolute;
+  left: 50%;
+  bottom: 20px;
+  transform: translateX(-50%);
+  z-index: 11;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 12px 18px;
+  text-align: center;
+  color: var(--text-muted);
+  background: rgba(255, 255, 255, 0.94);
+  border: 1px solid var(--border-light);
+  border-radius: 10px;
+  box-shadow: 0 4px 16px rgba(15, 23, 42, 0.08);
+  pointer-events: none;
+  max-width: min(420px, 92%);
+}
+
+.fleet-gps-empty i {
+  font-size: 28px;
+  color: var(--primary-color);
+}
+
+.fleet-gps-empty p {
+  margin: 0;
+  max-width: 320px;
+  font-size: 13px;
+}
+
+.detailed-map-area .location-popup {
+  transform: translate(-50%, -100%);
+  z-index: 12;
+}
+
 .map-overlay-layer {
   position: absolute;
   top: 0;
@@ -2624,6 +2707,17 @@ form.fih-search-box {
 .detailed-map-area {
   flex: 1;
   position: relative;
+  min-height: 500px;
+  height: 100%;
+}
+
+.detailed-map-area .map-container,
+.detailed-map-area .fleet-gps-map-canvas {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  min-height: 500px;
 }
 
 .det-subtitle {

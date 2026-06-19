@@ -2,7 +2,7 @@
 from __future__ import annotations
 
 from types import SimpleNamespace
-from unittest.mock import patch
+from unittest.mock import MagicMock, patch
 from uuid import uuid4
 
 from django.test import SimpleTestCase
@@ -91,6 +91,9 @@ class EmptyMoveCreateServiceTests(SimpleTestCase):
 
     @patch('mobile_api.empty_move.services.empty_move_create_service.transaction')
     @patch(
+        'mobile_api.empty_move.services.empty_move_create_service.apply_movement_route_map_links'
+    )
+    @patch(
         'mobile_api.empty_move.services.empty_move_create_service.birth_empty_move_for_driver'
     )
     @patch(
@@ -106,7 +109,7 @@ class EmptyMoveCreateServiceTests(SimpleTestCase):
     @patch(
         'mobile_api.empty_move.services.empty_move_create_service.DashboardBookingSelector'
     )
-    def test_creates_empty_move_without_auto_start(
+    def test_always_auto_starts_em1_on_create(
         self,
         mock_booking_cls,
         mock_movement_cls,
@@ -114,6 +117,7 @@ class EmptyMoveCreateServiceTests(SimpleTestCase):
         mock_resolve_location,
         mock_resolve_truck,
         mock_birth,
+        mock_apply_links,
         _txn,
     ):
         mock_booking_cls.return_value.select_current_driver_booking.return_value = None
@@ -127,10 +131,11 @@ class EmptyMoveCreateServiceTests(SimpleTestCase):
             pk=movement_id,
             movement_id=movement_id,
             movement_no='TML-0001',
-            status='Scheduled',
+            status='In Progress',
             empty_move_reason='reposition',
             from_location_point=loc,
             to_location_point=loc,
+            refresh_from_db=MagicMock(),
         )
         mock_birth.return_value = movement
 
@@ -139,7 +144,7 @@ class EmptyMoveCreateServiceTests(SimpleTestCase):
         ) as mock_model:
             mock_model.objects.select_related.return_value.get.return_value = movement
             service = EmptyMoveCreateService()
-            with patch.object(service, '_auto_start_movement', return_value=False):
+            with patch.object(service, '_auto_start_movement', return_value=True) as mock_start:
                 result = service.create_empty_move(
                     driver=_driver(),
                     tenant_user=SimpleNamespace(pk=uuid4()),
@@ -148,10 +153,91 @@ class EmptyMoveCreateServiceTests(SimpleTestCase):
                         'empty_move_reason': 'reposition',
                         'from_location_id': uuid4(),
                         'to_location_id': uuid4(),
-                        'auto_start': False,
                     },
                 )
 
-        self.assertEqual(result['empty_move']['movement_no'], 'TML-0001')
-        self.assertEqual(result['empty_move']['job_type'], 'movement')
-        self.assertFalse(result['empty_move']['workflow_started'])
+        mock_start.assert_called_once()
+        self.assertTrue(result['empty_move']['workflow_started'])
+        mock_apply_links.assert_called_once()
+
+    @patch('mobile_api.empty_move.services.empty_move_create_service.transaction')
+    @patch(
+        'mobile_api.empty_move.services.empty_move_create_service.apply_movement_route_map_links'
+    )
+    @patch(
+        'mobile_api.empty_move.services.empty_move_create_service.birth_empty_move_for_driver'
+    )
+    @patch(
+        'mobile_api.empty_move.services.empty_move_create_service._resolve_driver_truck'
+    )
+    @patch(
+        'mobile_api.empty_move.services.empty_move_create_service._resolve_location'
+    )
+    @patch('mobile_api.empty_move.services.empty_move_create_service.schema_context')
+    @patch(
+        'mobile_api.empty_move.services.empty_move_create_service.DashboardMovementSelector'
+    )
+    @patch(
+        'mobile_api.empty_move.services.empty_move_create_service.DashboardBookingSelector'
+    )
+    def test_create_applies_route_gps_and_passes_start_coords_to_em1(
+        self,
+        mock_booking_cls,
+        mock_movement_cls,
+        _schema,
+        mock_resolve_location,
+        mock_resolve_truck,
+        mock_birth,
+        mock_apply_links,
+        _txn,
+    ):
+        mock_booking_cls.return_value.select_current_driver_booking.return_value = None
+        mock_movement_cls.return_value.select_current_empty_move.return_value = None
+        mock_resolve_truck.return_value = SimpleNamespace(pk=uuid4())
+        loc_from = SimpleNamespace(display_label='Depot A')
+        loc_to = SimpleNamespace(display_label='Depot B')
+        mock_resolve_location.side_effect = [loc_from, loc_to]
+
+        movement_id = uuid4()
+        movement = SimpleNamespace(
+            pk=movement_id,
+            movement_id=movement_id,
+            movement_no='TML-0061',
+            status='In Progress',
+            empty_move_reason='reposition',
+            from_location_point=loc_from,
+            to_location_point=loc_to,
+            refresh_from_db=MagicMock(),
+        )
+        mock_birth.return_value = movement
+
+        with patch(
+            'mobile_api.empty_move.services.empty_move_create_service.TenantTruckMovementLog'
+        ) as mock_model:
+            mock_model.objects.select_related.return_value.get.return_value = movement
+            service = EmptyMoveCreateService()
+            with patch.object(service, '_auto_start_movement', return_value=True) as mock_start:
+                result = service.create_empty_move(
+                    driver=_driver(),
+                    tenant_user=SimpleNamespace(pk=uuid4()),
+                    tenant_schema='tenant_test',
+                    payload={
+                        'empty_move_reason': 'reposition',
+                        'from_location_id': uuid4(),
+                        'to_location_id': uuid4(),
+                        'from_latitude': 24.7136,
+                        'from_longitude': 46.6753,
+                        'to_latitude': 21.4858,
+                        'to_longitude': 39.1925,
+                    },
+                )
+
+        mock_apply_links.assert_called_once()
+        link_kwargs = mock_apply_links.call_args.kwargs
+        self.assertEqual(link_kwargs['from_latitude'], '24.7136')
+        self.assertEqual(link_kwargs['to_longitude'], '39.1925')
+        mock_start.assert_called_once()
+        start_kwargs = mock_start.call_args.kwargs
+        self.assertEqual(start_kwargs['latitude'], '24.7136')
+        self.assertEqual(start_kwargs['longitude'], '46.6753')
+        self.assertTrue(result['empty_move']['workflow_started'])

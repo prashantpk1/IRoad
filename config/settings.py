@@ -27,6 +27,9 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 # SECURITY WARNING: keep the secret key used in production secret!
 SECRET_KEY = config('SECRET_KEY')
 
+# Google Maps JavaScript API (Fleet GPS Surveillance dashboard)
+GOOGLE_MAPS_API_KEY = config('GOOGLE_MAPS_API_KEY', default='')
+
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = config('DEBUG', default=False, cast=bool)
 
@@ -219,6 +222,11 @@ DATABASES = {
         'PASSWORD': config('DB_PASSWORD'),
         'HOST': config('DB_HOST'),
         'PORT': config('DB_PORT', default='5432'),
+        'OPTIONS': {
+            # Local PostgreSQL on Windows often has SSL disabled; libpq may still
+            # attempt an SSL handshake and fail with "error response during SSL exchange".
+            'sslmode': config('DB_SSLMODE', default='disable'),
+        },
     }
 }
 

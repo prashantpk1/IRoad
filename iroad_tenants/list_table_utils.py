@@ -21,6 +21,15 @@ def _param_key(name: str, prefix: str = '') -> str:
     return f'{prefix}{name}' if prefix else name
 
 
+def eal_list_query_href(encoded_query: str) -> str:
+    """Build a relative href query suffix for EAL list navigation.
+
+    Use ``?`` when there are no params — not ``''`` — so page-1 links clear an
+    existing ``?page=N`` (``href=""`` resolves to the full current URL).
+    """
+    return f'?{encoded_query}' if encoded_query else '?'
+
+
 def eal_column_filter_values(request, prefix: str = '') -> dict[int, str]:
     """Parse ``[prefix]filter_<col_index>`` query params from the request."""
     filter_prefix = _param_key('filter_', prefix)
@@ -59,7 +68,7 @@ def copy_eal_list_params(
         else:
             q[key] = value
     encoded = q.urlencode()
-    return f'?{encoded}' if encoded else ''
+    return eal_list_query_href(encoded)
 
 
 def _parse_boolean_filter(val: str) -> bool | None:
@@ -201,7 +210,7 @@ def paginate_tenant_list(
         else:
             q.pop(page_key, None)
         encoded = q.urlencode()
-        return f'?{encoded}' if encoded else ''
+        return eal_list_query_href(encoded)
 
     return page, {
         'pagination_page_links': [(n, _page_url(n)) for n in page.paginator.page_range],

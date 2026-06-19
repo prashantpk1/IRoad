@@ -30,6 +30,8 @@ from tenant_workspace.models import (
     TruckMaster,
 )
 
+from iroad_tenants.fleet_gps_tracking import build_fleet_gps_payload
+
 
 def _shift_month(year: int, month: int, delta: int) -> tuple[int, int]:
     idx = year * 12 + (month - 1) + delta
@@ -977,10 +979,17 @@ def build_tenant_dashboard_overview(tenant: TenantProfile) -> dict[str, Any]:
         "truck_rows": [],
         "driver_rows": [],
     }
+    fleet_gps: dict[str, Any] = {
+        'default_center': {'lat': 24.7136, 'lng': 46.6753},
+        'live_markers': [],
+        'featured_track': None,
+        'updated_at': '—',
+    }
     if schema_name:
         with schema_context(schema_name):
             ops = _build_ops_hub_data()
             fleet = _build_fleet_hub_data(schema_name)
+            fleet_gps = build_fleet_gps_payload()
 
     return {
         "plan_name": plan_name,
@@ -1000,4 +1009,5 @@ def build_tenant_dashboard_overview(tenant: TenantProfile) -> dict[str, Any]:
         "overview_actions": overview_actions,
         "ops": ops,
         "fleet": fleet,
+        "fleet_gps": fleet_gps,
     }

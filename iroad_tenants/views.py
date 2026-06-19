@@ -46,6 +46,7 @@ from iroad_tenants.list_table_utils import (
     build_eal_list_queryset,
     copy_eal_list_params,
     eal_column_filter_values,
+    eal_list_query_href,
     get_list_search_q,
     paginate_tenant_list,
     prepare_eal_list,
@@ -1466,7 +1467,32 @@ class TenantDashboardView(View):
             context['tenant'],
         )
         context['dashboard_search_routes'] = build_dashboard_search_routes()
+        from django.conf import settings
+
+        context['google_maps_api_key'] = settings.GOOGLE_MAPS_API_KEY
+        context['fleet_gps_refresh_url'] = reverse(
+            'iroad_tenants:tenant_dashboard_fleet_gps',
+        )
         return render(request, 'iroad_tenants/index.html', context)
+
+
+class TenantDashboardFleetGpsView(View):
+    """JSON feed for Fleet GPS Surveillance map refresh."""
+
+    def get(self, request):
+        context = _tenant_context_from_session(request)
+        if context is None:
+            return JsonResponse({'error': 'Unauthorized'}, status=401)
+        tenant_registry = _activate_tenant_workspace_schema(request)
+        try:
+            from iroad_tenants.fleet_gps_tracking import build_fleet_gps_payload
+
+            focus_shipment_id = (request.GET.get('shipment_id') or '').strip()
+            return JsonResponse(
+                build_fleet_gps_payload(focus_shipment_id=focus_shipment_id),
+            )
+        finally:
+            restore_public_schema(request)
 
 
 class TenantDashboardSearchView(View):
@@ -10635,25 +10661,6 @@ def _tenant_operation_action_form_data_from_request(request, *, action_code_prev
     }
 
 
-def _tenant_operation_action_swap_peer_candidate(
-    form_data,
-    sequence_number,
-    *,
-    exclude_action_id=None,
-):
-    if not form_data.get('confirm_sequence_swap'):
-        return None
-    scope = (form_data.get('action_scope') or '').strip()
-    category = (form_data.get('sequence_category') or '').strip()
-    if not sequencing_is_active(scope, category):
-        return None
-    return find_sequence_peer(
-        category,
-        sequence_number,
-        exclude_action_id=exclude_action_id,
-    )
-
-
 def _tenant_operation_action_apply_confirmed_sequence_swap(
     form_data,
     *,
@@ -10685,13 +10692,6 @@ def _tenant_operation_action_apply_confirmed_sequence_swap(
         form_data=form_data,
     )
     return peer
-
-
-def _tenant_operation_action_validate_post_swap_toggles(form_data, *, exclude_action_id=None):
-    return validate_configuration_toggles(
-        form_data,
-        exclude_action_id=exclude_action_id,
-    )
 
 
 def _tenant_operation_action_save_form_errors(form_data, exc):
@@ -10746,20 +10746,12 @@ def _validate_tenant_operation_action_form_data(form_data, *, exclude_action_id=
     )
     form_errors.update(sequencing_errors)
 
-    swap_peer = _tenant_operation_action_swap_peer_candidate(
-        form_data,
-        sequence_number,
-        exclude_action_id=exclude_action_id,
-    )
-    defer_toggle_validation = bool(form_data.get('confirm_sequence_swap') and swap_peer is not None)
-
-    if not defer_toggle_validation:
-        form_errors.update(
-            validate_configuration_toggles(
-                form_data,
-                exclude_action_id=exclude_action_id,
-            )
+    form_errors.update(
+        validate_configuration_toggles(
+            form_data,
+            exclude_action_id=exclude_action_id,
         )
+    )
     form_errors.update(validate_status_impact_fields(form_data))
 
     return form_errors, sequence_number
@@ -10870,10 +10862,6 @@ class TenantOperationActionsCreateView(View):
                         form_data,
                         sequence_number=sequence_number,
                     )
-                    toggle_errors = _tenant_operation_action_validate_post_swap_toggles(form_data)
-                    if toggle_errors:
-                        first_error = next(iter(toggle_errors.values()))
-                        raise ValueError(first_error)
 
                     action_code = ''
                     for _ in range(10):
@@ -11047,13 +11035,6 @@ class TenantOperationActionsEditView(View):
                         sequence_number=sequence_number,
                         action=action,
                     )
-                    toggle_errors = _tenant_operation_action_validate_post_swap_toggles(
-                        form_data,
-                        exclude_action_id=action.action_id,
-                    )
-                    if toggle_errors:
-                        first_error = next(iter(toggle_errors.values()))
-                        raise ValueError(first_error)
                     _tenant_operation_action_assign_form_fields(
                         action,
                         form_data,
@@ -26665,7 +26646,7 @@ class TruckTypeMasterListView(View):
             else:
                 q.pop('page', None)
             encoded = q.urlencode()
-            return f'?{encoded}' if encoded else ''
+            return eal_list_query_href(encoded)
 
         def _sort_url(col_key):
             q = request.GET.copy()
@@ -27277,7 +27258,7 @@ class TruckMasterListView(View):
                 q['sort_dir'] = 'asc'
             q['sort_col'] = str(col_index)
             encoded = q.urlencode()
-            return f'?{encoded}' if encoded else ''
+            return eal_list_query_href(encoded)
 
         try:
             active_sort_col = int(list_ctx.get('sort_col') or 1)

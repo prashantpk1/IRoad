@@ -38,6 +38,21 @@ function applyView(view) {
       window.fihFleetMapInstance.invalidateSize();
     }, 150);
   }
+
+  if (view === "operations-hub") {
+    if (window.iroadOnOperationsHubShown) {
+      window.iroadOnOperationsHubShown();
+    } else if (window.iroadScheduleFleetGpsBoot) {
+      window.iroadScheduleFleetGpsBoot();
+    } else if (window.iroadTryBootFleetGpsMaps) {
+      window.setTimeout(window.iroadTryBootFleetGpsMaps, 100);
+      window.setTimeout(window.iroadTryBootFleetGpsMaps, 450);
+    }
+    if (window.iroadResizeFleetGpsMaps) {
+      window.setTimeout(window.iroadResizeFleetGpsMaps, 400);
+      window.setTimeout(window.iroadResizeFleetGpsMaps, 1000);
+    }
+  }
 }
 
 /* ── Finance Sales Hub Tabs ── */
@@ -148,6 +163,14 @@ function initSurveillanceTabs() {
         pane.getAttribute("data-surv-pane") === tabKey,
       );
     });
+
+    if (window.iroadOnSurveillanceTabChange) {
+      window.iroadOnSurveillanceTabChange(tabKey);
+    } else if (window.iroadResizeFleetGpsMaps) {
+      window.setTimeout(function () {
+        window.iroadResizeFleetGpsMaps();
+      }, 300);
+    }
   }
 
   tabBtns.forEach(function (btn) {
