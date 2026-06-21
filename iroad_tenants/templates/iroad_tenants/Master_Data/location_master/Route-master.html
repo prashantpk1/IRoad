@@ -25,10 +25,7 @@
         <div class="page-header-row align-items-start">
           <div class="page-header-left">
             <h1 class="page-title">{% if is_edit %}{% translate "Edit Route" %}{% else %}{% translate "Route Master" %}{% endif %}</h1>
-            <!-- <p class="page-subtitle">
-              {% translate "Define routes between origin and destination locations for planning and pricing." %}
-            </p> -->
-          </div>
+            </div>
           <div class="page-header-right ms-auto">
             <a href="{% url 'iroad_tenants:tenant_route_master_list' %}" class="btn btn-outline-secondary">
               <i class="bi bi-arrow-left me-1"></i>{% translate "Back" %}

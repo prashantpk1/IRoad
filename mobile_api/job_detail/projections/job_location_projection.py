@@ -65,25 +65,56 @@ def serialize_location_point(
     *,
     request: Any | None = None,
     map_link: str = '',
+    address: str = '',
+    latitude: str = '',
+    longitude: str = '',
 ) -> dict[str, Any]:
-    """Map ``TenantLocationMaster`` (empty-move from/to) to address-like DTO."""
-    if location is None:
-        if not (map_link or '').strip():
-            return {}
-        return {'map_link': (map_link or '').strip()}
-    english = (getattr(location, 'location_name_english', '') or '').strip()
-    arabic = (getattr(location, 'location_name_arabic', '') or '').strip()
-    display = (getattr(location, 'display_label', '') or english or '').strip()
-    return {
-        'location_id': str(
-            getattr(location, 'location_id', None) or getattr(location, 'pk', '') or ''
-        ),
-        'location_code': str(getattr(location, 'location_code', '') or ''),
-        'display_name': display,
-        'label': _localized_label(request, english or display, arabic),
-        'province': str(getattr(location, 'province', '') or ''),
-        'map_link': (map_link or '').strip(),
-    }
+    """Map movement endpoint to an address-like DTO (Location Master and/or Places)."""
+    address_text = (address or '').strip()
+    lat = str(latitude or '').strip()
+    lng = str(longitude or '').strip()
+    link = (map_link or '').strip()
+
+    if location is None and not address_text and not link and not (lat and lng):
+        return {}
+
+    if not link and lat and lng:
+        try:
+            from iroad_tenants.fleet_gps_tracking import build_google_maps_link
+
+            link = build_google_maps_link(lat, lng)
+        except Exception:
+            pass
+
+    result: dict[str, Any] = {}
+    if location is not None:
+        english = (getattr(location, 'location_name_english', '') or '').strip()
+        arabic = (getattr(location, 'location_name_arabic', '') or '').strip()
+        display = (getattr(location, 'display_label', '') or english or '').strip()
+        result = {
+            'location_id': str(
+                getattr(location, 'location_id', None) or getattr(location, 'pk', '') or ''
+            ),
+            'location_code': str(getattr(location, 'location_code', '') or ''),
+            'display_name': display,
+            'label': _localized_label(request, english or display, arabic),
+            'province': str(getattr(location, 'province', '') or ''),
+        }
+
+    if address_text:
+        result['display_name'] = address_text
+        result['label'] = address_text
+    elif not result:
+        result['display_name'] = ''
+        result['label'] = ''
+
+    if lat:
+        result['latitude'] = lat
+    if lng:
+        result['longitude'] = lng
+    if link:
+        result['map_link'] = link
+    return result
 
 
 def build_shipment_location_block(
@@ -126,6 +157,23 @@ def build_shipment_location_block(
     }
 
 
+def _movement_endpoint_projection(
+    movement: Any,
+    side: Literal['from', 'to'],
+    *,
+    request: Any | None = None,
+) -> dict[str, Any]:
+    prefix = f'{side}_'
+    return serialize_location_point(
+        _movement_location_point(movement, side),
+        request=request,
+        map_link=getattr(movement, f'{prefix}location_map_link', '') or '',
+        address=getattr(movement, f'{prefix}location_address', '') or '',
+        latitude=getattr(movement, f'{prefix}latitude', '') or '',
+        longitude=getattr(movement, f'{prefix}longitude', '') or '',
+    )
+
+
 def build_movement_location_block(
     movement: Any,
     *,
@@ -139,28 +187,20 @@ def build_movement_location_block(
             booking=getattr(movement, 'booking', None) or getattr(shipment, 'booking', None),
             request=request,
         )
-        block['movement_from'] = serialize_location_point(
-            _movement_location_point(movement, 'from'),
+        block['movement_from'] = _movement_endpoint_projection(
+            movement,
+            'from',
             request=request,
-            map_link=getattr(movement, 'from_location_map_link', '') or '',
         )
-        block['movement_to'] = serialize_location_point(
-            _movement_location_point(movement, 'to'),
+        block['movement_to'] = _movement_endpoint_projection(
+            movement,
+            'to',
             request=request,
-            map_link=getattr(movement, 'to_location_map_link', '') or '',
         )
         return block
 
     return {
         'route': {},
-        'pickup_address': serialize_location_point(
-            _movement_location_point(movement, 'from'),
-            request=request,
-            map_link=getattr(movement, 'from_location_map_link', '') or '',
-        ),
-        'drop_address': serialize_location_point(
-            _movement_location_point(movement, 'to'),
-            request=request,
-            map_link=getattr(movement, 'to_location_map_link', '') or '',
-        ),
+        'pickup_address': _movement_endpoint_projection(movement, 'from', request=request),
+        'drop_address': _movement_endpoint_projection(movement, 'to', request=request),
     }

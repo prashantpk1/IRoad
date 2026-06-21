@@ -7,10 +7,6 @@
 {% block breadcrumb %}{% endblock %}
 
 {% block content %}
-<!-- Top Header -->
-      
-
-      
       <div class="page-header">
         <nav aria-label="breadcrumb">
           <ol class="breadcrumb">
@@ -28,15 +24,7 @@
         <div class="page-header-row">
           <div class="page-header-left">
             <h1 class="page-title">{% if is_edit_mode %}Edit Client Attachment{% else %}Create Client Attachment{% endif %}</h1>
-            <!-- <p class="page-subtitle">
-              {% if is_edit_mode %}
-              Update attachment details or replace the file. Leave file empty to keep the current document.
-              {% else %}
-              Fill in the details below to upload a new attachment for a client
-              account.
-              {% endif %}
-            </p> -->
-          </div>
+            </div>
           <div class="page-header-right">
             <a
               href="{{ attachment_cancel_url|default:'#' }}"

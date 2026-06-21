@@ -1834,6 +1834,7 @@ form.fih-search-box {
   grid-template-columns: 1fr 1fr;
   gap: 14px;
   padding: 16px 20px 20px;
+  align-items: stretch;
 }
 
 .quota-panel {
@@ -1844,6 +1845,8 @@ form.fih-search-box {
   overflow: visible;
   display: flex;
   flex-direction: column;
+  height: 100%;
+  min-height: 300px;
 }
 
 .quota-panel-head {
@@ -1852,6 +1855,7 @@ form.fih-search-box {
   justify-content: space-between;
   gap: 8px;
   margin-bottom: 12px;
+  flex-shrink: 0;
 }
 
 .quota-title {
@@ -1877,47 +1881,81 @@ form.fih-search-box {
 
 /* ── Bar chart ── */
 .quota-chart-area {
-  display: grid;
-  grid-template-columns: 26px 1fr;
-  gap: 10px;
+  --quota-plot-height: 160px;
   flex: 1;
-  min-height: 200px;
+  display: grid;
+  grid-template-columns: 28px 1fr;
+  column-gap: 8px;
   overflow: visible;
+  align-items: center;
+  align-content: center;
 }
 
 .quota-y-axis {
-  display: flex;
-  flex-direction: column;
-  justify-content: space-between;
+  position: relative;
+  height: var(--quota-plot-height);
   font-size: 11px;
   color: #94a3b8;
   font-weight: 500;
   text-align: right;
-  padding: 4px 0 22px;
+  padding: 0;
+}
+
+.quota-y-tick {
+  position: absolute;
+  right: 0;
+  line-height: 1;
+}
+
+.quota-y-tick.is-top {
+  transform: translateY(0);
+}
+
+.quota-y-tick.is-mid {
+  transform: translateY(-50%);
+}
+
+.quota-y-tick.is-bottom {
+  transform: translateY(-100%);
 }
 
 .quota-bars-wrap {
   position: relative;
   display: grid;
-  grid-template-columns: repeat(4, 1fr);
-  gap: 14px;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 0;
   align-items: end;
-  height: 168px;
-  padding: 4px 10px 22px;
+  height: var(--quota-plot-height);
+  margin-bottom: 20px;
+  padding: 0;
   overflow: visible;
 }
 
 .quota-grid-lines {
   position: absolute;
-  inset: 0 0 22px 0;
-  background-image: repeating-linear-gradient(
-    to bottom,
-    #edf1f6 0,
-    #edf1f6 1px,
-    transparent 1px,
-    transparent 25%
-  );
-  background-size: 100% 25%;
+  inset: 0;
+  pointer-events: none;
+  z-index: 0;
+}
+
+.quota-grid-line {
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: 1px;
+  background: #edf1f6;
+}
+
+.quota-grid-line.is-top {
+  transform: translateY(0);
+}
+
+.quota-grid-line.is-mid {
+  transform: translateY(-50%);
+}
+
+.quota-grid-line.is-bottom {
+  transform: translateY(-100%);
 }
 
 .quota-month-group {
@@ -1927,7 +1965,7 @@ form.fih-search-box {
   align-items: flex-end;
   justify-content: center;
   gap: 6px;
-  height: 140px;
+  height: 100%;
   cursor: default;
 }
 
@@ -1949,6 +1987,10 @@ form.fih-search-box {
   transition:
     filter 0.15s,
     transform 0.15s;
+}
+
+.quota-bar[data-count="0"] {
+  display: none;
 }
 
 .quota-bar:hover {
@@ -2062,7 +2104,7 @@ form.fih-search-box {
   align-items: center;
   justify-content: center;
   flex: 1;
-  min-height: 200px;
+  min-height: 0;
   padding: 10px 0;
   position: relative;
 }
@@ -2160,11 +2202,13 @@ form.fih-search-box {
   align-items: center;
   justify-content: center;
   gap: 16px;
-  margin-top: 14px;
+  margin-top: auto;
+  padding-top: 8px;
   font-size: 11px;
   color: #475569;
   flex-wrap: wrap;
   font-weight: 500;
+  flex-shrink: 0;
 }
 
 .quota-legend.multi {

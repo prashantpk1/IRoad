@@ -48,6 +48,10 @@ class CodAmountHelperTests(SimpleTestCase):
         self.assertEqual(display['amount_due'], '100.00')
         self.assertEqual(display['expected_cod_amount'], '100.00')
         self.assertEqual(display['currency'], 'SAR')
+        self.assertFalse(display['field_configuration']['comment_required'])
+        self.assertFalse(display['field_configuration']['attachment_required'])
+        self.assertEqual(display['collection_rules']['minimum_amount'], '100.00')
+        self.assertTrue(display['collection_rules']['allow_over_collection'])
 
     def test_next_action_hint_includes_amount_for_a9(self):
         shipment = MagicMock()

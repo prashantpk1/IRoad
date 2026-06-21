@@ -1,221 +1,259 @@
+{% load printing_tags %}
 <!DOCTYPE html>
 <html lang="ar" dir="rtl">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>{{ report.report_no }}</title>
-  <style>
-    @page { size: A4; margin: 0.2cm; }
-    * { box-sizing: border-box; }
-    body {
-      margin: 0;
-      font-family: "Noto Naskh Arabic", "Amiri", "Tahoma", "Arial", sans-serif;
-      color: #111827;
-      direction: rtl;
-      unicode-bidi: plaintext;
-      font-size: 11px;
-      line-height: 1.4;
-    }
-    .doc { width: 100%; }
-    .head {
-      border-bottom: 1px solid #d1d5db;
-      padding-bottom: 6px;
-      margin-bottom: 8px;
-    }
-    .title { font-size: 18px; font-weight: 700; margin: 0; }
-    .sub { color: #4b5563; margin-top: 3px; }
-    .meta-grid {
-      display: grid;
-      grid-template-columns: repeat(4, minmax(0, 1fr));
-      gap: 6px;
-      margin: 8px 0 12px;
-    }
-    .meta-card {
-      border: 1px solid #e5e7eb;
-      padding: 5px 6px;
-      page-break-inside: avoid;
-    }
-    .meta-label { color: #6b7280; font-size: 10px; }
-    .meta-value { font-weight: 700; margin-top: 2px; }
-    table {
-      width: 100%;
-      border-collapse: collapse;
-      margin-top: 6px;
-      page-break-inside: auto;
-    }
-    thead { display: table-header-group; }
-    tfoot { display: table-footer-group; }
-    tr { page-break-inside: avoid; page-break-after: auto; }
-    th, td {
-      border: 1px solid #d1d5db;
-      padding: 4px;
-      vertical-align: top;
-    }
-    th { background: #f3f4f6; text-align: right; }
-    .num { text-align: left; direction: ltr; unicode-bidi: embed; }
-    .section-title {
-      margin-top: 10px;
-      font-size: 13px;
-      font-weight: 700;
-      page-break-after: avoid;
-    }
-    .summary-wrap {
-      margin-top: 10px;
-      border: 1px solid #d1d5db;
-      padding: 6px;
-      page-break-inside: avoid;
-    }
-    .summary-grid {
-      display: grid;
-      grid-template-columns: repeat(3, minmax(0, 1fr));
-      gap: 6px;
-    }
-    .summary-item {
-      border: 1px solid #e5e7eb;
-      padding: 6px;
-    }
-    .summary-item .k { color: #4b5563; font-size: 10px; }
-    .summary-item .v { margin-top: 2px; font-weight: 700; }
-    .signature-block {
-      margin-top: 12px;
-      border-top: 1px dashed #9ca3af;
-      padding-top: 8px;
-      page-break-inside: avoid;
-      min-height: 60px;
-    }
-    .screen-only { display: none; }
-    @media screen {
-      .screen-only { display: block; margin: 8px 0; }
-      .screen-only button { padding: 6px 10px; }
-    }
-  </style>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>تقرير فاتورة المبيعات | Sales Invoice Report</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Arabic:wght@300;400;500;600;700&family=IBM+Plex+Sans:wght@300;400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+{% include 'iroad_tenants/Printing-Templates/partials/print_brand_styles.html' %}
 </head>
-<body>
-  <div class="doc">
-    <div class="screen-only">
-      <button type="button" onclick="window.print()">Print</button>
-    </div>
 
-    <header class="head">
-      <h1 class="title">تقرير فاتورة المبيعات</h1>
-      <div class="sub">Sales Invoice Report</div>
-    </header>
+<body data-lang="bi" data-status="{{ report.status|lower }}">
 
-    <section class="meta-grid">
-      <div class="meta-card"><div class="meta-label">Report No</div><div class="meta-value">{{ report.report_no }}</div></div>
-      <div class="meta-card"><div class="meta-label">Report Date</div><div class="meta-value">{{ report.report_date|date:'Y-m-d' }}</div></div>
-      <div class="meta-card"><div class="meta-label">Status</div><div class="meta-value">{{ report.status }}</div></div>
-      <div class="meta-card"><div class="meta-label">Client Snapshot Ref</div><div class="meta-value">{{ report.client_id }}</div></div>
-      <div class="meta-card"><div class="meta-label">Booking From</div><div class="meta-value">{{ report.booking_date_from|date:'Y-m-d' }}</div></div>
-      <div class="meta-card"><div class="meta-label">Booking To</div><div class="meta-value">{{ report.booking_date_to|date:'Y-m-d' }}</div></div>
-      <div class="meta-card"><div class="meta-label">Currency</div><div class="meta-value">{{ report.currency|default:'SAR' }}</div></div>
-      <div class="meta-card"><div class="meta-label">Generated At</div><div class="meta-value">{{ report.updated_at|date:'Y-m-d H:i' }}</div></div>
+<div class="page">
+
+    {% include 'iroad_tenants/Printing-Templates/partials/print_doc_header.html' with doc_title_ar='تقرير فاتورة المبيعات' doc_title_en='Sales Invoice Report' doc_number=report.report_no %}
+
+    <section class="avoid-break">
+        <div class="section-head">
+            <div class="section-titles">
+                <div class="section-title-ar">معلومات التقرير</div>
+                <div class="section-title-en">Report Information</div>
+            </div>
+        </div>
+        <div class="field-grid grid-3">
+            <div class="field">
+                <div class="field-label"><span class="l-ar">رقم التقرير</span><span class="l-en">Report No.</span></div>
+                <div class="field-value mono strong">{{ report.report_no|default:print_na }}</div>
+            </div>
+            <div class="field">
+                <div class="field-label"><span class="l-ar">تاريخ التقرير</span><span class="l-en">Report Date</span></div>
+                <div class="field-value mono">{{ report.report_date|print_date }}</div>
+            </div>
+            <div class="field">
+                <div class="field-label"><span class="l-ar">تاريخ تحديث التقرير</span><span class="l-en">Report Update Date</span></div>
+                <div class="field-value mono">{{ report.updated_at|print_datetime }}</div>
+            </div>
+            <div class="field">
+                <div class="field-label"><span class="l-ar">الحالة</span><span class="l-en">Status</span></div>
+                <div class="field-value"><span class="pill {{ report.status|print_status_pill }}">{{ report.status|default:print_na }}</span></div>
+            </div>
+            <div class="field" style="grid-column: span 2;">
+                <div class="field-label"><span class="l-ar">حساب العميل</span><span class="l-en">Client Account</span></div>
+                <div class="field-value strong">{% if report.client %}{{ report.client.display_name }}{% else %}{{ print_na }}{% endif %}</div>
+            </div>
+        </div>
     </section>
 
-    <h2 class="section-title">Bookings</h2>
-    <table>
-      <thead>
-        <tr>
-          <th>SN</th>
-          <th>Booking Snapshot</th>
-          <th>SO Ref</th>
-          <th>Service Name</th>
-          <th>Trip Type</th>
-          <th class="num">Sell Price</th>
-        </tr>
-      </thead>
-      <tbody>
-        {% for row in booking_lines %}
-          <tr>
-            <td>{{ row.line_no }}</td>
-            <td>{{ row.booking_ref|default:'-' }}</td>
-            <td>{{ row.so_ref|default:'-' }}</td>
-            <td>{{ row.service_name|default:'-' }}</td>
-            <td>{{ row.trip_type|default:'-' }}</td>
-            <td class="num">{{ row.sell_price }}</td>
-          </tr>
-        {% empty %}
-          <tr><td colspan="6">No booking lines.</td></tr>
-        {% endfor %}
-      </tbody>
-    </table>
-
-    <h2 class="section-title">Related Shipments</h2>
-    <table>
-      <thead>
-        <tr>
-          <th>SN</th>
-          <th>Shipment Snapshot</th>
-          <th>Booking Ref</th>
-          <th>Date</th>
-          <th>Route</th>
-          <th>Truck</th>
-        </tr>
-      </thead>
-      <tbody>
-        {% for row in shipment_lines %}
-          <tr>
-            <td>{{ row.line_no }}</td>
-            <td>{{ row.shipment_ref|default:'-' }}</td>
-            <td>{{ row.booking_ref|default:'-' }}</td>
-            <td>{{ row.shipment_date|date:'Y-m-d' }}</td>
-            <td>{{ row.from_location|default:'' }}{% if row.to_location %} -> {{ row.to_location }}{% endif %}</td>
-            <td>{{ row.truck_plate|default:'-' }}</td>
-          </tr>
-        {% empty %}
-          <tr><td colspan="6">No shipment lines.</td></tr>
-        {% endfor %}
-      </tbody>
-    </table>
-
-    <h2 class="section-title">Related Surcharges</h2>
-    <table>
-      <thead>
-        <tr>
-          <th>SN</th>
-          <th>Surcharge Snapshot</th>
-          <th>Shipment Ref</th>
-          <th>Type</th>
-          <th>Service Name</th>
-          <th class="num">Amount</th>
-        </tr>
-      </thead>
-      <tbody>
-        {% for row in surcharge_lines %}
-          <tr>
-            <td>{{ row.line_no }}</td>
-            <td>{{ row.surcharge_trx_ref|default:'-' }}</td>
-            <td>{{ row.shipment_ref|default:'-' }}</td>
-            <td>{{ row.surcharge_type|default:'-' }}</td>
-            <td>{{ row.service_name|default:'-' }}</td>
-            <td class="num">{{ row.amount }}</td>
-          </tr>
-        {% empty %}
-          <tr><td colspan="6">No surcharge lines.</td></tr>
-        {% endfor %}
-      </tbody>
-    </table>
-
-    <section class="summary-wrap">
-      <div class="summary-grid">
-        <div class="summary-item"><div class="k">Bookings Count</div><div class="v">{{ bookings_count }}</div></div>
-        <div class="summary-item"><div class="k">Shipments Count</div><div class="v">{{ shipments_count }}</div></div>
-        <div class="summary-item"><div class="k">Surcharges Count</div><div class="v">{{ surcharges_count }}</div></div>
-        <div class="summary-item"><div class="k">Freight Amount</div><div class="v num">{{ report.total_freight_amount }}</div></div>
-        <div class="summary-item"><div class="k">Surcharges Amount</div><div class="v num">{{ report.total_surcharge_amount }}</div></div>
-        <div class="summary-item"><div class="k">Total Amount</div><div class="v num">{{ total_amount }}</div></div>
-      </div>
+    <section class="avoid-break">
+        <div class="section-head">
+            <div class="section-titles">
+                <div class="section-title-ar">فترة الحجوزات</div>
+                <div class="section-title-en">Booking Period</div>
+            </div>
+        </div>
+        <div class="field-grid grid-2">
+            <div class="field">
+                <div class="field-label"><span class="l-ar">من تاريخ</span><span class="l-en">Booking From</span></div>
+                <div class="field-value mono strong">{{ report.booking_date_from|print_date }}</div>
+            </div>
+            <div class="field">
+                <div class="field-label"><span class="l-ar">إلى تاريخ</span><span class="l-en">Booking To</span></div>
+                <div class="field-value mono strong">{{ report.booking_date_to|print_date }}</div>
+            </div>
+        </div>
     </section>
 
-    <section class="signature-block">
-      <strong>Authorized Signatures</strong>
+    <section class="avoid-break">
+        <div class="section-head">
+            <div class="section-titles">
+                <div class="section-title-ar">الحجوزات</div>
+                <div class="section-title-en">Bookings</div>
+            </div>
+        </div>
+        <table class="data-table">
+            <thead>
+                <tr>
+                    <th class="num" style="width: 5%;"><span class="l-ar">م</span><span class="l-en">SN</span></th>
+                    <th style="width: 18%;"><span class="l-ar">رقم الحجز</span><span class="l-en">Booking</span></th>
+                    <th style="width: 14%;"><span class="l-ar">تاريخ الحجز</span><span class="l-en">Booking Date</span></th>
+                    <th><span class="l-ar">صنف الخدمة</span><span class="l-en">Service Item</span></th>
+                    <th style="width: 14%;"><span class="l-ar">نوع الرحلة</span><span class="l-en">Trip Type</span></th>
+                    <th class="num" style="width: 14%;"><span class="l-ar">سعر البيع</span><span class="l-en">Sell Price</span></th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for line in booking_lines %}
+                <tr>
+                    <td class="num mono">{{ line.line_no }}</td>
+                    <td class="mono">{% if line.booking %}{{ line.booking.booking_no }}{% else %}{{ line.so_ref|default:print_na }}{% endif %}</td>
+                    <td class="mono">{% if line.booking %}{{ line.booking.booking_date|print_date }}{% else %}{{ print_na }}{% endif %}</td>
+                    <td>{{ line.service_name|default:print_na }}</td>
+                    <td>{{ line.trip_type|default:print_na }}</td>
+                    <td class="num mono strong">{{ line.sell_price|print_decimal:2 }}</td>
+                </tr>
+                {% empty %}
+                <tr>
+                    <td colspan="6" class="center">{{ print_na }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+            {% if booking_lines %}
+            <tfoot>
+                <tr>
+                    <td colspan="5" style="text-align: end; font-weight: 700; padding-inline-end: 14px;"><span class="l-ar">إجمالي الحجوزات</span><span class="l-en"> · Bookings Total</span></td>
+                    <td class="num mono" style="font-weight: 800; color: var(--brand-blue-dark); font-size: 11pt;">{{ report.total_freight_amount|print_money:report.currency }}</td>
+                </tr>
+            </tfoot>
+            {% endif %}
+        </table>
     </section>
-  </div>
 
-  <script>
-    window.addEventListener('load', function () {
-      setTimeout(function () { window.print(); }, 250);
-    });
-  </script>
+    <section class="avoid-break">
+        <div class="section-head">
+            <div class="section-titles">
+                <div class="section-title-ar">الشحنات المرتبطة</div>
+                <div class="section-title-en">Related Shipments</div>
+            </div>
+        </div>
+        <table class="data-table">
+            <thead>
+                <tr>
+                    <th class="num" style="width: 4%;"><span class="l-ar">م</span><span class="l-en">SN</span></th>
+                    <th style="width: 14%;"><span class="l-ar">الحجز</span><span class="l-en">Booking</span></th>
+                    <th style="width: 14%;"><span class="l-ar">الشحنة</span><span class="l-en">Shipment</span></th>
+                    <th style="width: 11%;"><span class="l-ar">تاريخ الشحن</span><span class="l-en">Shipment Date</span></th>
+                    <th><span class="l-ar">المسار</span><span class="l-en">Route</span></th>
+                    <th style="width: 9%;"><span class="l-ar">الشاحنة</span><span class="l-en">Truck</span></th>
+                    <th style="width: 12%;"><span class="l-ar">مرجع العميل</span><span class="l-en">Customer Ref</span></th>
+                    <th style="width: 11%;"><span class="l-ar">تاريخ الإثبات</span><span class="l-en">POD Date</span></th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for line in shipment_lines %}
+                <tr>
+                    <td class="num mono">{{ line.line_no }}</td>
+                    <td class="mono">{% if line.booking %}{{ line.booking.booking_no }}{% else %}{{ print_na }}{% endif %}</td>
+                    <td class="mono">{% if line.shipment %}{{ line.shipment.shipment_no }}{% else %}{{ print_na }}{% endif %}</td>
+                    <td class="mono">{{ line.shipment_date|print_date }}</td>
+                    <td>{% if line.from_location or line.to_location %}{{ line.from_location|default:'' }}{% if line.from_location and line.to_location %} - {% endif %}{{ line.to_location|default:'' }}{% else %}{{ print_na }}{% endif %}</td>
+                    <td class="mono">{{ line.truck_plate|default:print_na }}</td>
+                    <td class="mono">{{ line.customer_ref_docs|default:print_na }}</td>
+                    <td class="mono">{{ line.pod_date|print_date }}</td>
+                </tr>
+                {% empty %}
+                <tr>
+                    <td colspan="8" class="center">{{ print_na }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </section>
+
+    <section class="avoid-break">
+        <div class="section-head">
+            <div class="section-titles">
+                <div class="section-title-ar">الرسوم الإضافية المرتبطة</div>
+                <div class="section-title-en">Related Surcharges</div>
+            </div>
+        </div>
+        <table class="data-table">
+            <thead>
+                <tr>
+                    <th class="num" style="width: 5%;"><span class="l-ar">م</span><span class="l-en">SN</span></th>
+                    <th style="width: 16%;"><span class="l-ar">رقم المعاملة</span><span class="l-en">Transaction No.</span></th>
+                    <th style="width: 13%;"><span class="l-ar">تاريخ المعاملة</span><span class="l-en">Transaction Date</span></th>
+                    <th style="width: 16%;"><span class="l-ar">الشحنة</span><span class="l-en">Shipment</span></th>
+                    <th><span class="l-ar">النوع</span><span class="l-en">Type</span></th>
+                    <th class="num" style="width: 8%;"><span class="l-ar">الكمية</span><span class="l-en">Quantity</span></th>
+                    <th class="num" style="width: 11%;"><span class="l-ar">السعر</span><span class="l-en">Price</span></th>
+                    <th class="num" style="width: 12%;"><span class="l-ar">الإجمالي الفرعي</span><span class="l-en">Subtotal</span></th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for line in surcharge_lines %}
+                <tr>
+                    <td class="num mono">{{ line.line_no }}</td>
+                    <td class="mono">{% if line.surcharge %}{{ line.surcharge.transaction_no }}{% else %}{{ print_na }}{% endif %}</td>
+                    <td class="mono">{% if line.surcharge %}{{ line.surcharge.transaction_date|print_date }}{% else %}{{ print_na }}{% endif %}</td>
+                    <td class="mono">{% if line.shipment %}{{ line.shipment.shipment_no }}{% else %}{{ print_na }}{% endif %}</td>
+                    <td>{% firstof line.surcharge_type line.service_name print_na %}</td>
+                    <td class="num mono">{% if line.surcharge %}{{ line.surcharge.qty|print_decimal:2 }}{% else %}{{ print_na }}{% endif %}</td>
+                    <td class="num mono">{% if line.surcharge %}{{ line.surcharge.unit_price|print_decimal:2 }}{% else %}{{ print_na }}{% endif %}</td>
+                    <td class="num mono strong">{{ line.amount|print_decimal:2 }}</td>
+                </tr>
+                {% empty %}
+                <tr>
+                    <td colspan="8" class="center">{{ print_na }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+            {% if surcharge_lines %}
+            <tfoot>
+                <tr>
+                    <td colspan="7" style="text-align: end; font-weight: 700; padding-inline-end: 14px;"><span class="l-ar">إجمالي الرسوم الإضافية</span><span class="l-en"> · Surcharges Total</span></td>
+                    <td class="num mono" style="font-weight: 800; color: var(--brand-blue-dark); font-size: 11pt;">{{ report.total_surcharge_amount|print_money:report.currency }}</td>
+                </tr>
+            </tfoot>
+            {% endif %}
+        </table>
+    </section>
+
+    <section class="avoid-break">
+        <div class="section-head">
+            <div class="section-titles">
+                <div class="section-title-ar">ملخّص التقرير</div>
+                <div class="section-title-en">Report Summary</div>
+            </div>
+        </div>
+
+        <div class="summary-block-label">
+            <span>VOLUME</span>
+            <span class="label-ar">الكميات</span>
+        </div>
+        <div class="field-grid grid-3">
+            <div class="field">
+                <div class="field-label"><span class="l-ar">عدد الحجوزات</span><span class="l-en">Bookings Count</span></div>
+                <div class="field-value mono strong">{{ bookings_count }}</div>
+            </div>
+            <div class="field">
+                <div class="field-label"><span class="l-ar">عدد الشحنات</span><span class="l-en">Shipments Count</span></div>
+                <div class="field-value mono strong">{{ shipments_count }}</div>
+            </div>
+            <div class="field">
+                <div class="field-label"><span class="l-ar">عدد الرسوم الإضافية</span><span class="l-en">Surcharges Count</span></div>
+                <div class="field-value mono strong">{{ surcharges_count }}</div>
+            </div>
+        </div>
+
+        <div class="summary-block-label">
+            <span>AMOUNTS</span>
+            <span class="label-ar">المبالغ</span>
+        </div>
+        <div class="field-grid grid-3">
+            <div class="field">
+                <div class="field-label"><span class="l-ar">إجمالي الحجوزات</span><span class="l-en">Bookings Amount</span></div>
+                <div class="field-value price">{{ report.total_freight_amount|print_money:report.currency }}</div>
+            </div>
+            <div class="field">
+                <div class="field-label"><span class="l-ar">إجمالي الرسوم الإضافية</span><span class="l-en">Surcharges Amount</span></div>
+                <div class="field-value price">{{ report.total_surcharge_amount|print_money:report.currency }}</div>
+            </div>
+            <div class="field total-field">
+                <div class="field-label"><span class="l-ar">الإجمالي الكلي</span><span class="l-en">Total Amount</span></div>
+                <div class="field-value total-amount">{{ total_amount|print_money:report.currency }}</div>
+            </div>
+        </div>
+    </section>
+
+    <footer class="page-footer">
+        Page 1 of 1
+    </footer>
+
+</div>
+
 </body>
 </html>

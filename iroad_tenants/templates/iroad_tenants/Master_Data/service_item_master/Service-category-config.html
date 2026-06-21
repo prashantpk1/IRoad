@@ -22,8 +22,7 @@
   <div class="page-header-row align-items-start">
     <div class="page-header-left">
       <h1 class="page-title">{% if is_view %}{% translate "Service Category Detail" %}{% elif is_edit %}{% translate "Edit category" %}{% else %}{% translate "Service Category Config" %}{% endif %}</h1>
-      <!-- <p class="page-subtitle">{% if is_view %}{% translate "Read-only category details." %}{% elif is_edit %}{% translate "Update this service category." %}{% else %}{% translate "Manage category classifications for cargo modules." %}{% endif %}</p> -->
-    </div>
+      </div>
     <div class="page-header-right ms-auto">
       <a href="{{ back_to_list_url|default_if_none:'' }}{% if not back_to_list_url %}{% url 'iroad_tenants:tenant_service_item_category_list' %}{% endif %}" class="btn btn-outline-secondary">
         <i class="bi bi-arrow-left me-1"></i>{% translate "Back" %}

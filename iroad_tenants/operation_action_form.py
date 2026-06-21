@@ -39,6 +39,10 @@ EXCLUSIVE_MAX_ONE_TOGGLES = {
 }
 REQUIRED_EXACTLY_ONE_TOGGLE = 'auto_movement_post'
 REQUIRED_EXACTLY_ONE_TOGGLE_LABEL = 'Auto Movement Post'
+SINGLETON_TOGGLE_FIELDS = (
+    REQUIRED_EXACTLY_ONE_TOGGLE,
+    *EXCLUSIVE_MAX_ONE_TOGGLES.keys(),
+)
 
 OPERATION_IMPACT_FIELDS = (
     'auto_movement_post',
@@ -330,23 +334,64 @@ def operation_action_sequence_registry() -> dict:
     return registry
 
 
+def resolve_sequence_swap_peer(
+    form_data: dict,
+    sequence_number: int,
+    *,
+    exclude_action_id=None,
+):
+    """Return the peer occupying *sequence_number* when swap is confirmed."""
+    if not form_data.get('confirm_sequence_swap'):
+        return None
+    scope = (form_data.get('action_scope') or '').strip()
+    category = (form_data.get('sequence_category') or '').strip()
+    if not sequencing_is_active(scope, category):
+        return None
+    return find_sequence_peer(
+        category,
+        sequence_number,
+        exclude_action_id=exclude_action_id,
+    )
+
+
 def apply_confirmed_sequence_swap(*, peer, current_action, form_data: dict) -> None:
     """
     Before saving the current action, move the conflicting peer out of the slot.
     Edit: peer receives the current action's previous sequence number (pairwise swap).
-    Create: peer moves to the next free sequence slot.
+          Operation Impact toggles stay on each action.
+    Create: peer moves to the next free sequence slot with all singleton toggles OFF.
+             Each singleton toggle enabled on the new action is turned OFF on every
+             other action so ownership transfers to the record being created.
     """
     category = (form_data.get('sequence_category') or '').strip()
+    peer_update_fields = ['sequence_number', 'updated_at']
 
     if current_action is not None:
         peer.sequence_number = int(current_action.sequence_number or 1)
-    else:
-        peer.sequence_number = next_sequence_slot(
-            category,
-            exclude_action_ids=[peer.pk],
-        )
+        peer.save(update_fields=peer_update_fields)
+        return
 
-    peer.save(update_fields=['sequence_number', 'updated_at'])
+    peer.sequence_number = next_sequence_slot(
+        category,
+        exclude_action_ids=[peer.pk],
+    )
+    for field_name in SINGLETON_TOGGLE_FIELDS:
+        if getattr(peer, field_name, False):
+            setattr(peer, field_name, False)
+            peer_update_fields.append(field_name)
+    peer.save(update_fields=peer_update_fields)
+
+    from tenant_workspace.models import TenantOperationAction
+
+    for field_name in SINGLETON_TOGGLE_FIELDS:
+        if not form_data.get(field_name):
+            continue
+        others = TenantOperationAction.objects.filter(**{field_name: True}).exclude(
+            pk=peer.pk,
+        )
+        for other in others:
+            setattr(other, field_name, False)
+            other.save(update_fields=[field_name, 'updated_at'])
 
 
 def validate_sequence_number_placement(

@@ -1,26 +1,105 @@
+{% load printing_tags %}
 <!DOCTYPE html>
 <html lang="ar" dir="rtl">
 <head>
-  <meta charset="UTF-8">
-  <title>{{ report.report_no }}-B{{ booking_line.line_no }}</title>
-  <style>
-    @page { size: A4; margin: 0.2cm; }
-    body { font-family: Tahoma, Arial, sans-serif; direction: rtl; font-size: 11px; color: #111; }
-    table { width: 100%; border-collapse: collapse; margin-top: 8px; }
-    th, td { border: 1px solid #d1d5db; padding: 5px; text-align: right; }
-    th { background: #f3f4f6; } .num { direction: ltr; text-align: left; unicode-bidi: embed; }
-  </style>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>لقطة حجز | Booking Snapshot</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Arabic:wght@300;400;500;600;700&family=IBM+Plex+Sans:wght@300;400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+{% include 'iroad_tenants/Printing-Templates/partials/print_brand_styles.html' %}
 </head>
-<body>
-  <h2>سجل حجز (Snapshot) / Booking Snapshot</h2>
-  <table>
-    <tbody>
-      <tr><th>Report No</th><td>{{ report.report_no }}</td><th>Line No</th><td>{{ booking_line.line_no }}</td></tr>
-      <tr><th>Booking Ref</th><td>{% if booking_line.booking %}{{ booking_line.booking.booking_no }}{% else %}-{% endif %}</td><th>SO Ref</th><td>{{ booking_line.so_ref|default:'-' }}</td></tr>
-      <tr><th>Service</th><td>{{ booking_line.service_name|default:'-' }}</td><th>Trip Type</th><td>{{ booking_line.trip_type|default:'-' }}</td></tr>
-      <tr><th>Booking Status Snapshot</th><td>{{ booking_line.booking_status|default:'-' }}</td><th>Sell Price</th><td class="num">{{ booking_line.sell_price }}</td></tr>
-    </tbody>
-  </table>
-  <script>window.addEventListener('load', function(){ setTimeout(function(){ window.print(); }, 250); });</script>
+
+<body data-lang="bi" data-status="{{ report.status|lower }}">
+
+<div class="page">
+
+    {% if booking_line.booking %}
+        {% include 'iroad_tenants/Printing-Templates/partials/print_doc_header.html' with doc_title_ar='لقطة حجز' doc_title_en='Booking Snapshot' doc_number=booking_line.booking.booking_no %}
+    {% else %}
+        {% include 'iroad_tenants/Printing-Templates/partials/print_doc_header.html' with doc_title_ar='لقطة حجز' doc_title_en='Booking Snapshot' doc_number=report.report_no %}
+    {% endif %}
+
+    <section class="avoid-break">
+        <div class="section-head">
+            <div class="section-titles">
+                <div class="section-title-ar">معلومات التقرير</div>
+                <div class="section-title-en">Report Information</div>
+            </div>
+        </div>
+        <div class="field-grid grid-3">
+            <div class="field">
+                <div class="field-label"><span class="l-ar">رقم التقرير</span><span class="l-en">Report No.</span></div>
+                <div class="field-value mono strong">{{ report.report_no|default:print_na }}</div>
+            </div>
+            <div class="field">
+                <div class="field-label"><span class="l-ar">تاريخ التقرير</span><span class="l-en">Report Date</span></div>
+                <div class="field-value mono">{{ report.report_date|print_date }}</div>
+            </div>
+            <div class="field">
+                <div class="field-label"><span class="l-ar">الحالة</span><span class="l-en">Status</span></div>
+                <div class="field-value"><span class="pill {{ report.status|print_status_pill }}">{{ report.status|default:print_na }}</span></div>
+            </div>
+            <div class="field">
+                <div class="field-label"><span class="l-ar">من تاريخ</span><span class="l-en">Booking From</span></div>
+                <div class="field-value mono">{{ report.booking_date_from|print_date }}</div>
+            </div>
+            <div class="field">
+                <div class="field-label"><span class="l-ar">إلى تاريخ</span><span class="l-en">Booking To</span></div>
+                <div class="field-value mono">{{ report.booking_date_to|print_date }}</div>
+            </div>
+            <div class="field">
+                <div class="field-label"><span class="l-ar">حساب العميل</span><span class="l-en">Client Account</span></div>
+                <div class="field-value strong">{% if report.client %}{{ report.client.display_name }}{% else %}{{ print_na }}{% endif %}</div>
+            </div>
+        </div>
+    </section>
+
+    <section class="avoid-break">
+        <div class="section-head">
+            <div class="section-titles">
+                <div class="section-title-ar">لقطة الحجز</div>
+                <div class="section-title-en">Booking Snapshot</div>
+            </div>
+        </div>
+        <div class="field-grid grid-3">
+            <div class="field">
+                <div class="field-label"><span class="l-ar">رقم السطر</span><span class="l-en">Line No.</span></div>
+                <div class="field-value mono strong">{{ booking_line.line_no }}</div>
+            </div>
+            <div class="field">
+                <div class="field-label"><span class="l-ar">رقم الحجز</span><span class="l-en">Booking No.</span></div>
+                <div class="field-value mono strong">{% if booking_line.booking %}{{ booking_line.booking.booking_no }}{% else %}{{ print_na }}{% endif %}</div>
+            </div>
+            <div class="field">
+                <div class="field-label"><span class="l-ar">مرجع أمر البيع</span><span class="l-en">SO Ref</span></div>
+                <div class="field-value mono">{{ booking_line.so_ref|default:print_na }}</div>
+            </div>
+            <div class="field">
+                <div class="field-label"><span class="l-ar">صنف الخدمة</span><span class="l-en">Service Item</span></div>
+                <div class="field-value strong">{{ booking_line.service_name|default:print_na }}</div>
+            </div>
+            <div class="field">
+                <div class="field-label"><span class="l-ar">نوع الرحلة</span><span class="l-en">Trip Type</span></div>
+                <div class="field-value">{{ booking_line.trip_type|default:print_na }}</div>
+            </div>
+            <div class="field">
+                <div class="field-label"><span class="l-ar">حالة الحجز (لقطة)</span><span class="l-en">Booking Status Snapshot</span></div>
+                <div class="field-value"><span class="pill {{ booking_line.booking_status|print_status_pill }}">{{ booking_line.booking_status|default:print_na }}</span></div>
+            </div>
+            <div class="field">
+                <div class="field-label"><span class="l-ar">سعر البيع</span><span class="l-en">Sell Price</span></div>
+                <div class="field-value price">{{ booking_line.sell_price|print_money:report.currency }}</div>
+            </div>
+        </div>
+    </section>
+
+    <footer class="page-footer">
+        Page 1 of 1
+    </footer>
+
+</div>
+
 </body>
 </html>

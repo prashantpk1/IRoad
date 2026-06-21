@@ -3061,8 +3061,10 @@ class SalesInvoiceReportBooking(models.Model):
 
     def clean(self):
         errors = {}
-        if self.booking_status and self.booking_status.lower() != 'executed':
-            errors['booking_status'] = _('Only executed bookings can be added.')
+        allowed_statuses = {'confirmed', 'completed', 'executed'}
+        status_value = (self.booking_status or '').strip().lower()
+        if status_value and status_value not in allowed_statuses:
+            errors['booking_status'] = _('Only completed bookings can be added.')
         if errors:
             raise ValidationError(errors)
 
@@ -3114,6 +3116,11 @@ class SalesInvoiceReportSurcharge(models.Model):
         ordering = ['line_no']
         constraints = [
             models.UniqueConstraint(fields=['report', 'line_no'], name='sir_surcharge_line_no_uq'),
+            models.UniqueConstraint(
+                fields=['report', 'surcharge'],
+                condition=Q(surcharge__isnull=False),
+                name='sir_unique_surcharge_per_report_uq',
+            ),
         ]
         indexes = [
             models.Index(fields=['report', 'line_no'], name='sir_surcharge_report_line_idx'),
@@ -3165,6 +3172,11 @@ class SalesInvoiceReportShipment(models.Model):
         ordering = ['line_no']
         constraints = [
             models.UniqueConstraint(fields=['report', 'line_no'], name='sir_shipment_line_no_uq'),
+            models.UniqueConstraint(
+                fields=['report', 'shipment'],
+                condition=Q(shipment__isnull=False),
+                name='sir_unique_shipment_per_report_uq',
+            ),
         ]
         indexes = [
             models.Index(fields=['report', 'line_no'], name='sir_shipment_report_line_idx'),
@@ -4356,6 +4368,12 @@ class TenantTruckMovementLog(models.Model):
     )
     from_location_map_link = models.URLField(blank=True, default='')
     to_location_map_link = models.URLField(blank=True, default='')
+    from_location_address = models.CharField(max_length=500, blank=True, default='')
+    to_location_address = models.CharField(max_length=500, blank=True, default='')
+    from_latitude = models.CharField(max_length=32, blank=True, default='')
+    from_longitude = models.CharField(max_length=32, blank=True, default='')
+    to_latitude = models.CharField(max_length=32, blank=True, default='')
+    to_longitude = models.CharField(max_length=32, blank=True, default='')
     start_time = models.DateTimeField(null=True, blank=True)
     end_time = models.DateTimeField(null=True, blank=True)
     distance_km = models.DecimalField(max_digits=10, decimal_places=2, default=0)

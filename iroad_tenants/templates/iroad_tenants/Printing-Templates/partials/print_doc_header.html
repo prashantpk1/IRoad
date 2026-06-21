@@ -1,0 +1,19 @@
+<header class="doc-header">
+    <div class="org-block">
+        <div class="org-seal">
+            <div class="mark">IR</div>
+        </div>
+        <div class="org-info">
+            <div class="org-name-ar">{{ org.name_ar }}</div>
+            <div class="org-name-en">{{ org.name_en }}</div>
+        </div>
+    </div>
+
+    <div class="doc-title-block">
+        <div class="doc-title-ar">{{ doc_title_ar }}</div>
+        <div class="doc-title-en">{{ doc_title_en }}</div>
+        {% if doc_number %}
+            <div class="doc-number-tag">{{ doc_number }}</div>
+        {% endif %}
+    </div>
+</header>

@@ -24,10 +24,7 @@
             <h1 class="page-title">
               {% if is_ticket_edit %}Edit {{ ticket.ticket_no }}{% else %}Create Support Ticket{% endif %}
             </h1>
-            <!-- <p class="page-subtitle">
-              {% if is_ticket_edit %}Update subject and category for this ticket.{% else %}Fill in the details below to create a new support ticket.{% endif %}
-            </p> -->
-          </div>
+            </div>
           <div class="page-header-right">
             <a
               href="{% url 'iroad_tenants:tenant_support_ticket_list' %}"

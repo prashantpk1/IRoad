@@ -18,8 +18,7 @@
   <div class="page-header-row">
     <div class="page-header-left">
       <h1 class="page-title">Sales Invoice Report</h1>
-      <!-- <p class="page-subtitle">{{ report.report_no }} - Read-only worksheet review</p> -->
-    </div>
+      </div>
     <div class="page-header-right">
       <div class="eal-header-actions">
         {% if report.status != 'Converted' %}
@@ -67,6 +66,7 @@
             <th>Trip Type</th>
             <th>Sell Price</th>
             <th>Sales Report Status</th>
+            <th>Actions</th>
           </tr>
         </thead>
         <tbody>
@@ -83,9 +83,14 @@
             <td>{{ r.trip_type|default:"—" }}</td>
             <td>{{ r.sell_price }}</td>
             <td>{{ r.booking.sales_report_status|default:"Pending" }}</td>
+            <td>
+              <a href="{% url 'iroad_tenants:tenant_booking_print' report.report_id r.line_no %}" class="eal-row-btn" target="_blank" rel="noopener" title="Print booking snapshot">
+                <i class="bi bi-printer"></i>
+              </a>
+            </td>
           </tr>
           {% empty %}
-          <tr><td colspan="7" class="text-muted text-center">No booking lines.</td></tr>
+          <tr><td colspan="8" class="text-muted text-center">No booking lines.</td></tr>
           {% endfor %}
         </tbody>
       </table>
@@ -196,9 +201,9 @@
       <div class="eal-stat-card"><div class="eal-stat-icon amber"><i class="bi bi-tag"></i></div><div><div class="eal-stat-value">{{ surcharge_lines|length }}</div><div class="eal-stat-label">Surcharges count</div></div></div>
     </div>
     <div class="eal-stats-row">
-      <div class="eal-stat-card"><div class="eal-stat-icon green"><i class="bi bi-currency-dollar"></i></div><div><div class="eal-stat-value jor-summary-currency">${{ report.total_freight_amount|floatformat:2 }}</div><div class="eal-stat-label">Freight amount</div></div></div>
-      <div class="eal-stat-card"><div class="eal-stat-icon amber"><i class="bi bi-cash-stack"></i></div><div><div class="eal-stat-value jor-summary-currency">${{ report.total_surcharge_amount|floatformat:2 }}</div><div class="eal-stat-label">Surcharges amount</div></div></div>
-      <div class="eal-stat-card"><div class="eal-stat-icon purple"><i class="bi bi-wallet2"></i></div><div><div class="eal-stat-value jor-summary-currency">${{ report.total_freight_amount|add:report.total_surcharge_amount|floatformat:2 }}</div><div class="eal-stat-label">Total</div></div></div>
+      <div class="eal-stat-card"><div class="eal-stat-icon green"><i class="bi bi-currency-dollar"></i></div><div><div class="eal-stat-value jor-summary-currency">{{ sir_currency_symbol|default:"SAR" }} {{ report.total_freight_amount|floatformat:2 }}</div><div class="eal-stat-label">Freight amount</div></div></div>
+      <div class="eal-stat-card"><div class="eal-stat-icon amber"><i class="bi bi-cash-stack"></i></div><div><div class="eal-stat-value jor-summary-currency">{{ sir_currency_symbol|default:"SAR" }} {{ report.total_surcharge_amount|floatformat:2 }}</div><div class="eal-stat-label">Surcharges amount</div></div></div>
+      <div class="eal-stat-card"><div class="eal-stat-icon purple"><i class="bi bi-wallet2"></i></div><div><div class="eal-stat-value jor-summary-currency">{{ sir_currency_symbol|default:"SAR" }} {{ report.total_freight_amount|add:report.total_surcharge_amount|floatformat:2 }}</div><div class="eal-stat-label">Total</div></div></div>
     </div>
   </div>
 </div>

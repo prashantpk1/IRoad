@@ -17,6 +17,12 @@ class MovementRouteMapLinkTests(SimpleTestCase):
         movement = SimpleNamespace(
             from_location_map_link='',
             to_location_map_link='',
+            from_location_address='',
+            to_location_address='',
+            from_latitude='',
+            from_longitude='',
+            to_latitude='',
+            to_longitude='',
             save=MagicMock(),
         )
 
@@ -26,10 +32,14 @@ class MovementRouteMapLinkTests(SimpleTestCase):
             from_longitude='46.6753',
             to_latitude='21.4858',
             to_longitude='39.1925',
+            from_address='Depot A',
+            to_address='Depot B',
         )
 
         self.assertIn('24.7136', movement.from_location_map_link)
         self.assertIn('21.4858', movement.to_location_map_link)
+        self.assertEqual(movement.from_location_address, 'Depot A')
+        self.assertEqual(movement.to_latitude, '21.4858')
         movement.save.assert_called_once()
 
     def test_sync_from_link_on_em1_start_action(self):

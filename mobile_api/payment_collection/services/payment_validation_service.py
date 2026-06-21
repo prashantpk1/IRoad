@@ -191,6 +191,13 @@ class PaymentValidationService:
                 http_status=400,
                 message_key='mobile.validation.failed',
             )
+        if submitted < expected:
+            raise PaymentCollectionError(
+                str(_('mobile.payment_collection.amount_below_minimum')),
+                code='amount_below_minimum',
+                http_status=400,
+                message_key='mobile.payment_collection.amount_below_minimum',
+            )
         variance = self.detect_variance(collected_amount=submitted, cod_amount=expected)
         return {
             'expected_amount': expected,

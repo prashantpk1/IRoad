@@ -1,27 +1,209 @@
+{% load printing_tags %}
 <!DOCTYPE html>
 <html lang="ar" dir="rtl">
 <head>
-  <meta charset="UTF-8">
-  <title>{{ driver.driver_code }}</title>
-  <style>
-    @page { size: A4; margin: 0.2cm; }
-    body { font-family: Tahoma, Arial, sans-serif; direction: rtl; font-size: 11px; color: #111; }
-    table { width: 100%; border-collapse: collapse; margin-top: 8px; }
-    th, td { border: 1px solid #d1d5db; padding: 5px; text-align: right; }
-    th { background: #f3f4f6; }
-  </style>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>بيانات السائق | Driver Information</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Arabic:wght@300;400;500;600;700&family=IBM+Plex+Sans:wght@300;400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+{% include 'iroad_tenants/Printing-Templates/partials/print_brand_styles.html' %}
 </head>
-<body>
-  <h2>ملف السائق / Driver Profile</h2>
-  <table>
-    <tbody>
-      <tr><th>Driver Code</th><td>{{ driver.driver_code }}</td><th>Status</th><td>{{ driver.driver_status }}</td></tr>
-      <tr><th>Arabic Name</th><td>{{ driver.arabic_name|default:'-' }}</td><th>English Name</th><td>{{ driver.english_name|default:'-' }}</td></tr>
-      <tr><th>Mobile</th><td>{{ driver.mobile_number|default:'-' }}</td><th>Source</th><td>{{ driver.driver_source|default:'-' }}</td></tr>
-      <tr><th>ID Number</th><td>{{ driver.id_number|default:'-' }}</td><th>DL Number</th><td>{{ driver.dl_number|default:'-' }}</td></tr>
-    </tbody>
-  </table>
-  <div style="margin-top:12px;page-break-inside:avoid;"><strong>Signature</strong><div style="height:64px;border-top:1px dashed #9ca3af;margin-top:6px;"></div></div>
-  <script>window.addEventListener('load', function(){ setTimeout(function(){ window.print(); }, 250); });</script>
+
+<body data-lang="bi" data-status="{{ driver.driver_status|lower }}">
+
+<div class="page">
+
+    {% include 'iroad_tenants/Printing-Templates/partials/print_doc_header.html' with doc_title_ar='بيانات السائق' doc_title_en='Driver Information' doc_number=driver.driver_code %}
+
+    <section class="avoid-break">
+        <div class="section-head">
+            <div class="section-titles">
+                <div class="section-title-ar">المعلومات الأساسية</div>
+                <div class="section-title-en">Basic Information</div>
+            </div>
+        </div>
+        <div class="field-grid grid-3">
+            <div class="field">
+                <div class="field-label"><span class="l-ar">رمز السائق</span><span class="l-en">Driver Code</span></div>
+                <div class="field-value mono strong">{{ driver.driver_code|default:print_na }}</div>
+            </div>
+            <div class="field">
+                <div class="field-label"><span class="l-ar">حساب المستخدم</span><span class="l-en">User Account</span></div>
+                <div class="field-value mono">{% if driver.user_account_id %}{{ driver.user_account_id.username }}{% else %}{{ print_na }}{% endif %}</div>
+            </div>
+            <div class="field">
+                <div class="field-label"><span class="l-ar">حالة السائق</span><span class="l-en">Driver Status</span></div>
+                <div class="field-value"><span class="pill {{ driver.driver_status|print_status_pill }}">{{ driver.driver_status|default:print_na }}</span></div>
+            </div>
+        </div>
+    </section>
+
+    <section class="avoid-break">
+        <div class="section-head">
+            <div class="section-titles">
+                <div class="section-title-ar">البيانات الشخصية</div>
+                <div class="section-title-en">Personal Information</div>
+            </div>
+        </div>
+        <div class="field-grid grid-2">
+            <div class="field">
+                <div class="field-label"><span class="l-ar">الاسم بالعربية</span><span class="l-en">Arabic Name</span></div>
+                <div class="field-value strong">{{ driver.arabic_name|default:print_na }}</div>
+            </div>
+            <div class="field">
+                <div class="field-label"><span class="l-ar">الاسم بالإنجليزية</span><span class="l-en">English Name</span></div>
+                <div class="field-value strong">{{ driver.english_name|default:print_na }}</div>
+            </div>
+            <div class="field">
+                <div class="field-label"><span class="l-ar">الجنسية</span><span class="l-en">Nationality</span></div>
+                <div class="field-value">{% if driver.nationality_country %}{{ driver.nationality_country.name_ar }}{% else %}{{ print_na }}{% endif %}</div>
+            </div>
+            <div class="field">
+                <div class="field-label"><span class="l-ar">تاريخ الميلاد</span><span class="l-en">Birth Date</span></div>
+                <div class="field-value mono">{{ driver.birth_date|print_date }}</div>
+            </div>
+        </div>
+    </section>
+
+    <section class="avoid-break">
+        <div class="section-head">
+            <div class="section-titles">
+                <div class="section-title-ar">بيانات الهوية / الإقامة</div>
+                <div class="section-title-en">ID / IQAMA Information</div>
+            </div>
+        </div>
+        <div class="field-grid grid-3">
+            <div class="field">
+                <div class="field-label"><span class="l-ar">رقم الهوية</span><span class="l-en">ID Number</span></div>
+                <div class="field-value mono strong">{{ driver.id_number|default:print_na }}</div>
+            </div>
+            <div class="field">
+                <div class="field-label"><span class="l-ar">تاريخ انتهاء الهوية</span><span class="l-en">ID Expiry Date</span></div>
+                <div class="field-value mono">{{ driver.id_expiry_date|print_date }}</div>
+            </div>
+            <div class="field">
+                <div class="field-label"><span class="l-ar">حالة الهوية</span><span class="l-en">ID Status</span></div>
+                <div class="field-value"><span class="pill {{ driver.id_status|print_status_pill }}">{{ driver.id_status|print_doc_status_label }}</span></div>
+            </div>
+        </div>
+    </section>
+
+    <section class="avoid-break">
+        <div class="section-head">
+            <div class="section-titles">
+                <div class="section-title-ar">بيانات جواز السفر</div>
+                <div class="section-title-en">Passport Information</div>
+            </div>
+        </div>
+        <div class="field-grid grid-3">
+            <div class="field">
+                <div class="field-label"><span class="l-ar">رقم الجواز</span><span class="l-en">Passport Number</span></div>
+                <div class="field-value mono strong">{{ driver.passport_number|default:print_na }}</div>
+            </div>
+            <div class="field">
+                <div class="field-label"><span class="l-ar">تاريخ انتهاء الجواز</span><span class="l-en">Passport Expiry Date</span></div>
+                <div class="field-value mono">{{ driver.passport_expiry_date|print_date }}</div>
+            </div>
+            <div class="field">
+                <div class="field-label"><span class="l-ar">حالة الجواز</span><span class="l-en">Passport Status</span></div>
+                <div class="field-value"><span class="pill {{ driver.passport_status|print_status_pill }}">{{ driver.passport_status|print_doc_status_label }}</span></div>
+            </div>
+        </div>
+    </section>
+
+    <section class="avoid-break">
+        <div class="section-head">
+            <div class="section-titles">
+                <div class="section-title-ar">بيانات رخصة القيادة</div>
+                <div class="section-title-en">Driving License Information</div>
+            </div>
+        </div>
+        <div class="field-grid grid-3">
+            <div class="field">
+                <div class="field-label"><span class="l-ar">رقم الرخصة</span><span class="l-en">Driving License Number</span></div>
+                <div class="field-value mono strong">{{ driver.dl_number|default:print_na }}</div>
+            </div>
+            <div class="field">
+                <div class="field-label"><span class="l-ar">تاريخ انتهاء الرخصة</span><span class="l-en">Driving License Expiry Date</span></div>
+                <div class="field-value mono">{{ driver.dl_expiry_date|print_date }}</div>
+            </div>
+            <div class="field">
+                <div class="field-label"><span class="l-ar">حالة الرخصة</span><span class="l-en">Driving License Status</span></div>
+                <div class="field-value"><span class="pill {{ driver.dl_status|print_status_pill }}">{{ driver.dl_status|print_doc_status_label }}</span></div>
+            </div>
+        </div>
+    </section>
+
+    <section class="avoid-break">
+        <div class="section-head">
+            <div class="section-titles">
+                <div class="section-title-ar">بيانات بطاقة السائق</div>
+                <div class="section-title-en">Driver Card Information</div>
+            </div>
+        </div>
+        <div class="field-grid grid-3">
+            <div class="field">
+                <div class="field-label"><span class="l-ar">رقم البطاقة</span><span class="l-en">Card Number</span></div>
+                <div class="field-value mono strong">{{ driver.card_number|default:print_na }}</div>
+            </div>
+            <div class="field">
+                <div class="field-label"><span class="l-ar">تاريخ انتهاء البطاقة</span><span class="l-en">Card Expiry Date</span></div>
+                <div class="field-value mono">{{ driver.card_expiry_date|print_date }}</div>
+            </div>
+            <div class="field">
+                <div class="field-label"><span class="l-ar">حالة البطاقة</span><span class="l-en">Card Status</span></div>
+                <div class="field-value"><span class="pill {{ driver.card_status|print_status_pill }}">{{ driver.card_status|print_doc_status_label }}</span></div>
+            </div>
+        </div>
+    </section>
+
+    <section class="avoid-break">
+        <div class="section-head">
+            <div class="section-titles">
+                <div class="section-title-ar">معلومات الاتصال</div>
+                <div class="section-title-en">Contact Information</div>
+            </div>
+        </div>
+        <div class="field-grid grid-2">
+            <div class="field">
+                <div class="field-label"><span class="l-ar">رقم الجوال</span><span class="l-en">Mobile Number</span></div>
+                <div class="field-value phone">{{ driver.mobile_number|print_phone }}</div>
+            </div>
+            <div class="field">
+                <div class="field-label"><span class="l-ar">رقم واتساب</span><span class="l-en">WhatsApp Number</span></div>
+                <div class="field-value phone">{{ driver.whatsapp_number|print_phone }}</div>
+            </div>
+        </div>
+    </section>
+
+    {% with default_truck=driver.trucks_as_default_driver.first %}
+    <section class="avoid-break">
+        <div class="section-head">
+            <div class="section-titles">
+                <div class="section-title-ar">الشاحنة المعيّنة</div>
+                <div class="section-title-en">Default Truck</div>
+            </div>
+        </div>
+        <div class="field-grid grid-2">
+            <div class="field">
+                <div class="field-label"><span class="l-ar">الشاحنة المعيّنة</span><span class="l-en">Default Truck</span></div>
+                <div class="field-value mono strong">{% if default_truck %}{{ default_truck.truck_code }}{% else %}{{ print_na }}{% endif %}</div>
+            </div>
+            <div class="field">
+                <div class="field-label"><span class="l-ar">تاريخ التعيين</span><span class="l-en">Assigned Date</span></div>
+                <div class="field-value mono">{% if default_truck %}{{ default_truck.updated_at|print_datetime }}{% else %}{{ print_na }}{% endif %}</div>
+            </div>
+        </div>
+    </section>
+    {% endwith %}
+
+    <footer class="page-footer">
+        Page 1 of 1
+    </footer>
+
+</div>
+
 </body>
 </html>

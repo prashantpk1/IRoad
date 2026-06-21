@@ -7,10 +7,6 @@
 {% block breadcrumb %}{% endblock %}
 
 {% block content %}
-<!-- Top Header -->
-      
-
-      
       <div class="page-header">
         <nav aria-label="breadcrumb">
           <ol class="breadcrumb">
@@ -28,10 +24,7 @@
         <div class="page-header-row">
           <div class="page-header-left">
             <h1 class="page-title">Client Attachments</h1>
-            <!-- <p class="page-subtitle">
-              Manage and view all client attachment records
-            </p> -->
-          </div>
+            </div>
           <div class="page-header-right">
             <div class="eal-header-actions">
               <a
@@ -292,6 +285,5 @@
 
         {% include 'iroad_tenants/partials/eal_list_pagination.html' with page_obj=client_attachments_page pagination_label='attachments' %}
       </div>
-      <!-- ========== END NEW TABLE UI DESIGN ========== -->
 {% endblock %}
 

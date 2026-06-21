@@ -20,11 +20,7 @@
   <div class="page-header-row">
     <div class="page-header-left">
       <h1 class="page-title">Truck Master</h1>
-      <!-- <p class="page-subtitle">
-        Register and manage truck details, plate information, and<br />
-        specifications.
-      </p> -->
-    </div>
+      </div>
     <div class="page-header-right ms-auto">
       <a href="{% if truck_cancel_url %}{{ truck_cancel_url }}{% else %}{% url 'iroad_tenants:truck_master' %}{% endif %}" class="btn btn-outline-secondary">
         <i class="bi bi-arrow-left me-1"></i>Back
@@ -52,8 +48,6 @@
   {% if form.non_field_errors %}
   <div class="alert alert-danger" role="alert">{{ form.non_field_errors }}</div>
   {% endif %}
-
-  <!-- Section 1: Basic Info & Ownership — matches designerDesign/tenantdesign/Truck-master.html -->
   <div class="form-card" data-section="1">
     <div class="form-card-header">
       <div class="form-card-icon blue">

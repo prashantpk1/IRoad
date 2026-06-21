@@ -359,9 +359,7 @@ class EvidenceValidationService:
             )
 
     def _validate_notes(self, payload: dict[str, Any], requirements: dict[str, Any]) -> None:
-        requires_note = bool(requirements.get('note'))
-        note_required = bool(requirements.get('note_required'))
-        if not requires_note and not note_required:
+        if not bool(requirements.get('note_required')):
             return
         notes = str(payload.get('notes') or '').strip()
         if not notes:

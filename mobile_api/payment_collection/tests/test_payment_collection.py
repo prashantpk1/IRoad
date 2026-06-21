@@ -58,10 +58,10 @@ class _DummyValidation:
                 'Invalid amount.',
                 code='invalid_amount',
             )
-        if submitted > expected:
+        if submitted < expected:
             raise PaymentCollectionError(
-                'Amount ceiling exceeded.',
-                code='amount_ceiling_exceeded',
+                'Collected amount cannot be less than the amount due.',
+                code='amount_below_minimum',
             )
         return {
             'expected_amount': expected,
@@ -99,29 +99,68 @@ class PaymentCollectionFoundationTests(TransactionTestCase):
         payload = {
             'client_payment_id': client_payment_id,
             'shipment_id': shipment_id,
-            'amount': '90.00',
-            'notes': 'partial test',
+            'amount': '100.00',
+            'notes': '',
             'payment_mode': 'COD',
-            'proof_media': [
-                {
-                    'media_type': 'photo',
-                    'file_ref': f'mobile_driver_uploads/{tenant}/{driver_id}/{shipment_id}/payment_collection/proof.jpg',
-                    'file_name': 'proof.jpg',
-                    'mime_type': 'image/jpeg',
-                    'checksum': '',
-                    'captured_at': None,
-                    'sort_order': 1,
-                }
-            ],
+            'proof_media': [],
         }
 
         result = service.stage_payment(driver=_driver(driver_id), tenant_schema=tenant, payload=payload)
         self.assertIn('payment_bundle', result)
         self.assertIn('reconciliation', result)
         self.assertTrue(result['payment_bundle']['bundle_id'])
-        self.assertTrue(result['reconciliation']['variance_detected'])
+        self.assertFalse(result['reconciliation']['variance_detected'])
+        self.assertEqual(result['field_configuration']['comment_required'], False)
+        self.assertEqual(result['field_configuration']['attachment_required'], False)
         self.assertEqual(PaymentCollectionBundle.objects.filter(tenant_schema=tenant).count(), 1)
-        self.assertEqual(PaymentCollectionEvidence.objects.filter(bundle__tenant_schema=tenant).count(), 1)
+
+    def test_cod_payment_blocks_amount_below_minimum(self):
+        tenant = 'tenant_payment'
+        driver_id = str(uuid.uuid4())
+        shipment_id = str(uuid.uuid4())
+        client_payment_id = f'pay-{uuid.uuid4()}'
+
+        service = PaymentCollectionService(
+            validation=_DummyValidation(expected_amount=Decimal('100.00')),
+        )
+
+        payload = {
+            'client_payment_id': client_payment_id,
+            'shipment_id': shipment_id,
+            'amount': '90.00',
+            'notes': '',
+            'payment_mode': 'COD',
+            'proof_media': [],
+        }
+
+        with self.assertRaises(PaymentCollectionError) as exc:
+            service.stage_payment(driver=_driver(driver_id), tenant_schema=tenant, payload=payload)
+        self.assertEqual(exc.exception.code, 'amount_below_minimum')
+
+    def test_cod_payment_allows_over_collection(self):
+        tenant = 'tenant_payment'
+        driver_id = str(uuid.uuid4())
+        shipment_id = str(uuid.uuid4())
+        client_payment_id = f'pay-{uuid.uuid4()}'
+
+        service = PaymentCollectionService(
+            validation=_DummyValidation(expected_amount=Decimal('100.00')),
+            idempotency=PaymentIdempotencyService(),
+            reconciliation=PaymentReconciliationService(),
+        )
+
+        payload = {
+            'client_payment_id': client_payment_id,
+            'shipment_id': shipment_id,
+            'amount': '110.00',
+            'notes': 'customer paid extra',
+            'payment_mode': 'COD',
+            'proof_media': [],
+        }
+
+        result = service.stage_payment(driver=_driver(driver_id), tenant_schema=tenant, payload=payload)
+        self.assertTrue(result['reconciliation']['variance_detected'])
+        self.assertEqual(result['collection_rules']['minimum_amount'], '100.00')
 
     def test_non_cod_shipment_rejected(self):
         tenant = 'tenant_payment'

@@ -8,6 +8,11 @@ from __future__ import annotations
 from decimal import Decimal
 from typing import Any
 
+from mobile_api.helpers.cod_amount import (
+    build_payment_collection_rules,
+    build_payment_screen_field_configuration,
+)
+
 
 class PaymentResponseBuilder:
     def build_response(
@@ -43,6 +48,8 @@ class PaymentResponseBuilder:
             'replayed': bool(replayed),
         }
 
+        expected_amount = Decimal(str(getattr(bundle, 'expected_amount', Decimal('0'))))
+
         return {
             'payment_bundle': payment_bundle,
             'reconciliation': {
@@ -50,6 +57,10 @@ class PaymentResponseBuilder:
                 'expected_amount': str(reconciliation.get('expected_amount')),
                 'collected_amount': str(reconciliation.get('collected_amount')),
             },
+            'field_configuration': build_payment_screen_field_configuration(),
+            'collection_rules': build_payment_collection_rules(
+                minimum_amount=expected_amount,
+            ),
             'next_step': {
                 'requires_execute_action': True,
             },

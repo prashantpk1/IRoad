@@ -28,6 +28,7 @@ from django.core.paginator import Paginator
 from django.core.files.storage import default_storage
 from django.core.files import File
 from django.db import IntegrityError, ProgrammingError, connection
+from iroad_tenants.pdf_rendering import render_pdf_from_html_bytes as _render_pdf_from_html_bytes
 from iroad_tenants.tenant_schema import restore_public_schema
 from django.db.models.deletion import ProtectedError
 from django.db import transaction as db_transaction
@@ -247,7 +248,9 @@ from iroad_tenants.operation_action_form import (
     operation_action_shipment_status_choices,
     recommended_sequence_number,
     repack_sequence_category,
+    resolve_sequence_swap_peer,
     sequencing_is_active,
+    SINGLETON_TOGGLE_FIELDS,
     validate_category_sequence_integrity,
     validate_configuration_toggles,
     validate_operation_action_sequencing,
@@ -359,137 +362,15 @@ def _require_tenant_jwt_auth(request):
     return auth_payload
 
 
-def _render_pdf_from_html_bytes(
-    html_content,
-    *,
-    page_size='A4',
-    margin_cm='0.2',
-):
-    """
-    Render HTML to PDF bytes entirely in-memory (no disk persistence).
-    """
-    command = [
-        'wkhtmltopdf',
-        '--quiet',
-        '--enable-local-file-access',
-        '--encoding',
-        'utf-8',
-        '--print-media-type',
-        '--page-size',
-        page_size,
-        '--margin-top',
-        f'{margin_cm}cm',
-        '--margin-right',
-        f'{margin_cm}cm',
-        '--margin-bottom',
-        f'{margin_cm}cm',
-        '--margin-left',
-        f'{margin_cm}cm',
-        '--footer-right',
-        'Page [page] of [toPage]',
-        '--footer-font-size',
-        '9',
-        '--footer-spacing',
-        '3',
-        '-',
-        '-',
-    ]
-    process = subprocess.Popen(
-        command,
-        stdin=subprocess.PIPE,
-        stdout=subprocess.PIPE,
-        stderr=subprocess.PIPE,
-    )
-    pdf_content, error = process.communicate(input=html_content.encode('utf-8'))
-    if process.returncode != 0:
-        err = (error or b'').decode('utf-8', errors='ignore').strip()
-        raise RuntimeError(err or 'wkhtmltopdf failed')
-    return _inject_pdf_auto_print_action(pdf_content)
-
-
-def _pdf_literal_string(value):
-    """
-    Escape a JavaScript snippet as a PDF literal string.
-    """
-    return (
-        value.replace('\\', '\\\\')
-        .replace('(', '\\(')
-        .replace(')', '\\)')
-        .replace('\r', '\\r')
-        .replace('\n', '\\n')
-    )
-
-
-def _inject_pdf_auto_print_action(pdf_content):
-    """
-    Add a PDF OpenAction that asks compatible PDF viewers to open the print dialog.
-
-    The PDF is still generated and returned entirely as bytes; no temporary files,
-    cache files, or object storage writes are used.
-    """
-    root_matches = list(re.finditer(br'/Root\s+(\d+)\s+(\d+)\s+R', pdf_content))
-    size_matches = list(re.finditer(br'/Size\s+(\d+)', pdf_content))
-    startxref_match = re.search(br'startxref\s+(\d+)', pdf_content[pdf_content.rfind(b'startxref'):])
-    if not root_matches or not size_matches or not startxref_match:
-        raise RuntimeError('Unable to locate PDF catalog for auto-print action')
-
-    root_obj = int(root_matches[-1].group(1))
-    root_gen = int(root_matches[-1].group(2))
-    trailer_size = int(size_matches[-1].group(1))
-    previous_xref = int(startxref_match.group(1))
-
-    catalog_pattern = re.compile(
-        rb'%d\s+%d\s+obj\s*(.*?)\s*endobj' % (root_obj, root_gen),
-        re.DOTALL,
-    )
-    catalog_matches = list(catalog_pattern.finditer(pdf_content))
-    if not catalog_matches:
-        raise RuntimeError('Unable to locate PDF catalog object for auto-print action')
-
-    catalog_body = catalog_matches[-1].group(1).strip()
-    if not catalog_body.startswith(b'<<') or not catalog_body.endswith(b'>>'):
-        raise RuntimeError('Unsupported PDF catalog format for auto-print action')
-
-    print_js = 'this.print({bUI: true, bSilent: false, bShrinkToFit: true});'
-    open_action = (
-        b'\n/OpenAction << /S /JavaScript /JS ('
-        + _pdf_literal_string(print_js).encode('ascii')
-        + b') >>\n'
-    )
-    insert_at = catalog_body.rfind(b'>>')
-    updated_catalog = catalog_body[:insert_at] + open_action + catalog_body[insert_at:]
-
-    prefix = b'' if pdf_content.endswith(b'\n') else b'\n'
-    new_object_offset = len(pdf_content) + len(prefix)
-    new_object = (
-        b'%d %d obj\n' % (root_obj, root_gen)
-        + updated_catalog
-        + b'\nendobj\n'
-    )
-    xref_offset = new_object_offset + len(new_object)
-    incremental_update = (
-        prefix
-        + new_object
-        + b'xref\n'
-        + b'%d 1\n' % root_obj
-        + b'%010d %05d n \n' % (new_object_offset, root_gen)
-        + b'trailer\n'
-        + b'<< /Size %d /Root %d %d R /Prev %d >>\n'
-        % (trailer_size, root_obj, root_gen, previous_xref)
-        + b'startxref\n'
-        + str(xref_offset).encode('ascii')
-        + b'\n%%EOF\n'
-    )
-    return pdf_content + incremental_update
-
-
 def _render_printing_template_html(filename, context=None):
     """
     Render canonical tenant print templates from the app template directory.
     """
+    from iroad_tenants.printing_context import enrich_print_template_context
+
     return render_to_string(
         f'iroad_tenants/Printing-Templates/{filename}',
-        context or {},
+        enrich_print_template_context(context or {}),
     )
 
 
@@ -509,6 +390,34 @@ def _inline_pdf_response(pdf_content, filename):
     response['Pragma'] = 'no-cache'
     response['Expires'] = '0'
     return response
+
+
+def _print_preview_format(request) -> str:
+    return (request.GET.get('format') or request.GET.get('preview') or '').strip().casefold()
+
+
+def _respond_print_document(
+    request,
+    html_content,
+    filename,
+    *,
+    page_size='A4',
+    margin_cm='0',
+):
+    """
+    Return branded print output.
+
+    ``?format=html`` — same template as PDF (matches Printing-Templates/ design in browser).
+    Default — inline PDF via wkhtmltopdf.
+    """
+    if _print_preview_format(request) in {'html', 'preview'}:
+        return HttpResponse(html_content, content_type='text/html; charset=utf-8')
+    pdf_content = _render_pdf_from_html_bytes(
+        html_content,
+        page_size=page_size,
+        margin_cm=margin_cm,
+    )
+    return _inline_pdf_response(pdf_content, filename)
 
 ADDRESS_MASTER_AUTO_FORM_CODE = 'address-master'
 ADDRESS_MASTER_AUTO_FORM_LABEL = 'Address Code'
@@ -1233,9 +1142,12 @@ def _tenant_context_from_session(request, *, _debug_label=''):
         _clear_tenant_bootstrap_session(request)
         return None
     if redis_ok is None and not jwt_claims:
-        from iroad_frontend.exceptions import ServiceUnavailableError
-
-        raise ServiceUnavailableError('Session service is temporarily unavailable.')
+        print(
+            f'{_dbg} FAIL: Redis unavailable and no JWT fallback '
+            f'(tenant_id={tenant.tenant_id} jti={tenant_jti})'
+        )
+        _clear_tenant_bootstrap_session(request)
+        return None
 
     # Default to tenant owner profile.
     if tenant.first_name or tenant.last_name:
@@ -7098,12 +7010,15 @@ class TenantSalesInvoiceReportCreateView(View):
                 date_from = parse_date((request.GET.get('booking_date_from') or '').strip())
                 date_to = parse_date((request.GET.get('booking_date_to') or '').strip())
                 currency = (request.GET.get('currency') or '').strip()
+                exclude_report_id = _coerce_uuid((request.GET.get('report_id') or '').strip())
                 try:
                     if action == 'lookup_catalog':
                         payload = _sales_invoice_report_lookup_catalog_payload(
                             client_id=client_id,
                             booking_date_from=date_from,
                             booking_date_to=date_to,
+                            exclude_report_id=exclude_report_id,
+                            request=request,
                         )
                     else:
                         payload = _sales_invoice_report_preview_payload(
@@ -7111,6 +7026,7 @@ class TenantSalesInvoiceReportCreateView(View):
                             booking_date_from=date_from,
                             booking_date_to=date_to,
                             currency=currency,
+                            exclude_report_id=exclude_report_id,
                         )
                 except ValidationError as exc:
                     return JsonResponse({'ok': False, 'error': str(exc)}, status=400)
@@ -7250,6 +7166,11 @@ class TenantSalesInvoiceReportDetailView(View):
                     'status_timeline': status_timeline,
                     'lock_state': _sales_invoice_report_lock_state(report.status),
                     'tenant_schema_name': getattr(tenant_registry, 'schema_name', ''),
+                    **_sales_invoice_report_currency_context(
+                        request,
+                        client=report.client,
+                        currency_code=report.currency,
+                    ),
                 }
             )
             return render(request, self.template_name, context)
@@ -7274,7 +7195,7 @@ class TenantSalesInvoiceReportPrintView(View):
 
         try:
             # Snapshot reliance: use report + snapshot child rows only.
-            report = SalesInvoiceReport.objects.filter(pk=report_id).first()
+            report = SalesInvoiceReport.objects.select_related('client').filter(pk=report_id).first()
             if not report:
                 return JsonResponse({'error': 'Sales Invoice Report not found'}, status=404)
 
@@ -7305,13 +7226,14 @@ class TenantSalesInvoiceReportPrintView(View):
                 },
             )
 
-            pdf_content = _render_pdf_from_html_bytes(
-                html_content,
-                page_size='A4',
-                margin_cm='0.2',
-            )
             filename = _safe_pdf_filename(report.report_no, 'SIR.pdf')
-            return _inline_pdf_response(pdf_content, filename)
+            return _respond_print_document(
+                request,
+                html_content,
+                filename,
+                page_size='A4',
+                margin_cm='0',
+            )
         except Exception:
             logger.exception('Tenant sales invoice print stream failed')
             return JsonResponse({'error': 'Failed to render print PDF'}, status=500)
@@ -7330,10 +7252,14 @@ class TenantBookingSnapshotPrintView(View):
         if tenant_registry is None:
             return JsonResponse({'error': 'Tenant session is not active'}, status=401)
         try:
-            report = SalesInvoiceReport.objects.filter(pk=report_id).first()
+            report = SalesInvoiceReport.objects.select_related('client').filter(pk=report_id).first()
             if not report:
                 return JsonResponse({'error': 'Sales Invoice Report not found'}, status=404)
-            booking_line = report.booking_lines.filter(line_no=line_no).first()
+            booking_line = (
+                report.booking_lines.select_related('booking')
+                .filter(line_no=line_no)
+                .first()
+            )
             if not booking_line:
                 return JsonResponse({'error': 'Booking snapshot line not found'}, status=404)
             html_content = _render_printing_template_html(
@@ -7343,9 +7269,14 @@ class TenantBookingSnapshotPrintView(View):
                     'booking_line': booking_line,
                 },
             )
-            pdf_content = _render_pdf_from_html_bytes(html_content, page_size='A4', margin_cm='0.2')
             filename = _safe_pdf_filename(f'{report.report_no or "BK"}-B{line_no}', 'BK.pdf')
-            return _inline_pdf_response(pdf_content, filename)
+            return _respond_print_document(
+                request,
+                html_content,
+                filename,
+                page_size='A4',
+                margin_cm='0',
+            )
         except Exception:
             logger.exception('Tenant booking snapshot print stream failed')
             return JsonResponse({'error': 'Failed to render print PDF'}, status=500)
@@ -7354,7 +7285,7 @@ class TenantBookingSnapshotPrintView(View):
 
 
 class TenantShipmentPrintView(View):
-    template_name = 'iroad_tenants/Printing-Templates/shipment_print_dynamic.html'
+    template_name = 'iroad_tenants/Printing-Templates/shipment_print.html'
 
     def get(self, request, shipment_id):
         auth_payload = _require_tenant_jwt_auth(request)
@@ -7364,12 +7295,19 @@ class TenantShipmentPrintView(View):
         if tenant_registry is None:
             return JsonResponse({'error': 'Tenant session is not active'}, status=401)
         try:
-            shipment = TenantShipment.objects.select_related('truck').filter(pk=shipment_id).first()
+            shipment = TenantShipment.objects.select_related(
+                'truck',
+                'driver',
+                'client_account',
+                'booking',
+                'loading_address',
+                'delivery_address',
+            ).filter(pk=shipment_id).first()
             if not shipment:
                 return JsonResponse({'error': 'Shipment not found'}, status=404)
             booking = shipment.booking if shipment.booking_id else None
             html_content = _render_printing_template_html(
-                'shipment_print_dynamic.html',
+                'shipment_print.html',
                 {
                     'shipment': shipment,
                     'booking': booking,
@@ -7377,9 +7315,14 @@ class TenantShipmentPrintView(View):
                     'additional_charges': shipment.total_additional_charges,
                 },
             )
-            pdf_content = _render_pdf_from_html_bytes(html_content, page_size='A4', margin_cm='0.2')
             filename = _safe_pdf_filename(shipment.shipment_no, 'SH.pdf')
-            return _inline_pdf_response(pdf_content, filename)
+            return _respond_print_document(
+                request,
+                html_content,
+                filename,
+                page_size='A4',
+                margin_cm='0',
+            )
         except Exception:
             logger.exception('Tenant shipment print stream failed')
             return JsonResponse({'error': 'Failed to render print PDF'}, status=500)
@@ -7413,13 +7356,18 @@ class TenantSurchargePrintView(View):
                     'shipment': surcharge.shipment,
                 },
             )
-            pdf_content = _render_pdf_from_html_bytes(html_content, page_size='A4', margin_cm='0.2')
             surcharge_ref = (
                 surcharge.transaction_no
                 or f'SST-{str(surcharge.surcharge_id)[:8]}'
             )
             filename = _safe_pdf_filename(surcharge_ref, 'SST.pdf')
-            return _inline_pdf_response(pdf_content, filename)
+            return _respond_print_document(
+                request,
+                html_content,
+                filename,
+                page_size='A4',
+                margin_cm='0',
+            )
         except Exception:
             logger.exception('Tenant surcharge print stream failed')
             return JsonResponse({'error': 'Failed to render print PDF'}, status=500)
@@ -7438,16 +7386,24 @@ class TenantDriverPrintView(View):
         if tenant_registry is None:
             return JsonResponse({'error': 'Tenant session is not active'}, status=401)
         try:
-            driver = DriverMaster.objects.filter(pk=driver_id).first()
+            driver = DriverMaster.objects.select_related(
+                'nationality_country',
+                'user_account_id',
+            ).filter(pk=driver_id).first()
             if not driver:
                 return JsonResponse({'error': 'Driver not found'}, status=404)
             html_content = _render_printing_template_html(
                 'driver_print.html',
                 {'driver': driver},
             )
-            pdf_content = _render_pdf_from_html_bytes(html_content, page_size='A4', margin_cm='0.2')
             filename = _safe_pdf_filename(driver.driver_code, 'DR.pdf')
-            return _inline_pdf_response(pdf_content, filename)
+            return _respond_print_document(
+                request,
+                html_content,
+                filename,
+                page_size='A4',
+                margin_cm='0',
+            )
         except Exception:
             logger.exception('Tenant driver print stream failed')
             return JsonResponse({'error': 'Failed to render print PDF'}, status=500)
@@ -7466,16 +7422,25 @@ class TenantTruckPrintView(View):
         if tenant_registry is None:
             return JsonResponse({'error': 'Tenant session is not active'}, status=401)
         try:
-            truck = TruckMaster.objects.select_related('truck_type', 'default_driver_id').filter(pk=truck_id).first()
+            truck = TruckMaster.objects.select_related(
+                'truck_type',
+                'default_driver_id',
+                'registration_country',
+            ).filter(pk=truck_id).first()
             if not truck:
                 return JsonResponse({'error': 'Truck not found'}, status=404)
             html_content = _render_printing_template_html(
                 'truck_print.html',
                 {'truck': truck},
             )
-            pdf_content = _render_pdf_from_html_bytes(html_content, page_size='A4', margin_cm='0.2')
             filename = _safe_pdf_filename(truck.truck_code, 'TR.pdf')
-            return _inline_pdf_response(pdf_content, filename)
+            return _respond_print_document(
+                request,
+                html_content,
+                filename,
+                page_size='A4',
+                margin_cm='0',
+            )
         except Exception:
             logger.exception('Tenant truck print stream failed')
             return JsonResponse({'error': 'Failed to render print PDF'}, status=500)
@@ -7507,9 +7472,14 @@ class TenantTreasuryPrintView(View):
                     'transactions': transactions,
                 },
             )
-            pdf_content = _render_pdf_from_html_bytes(html_content, page_size='A4', margin_cm='0.2')
             filename = _safe_pdf_filename(treasury.treasury_code, 'TRS.pdf')
-            return _inline_pdf_response(pdf_content, filename)
+            return _respond_print_document(
+                request,
+                html_content,
+                filename,
+                page_size='A4',
+                margin_cm='0',
+            )
         except Exception:
             logger.exception('Tenant treasury print stream failed')
             return JsonResponse({'error': 'Failed to render print PDF'}, status=500)
@@ -7537,12 +7507,15 @@ class TenantSalesInvoiceReportUpdateView(View):
                 date_from = parse_date((request.GET.get('booking_date_from') or '').strip())
                 date_to = parse_date((request.GET.get('booking_date_to') or '').strip())
                 currency = (request.GET.get('currency') or '').strip()
+                exclude_report_id = _coerce_uuid((request.GET.get('report_id') or '').strip())
                 try:
                     if action == 'lookup_catalog':
                         payload = _sales_invoice_report_lookup_catalog_payload(
                             client_id=client_id,
                             booking_date_from=date_from,
                             booking_date_to=date_to,
+                            exclude_report_id=exclude_report_id,
+                            request=request,
                         )
                     else:
                         payload = _sales_invoice_report_preview_payload(
@@ -7550,12 +7523,13 @@ class TenantSalesInvoiceReportUpdateView(View):
                             booking_date_from=date_from,
                             booking_date_to=date_to,
                             currency=currency,
+                            exclude_report_id=exclude_report_id,
                         )
                 except ValidationError as exc:
                     return JsonResponse({'ok': False, 'error': str(exc)}, status=400)
                 return JsonResponse(payload)
 
-            report = SalesInvoiceReport.objects.filter(pk=report_id).first()
+            report = SalesInvoiceReport.objects.select_related('client').filter(pk=report_id).first()
             if not report:
                 messages.error(request, 'Sales Invoice Report not found.', extra_tags='tenant')
                 return _tenant_redirect(request, 'iroad_tenants:sales_invoice_report_list')
@@ -7578,6 +7552,12 @@ class TenantSalesInvoiceReportUpdateView(View):
                     'auto_post_enabled': report.auto_post,
                     'lock_state': _sales_invoice_report_lock_state(report.status),
                     'tenant_schema_name': getattr(tenant_registry, 'schema_name', ''),
+                    'sir_report_id': str(report.report_id),
+                    **_sales_invoice_report_currency_context(
+                        request,
+                        client=report.client,
+                        currency_code=report.currency,
+                    ),
                 }
             )
             return render(request, self.template_name, context)
@@ -7596,7 +7576,7 @@ class TenantSalesInvoiceReportUpdateView(View):
             return response
         try:
             auto_post = _post_flag_enabled(request.POST, 'auto_post')
-            report = SalesInvoiceReport.objects.filter(pk=report_id).first()
+            report = SalesInvoiceReport.objects.select_related('client').filter(pk=report_id).first()
             if not report:
                 messages.error(request, 'Sales Invoice Report not found.', extra_tags='tenant')
                 return _tenant_redirect(request, 'iroad_tenants:sales_invoice_report_list')
@@ -7710,7 +7690,7 @@ class TenantSalesInvoiceReportStatusUpdateView(View):
             clear_tenant_portal_cookie(response, request=request)
             return response
         try:
-            report = SalesInvoiceReport.objects.filter(pk=report_id).first()
+            report = SalesInvoiceReport.objects.select_related('client').filter(pk=report_id).first()
             if not report:
                 messages.error(request, 'Sales Invoice Report not found.', extra_tags='tenant')
                 return _tenant_redirect(request, 'iroad_tenants:sales_invoice_report_list')
@@ -10746,12 +10726,37 @@ def _validate_tenant_operation_action_form_data(form_data, *, exclude_action_id=
     )
     form_errors.update(sequencing_errors)
 
-    form_errors.update(
-        validate_configuration_toggles(
-            form_data,
+    pending_swap_peer = None
+    sequence_swap_prompt = sequencing_errors.get('sequence_number', '')
+    if (
+        not form_data.get('confirm_sequence_swap')
+        and 'Confirm swap' in sequence_swap_prompt
+    ):
+        pending_swap_peer = find_sequence_peer(
+            (form_data.get('sequence_category') or '').strip(),
+            sequence_number,
             exclude_action_id=exclude_action_id,
         )
+
+    swap_peer = resolve_sequence_swap_peer(
+        form_data,
+        sequence_number,
+        exclude_action_id=exclude_action_id,
     )
+    swap_peer_ids = [swap_peer.pk] if swap_peer is not None else []
+
+    toggle_errors = validate_configuration_toggles(
+        form_data,
+        exclude_action_id=exclude_action_id,
+        exclude_action_ids=swap_peer_ids,
+    )
+    if exclude_action_id is None and (
+        form_data.get('confirm_sequence_swap') or pending_swap_peer is not None
+    ):
+        for field_name in SINGLETON_TOGGLE_FIELDS:
+            if form_data.get(field_name):
+                toggle_errors.pop(field_name, None)
+    form_errors.update(toggle_errors)
     form_errors.update(validate_status_impact_fields(form_data))
 
     return form_errors, sequence_number
@@ -13182,40 +13187,6 @@ class TenantOperationSurchargeSalesCreateView(View):
             restore_public_schema(request)
 
 
-class TenantShipmentPrintView(View):
-    template_name = 'iroad_tenants/Printing-Templates/shipment_print_dynamic.html'
-
-    def get(self, request, shipment_id):
-        auth_payload = _require_tenant_jwt_auth(request)
-        if auth_payload is None:
-            return JsonResponse({'error': 'Unauthorized'}, status=401)
-        tenant_registry = _activate_tenant_workspace_schema(request)
-        if tenant_registry is None:
-            return JsonResponse({'error': 'Tenant session is not active'}, status=401)
-        try:
-            shipment = TenantShipment.objects.select_related('truck').filter(pk=shipment_id).first()
-            if not shipment:
-                return JsonResponse({'error': 'Shipment not found'}, status=404)
-            booking = shipment.booking if shipment.booking_id else None
-            html_content = _render_printing_template_html(
-                'shipment_print_dynamic.html',
-                {
-                    'shipment': shipment,
-                    'booking': booking,
-                    'cod_payment_status': _tenant_shipment_cod_payment_status(shipment),
-                    'additional_charges': shipment.total_additional_charges,
-                },
-            )
-            pdf_content = _render_pdf_from_html_bytes(html_content, page_size='A4', margin_cm='0.2')
-            filename = _safe_pdf_filename(shipment.shipment_no, 'SH.pdf')
-            return _inline_pdf_response(pdf_content, filename)
-        except Exception:
-            logger.exception('Tenant shipment print stream failed')
-            return JsonResponse({'error': 'Failed to render print PDF'}, status=500)
-        finally:
-            restore_public_schema(request)
-
-# Updated operation management views from iroad_tenants/sdsdsd.txt; existing stubs are kept above.
 def _tenant_booking_form_data_from_post(request):
     """Rebuild template booking_form_data from a failed POST submission."""
     trip_type = (request.POST.get('trip_type') or '').strip()
@@ -22662,9 +22633,6 @@ class TenantClientAccountCreateView(View):
             'billing_region': '',
             'postal_code': '',
             'country': '',
-            'credit_limit_amount': '',
-            'limit_currency_code': 'SAR',
-            'payment_term_days': '',
             'national_id': '',
             'commercial_registration_no': '',
             'tax_registration_no': '',
@@ -22677,7 +22645,6 @@ class TenantClientAccountCreateView(View):
                 data[key] = (request.POST.get(key) or '').strip() or data[key]
             else:
                 data[key] = (request.POST.get(key) or '').strip()
-        data['limit_currency_code'] = data['limit_currency_code'] or 'SAR'
         return data
 
     def _build_preview_account_no(self):
@@ -22763,23 +22730,6 @@ class TenantClientAccountCreateView(View):
             if not form_errors.get('client_type'):
                 _validate_client_account_document_rules(form_data, settings_obj, form_errors)
 
-            credit_limit_raw = form_data['credit_limit_amount'] or '0'
-            payment_term_raw = form_data['payment_term_days'] or '0'
-            try:
-                credit_limit_amount = Decimal(credit_limit_raw)
-                if credit_limit_amount < 0:
-                    raise ValueError
-            except Exception:
-                form_errors['credit_limit_amount'] = 'Credit Limit Amount must be 0 or greater.'
-                credit_limit_amount = Decimal('0')
-            try:
-                payment_term_days = int(payment_term_raw)
-                if payment_term_days < 0:
-                    raise ValueError
-            except Exception:
-                form_errors['payment_term_days'] = 'Payment Term (Days) must be 0 or greater.'
-                payment_term_days = 0
-
             if form_errors:
                 form_data['account_no'] = self._build_preview_account_no()
                 context.update(
@@ -22815,9 +22765,6 @@ class TenantClientAccountCreateView(View):
                     billing_region=form_data['billing_region'],
                     postal_code=form_data['postal_code'],
                     country=form_data['country'],
-                    credit_limit_amount=credit_limit_amount,
-                    limit_currency_code=form_data['limit_currency_code'] or 'SAR',
-                    payment_term_days=payment_term_days,
                     national_id=form_data['national_id'],
                     commercial_registration_no=form_data['commercial_registration_no'],
                     tax_registration_no=form_data['tax_registration_no'],
@@ -22866,9 +22813,6 @@ class TenantClientAccountEditView(TenantClientAccountCreateView):
             'billing_region': account.billing_region or '',
             'postal_code': account.postal_code or '',
             'country': account.country or '',
-            'credit_limit_amount': str(account.credit_limit_amount),
-            'limit_currency_code': account.limit_currency_code or 'SAR',
-            'payment_term_days': str(account.payment_term_days),
             'national_id': account.national_id or '',
             'commercial_registration_no': account.commercial_registration_no or '',
             'tax_registration_no': account.tax_registration_no or '',
@@ -22951,23 +22895,6 @@ class TenantClientAccountEditView(TenantClientAccountCreateView):
             if not form_errors.get('client_type'):
                 _validate_client_account_document_rules(form_data, settings_obj, form_errors)
 
-            credit_limit_raw = form_data['credit_limit_amount'] or '0'
-            payment_term_raw = form_data['payment_term_days'] or '0'
-            try:
-                credit_limit_amount = Decimal(credit_limit_raw)
-                if credit_limit_amount < 0:
-                    raise ValueError
-            except Exception:
-                form_errors['credit_limit_amount'] = 'Credit Limit Amount must be 0 or greater.'
-                credit_limit_amount = Decimal('0')
-            try:
-                payment_term_days = int(payment_term_raw)
-                if payment_term_days < 0:
-                    raise ValueError
-            except Exception:
-                form_errors['payment_term_days'] = 'Payment Term (Days) must be 0 or greater.'
-                payment_term_days = 0
-
             if form_errors:
                 context.update(
                     {
@@ -22995,9 +22922,6 @@ class TenantClientAccountEditView(TenantClientAccountCreateView):
             account.billing_region = form_data['billing_region']
             account.postal_code = form_data['postal_code']
             account.country = form_data['country']
-            account.credit_limit_amount = credit_limit_amount
-            account.limit_currency_code = form_data['limit_currency_code'] or 'SAR'
-            account.payment_term_days = payment_term_days
             account.national_id = form_data['national_id']
             account.commercial_registration_no = form_data['commercial_registration_no']
             account.tax_registration_no = form_data['tax_registration_no']
@@ -23573,6 +23497,10 @@ def _sales_invoice_report_create_page_context(
         'surcharge_lines': [],
         'shipment_lines': [],
         'tenant_schema_name': getattr(tenant_registry, 'schema_name', ''),
+        **_sales_invoice_report_currency_context(
+            request,
+            client=TenantClientAccount.objects.filter(pk=client_id).first() if client_id else None,
+        ),
         **_sales_invoice_report_form_extras(
             request,
             client_account_id=client_id,
@@ -23597,6 +23525,11 @@ def _prefill_sales_invoice_report_client_from_request(request, report_form):
         account = TenantClientAccount.objects.filter(account_no=account_no).first()
     if account is not None:
         report_form.initial['client'] = account.pk
+        preferred_currency = (account.preferred_currency or '').strip().upper()
+        if preferred_currency and not (
+            report_form.initial.get('currency') or getattr(report_form.instance, 'currency', '')
+        ):
+            report_form.initial['currency'] = preferred_currency
     return account
 
 
@@ -25283,6 +25216,7 @@ class TenantClientContractListView(View):
                 except NoReverseMatch:
                     del_u = _tenant_client_contract_delete_path(cid)
                 row.list_delete_action_url = del_u
+                row.can_delete = client_contract_delete_block_message(row) is None
             today = timezone.localdate()
             soon_cutoff = today + timezone.timedelta(days=30)
             all_contracts = list(
@@ -35804,22 +35738,95 @@ def _sales_invoice_report_manual_lookup_options():
     }
 
 
-def _sir_booking_ids_on_converted_reports():
-    return set(
-        SalesInvoiceReportBooking.objects.filter(
-            report__status=SalesInvoiceReport.Status.CONVERTED,
-            booking__isnull=False,
-        ).values_list('booking_id', flat=True)
+def _sir_booking_ids_on_reports(*, exclude_report_id=None):
+    qs = SalesInvoiceReportBooking.objects.filter(booking__isnull=False)
+    if exclude_report_id:
+        qs = qs.exclude(report_id=exclude_report_id)
+    return set(qs.values_list('booking_id', flat=True))
+
+
+def _sir_shipment_ids_on_reports(*, exclude_report_id=None):
+    qs = SalesInvoiceReportShipment.objects.filter(shipment__isnull=False)
+    if exclude_report_id:
+        qs = qs.exclude(report_id=exclude_report_id)
+    return set(qs.values_list('shipment_id', flat=True))
+
+
+def _sir_surcharge_ids_on_reports(*, exclude_report_id=None):
+    qs = SalesInvoiceReportSurcharge.objects.filter(surcharge__isnull=False)
+    if exclude_report_id:
+        qs = qs.exclude(report_id=exclude_report_id)
+    return set(qs.values_list('surcharge_id', flat=True))
+
+
+def _sir_valid_currency_code(currency_code, *, request=None):
+    code = (currency_code or '').strip().upper()
+    if code and Currency.objects.filter(currency_code=code, is_active=True).exists():
+        return code
+    if request is not None:
+        org_code = (_organization_base_currency(request) or '').strip().upper()
+        if org_code and Currency.objects.filter(currency_code=org_code, is_active=True).exists():
+            return org_code
+    return (
+        Currency.objects.filter(is_active=True)
+        .order_by('currency_code')
+        .values_list('currency_code', flat=True)
+        .first()
+        or 'SAR'
     )
 
 
-def _sir_surcharge_ids_on_converted_reports():
-    return set(
-        SalesInvoiceReportSurcharge.objects.filter(
-            report__status=SalesInvoiceReport.Status.CONVERTED,
-            surcharge__isnull=False,
-        ).values_list('surcharge_id', flat=True)
+def _sir_currency_symbol(currency_code):
+    code = (currency_code or '').strip().upper()
+    row = Currency.objects.filter(currency_code=code, is_active=True).first()
+    if row and (row.currency_symbol or '').strip():
+        return row.currency_symbol.strip()
+    return code or 'SAR'
+
+
+def _resolve_sir_report_currency_code(*, client=None, currency_code='', request=None):
+    explicit = (currency_code or '').strip().upper()
+    if explicit:
+        return _sir_valid_currency_code(explicit, request=request)
+    if client is not None:
+        preferred = (getattr(client, 'preferred_currency', '') or '').strip().upper()
+        if preferred:
+            return _sir_valid_currency_code(preferred, request=request)
+    if request is not None:
+        return _sir_valid_currency_code(_organization_base_currency(request), request=request)
+    return 'SAR'
+
+
+def _sales_invoice_report_currency_context(request, *, client=None, currency_code=''):
+    code = _resolve_sir_report_currency_code(
+        client=client,
+        currency_code=currency_code,
+        request=request,
     )
+    return {
+        'sir_currency_code': code,
+        'sir_currency_symbol': _sir_currency_symbol(code),
+    }
+
+
+def _tenant_booking_has_eligible_shipment_for_sir(
+    booking,
+    *,
+    booking_date_from=None,
+    booking_date_to=None,
+):
+    if booking is None:
+        return False
+    qs = _tenant_active_shipments_qs().filter(booking_id=booking.booking_id)
+    if booking_date_from and booking_date_to:
+        qs = qs.filter(
+            shipment_date__gte=booking_date_from,
+            shipment_date__lte=booking_date_to,
+        )
+    for shipment in qs:
+        if _tenant_shipment_eligible_for_sir(shipment):
+            return True
+    return False
 
 
 def _tenant_shipment_cod_settled_for_sir(shipment):
@@ -35922,14 +35929,22 @@ def _sir_surcharge_row_snapshot(surcharge, *, line_no):
     }
 
 
-def _sir_eligible_operational_rows(*, client_id, booking_date_from, booking_date_to, currency):
+def _sir_eligible_operational_rows(
+    *,
+    client_id,
+    booking_date_from,
+    booking_date_to,
+    currency,
+    exclude_report_id=None,
+):
     """Ch.12 §12.4 sweep: confirmed bookings with closed, POD-compliant, billable shipments."""
     client_obj, _client_refs = _sales_invoice_report_client_refs(client_id)
     if client_obj is None:
         return {'bookings': [], 'shipments': [], 'surcharges': []}
 
-    converted_booking_ids = _sir_booking_ids_on_converted_reports()
-    converted_surcharge_ids = _sir_surcharge_ids_on_converted_reports()
+    used_booking_ids = _sir_booking_ids_on_reports(exclude_report_id=exclude_report_id)
+    used_shipment_ids = _sir_shipment_ids_on_reports(exclude_report_id=exclude_report_id)
+    used_surcharge_ids = _sir_surcharge_ids_on_reports(exclude_report_id=exclude_report_id)
 
     booking_qs = (
         TenantBooking.objects.select_related('service_item', 'sales_invoice_report')
@@ -35963,7 +35978,9 @@ def _sir_eligible_operational_rows(*, client_id, booking_date_from, booking_date
             continue
         if not shipment.booking_id:
             continue
-        if shipment.booking_id in converted_booking_ids:
+        if shipment.booking_id in used_booking_ids:
+            continue
+        if shipment.shipment_id in used_shipment_ids:
             continue
         eligible_shipments.append(shipment)
         eligible_booking_ids.add(shipment.booking_id)
@@ -36001,7 +36018,7 @@ def _sir_eligible_operational_rows(*, client_id, booking_date_from, booking_date
 
     surcharge_rows = []
     for surcharge in surcharge_qs:
-        if surcharge.surcharge_id in converted_surcharge_ids:
+        if surcharge.surcharge_id in used_surcharge_ids:
             continue
         surcharge_rows.append(
             _sir_surcharge_row_snapshot(surcharge, line_no=len(surcharge_rows) + 1)
@@ -36037,7 +36054,7 @@ def _eligible_confirmed_surcharges_for_report(*, booking_ids, booking_date_from=
     if not booking_uuid_refs:
         return []
 
-    converted_surcharge_ids = _sir_surcharge_ids_on_converted_reports()
+    converted_surcharge_ids = _sir_surcharge_ids_on_reports()
     shipment_ids = list(
         _tenant_active_shipments_qs()
         .filter(booking_id__in=booking_uuid_refs)
@@ -36211,7 +36228,13 @@ def _tenant_surcharge_mark_invoiced_for_converted_report(report):
     ).update(status=TenantShipmentSurcharge.Status.INVOICED, updated_at=timezone.now())
 
 
-def _resolve_manual_surcharge_for_report(report, value, *, booking_ids=None):
+def _resolve_manual_surcharge_for_report(
+    report,
+    value,
+    *,
+    booking_ids=None,
+    shipment_ids=None,
+):
     value = str(value or '').strip()
     if not value:
         return None
@@ -36225,7 +36248,11 @@ def _resolve_manual_surcharge_for_report(report, value, *, booking_ids=None):
         .exclude(shipment__shipment_status=TenantShipment.ShipmentStatus.CANCELLED)
         .filter(lookup_q, status=TenantShipmentSurcharge.Status.CONFIRMED)
     )
-    if booking_ids:
+    if shipment_ids:
+        shipment_uuid_refs = [v for v in (_coerce_uuid(x) for x in shipment_ids) if v]
+        if shipment_uuid_refs:
+            qs = qs.filter(shipment_id__in=shipment_uuid_refs)
+    elif booking_ids:
         booking_uuid_refs = [v for v in (_coerce_uuid(x) for x in booking_ids) if v]
         if booking_uuid_refs:
             qs = qs.filter(
@@ -36251,6 +36278,10 @@ def _manual_sales_invoice_report_rows_from_post(report, post_data):
     booking_rows = []
     shipment_rows = []
     surcharge_rows = []
+
+    used_booking_ids_on_other_reports = _sir_booking_ids_on_reports(exclude_report_id=report.pk)
+    used_shipment_ids_on_other_reports = _sir_shipment_ids_on_reports(exclude_report_id=report.pk)
+    used_surcharge_ids_on_other_reports = _sir_surcharge_ids_on_reports(exclude_report_id=report.pk)
 
     booking_refs = _manual_post_list(post_data, 'manual_booking_ref[]')
     booking_ids = _manual_post_list(post_data, 'manual_booking_id[]')
@@ -36282,7 +36313,21 @@ def _manual_sales_invoice_report_rows_from_post(report, post_data):
             errors.append(f'Booking row {index + 1}: select a confirmed booking for this client and period.')
             continue
         if not _tenant_booking_eligible_for_sir(booking):
-            errors.append(f'Booking row {index + 1}: only confirmed bookings can be added.')
+            errors.append(f'Booking row {index + 1}: only completed bookings can be added.')
+            continue
+        if not _tenant_booking_has_eligible_shipment_for_sir(
+            booking,
+            booking_date_from=report.booking_date_from,
+            booking_date_to=report.booking_date_to,
+        ):
+            errors.append(
+                f'Booking row {index + 1}: booking must have at least one Closed shipment with Completed POD.'
+            )
+            continue
+        if booking.booking_id in used_booking_ids_on_other_reports:
+            errors.append(
+                f'Booking row {index + 1}: booking is already on another sales invoice report.'
+            )
             continue
         if booking.booking_id in seen_booking_ids:
             errors.append(f'Booking row {index + 1}: duplicate booking is not allowed.')
@@ -36333,8 +36378,13 @@ def _manual_sales_invoice_report_rows_from_post(report, post_data):
             continue
         if not _tenant_shipment_eligible_for_sir(shipment):
             errors.append(
-                f'Shipment row {index + 1}: shipment must be Closed with Compliant POD'
+                f'Shipment row {index + 1}: shipment must be Closed with Completed POD'
                 f'{" and COD collected" if (shipment.booking and (shipment.booking.order_type or "").lower() == "cod") else ""}.'
+            )
+            continue
+        if shipment.shipment_id in used_shipment_ids_on_other_reports:
+            errors.append(
+                f'Shipment row {index + 1}: shipment is already on another sales invoice report.'
             )
             continue
         if shipment.shipment_id in seen_shipment_ids:
@@ -36342,6 +36392,8 @@ def _manual_sales_invoice_report_rows_from_post(report, post_data):
             continue
         seen_shipment_ids.add(shipment.shipment_id)
         shipment_rows.append(_sir_shipment_row_snapshot(shipment, line_no=len(shipment_rows) + 1))
+
+    selected_shipment_ids = [row['shipment_id'] for row in shipment_rows]
 
     surcharge_refs = _manual_post_list(post_data, 'manual_surcharge_ref[]')
     surcharge_ids = _manual_post_list(post_data, 'manual_surcharge_id[]')
@@ -36354,19 +36406,29 @@ def _manual_sales_invoice_report_rows_from_post(report, post_data):
         surcharge = None
         parsed_surcharge_id = _coerce_uuid(surcharge_id_raw)
         if parsed_surcharge_id:
-            surcharge = (
+            surcharge_qs = (
                 TenantShipmentSurcharge.objects.select_related('shipment', 'shipment__booking', 'booking')
                 .filter(pk=parsed_surcharge_id, status=TenantShipmentSurcharge.Status.CONFIRMED)
-                .first()
             )
+            if selected_shipment_ids:
+                surcharge_qs = surcharge_qs.filter(shipment_id__in=selected_shipment_ids)
+            surcharge = surcharge_qs.first()
         if surcharge is None:
             surcharge = _resolve_manual_surcharge_for_report(
                 report,
                 surcharge_ref,
-                booking_ids=selected_booking_ids or None,
+                shipment_ids=selected_shipment_ids or None,
             )
         if surcharge is None:
             errors.append(f'Surcharge row {index + 1}: select a confirmed surcharge for the selected shipment.')
+            continue
+        if selected_shipment_ids and surcharge.shipment_id not in selected_shipment_ids:
+            errors.append(f'Surcharge row {index + 1}: surcharge must belong to a selected shipment.')
+            continue
+        if surcharge.surcharge_id in used_surcharge_ids_on_other_reports:
+            errors.append(
+                f'Surcharge row {index + 1}: surcharge is already on another sales invoice report.'
+            )
             continue
         if surcharge.surcharge_id in seen_surcharge_ids:
             errors.append(f'Surcharge row {index + 1}: duplicate surcharge is not allowed.')
@@ -36376,6 +36438,11 @@ def _manual_sales_invoice_report_rows_from_post(report, post_data):
 
     if errors:
         raise ValidationError(errors)
+
+    if not booking_rows:
+        raise ValidationError(
+            'Add at least one eligible booking line before saving.'
+        )
 
     return {
         'bookings': booking_rows,
@@ -36446,7 +36513,14 @@ def _sir_surcharge_lookup_snapshot(surcharge):
     return row
 
 
-def _sales_invoice_report_lookup_catalog_payload(*, client_id, booking_date_from, booking_date_to):
+def _sales_invoice_report_lookup_catalog_payload(
+    *,
+    client_id,
+    booking_date_from,
+    booking_date_to,
+    exclude_report_id=None,
+    request=None,
+):
     """Manual-entry lookup catalog filtered by client account and booking period."""
     if not client_id:
         raise ValidationError('Client is required.')
@@ -36459,8 +36533,13 @@ def _sales_invoice_report_lookup_catalog_payload(*, client_id, booking_date_from
     if client_obj is None:
         raise ValidationError('Select an active client account.')
 
-    converted_booking_ids = _sir_booking_ids_on_converted_reports()
-    converted_surcharge_ids = _sir_surcharge_ids_on_converted_reports()
+    used_booking_ids = _sir_booking_ids_on_reports(exclude_report_id=exclude_report_id)
+    used_shipment_ids = _sir_shipment_ids_on_reports(exclude_report_id=exclude_report_id)
+    used_surcharge_ids = _sir_surcharge_ids_on_reports(exclude_report_id=exclude_report_id)
+    currency_ctx = _sales_invoice_report_currency_context(
+        request,
+        client=client_obj,
+    )
 
     bookings = []
     booking_lines = {}
@@ -36480,7 +36559,13 @@ def _sales_invoice_report_lookup_catalog_payload(*, client_id, booking_date_from
     )
 
     for booking in booking_qs:
-        if booking.booking_id in converted_booking_ids:
+        if booking.booking_id in used_booking_ids:
+            continue
+        if not _tenant_booking_has_eligible_shipment_for_sir(
+            booking,
+            booking_date_from=booking_date_from,
+            booking_date_to=booking_date_to,
+        ):
             continue
         booking_id = str(booking.booking_id)
         booking_no = booking.booking_no
@@ -36509,6 +36594,8 @@ def _sales_invoice_report_lookup_catalog_payload(*, client_id, booking_date_from
         for shipment in shipment_qs:
             if not _tenant_shipment_eligible_for_sir(shipment):
                 continue
+            if shipment.shipment_id in used_shipment_ids:
+                continue
             snap = _sir_shipment_lookup_snapshot(shipment)
             line_key = snap.get('line_key') or ''
             if not line_key:
@@ -36532,7 +36619,7 @@ def _sales_invoice_report_lookup_catalog_payload(*, client_id, booking_date_from
                 )
             shipment_key = str(shipment.shipment_id)
             for surcharge in surcharge_qs:
-                if surcharge.surcharge_id in converted_surcharge_ids:
+                if surcharge.surcharge_id in used_surcharge_ids:
                     continue
                 s_snap = _sir_surcharge_lookup_snapshot(surcharge)
                 bucket = surcharges_by_shipment.setdefault(shipment_key, [])
@@ -36550,10 +36637,18 @@ def _sales_invoice_report_lookup_catalog_payload(*, client_id, booking_date_from
         'shipments_by_line': shipments_by_line,
         'surcharges_by_shipment': surcharges_by_shipment,
         'maps': maps,
+        **currency_ctx,
     }
 
 
-def _sales_invoice_report_preview_payload(*, client_id, booking_date_from, booking_date_to, currency):
+def _sales_invoice_report_preview_payload(
+    *,
+    client_id,
+    booking_date_from,
+    booking_date_to,
+    currency,
+    exclude_report_id=None,
+):
     if not client_id:
         raise ValidationError('Client is required.')
     if not booking_date_from or not booking_date_to:
@@ -36567,6 +36662,7 @@ def _sales_invoice_report_preview_payload(*, client_id, booking_date_from, booki
         booking_date_from=booking_date_from,
         booking_date_to=booking_date_to,
         currency=currency,
+        exclude_report_id=exclude_report_id,
     )
     rows = sweep['bookings']
     shipment_rows = sweep['shipments']
@@ -36603,7 +36699,13 @@ def _refresh_sales_invoice_report_children(report: SalesInvoiceReport):
         booking_date_from=report.booking_date_from,
         booking_date_to=report.booking_date_to,
         currency=report.currency,
+        exclude_report_id=report.pk,
     )
+    if not sweep['bookings']:
+        raise ValidationError(
+            'No eligible bookings found for the selected client and period. '
+            'Adjust filters or complete shipments (Closed + POD Completed) before saving.'
+        )
 
     with db_transaction.atomic():
         _sir_bulk_create_child_lines(

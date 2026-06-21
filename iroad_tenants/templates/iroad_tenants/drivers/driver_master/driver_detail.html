@@ -18,10 +18,12 @@
   <div class="page-header-row">
     <div class="page-header-left">
       <h1 class="page-title">Driver Details</h1>
-      <!-- <p class="page-subtitle">View comprehensive profile, trip history, and documentation for the driver.</p> -->
-    </div>
+      </div>
     <div class="page-header-right">
       <div class="eal-header-actions">
+        <a href="{% url 'iroad_tenants:tenant_driver_print' driver.driver_id %}" class="eal-btn eal-btn-outline" target="_blank" rel="noopener">
+          <i class="bi bi-printer"></i><span>Print</span>
+        </a>
         <a href="{% url 'iroad_tenants:driver_master' %}" class="eal-btn eal-btn-outline">
           <i class="bi bi-arrow-left"></i><span>Back</span>
         </a>

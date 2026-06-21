@@ -1,9 +1,9 @@
 """
 Create driver-initiated empty truck movements (On Call mode).
 
-Locations are tenant master UUIDs; mobile GPS (from/to latitude & longitude)
-is stored on the TML map-link fields and on the EM1 action log. EM1 always
-fires automatically when the empty move is created.
+Endpoints accept tenant Location Master UUIDs and/or Google Places snapshots
+(``from_address`` / ``to_address`` with coordinates). Route GPS is stored on
+the TML; EM1 always fires automatically when the empty move is created.
 """
 from __future__ import annotations
 
@@ -86,7 +86,9 @@ def _resolve_driver_truck(driver: Any, truck_id: Any | None) -> TruckMaster | No
     return None
 
 
-def _resolve_location(location_id) -> TenantLocationMaster:
+def _resolve_location(location_id) -> TenantLocationMaster | None:
+    if location_id is None:
+        return None
     location = TenantLocationMaster.active_serviceable_objects.filter(
         location_id=location_id,
     ).first()
@@ -141,6 +143,23 @@ def _resolve_start_gps(payload: Mapping[str, Any]) -> tuple[str, str]:
     return _coord_str(payload.get('latitude')), _coord_str(payload.get('longitude'))
 
 
+def _movement_endpoint_projection(
+    movement: Any,
+    side: str,
+    *,
+    request: Any | None = None,
+) -> dict[str, Any]:
+    prefix = f'{side}_'
+    return serialize_location_point(
+        getattr(movement, f'{prefix}location_point', None),
+        request=request,
+        map_link=getattr(movement, f'{prefix}location_map_link', '') or '',
+        address=getattr(movement, f'{prefix}location_address', '') or '',
+        latitude=getattr(movement, f'{prefix}latitude', '') or '',
+        longitude=getattr(movement, f'{prefix}longitude', '') or '',
+    )
+
+
 def _project_movement_response(
     movement: Any,
     *,
@@ -156,14 +175,8 @@ def _project_movement_response(
         'movement_no': str(getattr(movement, 'movement_no', '') or ''),
         'movement_status': str(getattr(movement, 'status', '') or ''),
         'empty_move_reason': str(getattr(movement, 'empty_move_reason', '') or ''),
-        'from_location': serialize_location_point(
-            getattr(movement, 'from_location_point', None),
-            request=request,
-        ),
-        'to_location': serialize_location_point(
-            getattr(movement, 'to_location_point', None),
-            request=request,
-        ),
+        'from_location': _movement_endpoint_projection(movement, 'from', request=request),
+        'to_location': _movement_endpoint_projection(movement, 'to', request=request),
         'workflow_started': workflow_started,
     }
 
@@ -213,13 +226,17 @@ class EmptyMoveCreateService:
                     message_key='mobile.empty_move.truck_required',
                 )
 
-            from_location = _resolve_location(payload['from_location_id'])
-            to_location = _resolve_location(payload['to_location_id'])
+            from_location = _resolve_location(payload.get('from_location_id'))
+            to_location = _resolve_location(payload.get('to_location_id'))
 
             movement_date = payload.get('movement_date') or timezone.localdate()
             created_by = _driver_label(driver)
 
+            from_address = str(payload.get('from_address') or '').strip()
+            to_address = str(payload.get('to_address') or '').strip()
             start_lat, start_lng = _resolve_start_gps(payload)
+            to_lat = _coord_str(payload.get('to_latitude'))
+            to_lng = _coord_str(payload.get('to_longitude'))
 
             with transaction.atomic():
                 movement = birth_empty_move_for_driver(
@@ -236,8 +253,10 @@ class EmptyMoveCreateService:
                     movement,
                     from_latitude=start_lat,
                     from_longitude=start_lng,
-                    to_latitude=_coord_str(payload.get('to_latitude')),
-                    to_longitude=_coord_str(payload.get('to_longitude')),
+                    to_latitude=to_lat,
+                    to_longitude=to_lng,
+                    from_address=from_address,
+                    to_address=to_address,
                 )
 
                 workflow_started = self._auto_start_movement(

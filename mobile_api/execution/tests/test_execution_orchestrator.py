@@ -316,7 +316,7 @@ class ExecuteActionOrchestratorTests(SimpleTestCase):
         self.assertEqual(result.payload['variance']['variance_type'], 'none')
         self.assertEqual(result.payload['variance']['variance_amount'], '0.00')
 
-    def test_a9_variance_bundle_allowed_and_flagged(self):
+    def test_a9_short_staged_bundle_rejected(self):
         orch = self._orchestrator()
 
         def _capture_prepare(ctx, **kw):
@@ -330,27 +330,6 @@ class ExecuteActionOrchestratorTests(SimpleTestCase):
             ctx.sync_metadata = {'content_hash': 'h1', 'workflow_version': 'v1'}
             return {}
 
-        def _capture_build(ctx, **kw):
-            return ExecuteActionResult(
-                payload={
-                    'execution': {'action_log_id': 'log-1'},
-                    'workflow': ctx.workflow,
-                    'pod_cod': {'treasury_pending': False, 'cod_collected': True},
-                    'round_trip': {},
-                    'sync_metadata': ctx.sync_metadata,
-                },
-                http_status=201,
-            )
-
-        kernel_result = SimpleNamespace(
-            action_log=SimpleNamespace(
-                log_id='log-1',
-                idempotency_key='client-uuid-execute-1',
-                operation_action=_collect_payment_action(),
-            ),
-            reused_existing=False,
-        )
-
         bundle = SimpleNamespace(
             id='pb-1',
             client_payment_id='client-uuid-execute-1',
@@ -362,13 +341,6 @@ class ExecuteActionOrchestratorTests(SimpleTestCase):
             payment_mode='cash',
             created_at=None,
         )
-
-        class _TreasuryTxn:
-            transaction_id = 'tt-2'
-
-        def _kernel_side_effect(context, *, tenant_user, request):
-            context.shipment.collection_status = 'Collected'
-            return kernel_result
 
         with patch.object(
             orch._reconcile_service,
@@ -399,48 +371,29 @@ class ExecuteActionOrchestratorTests(SimpleTestCase):
             orch._validation_service,
             'resolve_operation_action',
             return_value=_collect_payment_action(),
-        ), patch.object(
-            orch,
-            '_execute_kernel',
-            side_effect=_kernel_side_effect,
-        ), patch.object(
-            orch._media_service,
-            'persist_execution_media',
-        ), patch.object(
-            orch._response_service,
-            'build_execute_result',
-            side_effect=_capture_build,
         ), patch(
             'mobile_api.payment_collection.models.PaymentCollectionBundle',
         ) as bundle_model, patch(
-            'mobile_api.execution.services.execute_action_orchestrator.DriverTreasuryTransaction',
-        ) as treasury_txn_model, patch(
             'django.db.connection',
             autospec=True,
         ) as db_connection:
             db_connection.schema_name = 'tenant-1'
             bundle_model.objects.filter.return_value.order_by.return_value.first.return_value = bundle
-            treasury_txn_model.objects.filter.return_value.order_by.return_value.first.return_value = _TreasuryTxn()
 
-            result = orch._run_execute_pipeline(
-                driver=_driver(),
-                tenant_schema='tenant-1',
-                job_type='shipment',
-                job_id='ship-1',
-                action_code='A9',
-                payload=self._base_payload(),
-                request=None,
-                tenant_user=None,
-                user_id='user-1',
-            )
+            with self.assertRaises(ExecuteActionError) as exc:
+                orch._run_execute_pipeline(
+                    driver=_driver(),
+                    tenant_schema='tenant-1',
+                    job_type='shipment',
+                    job_id='ship-1',
+                    action_code='A9',
+                    payload=self._base_payload(),
+                    request=None,
+                    tenant_user=None,
+                    user_id='user-1',
+                )
 
-        self.assertEqual(result.payload['success'], True)
-        self.assertEqual(result.payload['cod_payment_status'], 'Collected')
-        self.assertEqual(result.payload['treasury_transaction_id'], 'tt-2')
-        self.assertIsNotNone(result.payload['variance'])
-        self.assertEqual(result.payload['variance']['has_variance'], True)
-        self.assertEqual(result.payload['variance']['variance_type'], 'short')
-        self.assertEqual(result.payload['variance']['variance_amount'], '50.00')
+        self.assertEqual(exc.exception.code, 'amount_below_minimum')
 
     def test_a9_requires_mobile_cod_amount_without_staged_bundle(self):
         orch = self._orchestrator()

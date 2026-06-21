@@ -23,27 +23,48 @@ def apply_movement_route_map_links(
     from_longitude: str = '',
     to_latitude: str = '',
     to_longitude: str = '',
+    from_address: str = '',
+    to_address: str = '',
 ) -> None:
-    """Persist planned route GPS on the truck movement log (TML map-link fields)."""
+    """Persist planned route GPS and Google Places snapshots on the TML."""
     if movement is None:
         return
     from iroad_tenants.fleet_gps_tracking import build_google_maps_link
 
     update_fields: list[str] = []
-    from_link = build_google_maps_link(
-        (from_latitude or '').strip(),
-        (from_longitude or '').strip(),
-    )
-    to_link = build_google_maps_link(
-        (to_latitude or '').strip(),
-        (to_longitude or '').strip(),
-    )
+    from_lat = (from_latitude or '').strip()[:32]
+    from_lng = (from_longitude or '').strip()[:32]
+    to_lat = (to_latitude or '').strip()[:32]
+    to_lng = (to_longitude or '').strip()[:32]
+    from_addr = (from_address or '').strip()[:500]
+    to_addr = (to_address or '').strip()[:500]
+
+    from_link = build_google_maps_link(from_lat, from_lng)
+    to_link = build_google_maps_link(to_lat, to_lng)
     if from_link and not (getattr(movement, 'from_location_map_link', '') or '').strip():
         movement.from_location_map_link = from_link[:500]
         update_fields.append('from_location_map_link')
     if to_link and not (getattr(movement, 'to_location_map_link', '') or '').strip():
         movement.to_location_map_link = to_link[:500]
         update_fields.append('to_location_map_link')
+    if from_addr and not (getattr(movement, 'from_location_address', '') or '').strip():
+        movement.from_location_address = from_addr
+        update_fields.append('from_location_address')
+    if to_addr and not (getattr(movement, 'to_location_address', '') or '').strip():
+        movement.to_location_address = to_addr
+        update_fields.append('to_location_address')
+    if from_lat and not (getattr(movement, 'from_latitude', '') or '').strip():
+        movement.from_latitude = from_lat
+        update_fields.append('from_latitude')
+    if from_lng and not (getattr(movement, 'from_longitude', '') or '').strip():
+        movement.from_longitude = from_lng
+        update_fields.append('from_longitude')
+    if to_lat and not (getattr(movement, 'to_latitude', '') or '').strip():
+        movement.to_latitude = to_lat
+        update_fields.append('to_latitude')
+    if to_lng and not (getattr(movement, 'to_longitude', '') or '').strip():
+        movement.to_longitude = to_lng
+        update_fields.append('to_longitude')
     if update_fields:
         update_fields.append('updated_at')
         movement.save(update_fields=update_fields)

@@ -48,7 +48,7 @@ def build_cod_payment_display(
     *,
     shipment: Any | None = None,
     booking: Any | None = None,
-) -> dict[str, str]:
+) -> dict[str, Any]:
     """
     Driver Collect Payment fields: amount due from booking line / shipment COD.
     """
@@ -65,4 +65,24 @@ def build_cod_payment_display(
         'amount_due': text,
         'cod_amount': text,
         'currency': _DEFAULT_CURRENCY,
+        'field_configuration': build_payment_screen_field_configuration(),
+        'collection_rules': build_payment_collection_rules(minimum_amount=amount),
+    }
+
+
+def build_payment_screen_field_configuration() -> dict[str, bool]:
+    """Driver Collect Payment screen — comment and attachment are optional."""
+    return {
+        'comment_required': False,
+        'attachment_required': False,
+    }
+
+
+def build_payment_collection_rules(*, minimum_amount: Decimal) -> dict[str, Any]:
+    """Driver may collect the exact due amount or higher; never less."""
+    minimum = Decimal(str(minimum_amount or 0))
+    return {
+        'minimum_amount': format(minimum, 'f'),
+        'allow_over_collection': True,
+        'block_under_collection': True,
     }

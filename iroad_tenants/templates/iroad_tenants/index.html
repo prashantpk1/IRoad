@@ -74,14 +74,27 @@
                 </div>
                 <span class="quota-chip">Monthly</span>
               </div>
-              <div class="quota-chart-area">
+              <div
+                class="quota-chart-area"
+                style="--quota-y-divisions: {{ tenant_dashboard.chart_y_divisions }}"
+              >
                 <div class="quota-y-axis">
                   {% for tick in tenant_dashboard.chart_y_ticks %}
-                    <span>{{ tick }}</span>
+                    <span
+                      class="quota-y-tick{% if forloop.first %} is-top{% elif forloop.last %} is-bottom{% else %} is-mid{% endif %}"
+                      style="top: {{ tick.position_pct }}%"
+                    >{{ tick.label }}</span>
                   {% endfor %}
                 </div>
                 <div class="quota-bars-wrap">
-                  <div class="quota-grid-lines"></div>
+                  <div class="quota-grid-lines">
+                    {% for tick in tenant_dashboard.chart_y_ticks %}
+                      <span
+                        class="quota-grid-line{% if forloop.first %} is-top{% elif forloop.last %} is-bottom{% else %} is-mid{% endif %}"
+                        style="top: {{ tick.position_pct }}%"
+                      ></span>
+                    {% endfor %}
+                  </div>
                   {% for m in tenant_dashboard.chart_months %}
                     <div class="quota-month-group" tabindex="0">
                       <div
@@ -91,7 +104,7 @@
                         data-series-label="Total Trucks"
                         data-count="{{ m.truck_count }}"
                         data-month="{{ m.label }}"
-                        style="height: {{ m.truck_height_px }}px"
+                        style="height: {{ m.truck_pct }}%"
                       ></div>
                       <div
                         class="quota-bar driver"
@@ -100,7 +113,7 @@
                         data-series-label="Active Drivers"
                         data-count="{{ m.driver_count }}"
                         data-month="{{ m.label }}"
-                        style="height: {{ m.driver_height_px }}px"
+                        style="height: {{ m.driver_pct }}%"
                       ></div>
                       <span class="quota-month-label">{{ m.label }}</span>
                     </div>
@@ -880,14 +893,27 @@
                   FLEET VS DRIVER SYNCHRONIZATION
                 </div>
               </div>
-              <div class="quota-chart-area">
+              <div
+                class="quota-chart-area"
+                style="--quota-y-divisions: {{ tenant_dashboard.fleet.chart_y_divisions }}"
+              >
                 <div class="quota-y-axis">
                   {% for tick in tenant_dashboard.fleet.chart_y_ticks %}
-                    <span>{{ tick }}</span>
+                    <span
+                      class="quota-y-tick{% if forloop.first %} is-top{% elif forloop.last %} is-bottom{% else %} is-mid{% endif %}"
+                      style="top: {{ tick.position_pct }}%"
+                    >{{ tick.label }}</span>
                   {% endfor %}
                 </div>
                 <div class="quota-bars-wrap">
-                  <div class="quota-grid-lines"></div>
+                  <div class="quota-grid-lines">
+                    {% for tick in tenant_dashboard.fleet.chart_y_ticks %}
+                      <span
+                        class="quota-grid-line{% if forloop.first %} is-top{% elif forloop.last %} is-bottom{% else %} is-mid{% endif %}"
+                        style="top: {{ tick.position_pct }}%"
+                      ></span>
+                    {% endfor %}
+                  </div>
                   {% for m in tenant_dashboard.fleet.chart_months %}
                     <div class="quota-month-group" tabindex="0">
                       <div
@@ -897,7 +923,7 @@
                         data-series-label="Total Trucks"
                         data-count="{{ m.truck_count }}"
                         data-month="{{ m.label }}"
-                        style="height: {{ m.truck_height_px }}px"
+                        style="height: {{ m.truck_pct }}%"
                       ></div>
                       <div
                         class="quota-bar driver"
@@ -906,7 +932,7 @@
                         data-series-label="Active Drivers"
                         data-count="{{ m.driver_count }}"
                         data-month="{{ m.label }}"
-                        style="height: {{ m.driver_height_px }}px"
+                        style="height: {{ m.driver_pct }}%"
                       ></div>
                       <span class="quota-month-label">{{ m.label }}</span>
                     </div>

@@ -3,11 +3,9 @@
 {% load static %}
 
 
-
 {% block title %}Truck Attachments | iRoad{% endblock %}
 
 {% block breadcrumb %}{% endblock %}
-
 
 
 {% block content %}
@@ -36,13 +34,7 @@
 
       <h1 class="page-title">Truck Attachments</h1>
 
-      <!-- <p class="page-subtitle">
-
-        Upload and manage attachment documents for trucks in the fleet.
-
-      </p> -->
-
-    </div>
+      </div>
 
     <div class="page-header-right">
       <div class="eal-header-actions">
@@ -56,7 +48,6 @@
   </div>
 
 </div>
-
 
 
 <form
@@ -103,7 +94,6 @@
   <div class="alert alert-danger" role="alert">{{ form_non_field_errors }}</div>
 
   {% endif %}
-
 
 
   <!-- Section 1: Attachment Details -->
@@ -250,7 +240,6 @@
       </div>
 
 
-
       <div class="field-group">
 
         <h3 class="field-group-title">
@@ -364,7 +353,6 @@
       </div>
 
 
-
       <div class="field-group">
 
         <h3 class="field-group-title">
@@ -410,7 +398,6 @@
         {% if form_errors.is_expiry_applicable %}<div class="text-danger small">{{ form_errors.is_expiry_applicable }}</div>{% endif %}
 
 
-
         <div class="fields-grid cols-2" id="taExpiryDateWrapper">
 
           <div class="field">
@@ -448,7 +435,6 @@
         </div>
 
       </div>
-
 
 
       <div class="field-group">
@@ -506,7 +492,6 @@
     </div>
 
   </div>
-
 
 
   <!-- Section 2: File Upload & Notes -->
@@ -655,7 +640,6 @@
   </div>
 
 
-
   <div class="form-actions-bar">
 
     <div class="form-actions-left">
@@ -691,7 +675,6 @@
 {% endblock %}
 
 
-
 {% block extra_js %}
 
 {{ block.super }}
@@ -707,7 +690,6 @@
   var expiryInput = document.getElementById("taExpiryDate");
 
   var labelEl = document.querySelector(".js-ta-expiry-label");
-
 
 
   function refresh() {
@@ -731,7 +713,6 @@
     }
 
   }
-
 
 
   if (toggle) toggle.addEventListener("change", refresh);

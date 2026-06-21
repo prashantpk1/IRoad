@@ -97,14 +97,7 @@
   <div class="page-header-row">
     <div class="page-header-left">
       <h1 class="page-title">{{ page_title }}</h1>
-      <!-- <p class="page-subtitle">
-        {% if is_edit %}
-        Update {{ report.report_no }} — client, booking period, and worksheet lines.
-        {% else %}
-        Select client account and booking period to build the billing worksheet.
-        {% endif %}
-      </p> -->
-    </div>
+      </div>
     <div class="page-header-right">
       <div class="eal-header-actions">
         <a href="{% if sir_cancel_url %}{{ sir_cancel_url }}{% else %}{% url 'iroad_tenants:sales_invoice_report_list' %}{% endif %}" class="eal-btn eal-btn-outline">
@@ -511,9 +504,9 @@
         <div class="eal-stat-card"><div class="eal-stat-icon amber"><i class="bi bi-tag"></i></div><div><div class="eal-stat-value" id="sirSurchargesCount">{{ surcharge_lines|length }}</div><div class="eal-stat-label">Surcharges count</div></div></div>
       </div>
       <div class="eal-stats-row">
-        <div class="eal-stat-card"><div class="eal-stat-icon green"><i class="bi bi-currency-dollar"></i></div><div><div class="eal-stat-value jor-summary-currency" id="id_total_freight_amount_display">${{ report_form.total_freight_amount.value|default:"0"|floatformat:2 }}</div><div class="eal-stat-label">Freight amount</div></div></div>
-        <div class="eal-stat-card"><div class="eal-stat-icon amber"><i class="bi bi-cash-stack"></i></div><div><div class="eal-stat-value jor-summary-currency" id="id_total_surcharge_amount_display">${{ report_form.total_surcharge_amount.value|default:"0"|floatformat:2 }}</div><div class="eal-stat-label">Surcharges amount</div></div></div>
-        <div class="eal-stat-card jor-summary-total-card"><div class="eal-stat-icon purple"><i class="bi bi-wallet2"></i></div><div>{% with freight=report_form.total_freight_amount.value|default:0 surcharge=report_form.total_surcharge_amount.value|default:0 %}<div class="eal-stat-value jor-summary-currency" id="sirCombinedTotal">${{ freight|add:surcharge|floatformat:2 }}</div>{% endwith %}<div class="eal-stat-label">Total</div></div></div>
+        <div class="eal-stat-card"><div class="eal-stat-icon green"><i class="bi bi-currency-dollar"></i></div><div><div class="eal-stat-value jor-summary-currency" id="id_total_freight_amount_display">{{ sir_currency_symbol|default:"SAR" }} {{ report_form.total_freight_amount.value|default:"0"|floatformat:2 }}</div><div class="eal-stat-label">Freight amount</div></div></div>
+        <div class="eal-stat-card"><div class="eal-stat-icon amber"><i class="bi bi-cash-stack"></i></div><div><div class="eal-stat-value jor-summary-currency" id="id_total_surcharge_amount_display">{{ sir_currency_symbol|default:"SAR" }} {{ report_form.total_surcharge_amount.value|default:"0"|floatformat:2 }}</div><div class="eal-stat-label">Surcharges amount</div></div></div>
+        <div class="eal-stat-card jor-summary-total-card"><div class="eal-stat-icon purple"><i class="bi bi-wallet2"></i></div><div>{% with freight=report_form.total_freight_amount.value|default:0 surcharge=report_form.total_surcharge_amount.value|default:0 %}<div class="eal-stat-value jor-summary-currency" id="sirCombinedTotal">{{ sir_currency_symbol|default:"SAR" }} {{ freight|add:surcharge|floatformat:2 }}</div>{% endwith %}<div class="eal-stat-label">Total</div></div></div>
       </div>
     </div>
   </div>
@@ -537,8 +530,18 @@
 {{ block.super }}
 {{ operation_sales_report_status_options|json_script:"sir-sales-status-options" }}
 {{ operation_pod_status_options|json_script:"sir-pod-status-options" }}
+{{ sir_currency_symbol|default:"SAR"|json_script:"sir-currency-symbol" }}
+{{ sir_currency_code|default:"SAR"|json_script:"sir-currency-code" }}
 <script>
 (function () {
+  var sirCurrencySymbol = "SAR";
+  var sirReportId = "{{ sir_report_id|default:''|escapejs }}";
+  try {
+    var symNode = document.getElementById("sir-currency-symbol");
+    sirCurrencySymbol = symNode ? JSON.parse(symNode.textContent || "\"SAR\"") : "SAR";
+  } catch (e) {
+    sirCurrencySymbol = "SAR";
+  }
   var sirCatalog = {
     bookings: [],
     booking_lines: {},
@@ -590,10 +593,17 @@
   function findBookingById(bookingId) {
     return (sirCatalog.bookings || []).find(function (b) { return b.booking_id === bookingId; }) || null;
   }
-  function selectedBookingIdsFromTable() {
-    return Array.prototype.slice.call(document.querySelectorAll('#sirBookingsBody input[name="manual_booking_id[]"]'))
-      .map(function (el) { return (el.value || "").trim(); })
-      .filter(Boolean);
+  function selectedBookingIdsFromTable(excludeRow) {
+    var rows = Array.prototype.slice.call(document.querySelectorAll("#sirBookingsBody tr"));
+    return rows.map(function (row) {
+      if (excludeRow && row === excludeRow) return "";
+      var el = row.querySelector('input[name="manual_booking_id[]"]');
+      return el ? (el.value || "").trim() : "";
+    }).filter(Boolean);
+  }
+  function bookingAlreadySelected(bookingId, excludeRow) {
+    if (!bookingId) return false;
+    return selectedBookingIdsFromTable(excludeRow).indexOf(bookingId) !== -1;
   }
   function selectedShipmentIdsFromTable() {
     return Array.prototype.slice.call(document.querySelectorAll('#sirShipmentsBody input[name="manual_shipment_id[]"]'))
@@ -604,7 +614,9 @@
     var row = input.closest("tr");
     var kind = input.getAttribute("data-lookup-kind") || "";
     if (kind === "booking" || input.classList.contains("sir-booking-lookup")) {
-      return (sirCatalog.bookings || []).map(function (b) {
+      return (sirCatalog.bookings || []).filter(function (b) {
+        return !bookingAlreadySelected(b.booking_id, row);
+      }).map(function (b) {
         return { value: b.booking_no, label: b.label, data: b };
       });
     }
@@ -768,8 +780,14 @@
     var kind = input.getAttribute("data-lookup-kind") || "";
     input.value = option.value;
     if (kind === "booking" || input.classList.contains("sir-booking-lookup")) {
+      if (bookingAlreadySelected(option.data.booking_id, row)) {
+        showMessage("danger", "Duplicate booking is not allowed on the same report.");
+        return;
+      }
       applyBookingSelection(row, option.data);
+      pullRelatedShipmentsAndSurchargesForBooking(option.data);
       recalculateManualTotals();
+      clearMessage();
       return;
     }
     if (kind === "shipment_booking" || input.classList.contains("sir-shipment-booking-lookup")) {
@@ -832,6 +850,112 @@
       applySurchargeSelection(row, option.data);
       recalculateManualTotals();
     }
+  }
+  function existingSurchargeIds() {
+    return Array.prototype.slice.call(document.querySelectorAll('#sirSurchargesBody input[name="manual_surcharge_id[]"]'))
+      .map(function (el) { return (el.value || "").trim(); })
+      .filter(Boolean);
+  }
+  function tableHasOnlyEmptyRow(body, hiddenName) {
+    if (!body) return false;
+    var rows = body.querySelectorAll("tr");
+    if (rows.length !== 1) return false;
+    var idInput = rows[0].querySelector('input[name="' + hiddenName + '"]');
+    return !idInput || !(idInput.value || "").trim();
+  }
+  function buildShipmentRowHtml(r) {
+    var route = (r.from_location || "") + ((r.to_location || "") ? " → " + r.to_location : "");
+    var lineKey = safeAttr((r.booking_id || "") + "|" + (r.booking_item_type || ""));
+    return '<tr>'
+      + '<td class="shipment-sn">' + safeText(r.line_no) + '</td>'
+      + '<td><input type="hidden" name="manual_shipment_id[]" value="' + safeAttr(r.shipment_id) + '"><input type="hidden" class="sir-shipment-booking-id" name="manual_shipment_booking_id[]" value="' + safeAttr(r.booking_id) + '"><div class="lookup-input-wrap"><i class="bi bi-search lookup-input-icon"></i><input type="text" class="form-control form-control-sm lookup-input sir-shipment-booking-lookup" name="manual_shipment_booking_ref[]" placeholder="Select booking..." data-lookup-kind="shipment_booking" value="' + safeAttr(r.booking_no) + '"></div></td>'
+      + '<td><input type="hidden" class="sir-shipment-line-key" name="manual_shipment_line_key[]" value="' + lineKey + '"><div class="lookup-input-wrap"><i class="bi bi-search lookup-input-icon"></i><input type="text" class="form-control form-control-sm lookup-input sir-shipment-line-lookup" name="manual_shipment_booking_line[]" placeholder="Select line..." data-lookup-kind="booking_line" value="' + safeAttr(r.booking_item_type) + '"></div></td>'
+      + '<td><div class="lookup-input-wrap"><i class="bi bi-search lookup-input-icon"></i><input type="text" class="form-control form-control-sm lookup-input sir-shipment-lookup" name="manual_shipment_ref[]" placeholder="Select shipment..." data-lookup-kind="shipment" value="' + safeAttr(r.shipment_no) + '"></div></td>'
+      + '<td><input type="date" class="form-control form-control-sm" name="manual_shipment_date[]" value="' + safeAttr(r.shipment_date) + '" readonly></td>'
+      + '<td><input type="text" class="form-control form-control-sm" name="manual_shipment_route[]" placeholder="Route" value="' + safeAttr(route) + '" readonly></td>'
+      + '<td><input type="text" class="form-control form-control-sm" name="manual_shipment_truck[]" placeholder="Truck" value="' + safeAttr(r.truck_plate) + '" readonly></td>'
+      + '<td><input type="text" class="form-control form-control-sm" name="manual_shipment_customer_ref[]" placeholder="Customer ref" value="' + safeAttr(r.customer_ref_docs) + '" readonly></td>'
+      + '<td><select class="form-select form-select-sm sir-shipment-pod-status" name="manual_shipment_pod_status[]" disabled aria-readonly="true">' + podStatusSelectHtml(r.pod_status || "") + '</select></td>'
+      + '</tr>';
+  }
+  function buildSurchargeRowHtml(r) {
+    var st = (r.surcharge_type || "").toString().toLowerCase();
+    return '<tr>'
+      + '<td class="surcharge-sn">' + safeText(r.line_no) + '</td>'
+      + '<td><input type="hidden" class="sir-surcharge-shipment-id" name="manual_surcharge_shipment_id[]" value="' + safeAttr(r.shipment_id) + '"><div class="lookup-input-wrap"><i class="bi bi-search lookup-input-icon"></i><input type="text" class="form-control form-control-sm lookup-input sir-surcharge-shipment-lookup" name="manual_surcharge_shipment_ref[]" placeholder="Select shipment..." data-lookup-kind="surcharge_shipment" value="' + safeAttr(r.shipment_no) + '"></div></td>'
+      + '<td><input type="hidden" name="manual_surcharge_id[]" value="' + safeAttr(r.surcharge_id) + '"><div class="lookup-input-wrap"><i class="bi bi-search lookup-input-icon"></i><input type="text" class="form-control form-control-sm lookup-input sir-surcharge-lookup" name="manual_surcharge_ref[]" placeholder="Select transaction..." data-lookup-kind="surcharge" value="' + safeAttr(r.transaction_no) + '"></div></td>'
+      + '<td><input type="date" class="form-control form-control-sm" name="manual_surcharge_date[]" value="' + safeAttr(r.transaction_date) + '" readonly></td>'
+      + '<td><select class="form-select form-select-sm" name="manual_surcharge_type[]" disabled>'
+        + '<option value="" ' + (st ? '' : 'selected ') + 'disabled>-Select type-</option>'
+        + '<option value="fuel" ' + (st === 'fuel' ? 'selected' : '') + '>Fuel</option>'
+        + '<option value="detention" ' + (st === 'detention' ? 'selected' : '') + '>Detention</option>'
+        + '<option value="other" ' + (st === 'other' ? 'selected' : '') + '>Other</option>'
+      + '</select></td>'
+      + '<td><input type="number" class="form-control form-control-sm text-end" name="manual_surcharge_qty[]" placeholder="0" step="1" min="0" value="' + safeAttr(r.qty) + '" readonly></td>'
+      + '<td><input type="number" class="form-control form-control-sm text-end" name="manual_surcharge_price[]" placeholder="0.00" step="0.01" value="' + safeAttr(r.unit_price) + '" readonly></td>'
+      + '<td><input type="number" class="form-control form-control-sm text-end" name="manual_surcharge_amount[]" placeholder="0.00" step="0.01" value="' + safeAttr(r.amount) + '" readonly></td>'
+      + '</tr>';
+  }
+  function appendShipmentRows(shipments) {
+    var body = document.getElementById("sirShipmentsBody");
+    if (!body || !shipments || !shipments.length) return;
+    var existing = existingShipmentIdsFromTable();
+    var html = "";
+    shipments.forEach(function (shipment) {
+      var shipmentId = String(shipment.shipment_id || "");
+      if (!shipmentId || existing.indexOf(shipmentId) !== -1) return;
+      html += buildShipmentRowHtml(shipment);
+      existing.push(shipmentId);
+    });
+    if (!html) return;
+    if (tableHasOnlyEmptyRow(body, "manual_shipment_id[]")) {
+      body.innerHTML = html;
+    } else {
+      body.insertAdjacentHTML("beforeend", html);
+    }
+    renumberTableBody(body, "shipments");
+    initLookupInputsIn(body);
+    syncAllManualRowStates();
+  }
+  function appendSurchargeRows(surcharges) {
+    var body = document.getElementById("sirSurchargesBody");
+    if (!body || !surcharges || !surcharges.length) return;
+    var existing = existingSurchargeIds();
+    var html = "";
+    surcharges.forEach(function (surcharge) {
+      var surchargeId = String(surcharge.surcharge_id || "");
+      if (!surchargeId || existing.indexOf(surchargeId) !== -1) return;
+      html += buildSurchargeRowHtml(surcharge);
+      existing.push(surchargeId);
+    });
+    if (!html) return;
+    if (tableHasOnlyEmptyRow(body, "manual_surcharge_id[]")) {
+      body.innerHTML = html;
+    } else {
+      body.insertAdjacentHTML("beforeend", html);
+    }
+    renumberTableBody(body, "surcharges");
+    initLookupInputsIn(body);
+    syncAllManualRowStates();
+  }
+  function pullRelatedShipmentsAndSurchargesForBooking(booking) {
+    if (!booking || !booking.booking_id || (autoPostEl && autoPostEl.checked)) return;
+    var bookingId = String(booking.booking_id);
+    var shipments = [];
+    Object.keys(sirCatalog.shipments_by_line || {}).forEach(function (key) {
+      if (key.indexOf(bookingId + "|") !== 0) return;
+      (sirCatalog.shipments_by_line[key] || []).forEach(function (shipment) {
+        shipments.push(shipment);
+      });
+    });
+    appendShipmentRows(shipments);
+    var surcharges = [];
+    shipments.forEach(function (shipment) {
+      ((sirCatalog.surcharges_by_shipment || {})[String(shipment.shipment_id)] || []).forEach(function (surcharge) {
+        surcharges.push(surcharge);
+      });
+    });
+    appendSurchargeRows(surcharges);
   }
   function buildEmptyRow(kind) {
     if (kind === "bookings") {
@@ -981,18 +1105,23 @@
   var combinedTotalEl = document.getElementById("sirCombinedTotal");
 
   if (ccyEl && !ccyEl.value) {
-    ccyEl.value = "SAR";
+    try {
+      var codeNode = document.getElementById("sir-currency-code");
+      ccyEl.value = codeNode ? JSON.parse(codeNode.textContent || "\"SAR\"") : "SAR";
+    } catch (e) {
+      ccyEl.value = "SAR";
+    }
   }
 
   function formatMoney(v) {
     if (v === null || v === undefined || v === "" || v === "—") {
-      return "$0.00";
+      return sirCurrencySymbol + " 0.00";
     }
     var n = parseFloat(String(v).replace(/[^0-9.-]/g, ""));
     if (!Number.isFinite(n)) {
-      return "$0.00";
+      return sirCurrencySymbol + " 0.00";
     }
-    return "$" + n.toFixed(2);
+    return sirCurrencySymbol + " " + n.toFixed(2);
   }
 
   function setTotals(f, s, c) {
@@ -1039,6 +1168,7 @@
       booking_date_to: toEl.value,
       currency: (ccyEl && ccyEl.value) || "SAR"
     });
+    if (sirReportId) params.set("report_id", sirReportId);
     fetch(window.location.pathname + "?" + params.toString(), { credentials: "same-origin" })
       .then(function (r) { return r.json().then(function (j) { return { status: r.status, body: j }; }); })
       .then(function (resp) {
@@ -1260,6 +1390,7 @@
       booking_date_from: fromEl.value,
       booking_date_to: toEl.value,
     });
+    if (sirReportId) params.set("report_id", sirReportId);
     return fetch(window.location.pathname + "?" + params.toString(), { credentials: "same-origin" })
       .then(function (r) { return r.json(); })
       .then(function (data) {
@@ -1268,6 +1399,12 @@
           return;
         }
         sirCatalog = data;
+        if (data.sir_currency_code && ccyEl && !sirReportId && !(ccyEl.value || "").trim()) {
+          ccyEl.value = data.sir_currency_code;
+        }
+        if (data.sir_currency_symbol && !sirReportId) {
+          sirCurrencySymbol = data.sir_currency_symbol;
+        }
         clearMessage();
         initLookupInputsIn(document);
         syncAllManualRowStates();
@@ -1303,6 +1440,20 @@
   if (addSurchargeBtn) {
     addSurchargeBtn.addEventListener("click", function () {
       appendManualRow("sirSurchargesBody", "surcharges");
+    });
+  }
+
+  var sirForm = document.getElementById("sirForm");
+  if (sirForm) {
+    sirForm.addEventListener("submit", function (e) {
+      if (autoPostEl && autoPostEl.checked) {
+        return;
+      }
+      if (!selectedBookingIdsFromTable().length) {
+        e.preventDefault();
+        showMessage("danger", "Add at least one eligible booking line before saving.");
+        window.scrollTo({ top: 0, behavior: "smooth" });
+      }
     });
   }
 

@@ -23,14 +23,7 @@
   <div class="page-header-row">
     <div class="page-header-left">
       <h1 class="page-title">{{ page_title }}</h1>
-      <!-- <p class="page-subtitle">
-        {% if is_edit %}
-          Update driver details, documents, and contact information.
-        {% else %}
-          Fill in the details below to register a new driver.
-        {% endif %}
-      </p> -->
-    </div>
+      </div>
     <div class="page-header-right ms-auto">
       <a href="{% if driver_cancel_url %}{{ driver_cancel_url }}{% else %}{% url 'iroad_tenants:driver_master' %}{% endif %}" class="btn btn-outline-secondary">
         <i class="bi bi-arrow-left me-1"></i>Back

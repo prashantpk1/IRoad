@@ -7,10 +7,6 @@
 {% block breadcrumb %}{% endblock %}
 
 {% block content %}
-<!-- Top Header -->
-      
-
-      
       <div class="page-header">
         <nav aria-label="breadcrumb">
           <ol class="breadcrumb">
@@ -28,15 +24,7 @@
         <div class="page-header-row">
           <div class="page-header-left">
             <h1 class="page-title">{% if is_edit_mode %}Edit Client Contract{% else %}Create Client Contract{% endif %}</h1>
-            <!-- <p class="page-subtitle">
-              {% if is_edit_mode %}
-              Update dates, notes, or replace the contract document. Leave the file empty to keep the current upload.
-              {% else %}
-              Fill in the details below to register a new client contract in the
-              system.
-              {% endif %}
-            </p> -->
-          </div>
+            </div>
           <div class="page-header-right">
             <div class="eal-header-actions">
               <a href="{{ contract_cancel_url|default:'#' }}" class="eal-btn eal-btn-outline">

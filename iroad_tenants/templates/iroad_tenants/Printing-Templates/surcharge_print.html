@@ -1,28 +1,130 @@
+{% load printing_tags %}
 <!DOCTYPE html>
 <html lang="ar" dir="rtl">
 <head>
-  <meta charset="UTF-8">
-  <title>Surcharge {{ surcharge.transaction_no|default:surcharge.surcharge_id }}</title>
-  <style>
-    @page { size: A4; margin: 0.2cm; }
-    body { font-family: Tahoma, Arial, sans-serif; direction: rtl; font-size: 11px; color: #111; }
-    table { width: 100%; border-collapse: collapse; margin-top: 8px; }
-    thead { display: table-header-group; } tr { page-break-inside: avoid; }
-    th, td { border: 1px solid #d1d5db; padding: 5px; text-align: right; }
-    th { background: #f3f4f6; } .num { direction: ltr; text-align: left; unicode-bidi: embed; }
-  </style>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>معاملة رسوم إضافية | Surcharges Transaction</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Arabic:wght@300;400;500;600;700&family=IBM+Plex+Sans:wght@300;400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+{% include 'iroad_tenants/Printing-Templates/partials/print_brand_styles.html' %}
 </head>
-<body>
-  <h2>رسوم إضافية / Surcharge</h2>
-  <table>
-    <tbody>
-      <tr><th>Surcharge Ref</th><td>{{ surcharge.transaction_no|default:surcharge.surcharge_id }}</td><th>Shipment</th><td>{{ shipment.shipment_no|default:'-' }}</td></tr>
-      <tr><th>Item Label</th><td>{{ surcharge.item_label }}</td><th>Line No</th><td>{{ surcharge.line_no }}</td></tr>
-      <tr><th>Quantity</th><td class="num">{{ surcharge.qty }}</td><th>Subtotal</th><td class="num">{{ surcharge.subtotal }}</td></tr>
-      <tr><th>Created</th><td>{{ surcharge.created_at|date:'Y-m-d H:i' }}</td><th>Updated</th><td>{{ surcharge.updated_at|date:'Y-m-d H:i' }}</td></tr>
-    </tbody>
-  </table>
-  <div style="margin-top:12px;page-break-inside:avoid;"><strong>Signature</strong><div style="height:64px;border-top:1px dashed #9ca3af;margin-top:6px;"></div></div>
-  <script>window.addEventListener('load', function(){ setTimeout(function(){ window.print(); }, 250); });</script>
+
+<body data-lang="bi" data-status="{{ surcharge.status|lower }}">
+
+<div class="page">
+
+    {% include 'iroad_tenants/Printing-Templates/partials/print_doc_header.html' with doc_title_ar='معاملة رسوم إضافية' doc_title_en='Surcharges Transaction' doc_number=surcharge.transaction_no %}
+
+    <section class="avoid-break">
+        <div class="section-head">
+            <div class="section-titles">
+                <div class="section-title-ar">بيانات المعاملة</div>
+                <div class="section-title-en">Transaction Information</div>
+            </div>
+        </div>
+        <div class="field-grid grid-3">
+            <div class="field">
+                <div class="field-label"><span class="l-ar">رقم المعاملة</span><span class="l-en">Transaction No.</span></div>
+                <div class="field-value mono strong">{{ surcharge.transaction_no|default:print_na }}</div>
+            </div>
+            <div class="field">
+                <div class="field-label"><span class="l-ar">التاريخ</span><span class="l-en">Date</span></div>
+                <div class="field-value mono">{{ surcharge.transaction_date|print_date }}</div>
+            </div>
+            <div class="field">
+                <div class="field-label"><span class="l-ar">الحالة</span><span class="l-en">Status</span></div>
+                <div class="field-value"><span class="pill {{ surcharge.status|print_status_pill }}">{{ surcharge.status|default:print_na }}</span></div>
+            </div>
+        </div>
+    </section>
+
+    <section class="avoid-break">
+        <div class="section-head">
+            <div class="section-titles">
+                <div class="section-title-ar">تفاصيل الشحنة</div>
+                <div class="section-title-en">Shipment Details</div>
+            </div>
+        </div>
+        <div class="field-grid grid-3">
+            <div class="field">
+                <div class="field-label"><span class="l-ar">مرجع الشحنة</span><span class="l-en">Shipment Ref</span></div>
+                <div class="field-value mono">{% if shipment %}{{ shipment.shipment_no }}{% else %}{{ print_na }}{% endif %}</div>
+            </div>
+            <div class="field">
+                <div class="field-label"><span class="l-ar">مرجع الحجز</span><span class="l-en">Booking Ref</span></div>
+                <div class="field-value mono">{% if surcharge.booking %}{{ surcharge.booking.booking_no }}{% elif shipment and shipment.booking %}{{ shipment.booking.booking_no }}{% else %}{{ print_na }}{% endif %}</div>
+            </div>
+            <div class="field">
+                <div class="field-label"><span class="l-ar">العميل</span><span class="l-en">Client</span></div>
+                <div class="field-value strong">{% if surcharge.client_account %}{{ surcharge.client_account.display_name }}{% elif shipment and shipment.client_account %}{{ shipment.client_account.display_name }}{% else %}{{ print_na }}{% endif %}</div>
+            </div>
+        </div>
+    </section>
+
+    <section class="avoid-break">
+        <div class="section-head">
+            <div class="section-titles">
+                <div class="section-title-ar">تفاصيل الرسم</div>
+                <div class="section-title-en">Charge Details</div>
+            </div>
+        </div>
+        <div class="field-grid grid-3" style="margin-bottom: 10px;">
+            <div class="field">
+                <div class="field-label"><span class="l-ar">الخدمة</span><span class="l-en">Service</span></div>
+                <div class="field-value strong">{{ surcharge.item_label|default:print_na }}</div>
+            </div>
+            <div class="field" style="grid-column: span 2;">
+                <div class="field-label"><span class="l-ar">الوصف</span><span class="l-en">Description</span></div>
+                <div class="field-value">{{ surcharge.description|default:print_na }}</div>
+            </div>
+        </div>
+        <div class="field-grid grid-3">
+            <div class="field">
+                <div class="field-label"><span class="l-ar">الكمية</span><span class="l-en">Quantity</span></div>
+                <div class="field-value mono">{{ surcharge.qty|print_decimal:2 }}</div>
+            </div>
+            <div class="field">
+                <div class="field-label"><span class="l-ar">سعر الوحدة</span><span class="l-en">Unit Price</span></div>
+                <div class="field-value mono">{{ surcharge.unit_price|print_money:surcharge.currency }}</div>
+            </div>
+            <div class="field">
+                <div class="field-label"><span class="l-ar">الإجمالي</span><span class="l-en">Total Amount</span></div>
+                <div class="field-value price">{{ surcharge.subtotal|print_money:surcharge.currency }}</div>
+            </div>
+        </div>
+    </section>
+
+    <section class="avoid-break">
+        <div class="section-head">
+            <div class="section-titles">
+                <div class="section-title-ar">المبررات</div>
+                <div class="section-title-en">Justification</div>
+            </div>
+        </div>
+
+        <div class="instructions-box{% if not surcharge.reason %} empty{% endif %}" style="margin-bottom: 12px;">
+            <div class="head">
+                <span class="l-ar">السبب</span>
+                <span class="l-en">Reason</span>
+            </div>
+            <div class="body">{% if surcharge.reason %}{{ surcharge.reason }}{% else %}{{ print_na }}{% endif %}</div>
+        </div>
+
+        <div class="field-grid grid-1">
+            <div class="field">
+                <div class="field-label"><span class="l-ar">المرفق</span><span class="l-en">Attachment</span></div>
+                <div class="field-value">{% if surcharge.attachment_file %}{{ surcharge.attachment_file.name|default:print_na }}{% else %}{{ print_na }}{% endif %}</div>
+            </div>
+        </div>
+    </section>
+
+    <footer class="page-footer">
+        Page 1 of 1
+    </footer>
+
+</div>
+
 </body>
 </html>

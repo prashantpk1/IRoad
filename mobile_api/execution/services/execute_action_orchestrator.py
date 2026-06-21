@@ -374,10 +374,14 @@ class ExecuteActionOrchestrator:
                     message_key='mobile.validation.failed',
                     refresh_required=True,
                 )
-            context.payload['mobile_cod_amount'] = collected
             expected = Decimal(
                 str(getattr(context.shipment, 'cod_amount', None) or Decimal('0'))
             )
+            ExecuteActionOrchestrator._assert_cod_amount_not_below_minimum(
+                collected=collected,
+                expected=expected,
+            )
+            context.payload['mobile_cod_amount'] = collected
             context.resolver_meta = dict(context.resolver_meta or {})
             context.resolver_meta['payment_collection_variance'] = (
                 ExecuteActionOrchestrator._build_payment_variance_from_amounts(
@@ -397,8 +401,15 @@ class ExecuteActionOrchestrator:
                 refresh_required=True,
             )
 
+        collected = Decimal(str(bundle.amount))
+        expected = Decimal(str(getattr(bundle, 'expected_amount', None) or Decimal('0')))
+        ExecuteActionOrchestrator._assert_cod_amount_not_below_minimum(
+            collected=collected,
+            expected=expected,
+        )
+
         # Staged bundle is source of truth for Action 9 treasury posting.
-        context.payload['mobile_cod_amount'] = Decimal(str(bundle.amount))
+        context.payload['mobile_cod_amount'] = collected
 
         context.resolver_meta = dict(context.resolver_meta or {})
         context.resolver_meta['payment_collection_bundle'] = bundle
@@ -463,6 +474,21 @@ class ExecuteActionOrchestrator:
         payload['treasury_transaction_id'] = str(getattr(treasury_txn, 'transaction_id', '') or '') if treasury_txn else ''
         payload['variance'] = variance
         return ExecuteActionResult(payload=payload, http_status=result.http_status)
+
+    @staticmethod
+    def _assert_cod_amount_not_below_minimum(
+        *,
+        collected: Decimal,
+        expected: Decimal,
+    ) -> None:
+        if collected < expected:
+            raise ExecuteActionError(
+                'Collected amount cannot be less than the amount due.',
+                code='amount_below_minimum',
+                http_status=400,
+                message_key='mobile.payment_collection.amount_below_minimum',
+                refresh_required=True,
+            )
 
     @staticmethod
     def _is_collect_payment_action(action_master_row: Any | None) -> bool:

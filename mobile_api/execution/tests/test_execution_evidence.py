@@ -114,7 +114,7 @@ class EvidenceValidationTests(SimpleTestCase):
         )
         EvidenceValidationService().validate_required_evidence(ctx)
 
-    def test_missing_notes_raises(self):
+    def test_a9_notes_optional_when_blank(self):
         ctx = _context(
             operation_action=_action(
                 action_code='A9',
@@ -123,14 +123,30 @@ class EvidenceValidationTests(SimpleTestCase):
             ),
             payload={'notes': ''},
         )
-        with self.assertRaises(ExecuteActionError) as exc:
-            EvidenceValidationService().validate_required_evidence(ctx)
-        self.assertEqual(exc.exception.code, 'notes_required')
-        self.assertIn('Notes are required', str(exc.exception))
-        self.assertEqual(
-            exc.exception.validation_error.get('field'),
-            'notes',
+        EvidenceValidationService().validate_required_evidence(ctx)
+
+    def test_notes_required_only_when_flagged(self):
+        ctx = _context(
+            operation_action=_action(
+                action_code='A2',
+                english_label='Pickup Arrival',
+                movement_status_impact='',
+            ),
+            payload={'latitude': '1', 'longitude': '2', 'notes': ''},
         )
+        with patch(
+            'mobile_api.execution.evidence.evidence_validation_service.build_execution_requirements',
+            return_value={
+                'gps': True,
+                'photo': False,
+                'video': False,
+                'note': True,
+                'note_required': True,
+            },
+        ):
+            with self.assertRaises(ExecuteActionError) as exc:
+                EvidenceValidationService().validate_required_evidence(ctx)
+        self.assertEqual(exc.exception.code, 'notes_required')
 
     def test_invalid_media_type(self):
         self._media_security_patch.stop()

@@ -1,27 +1,154 @@
+{% load printing_tags %}
 <!DOCTYPE html>
 <html lang="ar" dir="rtl">
 <head>
-  <meta charset="UTF-8">
-  <title>{{ truck.truck_code }}</title>
-  <style>
-    @page { size: A4; margin: 0.2cm; }
-    body { font-family: Tahoma, Arial, sans-serif; direction: rtl; font-size: 11px; color: #111; }
-    table { width: 100%; border-collapse: collapse; margin-top: 8px; }
-    th, td { border: 1px solid #d1d5db; padding: 5px; text-align: right; }
-    th { background: #f3f4f6; }
-  </style>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>بيانات الشاحنة | Truck Information</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Arabic:wght@300;400;500;600;700&family=IBM+Plex+Sans:wght@300;400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+{% include 'iroad_tenants/Printing-Templates/partials/print_brand_styles.html' %}
 </head>
-<body>
-  <h2>بيانات الشاحنة / Truck Profile</h2>
-  <table>
-    <tbody>
-      <tr><th>Truck Code</th><td>{{ truck.truck_code }}</td><th>Status</th><td>{{ truck.status }}</td></tr>
-      <tr><th>Plate Number</th><td>{{ truck.plate_number|default:'-' }}</td><th>Type</th><td>{% if truck.truck_type %}{{ truck.truck_type.english_label }}{% else %}-{% endif %}</td></tr>
-      <tr><th>Sourcing</th><td>{{ truck.sourcing_mode|default:'-' }}</td><th>Owner</th><td>{{ truck.owner_name|default:'-' }}</td></tr>
-      <tr><th>Default Driver</th><td>{% if truck.default_driver_id %}{{ truck.default_driver_id.driver_code }}{% else %}-{% endif %}</td><th>VIN</th><td>{{ truck.chassis_number_vin|default:'-' }}</td></tr>
-    </tbody>
-  </table>
-  <div style="margin-top:12px;page-break-inside:avoid;"><strong>Signature</strong><div style="height:64px;border-top:1px dashed #9ca3af;margin-top:6px;"></div></div>
-  <script>window.addEventListener('load', function(){ setTimeout(function(){ window.print(); }, 250); });</script>
+
+<body data-lang="bi" data-status="{{ truck.status|lower }}">
+
+<div class="page">
+
+    {% include 'iroad_tenants/Printing-Templates/partials/print_doc_header.html' with doc_title_ar='بيانات الشاحنة' doc_title_en='Truck Information' doc_number=truck.truck_code %}
+
+    <section class="avoid-break">
+        <div class="section-head">
+            <div class="section-titles">
+                <div class="section-title-ar">المعلومات الأساسية والملكية</div>
+                <div class="section-title-en">Basic Information &amp; Ownership</div>
+            </div>
+        </div>
+        <div class="field-grid grid-2">
+            <div class="field">
+                <div class="field-label"><span class="l-ar">رمز الشاحنة</span><span class="l-en">Truck Code</span></div>
+                <div class="field-value mono strong">{{ truck.truck_code|default:print_na }}</div>
+            </div>
+            <div class="field">
+                <div class="field-label"><span class="l-ar">الحالة</span><span class="l-en">Status</span></div>
+                <div class="field-value"><span class="pill {{ truck.status|print_status_pill }}">{{ truck.status|default:print_na }}</span></div>
+            </div>
+            <div class="field">
+                <div class="field-label"><span class="l-ar">معرّف المالك</span><span class="l-en">Owner ID</span></div>
+                <div class="field-value mono">{{ truck.owner_id|default:print_na }}</div>
+            </div>
+            <div class="field">
+                <div class="field-label"><span class="l-ar">اسم المالك</span><span class="l-en">Owner Name</span></div>
+                <div class="field-value strong">{{ truck.owner_name|default:print_na }}</div>
+            </div>
+        </div>
+    </section>
+
+    <section class="avoid-break">
+        <div class="section-head">
+            <div class="section-titles">
+                <div class="section-title-ar">اللوحة والتسجيل</div>
+                <div class="section-title-en">Plate &amp; Registration</div>
+            </div>
+        </div>
+        <div class="field-grid grid-2">
+            <div class="field">
+                <div class="field-label"><span class="l-ar">رقم اللوحة</span><span class="l-en">Plate Number</span></div>
+                <div class="field-value plate-id">{{ truck.plate_number|default:print_na }}</div>
+            </div>
+            <div class="field">
+                <div class="field-label"><span class="l-ar">دولة التسجيل</span><span class="l-en">Country of Registration</span></div>
+                <div class="field-value">{% if truck.registration_country %}{{ truck.registration_country.name_ar }}{% else %}{{ print_na }}{% endif %}</div>
+            </div>
+        </div>
+    </section>
+
+    <section class="avoid-break">
+        <div class="section-head">
+            <div class="section-titles">
+                <div class="section-title-ar">تفاصيل المركبة</div>
+                <div class="section-title-en">Vehicle Details</div>
+            </div>
+        </div>
+        <div class="field-grid grid-2">
+            <div class="field">
+                <div class="field-label"><span class="l-ar">نوع الشاحنة</span><span class="l-en">Truck Type</span></div>
+                <div class="field-value strong">{% if truck.truck_type %}{{ truck.truck_type.arabic_label }}{% else %}{{ print_na }}{% endif %}</div>
+            </div>
+            <div class="field">
+                <div class="field-label"><span class="l-ar">رقم الهيكل (VIN)</span><span class="l-en">Chassis Number (VIN)</span></div>
+                <div class="field-value mono">{{ truck.chassis_number_vin|default:print_na }}</div>
+            </div>
+            <div class="field">
+                <div class="field-label"><span class="l-ar">الرقم التسلسلي</span><span class="l-en">Serial Number</span></div>
+                <div class="field-value mono">{{ truck.serial_number|default:print_na }}</div>
+            </div>
+            <div class="field">
+                <div class="field-label"><span class="l-ar">اللون</span><span class="l-en">Color</span></div>
+                <div class="field-value">{{ truck.color|default:print_na }}</div>
+            </div>
+        </div>
+    </section>
+
+    <section class="avoid-break">
+        <div class="section-head">
+            <div class="section-titles">
+                <div class="section-title-ar">المواصفات</div>
+                <div class="section-title-en">Specifications</div>
+            </div>
+        </div>
+        <div class="field-grid grid-3">
+            <div class="field">
+                <div class="field-label"><span class="l-ar">عدد المحاور</span><span class="l-en">Axle Count</span></div>
+                <div class="field-value mono">{% if truck.axle_count is not None %}{{ truck.axle_count }}{% else %}{{ print_na }}{% endif %}</div>
+            </div>
+            <div class="field">
+                <div class="field-label"><span class="l-ar">عدد الإطارات</span><span class="l-en">Tires Count</span></div>
+                <div class="field-value mono">{% if truck.tires_count is not None %}{{ truck.tires_count }}{% else %}{{ print_na }}{% endif %}</div>
+            </div>
+            <div class="field">
+                <div class="field-label"><span class="l-ar">الوزن الفارغ (طن)</span><span class="l-en">Tare Weight (Ton)</span></div>
+                <div class="field-value mono">{{ truck.tare_weight_ton|print_decimal:3 }}</div>
+            </div>
+            <div class="field">
+                <div class="field-label"><span class="l-ar">سعة الحمولة (طن)</span><span class="l-en">Payload Capacity (Ton)</span></div>
+                <div class="field-value mono">{{ truck.payload_capacity_ton|print_decimal:3 }}</div>
+            </div>
+            <div class="field">
+                <div class="field-label"><span class="l-ar">الوزن الإجمالي (طن)</span><span class="l-en">Gross Weight (Ton)</span></div>
+                <div class="field-value mono">{{ truck.gross_weight_ton|print_decimal:3 }}</div>
+            </div>
+            <div class="field">
+                <div class="field-label"><span class="l-ar">الحجم (م³)</span><span class="l-en">Volume (m³)</span></div>
+                <div class="field-value mono">{{ truck.volume_m3|print_decimal:0 }}</div>
+            </div>
+        </div>
+    </section>
+
+    <section class="avoid-break">
+        <div class="section-head">
+            <div class="section-titles">
+                <div class="section-title-ar">السائق المعيّن</div>
+                <div class="section-title-en">Default Driver</div>
+            </div>
+        </div>
+        <div class="field-grid grid-2">
+            <div class="field">
+                <div class="field-label"><span class="l-ar">السائق المعيّن</span><span class="l-en">Default Driver</span></div>
+                <div class="field-value strong">{% if truck.default_driver_id %}{{ truck.default_driver_id.arabic_name }}{% else %}{{ print_na }}{% endif %}</div>
+            </div>
+            <div class="field">
+                <div class="field-label"><span class="l-ar">تاريخ التعيين</span><span class="l-en">Assigned Date</span></div>
+                <div class="field-value mono">{% if truck.default_driver_id %}{{ truck.updated_at|print_datetime }}{% else %}{{ print_na }}{% endif %}</div>
+            </div>
+        </div>
+    </section>
+
+    <footer class="page-footer">
+        Page 1 of 1
+    </footer>
+
+</div>
+
 </body>
 </html>

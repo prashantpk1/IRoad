@@ -54,17 +54,43 @@ def _nice_y_axis_max(*values: int) -> int:
     return max(step, int(math.ceil(top / float(step))) * step)
 
 
-def _chart_y_ticks(y_max: int) -> list[int]:
-    if y_max <= 1:
-        return [1, 0]
-    if y_max <= 10:
-        ticks: list[int] = []
-        for share in (1.0, 0.75, 0.5, 0.25, 0.0):
-            tick = int(round(y_max * share))
-            if not ticks or ticks[-1] != tick:
-                ticks.append(tick)
-        return ticks
-    return [y_max, int(y_max * 0.75), int(y_max * 0.5), int(y_max * 0.25), 0]
+def _chart_y_ticks(y_max: int) -> list[dict[str, Any]]:
+    """Return axis labels with percentage positions aligned to the plot height."""
+    if y_max <= 0:
+        y_max = 1
+
+    if y_max <= 5:
+        values = list(range(y_max, -1, -1))
+    else:
+        values = [y_max, int(y_max * 0.75), int(y_max * 0.5), int(y_max * 0.25), 0]
+        deduped: list[int] = []
+        seen: set[int] = set()
+        for value in values:
+            if value in seen:
+                continue
+            seen.add(value)
+            deduped.append(value)
+        values = deduped
+
+    ticks: list[dict[str, Any]] = []
+    for value in values:
+        position_pct = 0.0 if y_max == 0 else (1.0 - float(value) / float(y_max)) * 100.0
+        ticks.append(
+            {
+                "label": value,
+                "position_pct": round(position_pct, 4),
+            }
+        )
+    return ticks
+
+
+def _chart_y_divisions(y_max: int) -> int:
+    """Grid line count matches integer steps for small fleets; 25% bands for larger scales."""
+    if y_max <= 0:
+        return 1
+    if y_max <= 5:
+        return y_max
+    return 4
 
 
 CHART_PLOT_HEIGHT_PX = 140
@@ -286,7 +312,7 @@ def _workspace_counts(schema_name: str) -> _WorkspaceSnapshot:
         )
 
 
-def _fleet_chart_months(schema_name: str) -> tuple[list[dict[str, Any]], list[int]]:
+def _fleet_chart_months(schema_name: str) -> tuple[list[dict[str, Any]], list[dict[str, Any]], int, int]:
     today = timezone.localdate()
     chart_months: list[dict[str, Any]] = []
     series_trucks: list[int] = []
@@ -322,6 +348,7 @@ def _fleet_chart_months(schema_name: str) -> tuple[list[dict[str, Any]], list[in
 
     y_max = _nice_y_axis_max(*(series_trucks + series_drivers))
     y_ticks = _chart_y_ticks(y_max)
+    y_divisions = _chart_y_divisions(y_max)
     for row in chart_months:
         tc = int(row["truck_count"])
         dc = int(row["driver_count"])
@@ -332,7 +359,7 @@ def _fleet_chart_months(schema_name: str) -> tuple[list[dict[str, Any]], list[in
         row["driver_height_px"] = _bar_height_px(dc, y_max)
         row["truck_tip"] = f"Total Trucks: {_fmt_int(tc)} · {label}"
         row["driver_tip"] = f"Active Drivers: {_fmt_int(dc)} · {label}"
-    return chart_months, y_ticks
+    return chart_months, y_ticks, y_max, y_divisions
 
 
 def _attachment_compliance_counts(today: date, threshold: date) -> dict[str, int]:
@@ -638,7 +665,7 @@ def _build_fleet_hub_data(schema_name: str) -> dict[str, Any]:
         )
     fleet_donut_style = f"background: {_build_conic_gradient(fleet_donut_weights)};"
 
-    chart_months, chart_y_ticks = _fleet_chart_months(schema_name)
+    chart_months, chart_y_ticks, chart_y_max, chart_y_divisions = _fleet_chart_months(schema_name)
 
     truck_rows = []
     for truck in truck_qs.order_by("-updated_at")[:25]:
@@ -695,6 +722,8 @@ def _build_fleet_hub_data(schema_name: str) -> dict[str, Any]:
         "compliance": compliance,
         "chart_months": chart_months,
         "chart_y_ticks": chart_y_ticks,
+        "chart_y_max": chart_y_max,
+        "chart_y_divisions": chart_y_divisions,
         "fleet_donut_style": fleet_donut_style,
         "fleet_donut_segments": fleet_donut_segments,
         "truck_rows": truck_rows,
@@ -888,8 +917,14 @@ def build_tenant_dashboard_overview(tenant: TenantProfile) -> dict[str, Any]:
         )
     donut_style = f"background: {_build_conic_gradient(donut_weights)};"
 
-    chart_months, chart_y_ticks = _fleet_chart_months(schema_name) if schema_name else ([], [40, 30, 20, 10, 0])
-    y_max = chart_y_ticks[0] if chart_y_ticks else 40
+    if schema_name:
+        chart_months, chart_y_ticks, y_max, y_divisions = _fleet_chart_months(schema_name)
+    else:
+        chart_months = []
+        y_max = 40
+        y_ticks = _chart_y_ticks(y_max)
+        y_divisions = _chart_y_divisions(y_max)
+        chart_y_ticks = y_ticks
 
     today = timezone.localdate()
     range_start = date(*_shift_month(today.year, today.month, -3), 1)
@@ -974,6 +1009,8 @@ def build_tenant_dashboard_overview(tenant: TenantProfile) -> dict[str, Any]:
         },
         "chart_months": chart_months,
         "chart_y_ticks": chart_y_ticks,
+        "chart_y_max": y_max,
+        "chart_y_divisions": y_divisions,
         "fleet_donut_style": "background: conic-gradient(#e2e8f0 0 100%);",
         "fleet_donut_segments": [],
         "truck_rows": [],
@@ -1001,6 +1038,7 @@ def build_tenant_dashboard_overview(tenant: TenantProfile) -> dict[str, Any]:
         "chart_months": chart_months,
         "chart_y_ticks": chart_y_ticks,
         "chart_y_max": y_max,
+        "chart_y_divisions": y_divisions,
         "donut_style": donut_style,
         "donut_segments": donut_segments,
         "month_range_label": range_label,

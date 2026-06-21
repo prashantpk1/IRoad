@@ -3,6 +3,7 @@ from django.core.exceptions import ValidationError
 from django.utils.translation import gettext_lazy as _
 
 from iroad_tenants.tenant_form_choices import pin_model_choice_field
+from superadmin.models import Currency
 from tenant_workspace.models import (
     SalesInvoiceReport,
     SalesInvoiceReportBooking,
@@ -10,6 +11,19 @@ from tenant_workspace.models import (
     SalesInvoiceReportSurcharge,
     TenantClientAccount,
 )
+
+
+def _sir_form_valid_currency_code(currency_code):
+    code = (currency_code or '').strip().upper()
+    if code and Currency.objects.filter(currency_code=code, is_active=True).exists():
+        return code
+    return (
+        Currency.objects.filter(is_active=True)
+        .order_by('currency_code')
+        .values_list('currency_code', flat=True)
+        .first()
+        or 'SAR'
+    )
 
 
 class SalesInvoiceReportForm(forms.ModelForm):
@@ -78,7 +92,11 @@ class SalesInvoiceReportForm(forms.ModelForm):
         if cleaned.get('booking_date_from') and cleaned.get('booking_date_to'):
             if cleaned['booking_date_from'] > cleaned['booking_date_to']:
                 raise ValidationError({'booking_date_to': _('Booking To must be on/after Booking From.')})
-        cleaned['currency'] = (cleaned.get('currency') or 'SAR').strip()
+        cleaned['currency'] = _sir_form_valid_currency_code(cleaned.get('currency') or '')
+        client = cleaned.get('client')
+        if client and not (self.data.get('currency') or '').strip():
+            preferred = (getattr(client, 'preferred_currency', '') or '').strip().upper()
+            cleaned['currency'] = _sir_form_valid_currency_code(preferred or cleaned['currency'])
         return cleaned
 
 

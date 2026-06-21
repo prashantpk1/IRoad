@@ -92,6 +92,17 @@ class ActionExecutionMetadataTests(TestCase):
         self.assertFalse(row['execution_requirements']['gps'])
         self.assertFalse(row['execution_requirements']['note'])
 
+    def test_a9_note_not_required(self):
+        req = build_execution_requirements(
+            _action(
+                action_code='A9',
+                english_label='Collect Payment',
+                auto_treasury_post=True,
+                sequence_number=9,
+            ),
+        )
+        self.assertFalse(req['note_required'])
+
     def test_a1_start_job_has_no_capture_requirements(self):
         action = _action(
             action_code='A1',

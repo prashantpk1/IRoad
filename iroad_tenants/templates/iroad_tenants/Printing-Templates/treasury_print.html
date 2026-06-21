@@ -1,42 +1,95 @@
+{% load printing_tags %}
 <!DOCTYPE html>
 <html lang="ar" dir="rtl">
 <head>
-  <meta charset="UTF-8">
-  <title>{{ treasury.treasury_code }}</title>
-  <style>
-    @page { size: A4; margin: 0.2cm; }
-    body { font-family: Tahoma, Arial, sans-serif; direction: rtl; font-size: 11px; color: #111; }
-    table { width: 100%; border-collapse: collapse; margin-top: 8px; }
-    thead { display: table-header-group; } tr { page-break-inside: avoid; }
-    th, td { border: 1px solid #d1d5db; padding: 5px; text-align: right; }
-    th { background: #f3f4f6; } .num { direction: ltr; text-align: left; unicode-bidi: embed; }
-  </style>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>خزينة السائق | Driver Treasury</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Arabic:wght@300;400;500;600;700&family=IBM+Plex+Sans:wght@300;400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+{% include 'iroad_tenants/Printing-Templates/partials/print_brand_styles.html' %}
 </head>
-<body>
-  <h2>خزنة السائق / Driver Treasury</h2>
-  <table>
-    <tbody>
-      <tr><th>Treasury Code</th><td>{{ treasury.treasury_code }}</td><th>Status</th><td>{{ treasury.status }}</td></tr>
-      <tr><th>Driver</th><td>{{ treasury.driver.driver_code }} - {{ treasury.driver.arabic_name }}</td><th>Current Balance</th><td class="num">{{ treasury.current_balance }}</td></tr>
-    </tbody>
-  </table>
-  <h3 style="margin-top:10px;">Recent Transactions</h3>
-  <table>
-    <thead><tr><th>No</th><th>Date</th><th>Type</th><th>Category</th><th class="num">Amount</th></tr></thead>
-    <tbody>
-      {% for row in transactions %}
-      <tr>
-        <td>{{ row.transaction_no }}</td>
-        <td>{{ row.transaction_date|date:'Y-m-d H:i' }}</td>
-        <td>{{ row.transaction_type }}</td>
-        <td>{{ row.transaction_category }}</td>
-        <td class="num">{{ row.amount }}</td>
-      </tr>
-      {% empty %}
-      <tr><td colspan="5">No transactions.</td></tr>
-      {% endfor %}
-    </tbody>
-  </table>
-  <script>window.addEventListener('load', function(){ setTimeout(function(){ window.print(); }, 250); });</script>
+
+<body data-lang="bi" data-status="{{ treasury.status|lower }}">
+
+<div class="page">
+
+    {% include 'iroad_tenants/Printing-Templates/partials/print_doc_header.html' with doc_title_ar='خزينة السائق' doc_title_en='Driver Treasury' doc_number=treasury.treasury_code %}
+
+    <section class="avoid-break">
+        <div class="section-head">
+            <div class="section-titles">
+                <div class="section-title-ar">معلومات الخزينة</div>
+                <div class="section-title-en">Treasury Information</div>
+            </div>
+        </div>
+        <div class="field-grid grid-3" style="margin-bottom: 10px;">
+            <div class="field">
+                <div class="field-label"><span class="l-ar">رمز الخزينة</span><span class="l-en">Treasury Code</span></div>
+                <div class="field-value mono strong">{{ treasury.treasury_code|default:print_na }}</div>
+            </div>
+            <div class="field">
+                <div class="field-label"><span class="l-ar">السائق</span><span class="l-en">Driver</span></div>
+                <div class="field-value strong">{{ treasury.driver.driver_code }} · {{ treasury.driver.arabic_name }}</div>
+            </div>
+            <div class="field">
+                <div class="field-label"><span class="l-ar">الحالة</span><span class="l-en">Status</span></div>
+                <div class="field-value"><span class="pill {{ treasury.status|print_status_pill }}">{{ treasury.status|default:print_na }}</span></div>
+            </div>
+        </div>
+        <div class="field-grid grid-1">
+            <div class="field amount-field">
+                <div class="field-label"><span class="l-ar">الرصيد الحالي</span><span class="l-en">Current Balance</span></div>
+                <div class="field-value amount-value">{{ treasury.current_balance|print_money:currency_code }}</div>
+            </div>
+        </div>
+    </section>
+
+    <section>
+        <div class="section-head">
+            <div class="section-titles">
+                <div class="section-title-ar">المعاملات الأخيرة</div>
+                <div class="section-title-en">Recent Transactions</div>
+            </div>
+        </div>
+        <div class="table-wrap">
+            <table>
+                <thead>
+                    <tr>
+                        <th style="width: 5%;" class="num"><span class="l-ar">م</span><span class="l-en">SN</span></th>
+                        <th style="width: 16%;"><span class="l-ar">رقم المعاملة</span><span class="l-en">Transaction No.</span></th>
+                        <th style="width: 16%;"><span class="l-ar">تاريخ المعاملة</span><span class="l-en">Transaction Date</span></th>
+                        <th style="width: 10%;"><span class="l-ar">النوع</span><span class="l-en">Type</span></th>
+                        <th><span class="l-ar">التصنيف</span><span class="l-en">Category</span></th>
+                        <th class="num" style="width: 14%;"><span class="l-ar">المبلغ</span><span class="l-en">Amount</span></th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for row in transactions %}
+                    <tr>
+                        <td class="num mono">{{ forloop.counter }}</td>
+                        <td class="mono">{{ row.transaction_no|default:print_na }}</td>
+                        <td class="mono">{{ row.transaction_date|print_datetime }}</td>
+                        <td><span class="pill {{ row.transaction_type|lower|print_status_pill }}">{{ row.transaction_type|default:print_na }}</span></td>
+                        <td>{{ row.transaction_category|default:print_na }}</td>
+                        <td class="num mono strong">{{ row.amount|print_money:currency_code }}</td>
+                    </tr>
+                    {% empty %}
+                    <tr>
+                        <td colspan="6" class="center">{{ print_na }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </section>
+
+    <footer class="page-footer">
+        Page 1 of 1
+    </footer>
+
+</div>
+
 </body>
 </html>

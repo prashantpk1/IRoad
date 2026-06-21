@@ -7,10 +7,6 @@
 {% block breadcrumb %}{% endblock %}
 
 {% block content %}
-<!-- Top Header -->
-      
-
-      
       <div class="page-header">
         <nav aria-label="breadcrumb">
           <ol class="breadcrumb">
@@ -28,10 +24,7 @@
         <div class="page-header-row">
           <div class="page-header-left">
             <h1 class="page-title">Client Contacts List</h1>
-            <!-- <p class="page-subtitle">
-              Manage and view all registered client contacts
-            </p> -->
-          </div>
+            </div>
           <div class="page-header-right">
             <div class="eal-header-actions">
               {% include 'iroad_tenants/partials/eal_export_link.html' with export_url_name='iroad_tenants:tenant_client_contacts_export' export_filename='client_contacts_export.csv' %}
@@ -245,6 +238,5 @@
 
         {% include 'iroad_tenants/partials/eal_list_pagination.html' with page_obj=client_contacts_page pagination_label='contacts' %}
       </div>
-      <!-- ========== END NEW TABLE UI DESIGN ========== -->
 {% endblock %}
 

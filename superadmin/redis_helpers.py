@@ -440,11 +440,11 @@ def refresh_and_get_tenant_session(tenant_id, jti, timeout_minutes):
 
 
 def revoke_tenant_session_key(tenant_id, jti):
-    """Delete one tenant/driver session from Redis."""
+    """Delete one tenant/driver session from Redis (best-effort when Redis is down)."""
     if not jti:
-        return
-    client = get_redis_client()
-    client.delete(f'tenant:{tenant_id}:session:{jti}')
+        return False
+    key = f'tenant:{tenant_id}:session:{jti}'
+    return redis_safe_delete(key)
 
 
 def revoke_tenant_session_by_jti(jti):
@@ -454,17 +454,23 @@ def revoke_tenant_session_by_jti(jti):
     """
     if not jti:
         return 0
-    client = get_redis_client()
-    pattern = f'tenant:*:session:{jti}'
-    deleted = 0
-    cursor = 0
-    while True:
-        cursor, keys = client.scan(cursor, match=pattern, count=100)
-        for key in keys:
-            deleted += client.delete(key)
-        if cursor == 0:
-            break
-    return deleted
+
+    def _revoke():
+        client = get_redis_client()
+        pattern = f'tenant:*:session:{jti}'
+        deleted = 0
+        cursor = 0
+        while True:
+            cursor, keys = client.scan(cursor, match=pattern, count=100)
+            for key in keys:
+                deleted += client.delete(key)
+            if cursor == 0:
+                break
+        return deleted
+
+    _revoke.__name__ = 'revoke_tenant_session_by_jti'
+    result = _redis_call(_revoke, fallback=0)
+    return int(result or 0)
 
 
 def revoke_tenant_workspace_sessions_for_user_reference(tenant_id, tenant_user_pk):

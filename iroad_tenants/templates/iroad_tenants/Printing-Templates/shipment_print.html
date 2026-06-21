@@ -1,32 +1,214 @@
+{% load printing_tags %}
 <!DOCTYPE html>
 <html lang="ar" dir="rtl">
 <head>
-  <meta charset="UTF-8">
-  <title>{{ shipment.shipment_no }}</title>
-  <style>
-    @page { size: A4; margin: 0.2cm; }
-    body { font-family: Tahoma, Arial, sans-serif; direction: rtl; font-size: 11px; color: #111; }
-    table { width: 100%; border-collapse: collapse; margin-top: 8px; }
-    thead { display: table-header-group; } tr { page-break-inside: avoid; }
-    th, td { border: 1px solid #d1d5db; padding: 5px; text-align: right; }
-    th { background: #f3f4f6; } .block { page-break-inside: avoid; margin-top: 10px; }
-    .num { direction: ltr; text-align: left; unicode-bidi: embed; }
-  </style>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>بوليصة شحن | Shipment</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Arabic:wght@300;400;500;600;700&family=IBM+Plex+Sans:wght@300;400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+{% include 'iroad_tenants/Printing-Templates/partials/print_brand_styles.html' %}
 </head>
-<body>
-  <h2>بوليصة شحن / Shipment</h2>
-  <div class="block">
-    <table>
-      <tbody>
-        <tr><th>Shipment No</th><td>{{ shipment.shipment_no }}</td><th>Status</th><td>{{ shipment.shipment_status }}</td></tr>
-        <tr><th>Date</th><td>{{ shipment.shipment_date|date:'Y-m-d' }}</td><th>Order Type</th><td>{{ shipment.order_type|default:'-' }}</td></tr>
-        <tr><th>Booking Ref</th><td>{% if shipment.booking %}{{ shipment.booking.booking_no }}{% endif %}</td><th>Booking Item</th><td>{{ shipment.booking_item_ref }}</td></tr>
-        <tr><th>Route</th><td>{{ shipment.route_display|default:'-' }}</td><th>Trip Type</th><td>{{ shipment.trip_type|default:'-' }}</td></tr>
-        <tr><th>Client Snapshot</th><td>{% if shipment.client_account %}{{ shipment.client_account.account_no }} - {{ shipment.client_account.display_name }}{% else %}-{% endif %}</td><th>COD Amount</th><td class="num">{{ shipment.cod_amount }}</td></tr>
-      </tbody>
-    </table>
-  </div>
-  <div class="block"><strong>Signature</strong><div style="height:64px;border-top:1px dashed #9ca3af;margin-top:6px;"></div></div>
-  <script>window.addEventListener('load', function(){ setTimeout(function(){ window.print(); }, 250); });</script>
+
+<body data-lang="bi" data-status="{{ shipment.shipment_status|lower|default:'confirmed' }}">
+
+<div class="page">
+
+    {% include 'iroad_tenants/Printing-Templates/partials/print_doc_header.html' with doc_title_ar='بوليصة شحن' doc_title_en='Shipment' doc_number=shipment.shipment_no %}
+
+    <section class="avoid-break">
+        <div class="section-head">
+            <div class="section-titles">
+                <div class="section-title-ar">معلومات الشحنة</div>
+                <div class="section-title-en">Shipment Information</div>
+            </div>
+        </div>
+        <div class="field-grid grid-3">
+            <div class="field">
+                <div class="field-label"><span class="l-ar">رقم الشحنة</span><span class="l-en">Shipment No.</span></div>
+                <div class="field-value mono strong">{{ shipment.shipment_no|default:print_na }}</div>
+            </div>
+            <div class="field">
+                <div class="field-label"><span class="l-ar">نوع الطلب</span><span class="l-en">Order Type</span></div>
+                <div class="field-value">{% if shipment.order_type %}<span class="pill {{ shipment.order_type|print_status_pill }}">{{ shipment.order_type }}</span>{% else %}{{ print_na }}{% endif %}</div>
+            </div>
+            <div class="field">
+                <div class="field-label"><span class="l-ar">تاريخ الشحن</span><span class="l-en">Shipment Date</span></div>
+                <div class="field-value mono">{{ shipment.shipment_date|print_date }}</div>
+            </div>
+        </div>
+    </section>
+
+    <section class="avoid-break">
+        <div class="section-head">
+            <div class="section-titles">
+                <div class="section-title-ar">معلومات الحجز</div>
+                <div class="section-title-en">Booking Information</div>
+            </div>
+        </div>
+        <div class="field-grid grid-3">
+            <div class="field">
+                <div class="field-label"><span class="l-ar">رقم الحجز</span><span class="l-en">Booking No</span></div>
+                <div class="field-value mono">{% if shipment.booking %}{{ shipment.booking.booking_no }}{% else %}{{ print_na }}{% endif %}</div>
+            </div>
+            <div class="field">
+                <div class="field-label"><span class="l-ar">حساب العميل</span><span class="l-en">Client Account</span></div>
+                <div class="field-value strong">{% if shipment.client_account %}{{ shipment.client_account.display_name }}{% else %}{{ print_na }}{% endif %}</div>
+            </div>
+            <div class="field">
+                <div class="field-label"><span class="l-ar">نوع الطلب</span><span class="l-en">Order Type</span></div>
+                <div class="field-value">{% if shipment.order_type %}<span class="pill {{ shipment.order_type|print_status_pill }}">{{ shipment.order_type }}</span>{% else %}{{ print_na }}{% endif %}</div>
+            </div>
+            <div class="field">
+                <div class="field-label"><span class="l-ar">بند الحجز</span><span class="l-en">Booking Item</span></div>
+                <div class="field-value mono">{{ shipment.booking_item_ref|default:print_na }}</div>
+            </div>
+            <div class="field">
+                <div class="field-label"><span class="l-ar">نوع بند الحجز</span><span class="l-en">Booking Item Type</span></div>
+                <div class="field-value">{{ shipment.booking_item_type|default:print_na }}</div>
+            </div>
+            <div class="field">
+                <div class="field-label"><span class="l-ar">مسار بند الحجز</span><span class="l-en">Booking Item Route</span></div>
+                <div class="field-value">{{ shipment.route_display|default:print_na }}</div>
+            </div>
+            <div class="field">
+                <div class="field-label"><span class="l-ar">عدد وثائق إثبات التسليم</span><span class="l-en">POD Doc Count</span></div>
+                <div class="field-value mono">{{ shipment.pod_doc_count|default:0 }}</div>
+            </div>
+            <div class="field">
+                <div class="field-label"><span class="l-ar">مبلغ التحصيل</span><span class="l-en">COD Amount</span></div>
+                <div class="field-value price">{{ shipment.cod_amount|print_money:currency_code }}</div>
+            </div>
+            <div class="field">
+                <div class="field-label"><span class="l-ar">حالة دفع التحصيل</span><span class="l-en">COD Payment Status</span></div>
+                <div class="field-value"><span class="pill {{ cod_payment_status|print_status_pill }}">{{ cod_payment_status|default:print_na }}</span></div>
+            </div>
+            <div class="field">
+                <div class="field-label"><span class="l-ar">الرسوم الإضافية</span><span class="l-en">Additional Charges</span></div>
+                <div class="field-value price">{{ additional_charges|print_money:currency_code }}</div>
+            </div>
+        </div>
+    </section>
+
+    <section class="avoid-break">
+        <div class="section-head">
+            <div class="section-titles">
+                <div class="section-title-ar">الشاحنة والسائق</div>
+                <div class="section-title-en">Truck &amp; Driver</div>
+            </div>
+        </div>
+        <div class="field-grid grid-2">
+            <div class="field">
+                <div class="field-label"><span class="l-ar">الشاحنة</span><span class="l-en">Truck</span></div>
+                <div class="field-value strong">{% if shipment.truck %}{{ shipment.truck.plate_number }} / {{ shipment.truck.truck_code }}{% else %}{{ print_na }}{% endif %}</div>
+            </div>
+            <div class="field">
+                <div class="field-label"><span class="l-ar">السائق</span><span class="l-en">Driver</span></div>
+                <div class="field-value strong">{% if shipment.driver %}{{ shipment.driver.arabic_name }} / {{ shipment.driver.driver_code }}{% else %}{{ print_na }}{% endif %}</div>
+            </div>
+        </div>
+    </section>
+
+    <section>
+        <div class="section-head">
+            <div class="section-titles">
+                <div class="section-title-ar">عناوين التحميل</div>
+                <div class="section-title-en">Loading Address Lines</div>
+            </div>
+        </div>
+        <div class="table-wrap">
+            <table>
+                <thead>
+                    <tr>
+                        <th style="width:48px;"><span class="l-ar">م</span><span class="l-en">SN</span></th>
+                        <th><span class="l-ar">عنوان التحميل</span><span class="l-en">Loading Address</span></th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td class="num">1</td>
+                        <td>{% if shipment.loading_address %}{{ shipment.loading_address.address_code }} — {{ shipment.loading_address.display_name }}{% else %}{{ print_na }}{% endif %}</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </section>
+
+    <section>
+        <div class="section-head">
+            <div class="section-titles">
+                <div class="section-title-ar">عناوين التفريغ</div>
+                <div class="section-title-en">Delivery Address Lines</div>
+            </div>
+        </div>
+        <div class="table-wrap">
+            <table>
+                <thead>
+                    <tr>
+                        <th style="width:48px;"><span class="l-ar">م</span><span class="l-en">SN</span></th>
+                        <th><span class="l-ar">عنوان التفريغ</span><span class="l-en">Delivery Address</span></th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td class="num">1</td>
+                        <td>{% if shipment.delivery_address %}{{ shipment.delivery_address.address_code }} — {{ shipment.delivery_address.display_name }}{% else %}{{ print_na }}{% endif %}</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </section>
+
+    <section>
+        <div class="section-head">
+            <div class="section-titles">
+                <div class="section-title-ar">معلومات البضاعة</div>
+                <div class="section-title-en">Cargo Information</div>
+            </div>
+        </div>
+        <div class="table-wrap">
+            <table>
+                <thead>
+                    <tr>
+                        <th style="width:36px;"><span class="l-ar">م</span><span class="l-en">SN</span></th>
+                        <th><span class="l-ar">بند الحجز</span><span class="l-en">Booking Item</span></th>
+                        <th><span class="l-ar">صنف البضاعة</span><span class="l-en">Cargo</span></th>
+                        <th class="num"><span class="l-ar">الوزن (طن)</span><span class="l-en">Weight (Ton)</span></th>
+                        <th><span class="l-ar">الوحدة</span><span class="l-en">Unit</span></th>
+                        <th class="num"><span class="l-ar">الكمية</span><span class="l-en">Quantity</span></th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td class="num">1</td>
+                        <td>{{ shipment.cargo_booking_item|default:print_na }}</td>
+                        <td>{% if shipment.cargo %}{{ shipment.cargo.display_name }}{% else %}{{ shipment.cargo_booking_item|default:print_na }}{% endif %}</td>
+                        <td class="num">{{ shipment.cargo_weight|print_decimal:3 }}</td>
+                        <td>{{ shipment.cargo_unit|default:print_na }}</td>
+                        <td class="num">{{ shipment.cargo_qty|print_decimal:2 }}</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+
+        <div class="cargo-totals">
+            <div class="field">
+                <div class="field-label"><span class="l-ar">إجمالي كمية البضاعة</span><span class="l-en">Total Cargo Unit Quantity</span></div>
+                <div class="field-value">{% if booking %}{{ booking.total_cargo_qty|print_decimal:2 }}{% else %}{{ shipment.cargo_qty|print_decimal:2 }}{% endif %}</div>
+            </div>
+            <div class="field">
+                <div class="field-label"><span class="l-ar">إجمالي وزن البضاعة</span><span class="l-en">Total Cargo Weight</span></div>
+                <div class="field-value">{% if booking %}{{ booking.total_cargo_weight|print_decimal:3 }}{% else %}{{ shipment.cargo_weight|print_decimal:3 }}{% endif %}</div>
+            </div>
+        </div>
+    </section>
+
+    <footer class="page-footer">
+        Page 1 of 1
+    </footer>
+
+</div>
+
 </body>
 </html>

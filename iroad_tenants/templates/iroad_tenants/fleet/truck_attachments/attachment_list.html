@@ -19,10 +19,7 @@
   <div class="page-header-row">
     <div class="page-header-left">
       <h1 class="page-title">Truck Attachments — {{ truck.truck_code }} <span class="text-muted fw-normal">|</span> {{ truck.plate_number }}</h1>
-      <!-- <p class="page-subtitle">
-        Upload and manage attachment documents for trucks in the fleet.
-      </p> -->
-    </div>
+      </div>
     <div class="page-header-right">
       <div class="eal-header-actions gap-2">
         <a href="{% url 'iroad_tenants:truck_attachment_create' truck_id=truck.truck_id %}" class="eal-btn eal-btn-primary">

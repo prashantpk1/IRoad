@@ -7,10 +7,6 @@
 {% block breadcrumb %}{% endblock %}
 
 {% block content %}
-<!-- Top Header -->
-      
-
-      
       <div class="page-header">
         <nav aria-label="breadcrumb">
           <ol class="breadcrumb">
@@ -28,10 +24,7 @@
         <div class="page-header-row">
           <div class="page-header-left">
             <h1 class="page-title">Client Contracts List</h1>
-            <!-- <p class="page-subtitle">
-              Manage and view all registered client contracts.
-            </p> -->
-          </div>
+            </div>
           <div class="page-header-right">
             <div class="eal-header-actions">
               {% include 'iroad_tenants/partials/eal_export_link.html' with export_url_name='iroad_tenants:tenant_client_contract_export' export_filename='client_contracts_export.csv' %}
@@ -219,6 +212,7 @@
                         </a>
                       </li>
                       {% endif %}
+                      {% if contract.can_delete %}
                       <li><hr class="dropdown-divider" /></li>
                       <li>
                         <form
@@ -234,6 +228,7 @@
                           </button>
                         </form>
                       </li>
+                      {% endif %}
                     </ul>
                   </div>
                 </td>
@@ -249,6 +244,5 @@
 
         {% include 'iroad_tenants/partials/eal_list_pagination.html' with page_obj=client_contracts_page pagination_label='client contracts' %}
       </div>
-      <!-- ========== END TABLE UI DESIGN ========== -->
 {% endblock %}
 

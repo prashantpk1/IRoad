@@ -24,18 +24,14 @@
         <div class="page-header-row">
           <div class="page-header-left">
             <h1 class="page-title">Shipment List</h1>
-            <!-- <p class="page-subtitle">
-              View and manage shipments. Create manually with <strong>Add Shipment</strong>, or automatically when a driver
-              action with <strong>Auto Shipment Post</strong> enabled is logged.
-            </p> -->
-          </div>
+            </div>
           <div class="page-header-right">
             <div class="eal-header-actions">
               {% include 'iroad_tenants/partials/eal_export_link.html' with export_url_name='iroad_tenants:tenant_operation_shipment_export' export_filename='shipments_export.csv' %}
-              <!-- <a href="{% url 'iroad_tenants:tenant_operation_action_log_create' %}" class="eal-btn eal-btn-outline">
+              <a href="{% url 'iroad_tenants:tenant_operation_action_log_create' %}" class="eal-btn eal-btn-outline">
                 <i class="bi bi-journal-check"></i>
                 <span>Action Log</span>
-              </a> -->
+              </a>
               <a href="{% url 'iroad_tenants:tenant_operation_shipment_create' %}" class="eal-btn eal-btn-primary">
                 <i class="bi bi-plus-lg"></i>
                 <span>Add Shipment</span>
@@ -375,7 +371,6 @@
             </div>
           </div>
         </div>
-        <!-- ========== END TABLE UI DESIGN ========== -->
       </div>
 
 <!-- ========== SHIPMENT DETAIL SLIDE PANEL ========== -->
@@ -399,10 +394,6 @@
           <button class="detail-action-btn duplicate" title="Duplicate">
             <i class="bi bi-copy"></i>
             <span>Duplicate</span>
-          </button>
-          <button class="detail-action-btn delete" title="Delete">
-            <i class="bi bi-trash3"></i>
-            <span>Delete</span>
           </button>
         </div>
         <button class="detail-close-btn" id="detailCloseBtn" title="Close">

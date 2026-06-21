@@ -33,8 +33,7 @@
         <div class="page-header-row">
           <div class="page-header-left">
             <h1 class="page-title">{% if is_view %}Price List Details{% elif is_edit %}Edit Price List{% else %}Create Price List{% endif %}</h1>
-            <!-- <p class="page-subtitle">{% if is_view %}View complete price list header and item lines.{% elif is_edit %}Update the price list header and item lines, then save.{% else %}Fill in the details below to register a new price list in the system.{% endif %}</p> -->
-          </div>
+            </div>
           <div class="page-header-right">
             <a href="{% url 'iroad_tenants:tenant_price_list_master_list' %}" class="btn btn-outline-secondary">
               <i class="bi bi-arrow-left"></i> Back

@@ -155,10 +155,11 @@ def build_digital_capture_ui(
             },
             {
                 'id': 'note',
-                'label': 'Note',
+                'label': 'Comment',
                 'media_type': 'note',
                 'required': bool(requirements.get('note_required')),
-                'placeholder': 'Write a note...',
+                'optional': not bool(requirements.get('note_required')),
+                'placeholder': 'Write a comment (optional)...',
             },
         ],
         'footer_hint': 'Upload every mandatory signed document page.',

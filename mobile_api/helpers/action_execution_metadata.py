@@ -252,12 +252,7 @@ def build_execution_requirements(action, *, shipment=None) -> dict[str, Any]:
         'video_max_count': video_max,
         'video_optional': bool(getattr(action, 'auto_pod_post', False)),
         'note': requires_note,
-        'note_required': requires_note and action_matches(
-            action,
-            'collect payment',
-            'a9',
-            'action 9',
-        ),
+        'note_required': False,
         'signature': requires_photo and action_matches(
             action,
             'upload pod',

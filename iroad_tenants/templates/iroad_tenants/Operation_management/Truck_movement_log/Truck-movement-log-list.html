@@ -3,9 +3,7 @@
 {% load humanize %}
 
 
-
 {% block title %}Truck Movement Log List | iRoad Admin{% endblock %}
-
 
 
 {% block extra_css %}
@@ -127,9 +125,7 @@
 {% endblock %}
 
 
-
 {% block content %}
-
 
 
       <div class="page-header">
@@ -187,7 +183,6 @@
         </div>
 
       </div>
-
 
 
       <div class="eal-stats-row eal-stats-row--tml">
@@ -303,7 +298,6 @@
       </div>
 
 
-
       <div
 
         class="eal-table-card"
@@ -371,7 +365,6 @@
           </div>
 
         </div>
-
 
 
         <div class="eal-table-wrap">
@@ -471,13 +464,11 @@
         </div>
 
 
-
         {% include 'iroad_tenants/partials/eal_list_pagination.html' with page_obj=movement_page pagination_label='movement logs' %}
 
       </div>
 
 {% endblock %}
-
 
 
 {% block extra_js %}

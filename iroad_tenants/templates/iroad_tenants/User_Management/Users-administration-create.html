@@ -63,14 +63,7 @@
         {% if is_deleted_user %}Deleted User{% else %}User Administration{% endif %} &mdash;
         <span style="color: var(--primary-color)">{{ editing_user.username }}</span>
       </h1>
-      <!-- <p class="page-subtitle">
-        {% if is_deleted_user %}
-          This account is soft-deleted. Use Restore to clear deletion; the account stays Inactive until you activate it.
-        {% else %}
-          Read-only view of this user account.
-        {% endif %}
-      </p> -->
-    </div>
+      </div>
     <div class="page-header-right">
       <div class="eal-header-actions">
         <a href="{% url 'iroad_tenants:tenant_users_administration' %}" class="eal-btn eal-btn-outline">
@@ -373,8 +366,7 @@
   <div class="page-header-row">
     <div class="page-header-left">
       <h1 class="page-title">{% if is_edit_mode %}Edit User Administration{% else %}Create User Administration{% endif %}</h1>
-      <!-- <p class="page-subtitle">{% if is_edit_mode %}Update the details below to edit this user account.{% else %}Fill in the details below to create a new user account.{% endif %}</p> -->
-    </div>
+      </div>
     <div class="page-header-right">
       <div class="eal-header-actions">
         <a href="{% url 'iroad_tenants:tenant_users_administration' %}" class="eal-btn eal-btn-outline">

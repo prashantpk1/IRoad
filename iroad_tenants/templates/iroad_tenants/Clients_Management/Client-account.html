@@ -20,10 +20,6 @@
 {% endblock %}
 
 {% block content %}
-<!-- Top Header -->
-      
-
-      
       <div class="page-header">
         <nav aria-label="breadcrumb">
           <ol class="breadcrumb">
@@ -41,10 +37,7 @@
         <div class="page-header-row">
           <div class="page-header-left">
             <h1 class="page-title">Client Account</h1>
-            <!-- <p class="page-subtitle">
-              Manage and view all registered client accounts
-            </p> -->
-          </div>
+            </div>
           <div class="page-header-right">
             <div class="eal-header-actions">
               <a
@@ -379,6 +372,5 @@
 
         {% include 'iroad_tenants/partials/eal_list_pagination.html' with page_obj=client_accounts_page pagination_label='client accounts' %}
       </div>
-      <!-- ========== END NEW TABLE UI DESIGN ========== -->
 {% endblock %}
 

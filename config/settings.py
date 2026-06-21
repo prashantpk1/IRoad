@@ -30,6 +30,13 @@ SECRET_KEY = config('SECRET_KEY')
 # Google Maps JavaScript API (Fleet GPS Surveillance dashboard)
 GOOGLE_MAPS_API_KEY = config('GOOGLE_MAPS_API_KEY', default='')
 
+# Full path to wkhtmltopdf binary for in-memory PDF print streams (tenant + billing).
+# Leave empty to auto-detect from PATH or default Windows install folder.
+WKHTMLTOPDF_CMD = config('WKHTMLTOPDF_CMD', default='')
+
+# Public site root for absolute media URLs in PDF print templates (e.g. http://127.0.0.1:8000).
+SITE_URL = config('SITE_URL', default='')
+
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = config('DEBUG', default=False, cast=bool)
 
