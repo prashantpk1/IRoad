@@ -4,7 +4,11 @@ from __future__ import annotations
 from types import SimpleNamespace
 from unittest import TestCase
 
-from iroad_tenants.fleet_gps_tracking import _coords_from_log, build_google_maps_link
+from iroad_tenants.fleet_gps_tracking import (
+    _coords_from_log,
+    _resolve_shipment_route_context,
+    build_google_maps_link,
+)
 
 
 class FleetGpsCoordTests(TestCase):
@@ -33,3 +37,65 @@ class FleetGpsCoordTests(TestCase):
             build_google_maps_link('', '', 'https://maps.example/x'),
             'https://maps.example/x',
         )
+
+
+class FleetGpsRouteContextTests(TestCase):
+    def _address(self, label: str, lat: float, lng: float):
+        return SimpleNamespace(
+            display_name=label,
+            english_label=label,
+            arabic_label='',
+            map_link=f'https://maps.google.com/?q={lat},{lng}',
+        )
+
+    def test_outbound_leg_uses_forward_route_labels_and_address_pins(self):
+        shipment = SimpleNamespace(
+            booking_item_type='Outbound',
+            route_display='',
+            loading_address=self._address('Jeddah Site', 21.5433, 39.1728),
+            delivery_address=self._address('Makkah Site', 21.3891, 39.8579),
+            booking=SimpleNamespace(
+                trip_type='Round',
+                route_direction='forward',
+                route_display='',
+                loading_address=None,
+                delivery_address=None,
+                route=SimpleNamespace(
+                    route_id='route-1',
+                    route_label='Jeddah — Makkah',
+                    origin_point=SimpleNamespace(display_label='Jeddah'),
+                    destination_point=SimpleNamespace(display_label='Makkah'),
+                ),
+            ),
+        )
+        ctx = _resolve_shipment_route_context(shipment)
+        self.assertEqual(ctx['departure_label'], 'Jeddah')
+        self.assertEqual(ctx['arrival_label'], 'Makkah')
+        self.assertEqual(ctx['route_start'], {'lat': 21.5433, 'lng': 39.1728})
+        self.assertEqual(ctx['route_end'], {'lat': 21.3891, 'lng': 39.8579})
+
+    def test_backload_leg_reverses_route_and_swaps_address_pins(self):
+        shipment = SimpleNamespace(
+            booking_item_type='Backload',
+            route_display='',
+            loading_address=self._address('Jeddah Site', 21.5433, 39.1728),
+            delivery_address=self._address('Makkah Site', 21.3891, 39.8579),
+            booking=SimpleNamespace(
+                trip_type='Round',
+                route_direction='forward',
+                route_display='',
+                loading_address=None,
+                delivery_address=None,
+                route=SimpleNamespace(
+                    route_id='route-1',
+                    route_label='Jeddah — Makkah',
+                    origin_point=SimpleNamespace(display_label='Jeddah'),
+                    destination_point=SimpleNamespace(display_label='Makkah'),
+                ),
+            ),
+        )
+        ctx = _resolve_shipment_route_context(shipment)
+        self.assertEqual(ctx['departure_label'], 'Makkah')
+        self.assertEqual(ctx['arrival_label'], 'Jeddah')
+        self.assertEqual(ctx['route_start'], {'lat': 21.3891, 'lng': 39.8579})
+        self.assertEqual(ctx['route_end'], {'lat': 21.5433, 'lng': 39.1728})

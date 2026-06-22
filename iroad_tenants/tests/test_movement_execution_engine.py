@@ -20,6 +20,7 @@ from iroad_tenants.operation_runtime.movement_stage_derivation import (
 from iroad_tenants.operation_runtime.movement_state_machine import (
     STAGE_CREATED,
     STAGE_IN_TRANSIT,
+    STAGE_STARTED,
     is_movement_start_action,
     movement_impact_allowed_from_current,
 )
@@ -51,6 +52,7 @@ def _action(code, label, **kwargs):
     a.auto_shipment_post = False
     a.auto_movement_post = False
     a.auto_pod_post = False
+    a.prerequisite_action_codes = kwargs.get('prerequisite_action_codes', '')
     return a
 
 
@@ -83,6 +85,78 @@ class MovementStageTests(SimpleTestCase):
 
     @patch(
         'iroad_tenants.operation_runtime.movement_stage_derivation.movement_log_milestone_flags',
+        return_value={'start_done': False, 'in_transit_done': False, 'arrived_done': False, 'complete_done': False},
+    )
+    def test_completed_column_without_logs_is_created_not_terminal(self, _mock):
+        movement = _movement(status=TenantTruckMovementLog.Status.COMPLETED)
+        self.assertEqual(
+            derive_movement_execution_stage(movement),
+            STAGE_CREATED,
+        )
+
+    @patch(
+        'iroad_tenants.operation_runtime.movement_stage_derivation.movement_log_milestone_flags',
+        return_value={'start_done': False, 'in_transit_done': False, 'arrived_done': False, 'complete_done': True},
+    )
+    def test_completed_column_with_complete_log_is_completed(self, _mock):
+        movement = _movement(status=TenantTruckMovementLog.Status.COMPLETED)
+        from iroad_tenants.operation_runtime.movement_state_machine import STAGE_COMPLETED
+
+        self.assertEqual(
+            derive_movement_execution_stage(movement),
+            STAGE_COMPLETED,
+        )
+
+    @patch(
+        'iroad_tenants.operation_runtime.movement_stage_derivation.movement_log_milestone_flags',
+        return_value={'start_done': False, 'in_transit_done': False, 'arrived_done': False, 'complete_done': False},
+    )
+    def test_in_progress_without_logs_is_created(self, _mock):
+        movement = _movement(status=TenantTruckMovementLog.Status.IN_PROGRESS)
+        self.assertEqual(
+            derive_movement_execution_stage(movement),
+            STAGE_CREATED,
+        )
+
+    @patch(
+        'iroad_tenants.operation_runtime.movement_stage_derivation.movement_log_milestone_flags',
+        return_value={'start_done': True, 'in_transit_done': False, 'arrived_done': False, 'complete_done': False},
+    )
+    def test_in_progress_after_start_is_started(self, _mock):
+        movement = _movement(status=TenantTruckMovementLog.Status.IN_PROGRESS)
+        from iroad_tenants.operation_runtime.movement_state_machine import STAGE_STARTED
+
+        self.assertEqual(
+            derive_movement_execution_stage(movement),
+            STAGE_STARTED,
+        )
+
+    @patch(
+        'iroad_tenants.operation_runtime.movement_stage_derivation.movement_log_milestone_flags',
+        return_value={'start_done': True, 'in_transit_done': True, 'arrived_done': False, 'complete_done': False},
+    )
+    def test_scheduled_in_transit_milestones_use_in_transit_stage(self, _mock):
+        movement = _movement(status=TenantTruckMovementLog.Status.SCHEDULED)
+        self.assertEqual(
+            derive_movement_execution_stage(movement),
+            STAGE_IN_TRANSIT,
+        )
+
+    @patch(
+        'iroad_tenants.operation_runtime.movement_stage_derivation.movement_log_milestone_flags',
+        return_value={'start_done': True, 'in_transit_done': True, 'arrived_done': True, 'complete_done': False},
+    )
+    def test_completed_column_without_em4_log_uses_arrived_stage(self, _mock):
+        movement = _movement(status=TenantTruckMovementLog.Status.COMPLETED)
+        from iroad_tenants.operation_runtime.movement_state_machine import STAGE_ARRIVED
+
+        self.assertEqual(
+            derive_movement_execution_stage(movement),
+            STAGE_ARRIVED,
+        )
+
+    @patch(
+        'iroad_tenants.operation_runtime.movement_stage_derivation.movement_log_milestone_flags',
         return_value={'start_done': True, 'in_transit_done': True, 'arrived_done': False, 'complete_done': False},
     )
     def test_in_progress_in_transit_stage(self, _mock):
@@ -91,6 +165,59 @@ class MovementStageTests(SimpleTestCase):
             derive_movement_execution_stage(movement),
             STAGE_IN_TRANSIT,
         )
+
+
+class MovementReconcileTests(SimpleTestCase):
+    def test_terminal_completed_column_without_logs_uses_scheduled(self):
+        from iroad_tenants.operation_runtime.workflow_state_reconciler import (
+            reconcile_movement_execution_state,
+        )
+
+        movement = _movement(status=TenantTruckMovementLog.Status.COMPLETED)
+        with patch(
+            'iroad_tenants.operation_runtime.movement_stage_derivation.movement_log_milestone_flags',
+            return_value={
+                'start_done': False,
+                'in_transit_done': False,
+                'arrived_done': False,
+                'complete_done': False,
+            },
+        ):
+            state = reconcile_movement_execution_state(movement, prefetched_logs=[])
+
+        self.assertEqual(
+            state['authoritative_status'],
+            TenantTruckMovementLog.Status.SCHEDULED,
+        )
+        self.assertEqual(state['execution_sub_stage'], STAGE_CREATED)
+        self.assertTrue(state['drift']['has_drift'])
+        self.assertEqual(
+            state['drift']['reason'],
+            'terminal_column_without_action_logs',
+        )
+
+    def test_scheduled_column_without_logs_stays_scheduled(self):
+        from iroad_tenants.operation_runtime.workflow_state_reconciler import (
+            reconcile_movement_execution_state,
+        )
+
+        movement = _movement(status=TenantTruckMovementLog.Status.SCHEDULED)
+        with patch(
+            'iroad_tenants.operation_runtime.movement_stage_derivation.movement_log_milestone_flags',
+            return_value={
+                'start_done': False,
+                'in_transit_done': False,
+                'arrived_done': False,
+                'complete_done': False,
+            },
+        ):
+            state = reconcile_movement_execution_state(movement, prefetched_logs=[])
+
+        self.assertEqual(
+            state['authoritative_status'],
+            TenantTruckMovementLog.Status.SCHEDULED,
+        )
+        self.assertFalse(state['drift']['has_drift'])
 
 
 class MovementPolicyTests(SimpleTestCase):
@@ -118,6 +245,126 @@ class MovementPolicyTests(SimpleTestCase):
         action = _action('EM1', 'Start Movement', movement_status_impact='in_progress')
         self.assertTrue(
             movement_action_allowed(action, movement=movement),
+        )
+
+    @patch(
+        'iroad_tenants.operation_runtime.movement_execution_engine.movement_executed_action_ids',
+        return_value=set(),
+    )
+    @patch(
+        'iroad_tenants.operation_runtime.movement_action_validator.movement_log_milestone_flags',
+        return_value={'start_done': False, 'in_transit_done': False, 'arrived_done': False, 'complete_done': False},
+    )
+    @patch(
+        'iroad_tenants.operation_runtime.movement_action_validator.movement_workflow_column_for_policy',
+        return_value=TenantTruckMovementLog.Status.SCHEDULED,
+    )
+    def test_em1_allowed_when_column_in_progress_without_logs(
+        self,
+        _workflow_column,
+        _flags,
+        _ids,
+    ):
+        movement = _movement(status=TenantTruckMovementLog.Status.IN_PROGRESS)
+        action = _action('EM1', 'Start Movement', movement_status_impact='in_progress')
+        self.assertTrue(
+            movement_action_allowed(action, movement=movement),
+        )
+
+    @patch(
+        'iroad_tenants.operation_runtime.movement_execution_engine.movement_executed_action_ids',
+        return_value=set(),
+    )
+    @patch(
+        'iroad_tenants.operation_runtime.movement_action_validator._movement_executed_action_codes',
+        return_value={'EM1'},
+    )
+    @patch(
+        'iroad_tenants.operation_runtime.movement_action_validator.derive_movement_execution_stage',
+        return_value=STAGE_STARTED,
+    )
+    @patch(
+        'iroad_tenants.operation_runtime.movement_action_validator.movement_log_milestone_flags',
+        return_value={'start_done': True, 'in_transit_done': False, 'arrived_done': False, 'complete_done': False},
+    )
+    @patch(
+        'iroad_tenants.operation_runtime.movement_action_validator.movement_workflow_column_for_policy',
+        return_value=TenantTruckMovementLog.Status.IN_PROGRESS,
+    )
+    def test_em2_allowed_after_em1_logged(self, _workflow_column, _flags, _stage, _codes, _ids):
+        movement = _movement(status=TenantTruckMovementLog.Status.IN_PROGRESS)
+        em2 = _action(
+            'EM2',
+            'Depart Empty',
+            sequence_category='empty_move',
+            prerequisite_action_codes='EM1',
+        )
+        self.assertTrue(
+            movement_action_allowed(em2, movement=movement),
+        )
+
+    @patch(
+        'iroad_tenants.operation_runtime.movement_execution_engine.movement_executed_action_ids',
+        return_value=set(),
+    )
+    @patch(
+        'iroad_tenants.operation_runtime.movement_action_validator._movement_executed_action_codes',
+        return_value={'EM1', 'EM2'},
+    )
+    @patch(
+        'iroad_tenants.operation_runtime.movement_action_validator.derive_movement_execution_stage',
+        return_value=STAGE_IN_TRANSIT,
+    )
+    @patch(
+        'iroad_tenants.operation_runtime.movement_action_validator.movement_log_milestone_flags',
+        return_value={'start_done': True, 'in_transit_done': True, 'arrived_done': False, 'complete_done': False},
+    )
+    @patch(
+        'iroad_tenants.operation_runtime.movement_action_validator.movement_workflow_column_for_policy',
+        return_value=TenantTruckMovementLog.Status.IN_PROGRESS,
+    )
+    def test_em3_allowed_after_em2_logged(self, _workflow_column, _flags, _stage, _codes, _ids):
+        movement = _movement(status=TenantTruckMovementLog.Status.IN_PROGRESS)
+        em3 = _action(
+            'EM3',
+            'Arrival At Destination',
+            sequence_category='empty_move',
+            prerequisite_action_codes='EM2',
+        )
+        self.assertTrue(
+            movement_action_allowed(em3, movement=movement),
+        )
+
+    @patch(
+        'iroad_tenants.operation_runtime.movement_execution_engine.movement_executed_action_ids',
+        return_value=set(),
+    )
+    @patch(
+        'iroad_tenants.operation_runtime.movement_action_validator._movement_executed_action_codes',
+        return_value=set(),
+    )
+    @patch(
+        'iroad_tenants.operation_runtime.movement_action_validator.derive_movement_execution_stage',
+        return_value=STAGE_CREATED,
+    )
+    @patch(
+        'iroad_tenants.operation_runtime.movement_action_validator.movement_log_milestone_flags',
+        return_value={'start_done': False, 'in_transit_done': False, 'arrived_done': False, 'complete_done': False},
+    )
+    @patch(
+        'iroad_tenants.operation_runtime.movement_action_validator.movement_workflow_column_for_policy',
+        return_value=TenantTruckMovementLog.Status.SCHEDULED,
+    )
+    def test_em2_blocked_until_em1_logged(self, _workflow_column, _flags, _stage, _codes, _ids):
+        movement = _movement()
+        em2 = _action(
+            'EM2',
+            'Depart Empty',
+            sequence_category='empty_move',
+            prerequisite_action_codes='EM1',
+        )
+        self.assertFalse(
+            movement_action_allowed(em2, movement=movement),
         )
 
     @patch(

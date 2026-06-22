@@ -13,6 +13,7 @@ from tenant_workspace.models import (
     TenantShipment,
     TenantTruckMovementLog,
 )
+from tenant_workspace.ops_display import shipment_leg_addresses
 
 _COORD_RE = re.compile(r'(-?\d+(?:\.\d+)?)\s*,\s*(-?\d+(?:\.\d+)?)')
 
@@ -117,6 +118,48 @@ def _address_label(address) -> str:
         if val:
             return val
     return '—'
+
+
+def _coords_from_address(address) -> tuple[float, float] | None:
+    if address is None:
+        return None
+    return _coords_from_map_link(getattr(address, 'map_link', '') or '')
+
+
+def _coord_dict(coords: tuple[float, float] | None) -> dict[str, float] | None:
+    if coords is None:
+        return None
+    return {'lat': coords[0], 'lng': coords[1]}
+
+
+def _resolve_shipment_route_context(shipment) -> dict[str, Any]:
+    """
+    Dynamic route labels and endpoint pins for a shipment leg.
+
+    Labels follow booking route master + leg direction (round-trip backload reverses).
+    Map coordinates come from leg pickup/drop address ``map_link`` values.
+    """
+    from mobile_api.helpers.job_location_serialization import serialize_route
+
+    booking = getattr(shipment, 'booking', None)
+    route_data = serialize_route(shipment=shipment, booking=booking, request=None)
+    departure_label = (route_data.get('route_display_start') or '').strip() or '—'
+    arrival_label = (route_data.get('route_display_end') or '').strip() or '—'
+    route_display = (route_data.get('route_display') or '').strip() or '—'
+
+    pickup_addr, drop_addr = shipment_leg_addresses(shipment, booking)
+    if departure_label == '—':
+        departure_label = _address_label(pickup_addr)
+    if arrival_label == '—':
+        arrival_label = _address_label(drop_addr)
+
+    return {
+        'departure_label': departure_label,
+        'arrival_label': arrival_label,
+        'route_display': route_display,
+        'route_start': _coord_dict(_coords_from_address(pickup_addr)),
+        'route_end': _coord_dict(_coords_from_address(drop_addr)),
+    }
 
 
 def _driver_initials(driver) -> str:
@@ -315,10 +358,14 @@ def _shipment_trail(shipment) -> tuple[list[dict[str, float]], list[dict[str, st
             )
 
     if len(trail) < 2:
-        loading = shipment.loading_address
-        delivery = shipment.delivery_address
-        start = _coords_from_map_link(getattr(loading, 'map_link', '') or '')
-        end = _coords_from_map_link(getattr(delivery, 'map_link', '') or '')
+        route_ctx = _resolve_shipment_route_context(shipment)
+        start = None
+        end = None
+        route_start = route_ctx.get('route_start')
+        route_end = route_ctx.get('route_end')
+        if route_start and route_end:
+            start = (route_start['lat'], route_start['lng'])
+            end = (route_end['lat'], route_end['lng'])
         if start and end:
             trail = [
                 {'lat': start[0], 'lng': start[1]},
@@ -373,6 +420,11 @@ def _build_featured_track(
             'truck',
             'driver',
             'booking',
+            'booking__loading_address',
+            'booking__delivery_address',
+            'booking__route',
+            'booking__route__origin_point',
+            'booking__route__destination_point',
             'loading_address',
             'delivery_address',
         )
@@ -392,6 +444,11 @@ def _build_featured_track(
             'truck',
             'driver',
             'booking',
+            'booking__loading_address',
+            'booking__delivery_address',
+            'booking__route',
+            'booking__route__origin_point',
+            'booking__route__destination_point',
             'loading_address',
             'delivery_address',
         )
@@ -414,38 +471,34 @@ def _build_featured_track(
         if shipment is None or not _is_active_shipment(shipment):
             continue
         trail, history = _shipment_trail(shipment)
-        if not trail and not history:
+        route_ctx = _resolve_shipment_route_context(shipment)
+        has_route_pins = bool(route_ctx.get('route_start') and route_ctx.get('route_end'))
+        if not trail and not history and not has_route_pins:
             continue
 
         driver = shipment.driver or _resolve_driver_from_shipment(shipment)
-        loading = _address_label(shipment.loading_address)
-        delivery = _address_label(shipment.delivery_address)
-        if loading == '—' and shipment.booking:
-            loading = _address_label(getattr(shipment.booking, 'loading_address', None))
-        if delivery == '—' and shipment.booking:
-            delivery = _address_label(getattr(shipment.booking, 'delivery_address', None))
 
         current = trail[-1] if trail else None
         if current is None:
-            loading = shipment.loading_address
-            delivery = shipment.delivery_address
-            start = _coords_from_map_link(getattr(loading, 'map_link', '') or '')
-            end = _coords_from_map_link(getattr(delivery, 'map_link', '') or '')
-            if start:
-                current = {'lat': start[0], 'lng': start[1]}
-            elif end:
-                current = {'lat': end[0], 'lng': end[1]}
+            route_start = route_ctx.get('route_start')
+            route_end = route_ctx.get('route_end')
+            if route_start:
+                current = route_start
+            elif route_end:
+                current = route_end
         status_key = (shipment.shipment_status or '').strip().casefold()
         return {
             'shipment_id': str(shipment.pk),
             'shipment_no': shipment.shipment_no,
             'shipment_status': (shipment.shipment_status or '').upper(),
             'on_time': status_key not in {'cancelled', 'closed'},
-            'departure_label': loading,
+            'departure_label': route_ctx['departure_label'],
             'departure_time': _fmt_dt(shipment.created_at),
-            'arrival_label': delivery,
+            'arrival_label': route_ctx['arrival_label'],
             'arrival_time': '—',
-            'route_display': (shipment.route_display or '').strip() or '—',
+            'route_display': route_ctx['route_display'],
+            'route_start': route_ctx.get('route_start'),
+            'route_end': route_ctx.get('route_end'),
             'driver_name': (
                 (driver.english_name or driver.arabic_name) if driver else '—'
             ),

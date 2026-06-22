@@ -154,6 +154,34 @@ def _booking_line_type(shipment) -> str:
     return str(getattr(shipment, 'booking_item_type', '') or '').strip().casefold()
 
 
+def shipment_leg_addresses(shipment, booking=None):
+    """
+    Pickup and drop ``TenantAddressMaster`` rows for this shipment leg.
+
+    Round trip swaps loading/delivery on backload/inbound legs (same rule as mobile
+    ``resolve_leg_endpoint_addresses``).
+    """
+    if shipment is None:
+        return None, None
+    booking_obj = booking if booking is not None else getattr(shipment, 'booking', None)
+    leg_is_backload = _booking_line_type(shipment) in {'backload', 'inbound'}
+
+    loading = getattr(shipment, 'loading_address', None)
+    delivery = getattr(shipment, 'delivery_address', None)
+    if booking_obj is not None:
+        if loading is None:
+            loading = getattr(booking_obj, 'loading_address', None)
+        if delivery is None:
+            delivery = getattr(booking_obj, 'delivery_address', None)
+
+    trip = str(getattr(booking_obj, 'trip_type', '') or '').strip().casefold()
+    if trip == 'round' and (loading is not None or delivery is not None):
+        if leg_is_backload:
+            return delivery, loading
+        return loading, delivery
+    return loading, delivery
+
+
 def shipment_route_endpoints(shipment, booking=None):
     """From/to labels for SIR, History, and Action Log (FK addresses, booking, route_display)."""
     if shipment is None:

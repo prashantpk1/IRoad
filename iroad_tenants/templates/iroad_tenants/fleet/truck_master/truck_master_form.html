@@ -143,6 +143,9 @@
               <span class="toggle-label js-tm-owner-toggle-label">No</span>
             </label>
             {% if form.is_vendor_same_as_owner.errors %}<div class="text-danger small">{{ form.is_vendor_same_as_owner.errors }}</div>{% endif %}
+            <div class="text-warning small mt-1 d-none js-tm-org-owner-warning">
+              Organization Profile is missing Owner Name (English/Arabic) or CR/Tax number. Complete Organization Profile first.
+            </div>
           </div>
         </div>
       </div>
@@ -443,6 +446,7 @@
 
   var ownerToggle = document.getElementById("{{ form.is_vendor_same_as_owner.id_for_label }}");
   var ownerToggleLabel = form.querySelector(".js-tm-owner-toggle-label");
+  var ownerOrgWarning = form.querySelector(".js-tm-org-owner-warning");
   var ownerIdEl = document.getElementById("{{ form.owner_id.id_for_label }}");
   var ownerNameEl = document.getElementById("{{ form.owner_name.id_for_label }}");
   var vendorEl = document.getElementById("{{ form.vendor_account_id.id_for_label }}");
@@ -457,6 +461,8 @@
     if (ownerIdEl) ownerIdEl.value = orgOwner.owner_id || "";
     if (ownerNameEl) ownerNameEl.value = orgOwner.owner_name || "";
     if (vendorEl && ownerIdEl) vendorEl.value = (ownerIdEl.value || "").trim();
+    var missing = !(orgOwner.owner_id || "").trim() || !(orgOwner.owner_name || "").trim();
+    if (ownerOrgWarning) ownerOrgWarning.classList.toggle("d-none", !missing);
   }
 
   function syncOwnerFieldState() {
@@ -470,6 +476,7 @@
       ownerNameEl.classList.toggle("bg-light", enabled);
     }
     if (enabled) applyOrganizationOwnerFields();
+    else if (ownerOrgWarning) ownerOrgWarning.classList.add("d-none");
     if (ownerToggleLabel) ownerToggleLabel.textContent = enabled ? "Yes" : "No";
   }
 
@@ -491,6 +498,14 @@
 
   function hasRegistrationCountry() {
     return !!(countryEl && (countryEl.value || "").trim());
+  }
+
+  function sanitizeSaudiPlateDigits() {
+    if (!saudiPlateEl) return;
+    var digits = (saudiPlateEl.value || "").replace(/\D/g, "");
+    if (saudiPlateEl.value !== digits) {
+      saudiPlateEl.value = digits;
+    }
   }
 
   function combineSaudiPlate() {
@@ -555,7 +570,10 @@
 
   [saudiPlateEl, saudiEngEl, nonSaudiEl].forEach(function (el) {
     if (!el) return;
-    el.addEventListener("input", syncCombinedPlateNumber);
+    el.addEventListener("input", function () {
+      if (el === saudiPlateEl) sanitizeSaudiPlateDigits();
+      syncCombinedPlateNumber();
+    });
     el.addEventListener("change", syncCombinedPlateNumber);
   });
 
@@ -569,6 +587,7 @@
     window.setTimeout(updatePlateFieldVisibility, 0);
   });
 
+  sanitizeSaudiPlateDigits();
   updatePlateFieldVisibility();
 
   function highlightInvalidFields() {

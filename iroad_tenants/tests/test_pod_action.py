@@ -140,9 +140,15 @@ class SyncA7ActionLogMediaToPodPagesTests(TestCase):
             media_type='video',
             description='',
         )
-        action_log = MagicMock()
-        action_log.pk = 'log-1'
-        action_log.media_rows.all.return_value.order_by.return_value = [photo, video]
+        media_rows = MagicMock()
+        media_rows.all.return_value.order_by.return_value = [photo, video]
+        action_log = SimpleNamespace(
+            pk='log-1',
+            map_link='',
+            latitude='24.7136',
+            longitude='46.6753',
+            media_rows=media_rows,
+        )
 
         pod_line_1 = MagicMock()
         pod_line_2 = MagicMock()
@@ -158,12 +164,13 @@ class SyncA7ActionLogMediaToPodPagesTests(TestCase):
             pod_document=pod_document,
         )
 
-        self.assertEqual(pod_line_1.map_url, 'uploads/photo1.jpg')
+        self.assertEqual(pod_line_1.attachment_storage_path, 'uploads/photo1.jpg')
         self.assertEqual(pod_line_1.attachment_label, 'photo1.jpg')
+        self.assertEqual(pod_line_1.map_url, 'https://maps.google.com/?q=24.7136,46.6753')
         self.assertEqual(pod_line_1.soft_copy_status, 'Collected')
         self.assertEqual(pod_line_1.digital_evidence_status, 'Collected')
         mock_pod_page_model.objects.create.assert_called_once()
-        self.assertEqual(pod_line_2.map_url, 'uploads/clip.mp4')
+        self.assertEqual(pod_line_2.attachment_storage_path, 'uploads/clip.mp4')
         self.assertEqual(pod_line_2.attachment_label, 'clip.mp4')
 
 

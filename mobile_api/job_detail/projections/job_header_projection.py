@@ -26,6 +26,13 @@ from mobile_api.job_detail.projections.job_location_projection import (
     build_shipment_location_block,
     serialize_route,
 )
+from iroad_tenants.operation_runtime.movement_stage_derivation import (
+    derive_movement_operational_stage,
+)
+from iroad_tenants.operation_runtime.movement_state_machine import execution_stage_label
+from mobile_api.job_detail.services.job_detail_status_reconciler import (
+    entity_reconciliation_block,
+)
 
 
 def build_job_header(
@@ -104,6 +111,22 @@ def build_job_header(
         )
         base.update(
             build_movement_location_block(context.movement, request=request),
+        )
+        recon = entity_reconciliation_block(context)
+        auth_status = (recon.get('authoritative_status') or '').strip()
+        column_status = (recon.get('column_status') or '').strip()
+        operational = (recon.get('operational_stage') or '').strip()
+        movement_status = auth_status or str(getattr(context.movement, 'status', '') or '')
+        base['movement_status'] = movement_status
+        base['column_movement_status'] = column_status or movement_status
+        base['status_label'] = (
+            operational
+            or derive_movement_operational_stage(
+                context.movement,
+                status_for_stage=movement_status or None,
+            )
+            or execution_stage_label(movement_status)
+            or movement_status
         )
         return base
 

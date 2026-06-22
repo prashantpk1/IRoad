@@ -115,9 +115,15 @@ function iroadRenderDetailMap(data) {
   var popup = document.getElementById("fleet-detail-popup");
   var path = iroadTrailPoints(track && track.trail ? track.trail : []);
   var current = track && track.current ? iroadCoordPoint(track.current) : null;
+  var routeStart =
+    track && track.route_start ? iroadCoordPoint(track.route_start) : null;
+  var routeEnd = track && track.route_end ? iroadCoordPoint(track.route_end) : null;
   var embedUrl = "";
+  var hasRoutePins = !!(routeStart && routeEnd);
 
-  if (path.length >= 2) {
+  if (hasRoutePins) {
+    embedUrl = iroadEmbedRouteUrl(routeStart, routeEnd);
+  } else if (path.length >= 2) {
     embedUrl = iroadEmbedRouteUrl(path[0], path[path.length - 1]);
   } else if (path.length === 1) {
     embedUrl = iroadEmbedPointUrl(path[0], 14);
@@ -132,11 +138,14 @@ function iroadRenderDetailMap(data) {
   }
 
   if (emptyEl) {
-    emptyEl.classList.toggle("d-none", !!(track && (path.length || current)));
+    emptyEl.classList.toggle(
+      "d-none",
+      !!(track && (hasRoutePins || path.length || current)),
+    );
   }
 
   if (popup) {
-    if (track && (current || path.length)) {
+    if (track && (current || path.length || hasRoutePins)) {
       popup.classList.remove("d-none");
       var speedEl = document.getElementById("fleet-detail-speed");
       var headingEl = document.getElementById("fleet-detail-heading");

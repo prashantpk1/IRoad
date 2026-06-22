@@ -13,6 +13,8 @@ from iroad_tenants.operation_runtime.impacts import (
     resolve_movement_status_impact,
     resolve_shipment_status_impact,
 )
+from django.db.models import Q
+
 from tenant_workspace.models import TenantOperationActionLog, TenantTruckMovementLog
 
 # Align with operation_execution forward rank.
@@ -118,7 +120,7 @@ def scoped_movement_action_logs(
         .order_by('-log_date', '-created_at', '-log_id')
     )
     if driver_id:
-        qs = qs.filter(driver_id=driver_id)
+        qs = qs.filter(Q(driver_id=driver_id) | Q(driver_id__isnull=True))
     if exclude_log_id:
         qs = qs.exclude(log_id=exclude_log_id)
     return qs[:scan_limit]

@@ -5,6 +5,7 @@ from django.db.models import Prefetch, Q
 
 from iroad_tenants.shipment_pod_evidence import (
     action_log_attachment_meta_from_media,
+    action_log_attachment_storage_path_from_media,
     action_log_map_url,
 )
 from tenant_workspace.models import (
@@ -13,6 +14,18 @@ from tenant_workspace.models import (
     TenantShipment,
     TenantShipmentDocument,
 )
+
+
+def action_log_attachment_storage_path(log) -> str:
+    """Return storage path for the first media evidence row on an action log."""
+    if log is None:
+        return ''
+    media_rows = getattr(log, '_prefetched_media', None)
+    if media_rows is None:
+        media_rows = list(
+            TenantOperationActionMedia.objects.filter(action_log=log).order_by('line_no')[:1]
+        )
+    return action_log_attachment_storage_path_from_media(media_rows)
 
 
 def action_log_attachment_meta(log) -> tuple[str, str]:
@@ -173,6 +186,7 @@ def action_log_option_rows(*, shipment=None, limit=300):
                 'map_url': action_log_map_url(log),
                 'attachment_label': attachment_label,
                 'attachment_url': attachment_url,
+                'attachment_storage_path': action_log_attachment_storage_path(log),
             }
         )
     return rows

@@ -761,19 +761,40 @@ def get_allowed_actions(
         for_mobile=for_mobile,
     )
 
-    allowed_ids: list = []
-    for action in candidates.iterator(chunk_size=64):
-        if _action_is_allowed(
-            action,
+    def _collect_allowed_ids(candidate_qs) -> list:
+        ids: list = []
+        for action in candidate_qs.iterator(chunk_size=64):
+            if _action_is_allowed(
+                action,
+                booking=booking,
+                shipment=shipment,
+                movement=movement,
+                booking_item_type=booking_item_type,
+                exclude_log_id=exclude_log_id,
+                include_action_id=include_action_id,
+                executed_action_ids=executed_ids,
+            ):
+                ids.append(action.action_id)
+        return ids
+
+    allowed_ids = _collect_allowed_ids(candidates)
+
+    if not allowed_ids and movement is not None and shipment is None and booking is None:
+        from iroad_tenants.operation_runtime.action_master_catalog import (
+            ensure_empty_move_action_master_rows,
+        )
+
+        ensure_empty_move_action_master_rows()
+        candidates = prefilter_allowed_action_candidates(
             booking=booking,
             shipment=shipment,
             movement=movement,
             booking_item_type=booking_item_type,
-            exclude_log_id=exclude_log_id,
-            include_action_id=include_action_id,
             executed_action_ids=executed_ids,
-        ):
-            allowed_ids.append(action.action_id)
+            exclude_log_id=exclude_log_id,
+            for_mobile=for_mobile,
+        )
+        allowed_ids = _collect_allowed_ids(candidates)
 
     if include_action_id and str(include_action_id) not in {
         str(action_id) for action_id in allowed_ids

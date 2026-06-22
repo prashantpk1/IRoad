@@ -6,6 +6,8 @@ from __future__ import annotations
 
 from typing import Any
 
+from tenant_workspace.models import TenantTruckMovementLog
+
 from iroad_tenants.operation_runtime.execution_stage_deriver import (
     derive_job_execution_stage,
 )
@@ -21,6 +23,14 @@ from iroad_tenants.operation_runtime.latest_action_aggregator import (
 from iroad_tenants.operation_runtime.latest_state import (
     derive_latest_action_status,
     sync_shipment_status_from_action_log,
+)
+from iroad_tenants.operation_runtime.movement_stage_derivation import (
+    movement_log_milestone_flags,
+    movement_log_milestone_flags_from_logs,
+)
+from iroad_tenants.operation_runtime.movement_state_machine import (
+    MOVEMENT_COLUMN_SCHEDULED,
+    is_terminal_movement_status,
 )
 from iroad_tenants.operation_runtime.shipment_execution_stage import (
     STAGE_PICKUP,
@@ -204,25 +214,65 @@ def reconcile_movement_execution_state(
     log_evidence = derive_movement_status_from_logs(logs)
     authoritative = log_evidence.get('authoritative_status')
     column = (movement.status or '').strip() if movement else ''
+    log_count = int(log_evidence.get('log_count') or 0)
+    if prefetched_logs is not None:
+        flags = movement_log_milestone_flags_from_logs(
+            logs,
+            exclude_log_id=exclude_log_id,
+        )
+    else:
+        flags = movement_log_milestone_flags(movement, exclude_log_id=exclude_log_id)
+
+    workflow_authoritative = authoritative
+    has_drift = False
+    drift_reason = None
+    if flags.get('complete_done'):
+        workflow_authoritative = TenantTruckMovementLog.Status.COMPLETED
+        if column != TenantTruckMovementLog.Status.COMPLETED:
+            has_drift = True
+            drift_reason = 'complete_log_without_completed_column'
+    elif (
+        workflow_authoritative == TenantTruckMovementLog.Status.COMPLETED
+        and not flags.get('complete_done')
+    ):
+        workflow_authoritative = TenantTruckMovementLog.Status.IN_PROGRESS
+        has_drift = True
+        drift_reason = 'completed_column_without_em4_log'
+    elif column == TenantTruckMovementLog.Status.COMPLETED and not flags.get('complete_done'):
+        workflow_authoritative = TenantTruckMovementLog.Status.IN_PROGRESS
+        has_drift = True
+        drift_reason = drift_reason or 'completed_column_without_em4_log'
+    if log_count <= 0 and column:
+        workflow_authoritative = MOVEMENT_COLUMN_SCHEDULED
+        if column != MOVEMENT_COLUMN_SCHEDULED:
+            has_drift = True
+            if is_terminal_movement_status(column):
+                drift_reason = 'terminal_column_without_action_logs'
+            else:
+                drift_reason = 'column_without_action_logs'
+    elif authoritative and column and authoritative != column:
+        has_drift = True
+        drift_reason = 'movement_column_behind_logs'
 
     stage_block = derive_job_execution_stage(
         movement=movement,
+        authoritative_movement_status=workflow_authoritative,
         exclude_log_id=exclude_log_id,
+        prefetched_logs=logs,
     )
     sub_stage = stage_block.get('execution_sub_stage') or ''
     operational = stage_block.get('operational_stage') or ''
 
-    has_drift = bool(authoritative and column and authoritative != column)
     drift = {
         'has_drift': has_drift,
         'has_status_drift': has_drift,
         'has_stage_drift': False,
         'column_status': column or None,
-        'authoritative_status': authoritative or None,
+        'authoritative_status': workflow_authoritative or None,
         'latest_log_impact_status': log_evidence.get('latest_impact_status'),
         'peak_log_impact_status': log_evidence.get('peak_impact_status'),
-        'reason': 'movement_column_behind_logs' if has_drift else None,
-        'recommended_column_status': authoritative if has_drift else None,
+        'reason': drift_reason,
+        'recommended_column_status': workflow_authoritative if has_drift else None,
     }
 
     return {
@@ -230,14 +280,14 @@ def reconcile_movement_execution_state(
         'shipment_status': None,
         'column_status': None,
         'movement_status': column or None,
-        'derived_status': authoritative,
-        'authoritative_status': authoritative,
+        'derived_status': workflow_authoritative,
+        'authoritative_status': workflow_authoritative,
         'execution_sub_stage': sub_stage,
         'operational_stage': operational,
         'in_sync': not has_drift,
         'state_source': 'action_logs',
         'drift': drift,
-        'timeline': {'log_count': log_evidence.get('log_count', 0)},
+        'timeline': {'log_count': log_count},
         'latest_action': aggregate_latest_action_log(logs, request=request),
     }
 

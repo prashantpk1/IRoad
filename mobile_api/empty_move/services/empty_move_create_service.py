@@ -3,10 +3,11 @@ Create driver-initiated empty truck movements (On Call mode).
 
 Endpoints accept tenant Location Master UUIDs and/or Google Places snapshots
 (``from_address`` / ``to_address`` with coordinates). Route GPS is stored on
-the TML; EM1 always fires automatically when the empty move is created.
+the TML. The driver starts the move manually with EM1 after create (PCS §14.7.4).
 """
 from __future__ import annotations
 
+import logging
 from typing import Any, Mapping
 
 from django.core.exceptions import ValidationError as DjangoValidationError
@@ -45,6 +46,18 @@ from tenant_workspace.models import (
     TruckMaster,
 )
 
+logger = logging.getLogger('mobile_api.empty_move')
+_DEBUG = '[EMPTY_MOVE_DEBUG]'
+
+
+def _log_debug(step: str, **fields) -> None:
+    parts = [f'{_DEBUG} {step}']
+    for key, value in fields.items():
+        parts.append(f'{key}={value!r}')
+    line = ' | '.join(parts)
+    logger.warning(line)
+    print(line, flush=True)
+
 
 def _driver_label(driver: Any) -> str:
     code = str(getattr(driver, 'driver_code', '') or '').strip()
@@ -58,12 +71,14 @@ def _resolve_driver_truck(driver: Any, truck_id: Any | None) -> TruckMaster | No
     if truck_id:
         truck = TruckMaster.objects.filter(pk=truck_id).first()
         if truck is None:
+            _log_debug('truck_not_found', truck_id=truck_id, driver_id=getattr(driver, 'pk', ''))
             raise EmptyMoveError(
                 str(_('mobile.empty_move.truck_not_found')),
                 code='truck_not_found',
                 http_status=404,
                 message_key='mobile.empty_move.truck_not_found',
             )
+        _log_debug('truck_resolved', source='payload_truck_id', truck_id=truck.pk)
         return truck
 
     assignment = (
@@ -76,13 +91,31 @@ def _resolve_driver_truck(driver: Any, truck_id: Any | None) -> TruckMaster | No
         .first()
     )
     if assignment and assignment.truck_id:
+        _log_debug(
+            'truck_resolved',
+            source='assignment_history',
+            truck_id=assignment.truck_id,
+            driver_id=getattr(driver, 'pk', ''),
+        )
         return assignment.truck
 
     driver_pk_val = driver_pk(driver)
     if driver_pk_val is not None:
         truck = TruckMaster.objects.filter(default_driver_id=driver_pk_val).first()
         if truck is not None:
+            _log_debug(
+                'truck_resolved',
+                source='default_driver_on_truck',
+                truck_id=truck.pk,
+                driver_id=driver_pk_val,
+            )
             return truck
+    _log_debug(
+        'truck_missing',
+        driver_id=getattr(driver, 'pk', ''),
+        driver_pk_val=driver_pk_val,
+        had_open_assignment=bool(assignment),
+    )
     return None
 
 
@@ -108,6 +141,11 @@ def _assert_on_call_state(driver: Any, *, tenant_schema: str) -> None:
         tenant_schema=tenant_schema,
     )
     if booking_sel is not None:
+        _log_debug(
+            'blocked_active_booking',
+            driver_id=getattr(driver, 'pk', ''),
+            tenant_schema=tenant_schema,
+        )
         raise EmptyMoveError(
             str(_('mobile.empty_move.active_job_blocks_empty_move')),
             code='active_job_present',
@@ -120,6 +158,11 @@ def _assert_on_call_state(driver: Any, *, tenant_schema: str) -> None:
         tenant_schema=tenant_schema,
     )
     if existing is not None:
+        _log_debug(
+            'blocked_existing_empty_move',
+            driver_id=getattr(driver, 'pk', ''),
+            tenant_schema=tenant_schema,
+        )
         raise EmptyMoveError(
             str(_('mobile.empty_move.already_active')),
             code='empty_move_already_active',
@@ -182,7 +225,7 @@ def _project_movement_response(
 
 
 class EmptyMoveCreateService:
-    """Create empty move rows and always fire EM1 (Start Movement)."""
+    """Create empty move rows; driver fires EM1 (Start) from the workflow screen."""
 
     def create_empty_move(
         self,
@@ -219,6 +262,11 @@ class EmptyMoveCreateService:
 
             truck = _resolve_driver_truck(driver, payload.get('truck_id'))
             if truck is None:
+                _log_debug(
+                    'raising_truck_required',
+                    driver_id=getattr(driver, 'pk', ''),
+                    tenant_schema=schema,
+                )
                 raise EmptyMoveError(
                     str(_('mobile.empty_move.truck_required')),
                     code='truck_required',
@@ -258,19 +306,6 @@ class EmptyMoveCreateService:
                     from_address=from_address,
                     to_address=to_address,
                 )
-
-                workflow_started = self._auto_start_movement(
-                    movement=movement,
-                    driver=driver,
-                    tenant_user=tenant_user,
-                    truck=truck,
-                    tenant_schema=schema,
-                    jwt_payload=jwt_payload or {},
-                    notes=notes,
-                    client_action_id=client_action_id,
-                    latitude=start_lat or None,
-                    longitude=start_lng or None,
-                )
                 movement.refresh_from_db()
 
                 movement = (
@@ -287,7 +322,7 @@ class EmptyMoveCreateService:
             'empty_move': _project_movement_response(
                 movement,
                 request=request,
-                workflow_started=workflow_started,
+                workflow_started=False,
             ),
         }
 
@@ -305,6 +340,11 @@ class EmptyMoveCreateService:
         latitude: Any,
         longitude: Any,
     ) -> bool:
+        from iroad_tenants.operation_runtime.action_master_catalog import (
+            ensure_empty_move_action_master_rows,
+        )
+
+        ensure_empty_move_action_master_rows()
         em1 = TenantOperationAction.objects.filter(
             action_code__iexact='EM1',
             status=TenantOperationAction.Status.ACTIVE,

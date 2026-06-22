@@ -91,27 +91,121 @@ class ActionExecutionService:
         idempotency_key: str,
         source_channel: str,
         source_ref: str,
+        movement=None,
+        shipment=None,
+        booking=None,
+        booking_item_type: str = '',
+        job_type: str = '',
     ) -> TenantOperationActionLog | None:
         normalized_ref = (source_ref or '').strip()
+        resolved_job_type = (job_type or '').strip()
+        if not resolved_job_type:
+            if movement is not None:
+                resolved_job_type = 'movement'
+            elif shipment is not None:
+                resolved_job_type = 'shipment'
+            elif booking is not None:
+                resolved_job_type = 'booking'
+
+        def _accept(row: TenantOperationActionLog | None) -> TenantOperationActionLog | None:
+            if row is None:
+                return None
+            if not cls._idempotent_existing_applies(
+                booking=booking,
+                log=row,
+                booking_item_type=booking_item_type,
+                movement=movement,
+                shipment=shipment,
+                job_type=resolved_job_type,
+            ):
+                return None
+            return row
+
+        def _scoped(qs):
+            if movement is not None:
+                return qs.filter(truck_movement_id=movement.pk)
+            if shipment is not None:
+                return qs.filter(shipment_id=shipment.pk)
+            if booking is not None:
+                return qs.filter(booking_id=booking.pk)
+            return qs
+
+        # Empty-move: replay ONLY when the same client_action_id was retried on THIS
+        # movement. Never replay via source_ref alone (one EM2 slot per movement lifetime
+        # would block new depart attempts after a failed/stale log).
+        if resolved_job_type == 'movement' and movement is not None:
+            if not idempotency_key:
+                return None
+            row = _scoped(
+                TenantOperationActionLog.objects.filter(idempotency_key=idempotency_key)
+            ).first()
+            return _accept(row)
+
         if normalized_ref:
-            row = TenantOperationActionLog.objects.filter(
-                source_channel=source_channel,
-                source_ref=normalized_ref,
+            row = _scoped(
+                TenantOperationActionLog.objects.filter(
+                    source_channel=source_channel,
+                    source_ref=normalized_ref,
+                )
             ).first()
-            if row is not None:
-                return row
+            accepted = _accept(row)
+            if accepted is not None:
+                return accepted
         if idempotency_key and normalized_ref:
-            row = TenantOperationActionLog.objects.filter(
-                idempotency_key=idempotency_key,
-                source_ref=normalized_ref,
+            row = _scoped(
+                TenantOperationActionLog.objects.filter(
+                    idempotency_key=idempotency_key,
+                    source_ref=normalized_ref,
+                )
             ).first()
-            if row is not None:
-                return row
+            accepted = _accept(row)
+            if accepted is not None:
+                return accepted
         if idempotency_key:
-            return TenantOperationActionLog.objects.filter(
-                idempotency_key=idempotency_key,
+            row = _scoped(
+                TenantOperationActionLog.objects.filter(idempotency_key=idempotency_key)
             ).first()
+            return _accept(row)
         return None
+
+    @classmethod
+    def find_idempotency_key_collision(
+        cls,
+        *,
+        idempotency_key: str,
+        movement=None,
+        shipment=None,
+        booking=None,
+        job_type: str = '',
+    ) -> TenantOperationActionLog | None:
+        """Row using this key on a different job (global unique constraint guard)."""
+        key = (idempotency_key or '').strip()
+        if not key:
+            return None
+        row = TenantOperationActionLog.objects.filter(idempotency_key=key).first()
+        if row is None:
+            return None
+        from iroad_tenants.operation_runtime.idempotency import (
+            idempotent_log_matches_job_scope,
+        )
+
+        resolved_job_type = (job_type or '').strip()
+        if not resolved_job_type:
+            if movement is not None:
+                resolved_job_type = 'movement'
+            elif shipment is not None:
+                resolved_job_type = 'shipment'
+            elif booking is not None:
+                resolved_job_type = 'booking'
+        if idempotent_log_matches_job_scope(
+            log=row,
+            job_type=resolved_job_type,
+            movement=movement,
+            shipment=shipment,
+            booking=booking,
+        ):
+            return None
+        return row
 
     @classmethod
     @transaction.atomic
@@ -175,11 +269,19 @@ class ActionExecutionService:
             idempotency_key=normalized_key,
             source_channel=source_channel,
             source_ref=normalized_ref,
+            movement=movement,
+            shipment=shipment,
+            booking=booking,
+            booking_item_type=birth_booking_item_type or booking_item_type,
+            job_type='movement' if movement is not None else 'shipment' if shipment is not None else 'booking' if booking is not None else '',
         )
         if existing is not None and cls._idempotent_existing_applies(
             booking=booking,
             log=existing,
             booking_item_type=birth_booking_item_type or booking_item_type,
+            movement=movement,
+            shipment=shipment,
+            job_type='movement' if movement is not None else 'shipment' if shipment is not None else 'booking' if booking is not None else '',
         ):
             return ActionExecutionResult(action_log=existing, reused_existing=True)
 
@@ -266,11 +368,19 @@ class ActionExecutionService:
                 idempotency_key=normalized_key,
                 source_channel=source_channel,
                 source_ref=normalized_ref,
+                movement=movement,
+                shipment=shipment,
+                booking=booking,
+                booking_item_type=birth_booking_item_type or booking_item_type,
+                job_type='movement' if movement is not None else 'shipment' if shipment is not None else 'booking' if booking is not None else '',
             )
             if existing is not None and cls._idempotent_existing_applies(
                 booking=booking,
                 log=existing,
                 booking_item_type=birth_booking_item_type or booking_item_type,
+                movement=movement,
+                shipment=shipment,
+                job_type='movement' if movement is not None else 'shipment' if shipment is not None else 'booking' if booking is not None else '',
             ):
                 return ActionExecutionResult(action_log=existing, reused_existing=True)
             raise
@@ -283,8 +393,33 @@ class ActionExecutionService:
         booking=None,
         log,
         booking_item_type: str = '',
+        movement=None,
+        shipment=None,
+        job_type: str = '',
     ) -> bool:
-        """Booking backload must not reuse outbound preshipment idempotency rows."""
+        """Booking backload / movement / shipment scope for idempotent replay."""
+        from iroad_tenants.operation_runtime.idempotency import (
+            idempotent_log_matches_job_scope,
+        )
+
+        resolved_job_type = (job_type or '').strip()
+        if not resolved_job_type:
+            if movement is not None:
+                resolved_job_type = 'movement'
+            elif shipment is not None:
+                resolved_job_type = 'shipment'
+            elif booking is not None:
+                resolved_job_type = 'booking'
+
+        if not idempotent_log_matches_job_scope(
+            log=log,
+            job_type=resolved_job_type,
+            movement=movement,
+            shipment=shipment,
+            booking=booking,
+        ):
+            return False
+
         if booking is None:
             return True
         from iroad_tenants.operation_runtime.booking_preshipment_cycle import (

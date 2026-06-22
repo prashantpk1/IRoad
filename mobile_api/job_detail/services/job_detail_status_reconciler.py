@@ -149,6 +149,8 @@ def apply_reconciled_status_overlays(
     try:
         auth = (block.get('authoritative_status') or '').strip()
         if not auth:
+            auth = (block.get('column_status') or '').strip()
+        if not auth:
             yield
             return
 

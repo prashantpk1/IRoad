@@ -11,6 +11,7 @@ from django.test import SimpleTestCase
 
 from iroad_tenants.operation_runtime.allowed_actions_query import (
     _apply_mobile_scope_filter,
+    _apply_movement_mobile_scope_filter,
     prefilter_allowed_action_candidates,
 )
 from tenant_workspace.models import TenantOperationAction, TenantShipment
@@ -30,6 +31,12 @@ class AllowedActionsPrefilterTests(SimpleTestCase):
         qs = _apply_mobile_scope_filter(TenantOperationAction.objects.all())
         sql = str(qs.query).lower()
         self.assertIn('action_scope', sql)
+
+    def test_movement_mobile_scope_includes_empty_move_category(self):
+        qs = _apply_movement_mobile_scope_filter(TenantOperationAction.objects.all())
+        sql = str(qs.query).lower()
+        self.assertIn('empty_move', sql)
+        self.assertIn('em', sql)
 
     @patch(
         'iroad_tenants.operation_runtime.allowed_actions_query.active_operation_actions_queryset',

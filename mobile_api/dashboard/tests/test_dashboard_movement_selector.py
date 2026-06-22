@@ -86,7 +86,24 @@ def _movement(
 
 
 class MovementSelectionPolicyTests(SimpleTestCase):
-    def test_active_empty_move_by_source(self):
+    def _empty_flags(self):
+        return {
+            'start_done': False,
+            'in_transit_done': False,
+            'arrived_done': False,
+            'complete_done': False,
+        }
+
+    @patch(
+        'mobile_api.dashboard.selectors.movement_selection_policy.movement_log_milestone_flags',
+        return_value={
+            'start_done': False,
+            'in_transit_done': False,
+            'arrived_done': False,
+            'complete_done': False,
+        },
+    )
+    def test_active_empty_move_by_source(self, _mock_flags):
         driver = _driver()
         movement = _movement(driver_id=driver.pk)
         self.assertTrue(policy.is_active_empty_move(movement))
@@ -99,7 +116,32 @@ class MovementSelectionPolicyTests(SimpleTestCase):
         )
         self.assertFalse(policy.is_active_empty_move(movement))
 
-    def test_cancelled_movement_excluded(self):
+    @patch(
+        'mobile_api.dashboard.selectors.movement_selection_policy.movement_log_milestone_flags',
+        return_value={
+            'start_done': True,
+            'in_transit_done': True,
+            'arrived_done': True,
+            'complete_done': True,
+        },
+    )
+    def test_complete_log_excludes_even_when_column_in_progress(self, _mock_flags):
+        movement = _movement(
+            status=TenantTruckMovementLog.Status.IN_PROGRESS,
+            driver_id=uuid4(),
+        )
+        self.assertFalse(policy.is_active_empty_move(movement))
+
+    @patch(
+        'mobile_api.dashboard.selectors.movement_selection_policy.movement_log_milestone_flags',
+        return_value={
+            'start_done': False,
+            'in_transit_done': False,
+            'arrived_done': False,
+            'complete_done': False,
+        },
+    )
+    def test_cancelled_movement_excluded(self, _mock_flags):
         movement = _movement(
             status=TenantTruckMovementLog.Status.CANCELLED,
             driver_id=uuid4(),
@@ -124,7 +166,16 @@ class MovementSelectionPolicyTests(SimpleTestCase):
         )
         self.assertFalse(policy.is_active_empty_move(movement))
 
-    def test_movement_ordering_picks_earlier_date(self):
+    @patch(
+        'mobile_api.dashboard.selectors.movement_selection_policy.movement_log_milestone_flags',
+        return_value={
+            'start_done': False,
+            'in_transit_done': False,
+            'arrived_done': False,
+            'complete_done': False,
+        },
+    )
+    def test_movement_ordering_picks_earlier_date(self, _mock_flags):
         driver = _driver()
         later = _movement(
             movement_date=date(2026, 6, 1),
@@ -142,7 +193,16 @@ class MovementSelectionPolicyTests(SimpleTestCase):
         )
         self.assertEqual(picked.movement_no, 'EM-EARLY')
 
-    def test_assignment_validation_wrong_driver_skipped(self):
+    @patch(
+        'mobile_api.dashboard.selectors.movement_selection_policy.movement_log_milestone_flags',
+        return_value={
+            'start_done': False,
+            'in_transit_done': False,
+            'arrived_done': False,
+            'complete_done': False,
+        },
+    )
+    def test_assignment_validation_wrong_driver_skipped(self, _mock_flags):
         driver = _driver()
         other = _movement(driver_id=uuid4())
         self.assertIsNone(
@@ -213,6 +273,8 @@ class MovementProjectionTests(SimpleTestCase):
         )
         card = build_empty_move_card(selection=selection)
         self.assertEqual(card['movement_no'], 'EM-1')
+        self.assertEqual(card['movement_id'], str(movement.movement_id))
+        self.assertEqual(card['job_id'], card['movement_id'])
         self.assertEqual(card['movement_stage'], STAGE_CREATED)
         self.assertEqual(card['progress_percentage'], 10)
         self.assertEqual(card['pickup_address']['display_name'], 'Goa')

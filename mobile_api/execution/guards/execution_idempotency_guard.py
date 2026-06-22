@@ -98,12 +98,41 @@ class ExecutionIdempotencyGuard:
         Returns True when this request is a safe retry (no new validation of workflow).
         """
         normalized = keys or self.normalize_request_keys(context)
-        existing = self._log_lookup(normalized)
+        existing = self._resolve_existing_log(context, normalized)
         if existing is None:
+            from iroad_tenants.services.action_execution_service import ActionExecutionService
+
+            collision = ActionExecutionService.find_idempotency_key_collision(
+                idempotency_key=normalized.idempotency_key,
+                movement=context.movement,
+                shipment=context.shipment,
+                booking=context.booking,
+                job_type=context.job_type,
+            )
+            if collision is not None and normalized.idempotency_key:
+                raise self._validation_error(
+                    error_code='idempotency_key_scope_mismatch',
+                    message=(
+                        'This client_action_id was already used for a different job. '
+                        'Send a new client_action_id and retry.'
+                    ),
+                    refresh_required=False,
+                    http_status=409,
+                )
             context.idempotent_replay = False
             return False
 
         if not self._idempotent_log_applies_to_context(context, existing):
+            if normalized.idempotency_key:
+                raise self._validation_error(
+                    error_code='idempotency_key_scope_mismatch',
+                    message=(
+                        'This client_action_id was already used for a different job. '
+                        'Send a new client_action_id and retry.'
+                    ),
+                    refresh_required=False,
+                    http_status=409,
+                )
             context.idempotent_replay = False
             return False
 
@@ -160,9 +189,19 @@ class ExecutionIdempotencyGuard:
         context: ExecuteActionContext,
         log: Any,
     ) -> bool:
-        """
-        Outbound preshipment logs must not replay as backload executes (same A1 key).
-        """
+        from iroad_tenants.operation_runtime.idempotency import (
+            idempotent_log_matches_job_scope,
+        )
+
+        if not idempotent_log_matches_job_scope(
+            log=log,
+            job_type=context.job_type,
+            movement=context.movement,
+            shipment=context.shipment,
+            booking=context.booking,
+        ):
+            return False
+
         if context.job_type != 'booking' or context.booking is None:
             return True
         from iroad_tenants.operation_runtime.booking_preshipment_cycle import (
@@ -189,6 +228,32 @@ class ExecutionIdempotencyGuard:
                 booking_item_type='Backload',
             )
         return True
+
+    def _resolve_existing_log(
+        self,
+        context: ExecuteActionContext,
+        keys: IdempotencyKeys,
+    ) -> Any | None:
+        if self._log_lookup is not ExecutionIdempotencyGuard._default_log_lookup:
+            return self._log_lookup(keys)
+        return self._lookup_for_context(context, keys)
+
+    def _lookup_for_context(
+        self,
+        context: ExecuteActionContext,
+        keys: IdempotencyKeys,
+    ) -> Any | None:
+        from iroad_tenants.services.action_execution_service import ActionExecutionService
+
+        return ActionExecutionService._find_idempotent_existing(
+            idempotency_key=keys.idempotency_key,
+            source_channel=keys.source_channel,
+            source_ref=keys.source_ref,
+            movement=context.movement,
+            shipment=context.shipment,
+            booking=context.booking,
+            job_type=context.job_type,
+        )
 
     @staticmethod
     def _default_log_lookup(keys: IdempotencyKeys) -> Any | None:

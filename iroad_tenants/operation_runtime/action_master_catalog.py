@@ -252,6 +252,68 @@ PRODUCTION_ACTION_MASTER: tuple[ActionMasterSpec, ...] = (
     ),
 )
 
+EMPTY_MOVE_ACTION_CODES = frozenset({'EM1', 'EM2', 'EM3', 'EM4'})
+
+
+def _action_master_model_fields() -> set[str]:
+    return {field.name for field in TenantOperationAction._meta.fields}
+
+
+def ensure_empty_move_action_master_rows() -> bool:
+    """
+    Idempotently seed EM1–EM4 for the current tenant schema.
+
+    Empty-move mobile workflow depends on these rows; tenants created before the
+    catalog included EM actions may have none ACTIVE.
+    """
+    from iroad_tenants.operation_runtime.action_config_cache import (
+        invalidate_active_action_catalog_cache,
+    )
+
+    model_fields = _action_master_model_fields()
+    changed = False
+    for spec in PRODUCTION_ACTION_MASTER:
+        if spec.action_code not in EMPTY_MOVE_ACTION_CODES:
+            continue
+        defaults = spec.defaults(model_fields)
+        row = TenantOperationAction.objects.filter(
+            action_code__iexact=spec.action_code,
+        ).first()
+        if row is None:
+            TenantOperationAction.objects.create(
+                action_code=spec.action_code,
+                **defaults,
+            )
+            changed = True
+            continue
+        if row.status != TenantOperationAction.Status.ACTIVE:
+            row.status = TenantOperationAction.Status.ACTIVE
+            changed = True
+        patch = {
+            field: value
+            for field, value in defaults.items()
+            if getattr(row, field) != value
+        }
+        if patch:
+            for field, value in patch.items():
+                setattr(row, field, value)
+            row.save(update_fields=[*patch.keys(), 'updated_at'])
+            changed = True
+    if changed:
+        invalidate_active_action_catalog_cache()
+    else:
+        missing = not all(
+            TenantOperationAction.objects.filter(
+                action_code__iexact=code,
+                status=TenantOperationAction.Status.ACTIVE,
+            ).exists()
+            for code in EMPTY_MOVE_ACTION_CODES
+        )
+        if missing:
+            invalidate_active_action_catalog_cache()
+    return changed
+
+
 _EXCLUDED_FALLBACK_CODES = frozenset(
     {'A6', 'A7', 'A8', 'A9', 'A10', 'A1', 'A2', 'A3', 'A4', 'A5'},
 )

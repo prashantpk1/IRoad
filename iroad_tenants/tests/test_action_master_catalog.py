@@ -5,6 +5,7 @@ from django.test import SimpleTestCase
 
 from iroad_tenants.operation_runtime.action_master_catalog import (
     AUTO_COD_VERIFY_ACTION_CODE,
+    EMPTY_MOVE_ACTION_CODES,
     PRODUCTION_ACTION_MASTER,
 )
 from iroad_tenants.operation_runtime.impacts import resolve_shipment_status_impact
@@ -43,4 +44,10 @@ class ActionMasterCatalogTests(SimpleTestCase):
         self.assertEqual(
             mobile_codes,
             {f'A{i}' for i in range(1, 11)} | {f'EM{i}' for i in range(1, 5)},
+        )
+
+    def test_empty_move_catalog_codes(self):
+        self.assertEqual(
+            EMPTY_MOVE_ACTION_CODES,
+            {'EM1', 'EM2', 'EM3', 'EM4'},
         )

@@ -138,6 +138,19 @@ def _apply_mobile_scope_filter(qs: QuerySet) -> QuerySet:
     )
 
 
+def _apply_movement_mobile_scope_filter(qs: QuerySet) -> QuerySet:
+    """Mobile scope for movement-only / empty-move jobs (EM catalog rows)."""
+    return (
+        qs.filter(
+            Q(action_scope__in=_MOBILE_JOB_ACTION_SCOPES)
+            | Q(sequence_category__iexact='empty_move')
+            | Q(action_code__istartswith='EM'),
+        )
+        .exclude(admin_only=True)
+        .filter(Q(mobile_visible=True) | Q(hard_copy_collection=True))
+    )
+
+
 def _exclude_executed(qs: QuerySet, executed_ids: set) -> QuerySet:
     if executed_ids:
         qs = qs.exclude(action_id__in=executed_ids)
@@ -315,8 +328,22 @@ def _prefilter_movement_only_candidates(qs: QuerySet, *, movement) -> QuerySet:
         | Q(sequence_category__iexact='empty_move')
         | Q(auto_movement_post=True)
         | Q(action_code__istartswith='m')
+        | Q(action_code__istartswith='EM')
         | Q(english_label__icontains='movement'),
     )
+
+
+def _is_movement_only_prefilter(
+    *,
+    booking=None,
+    shipment=None,
+    movement=None,
+) -> bool:
+    if movement is None:
+        return False
+    if is_movement_only_context(shipment=shipment, movement=movement):
+        return True
+    return shipment is None and booking is None
 
 
 def prefilter_allowed_action_candidates(
@@ -332,9 +359,24 @@ def prefilter_allowed_action_candidates(
     """
     Narrow ACTIVE Action Config rows before ``_action_is_allowed`` evaluation.
     """
-    qs = active_operation_actions_queryset()
+    movement_only = _is_movement_only_prefilter(
+        booking=booking,
+        shipment=shipment,
+        movement=movement,
+    )
+    if movement_only:
+        from iroad_tenants.operation_runtime.action_master_catalog import (
+            ensure_empty_move_action_master_rows,
+        )
+
+        ensure_empty_move_action_master_rows()
+
+    qs = active_operation_actions_queryset(use_catalog_cache=not movement_only)
     if for_mobile:
-        qs = _apply_mobile_scope_filter(qs)
+        if movement_only:
+            qs = _apply_movement_mobile_scope_filter(qs)
+        else:
+            qs = _apply_mobile_scope_filter(qs)
 
     executed = executed_action_ids or set()
     qs = _exclude_executed(qs, executed)
@@ -349,13 +391,7 @@ def prefilter_allowed_action_candidates(
     if booking is not None and movement is None:
         return _prefilter_booking_candidates(qs, booking=booking)
 
-    if movement is not None and is_movement_only_context(
-        shipment=shipment,
-        movement=movement,
-    ):
-        return _prefilter_movement_only_candidates(qs, movement=movement)
-
-    if movement is not None and shipment is None and booking is None:
+    if movement_only:
         return _prefilter_movement_only_candidates(qs, movement=movement)
 
     if movement is not None:

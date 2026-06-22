@@ -312,6 +312,80 @@ class JobDetailWorkflowProjectionTests(SimpleTestCase):
         self.assertTrue(wf['workflow_integrity'].get('missing_log_warning'))
         self.assertEqual(wf['allowed_actions'], [])
 
+    @patch(
+        'mobile_api.job_detail.projections.workflow_projection.derive_job_execution_stage',
+    )
+    @patch(
+        'mobile_api.job_detail.projections.workflow_projection.OperationExecutionService.get_allowed_driver_actions',
+    )
+    def test_movement_completed_column_without_logs_uses_scheduled_overlay(
+        self,
+        mock_allowed,
+        mock_stage,
+    ):
+        captured_status = {}
+
+        def _capture_allowed(**kwargs):
+            captured_status['movement_status'] = kwargs['movement'].status
+            return _engine_payload(
+                stage='Created',
+                job_type='movement',
+                actions=[_action_row(code='EM1', label='Start Empty Move')],
+            )
+
+        mock_allowed.side_effect = _capture_allowed
+        mock_stage.return_value = {
+            'entity_type': 'movement',
+            'execution_sub_stage': 'created',
+            'operational_stage': 'Created',
+            'status_for_workflow': TenantTruckMovementLog.Status.SCHEDULED,
+        }
+
+        movement = _movement()
+        movement.status = TenantTruckMovementLog.Status.COMPLETED
+        ctx = JobDetailContext(
+            driver=_driver(),
+            tenant_schema='tenant_a',
+            user_id='u1',
+            job_type='movement',
+            job_id=str(movement.pk),
+            movement=movement,
+        )
+        ctx.reconciliation = {
+            'movement': _recon_block(
+                auth=TenantTruckMovementLog.Status.SCHEDULED,
+                column=TenantTruckMovementLog.Status.COMPLETED,
+                log_count=0,
+                drift=True,
+                reason='terminal_column_without_action_logs',
+            ),
+            'workflow_integrity': {
+                **_recon_block(
+                    auth=TenantTruckMovementLog.Status.SCHEDULED,
+                    column=TenantTruckMovementLog.Status.COMPLETED,
+                    log_count=0,
+                    drift=True,
+                )['workflow_integrity'],
+                'workflow_integrity_state': INTEGRITY_MISSING_LOGS,
+                'missing_log_warning': True,
+            },
+        }
+
+        wf = build_workflow_section(ctx)
+
+        self.assertEqual(
+            wf['reconciliation']['authoritative_status'],
+            TenantTruckMovementLog.Status.SCHEDULED,
+        )
+        self.assertEqual(wf['current_stage'], 'Created')
+        self.assertEqual(len(wf['allowed_actions']), 1)
+        self.assertEqual(wf['primary_action']['action_code'], 'EM1')
+        mock_allowed.assert_called_once()
+        self.assertEqual(
+            captured_status['movement_status'],
+            TenantTruckMovementLog.Status.SCHEDULED,
+        )
+
 
 class JobDetailReconcileIntegrationTests(SimpleTestCase):
     @patch(

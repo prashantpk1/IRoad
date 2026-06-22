@@ -25,6 +25,10 @@ from iroad_tenants.operation_runtime.workflow_state_reconciler import (
     reconcile_movement_execution_state,
     reconcile_shipment_execution_state,
 )
+from iroad_tenants.operation_runtime.movement_state_machine import (
+    MOVEMENT_COLUMN_SCHEDULED,
+    is_terminal_movement_status,
+)
 
 # API contract values
 AUTHORITY_ACTION_LOGS = 'action_logs'
@@ -132,7 +136,15 @@ def _slice_reconciled_state(raw: dict[str, Any] | None) -> dict[str, Any]:
 
     effective_auth = auth
     if not effective_auth and column:
-        effective_auth = column
+        entity_type = (raw.get('entity_type') or '').strip()
+        if (
+            entity_type == 'movement'
+            and log_count <= 0
+            and is_terminal_movement_status(column)
+        ):
+            effective_auth = MOVEMENT_COLUMN_SCHEDULED
+        else:
+            effective_auth = column
 
     integrity = build_workflow_integrity(
         log_count=log_count,

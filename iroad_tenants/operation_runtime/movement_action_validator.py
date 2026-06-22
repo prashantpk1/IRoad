@@ -25,11 +25,12 @@ from iroad_tenants.operation_runtime.movement_state_machine import (
 from iroad_tenants.operation_runtime.movement_stage_derivation import (
     derive_movement_execution_stage,
     movement_log_milestone_flags,
+    movement_workflow_column_for_policy,
 )
 from iroad_tenants.operation_runtime.shipment_execution_stage import (
     is_pickup_or_loading_action,
 )
-from tenant_workspace.models import TenantOperationAction, TenantTruckMovementLog
+from tenant_workspace.models import TenantOperationAction, TenantOperationActionLog, TenantTruckMovementLog
 
 
 def is_empty_movement(movement) -> bool:
@@ -81,6 +82,48 @@ def validate_movement_completion_stage(movement, *, exclude_log_id=None) -> str 
     return None
 
 
+def _movement_executed_action_codes(
+    movement,
+    *,
+    exclude_log_id=None,
+) -> set[str]:
+    if movement is None:
+        return set()
+    qs = TenantOperationActionLog.objects.exclude(operation_action__isnull=True)
+    if exclude_log_id:
+        qs = qs.exclude(log_id=exclude_log_id)
+    qs = qs.filter(truck_movement_id=movement.pk).select_related('operation_action')
+    return {
+        (getattr(log.operation_action, 'action_code', '') or '').strip().upper()
+        for log in qs
+        if getattr(log, 'operation_action', None) is not None
+        and (getattr(log.operation_action, 'action_code', '') or '').strip()
+    }
+
+
+def movement_prerequisites_met(
+    action,
+    movement,
+    *,
+    exclude_log_id=None,
+) -> bool:
+    raw = (getattr(action, 'prerequisite_action_codes', None) or '').strip()
+    if not raw:
+        return True
+    required = {
+        token.strip().upper()
+        for token in raw.split(',')
+        if token.strip()
+    }
+    if not required:
+        return True
+    executed = _movement_executed_action_codes(
+        movement,
+        exclude_log_id=exclude_log_id,
+    )
+    return required.issubset(executed)
+
+
 def movement_lifecycle_action_allowed(
     action,
     movement,
@@ -128,8 +171,11 @@ def movement_action_is_allowed(
     if action.status != TenantOperationAction.Status.ACTIVE:
         return False
 
-    current = movement.status or ''
-    if is_terminal_movement_status(current) and not is_movement_cancel_action(action):
+    workflow_current = movement_workflow_column_for_policy(
+        movement,
+        exclude_log_id=exclude_log_id,
+    )
+    if is_terminal_movement_status(workflow_current) and not is_movement_cancel_action(action):
         if action_matches(action, 'reversal', 'undo', 'r1', 'r2'):
             return True
         return False
@@ -141,12 +187,30 @@ def movement_action_is_allowed(
     if not action_applies_to_movement_context(action, empty_move=empty_move):
         return False
 
+    if not movement_prerequisites_met(
+        action,
+        movement,
+        exclude_log_id=exclude_log_id,
+    ):
+        return False
+
     impact = resolve_action_movement_impact(action)
     if impact:
         if is_movement_complete_action(action):
             if validate_movement_completion_stage(movement, exclude_log_id=exclude_log_id):
                 return False
-        return movement_impact_allowed_from_current(current=current, impact_status=impact)
+        if movement_impact_allowed_from_current(
+            current=workflow_current,
+            impact_status=impact,
+        ):
+            return True
+        if is_movement_start_action(action):
+            return movement_lifecycle_action_allowed(
+                action,
+                movement,
+                exclude_log_id=exclude_log_id,
+            )
+        return False
 
     if action.auto_movement_post:
         return False

@@ -273,6 +273,14 @@ class DashboardContextService:
         request: Any | None,
     ) -> None:
         with apply_reconciled_status_overlays(context):
+            if context.empty_move_selection is not None and context.active_empty_movement is not None:
+                from mobile_api.dashboard.selectors.dashboard_movement_selector import (
+                    DashboardMovementSelector,
+                )
+
+                context.empty_move_selection = DashboardMovementSelector._result_from_movement(
+                    context.active_empty_movement,
+                )
             if context.booking_selection is not None:
                 context.booking_projection = build_booking_card_from_selection(
                     context.booking_selection,

@@ -35,6 +35,25 @@ def movement_executed_action_ids(
     return set(qs.values_list('operation_action_id', flat=True))
 
 
+def movement_executed_action_codes(
+    movement,
+    *,
+    exclude_log_id=None,
+) -> set[str]:
+    if movement is None:
+        return set()
+    qs = TenantOperationActionLog.objects.exclude(operation_action__isnull=True)
+    if exclude_log_id:
+        qs = qs.exclude(log_id=exclude_log_id)
+    qs = qs.filter(truck_movement_id=movement.pk).select_related('operation_action')
+    return {
+        (getattr(log.operation_action, 'action_code', '') or '').strip().upper()
+        for log in qs
+        if getattr(log, 'operation_action', None) is not None
+        and (getattr(log.operation_action, 'action_code', '') or '').strip()
+    }
+
+
 def movement_action_allowed(
     action,
     *,

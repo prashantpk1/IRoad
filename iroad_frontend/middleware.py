@@ -7,6 +7,13 @@ from iroad_frontend.error_views import handle_exception_for_custom_page, render_
 
 ERROR_PAGES_STATUS_CODES = frozenset({400, 403, 404, 500, 503})
 
+# Mobile/REST JSON under /api/ must keep DRF envelope bodies (status, data.error_code).
+_API_JSON_PREFIX = '/api/'
+
+
+def _skip_custom_error_page(request) -> bool:
+    return (request.path or '').startswith(_API_JSON_PREFIX)
+
 
 class CustomErrorPageMiddleware:
     """
@@ -28,6 +35,8 @@ class CustomErrorPageMiddleware:
             raise
 
         if not getattr(settings, 'USE_CUSTOM_ERROR_PAGES', False):
+            return response
+        if _skip_custom_error_page(request):
             return response
         if response.status_code in ERROR_PAGES_STATUS_CODES:
             return render_error_page(request, response.status_code)

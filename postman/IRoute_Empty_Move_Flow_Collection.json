@@ -2,7 +2,7 @@
   "info": {
     "_postman_id": "b2c3d4e5-f6a7-8901-bcde-f12345678901",
     "name": "IRoute — Driver Empty Move Flow",
-    "description": "EMPTY MOVE FLOW\n\n1. Login (01)\n2. Dashboard (02)\n3. List Locations (02a) — auto-fills pickup_location_id + delivery_location_id UUIDs\n4. Create Empty Move (02b) — auto EM1\n5. Job Detail (03) → EM2 → EM3 → EM4\n\nMobile must use location_id UUID from 02a — NOT map numeric IDs like 286471198.",
+    "description": "EMPTY MOVE FLOW (driver confirms each step)\n\nMODE A — Tenant Location Master:\n  01 Login → 02 Dashboard → 02a Locations → 02b Create\n\nMODE B — Live GPS + address (no 02a):\n  01 Login → 02 Dashboard → 02b-live Create\n\nEXECUTE SEQUENCE (do not skip):\n  03 Job Detail → 04a EM1 Start Pickup → 05 EM2 Depart → 05c EM3 Arrive → 06 EM4 Complete\n\nRULES:\n  - movement_job_id from 02 Dashboard, 02b create, or 03 job detail\n  - content_hash + workflow_version from 03 (refresh after each execute)\n  - Each execute uses a NEW client_action_id (set in prerequest — never reuse)\n  - If EM2 sticks: check replayed=true — re-send with fresh guid\n  - 409 idempotency_key_scope_mismatch = use new client_action_id",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
   "variable": [
@@ -110,6 +110,33 @@
       "key": "delivery_longitude",
       "value": "39.8579",
       "description": "Delivery (to) — Makkah"
+    },
+    {
+      "key": "execute_client_action_id",
+      "value": "",
+      "description": "Set in prerequest before each EM1–EM4 execute (fresh UUID per send)"
+    },
+    {
+      "key": "from_address",
+      "value": "King Abdulaziz Rd, Jeddah, Saudi Arabia",
+      "description": "Live location — reverse-geocoded or map-picker address (from / pickup)"
+    },
+    {
+      "key": "to_address",
+      "value": "Industrial Area, Makkah, Saudi Arabia",
+      "description": "Live location — reverse-geocoded or map-picker address (to / delivery)"
+    }
+  ],
+  "event": [
+    {
+      "listen": "prerequest",
+      "script": {
+        "type": "text/javascript",
+        "exec": [
+          "// Shared helpers for execute requests (see prerequest on 04a–06).",
+          "pm.collectionVariables.unset('execute_client_action_id');"
+        ]
+      }
     }
   ],
   "item": [
@@ -227,11 +254,20 @@
             "type": "text/javascript",
             "exec": [
               "var resp = pm.response.json();",
-              "if (resp.data && resp.data.current_empty_move) {",
-              "    pm.collectionVariables.set(\"movement_job_id\", resp.data.current_empty_move.job_id);",
-              "    pm.test(\"Empty move found, movement_job_id saved\", function() { pm.expect(resp.data.current_empty_move.job_id).to.exist; });",
-              "} else {",
-              "    pm.test(\"No current empty move — driver in On Call mode, ready to start new empty move\", function() { pm.expect(true).to.be.true; });",
+              "var d = resp.data || {};",
+              "var em = d.current_empty_move || {};",
+              "var aj = d.active_job || {};",
+              "var movementId = em.movement_id || em.job_id || (aj.job_type === 'movement' ? aj.job_id : '');",
+              "if (movementId) {",
+              "    pm.collectionVariables.set('movement_job_id', movementId);",
+              "    pm.test('movement_job_id saved', function() { pm.expect(movementId).to.exist; });",
+              "}",
+              "if (d.sync_metadata) {",
+              "    if (d.sync_metadata.content_hash) pm.collectionVariables.set('content_hash', d.sync_metadata.content_hash);",
+              "    if (d.sync_metadata.workflow_version) pm.collectionVariables.set('workflow_version', d.sync_metadata.workflow_version);",
+              "}",
+              "if (!movementId) {",
+              "    pm.test('No current empty move — driver in On Call mode, ready to start new empty move', function() { pm.expect(true).to.be.true; });",
               "}"
             ]
           }
@@ -293,7 +329,74 @@
       ]
     },
     {
-      "name": "02b — Create Empty Move (auto EM1 + GPS)",
+      "name": "02b-live — Create Empty Move (Live GPS + Address — no Location UUIDs)",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{access_token}}"
+          },
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          },
+          {
+            "key": "Accept",
+            "value": "application/json"
+          },
+          {
+            "key": "Accept-Language",
+            "value": "en"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"empty_move_reason\": \"{{empty_move_reason}}\",\n  \"from_address\": \"{{from_address}}\",\n  \"from_latitude\": {{pickup_latitude}},\n  \"from_longitude\": {{pickup_longitude}},\n  \"to_address\": \"{{to_address}}\",\n  \"to_latitude\": {{delivery_latitude}},\n  \"to_longitude\": {{delivery_longitude}},\n  \"client_action_id\": \"em-create-live-{{$guid}}\",\n  \"notes\": \"{{empty_move_notes}}\"\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        },
+        "url": "{{base_url}}/driver/empty-moves/",
+        "description": "LIVE LOCATION MODE — GPS + reverse-geocoded address.\n\nDo NOT send from_location_id / to_location_id.\n\nREQUIRED: from_address + from_latitude + from_longitude AND to_address + to_latitude + to_longitude.\n\nOn success (201): saves movement_job_id. Status Scheduled — run 04a EM1 to start pickup."
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "var resp = pm.response.json();",
+              "pm.test('Status code is 201', function () { pm.response.to.have.status(201); });",
+              "if (resp.status === 1 && resp.data && resp.data.empty_move) {",
+              "    var em = resp.data.empty_move;",
+              "    pm.collectionVariables.set('movement_job_id', em.movement_id || em.job_id);",
+              "    pm.test('Empty move created (live location)', function () {",
+              "        pm.expect(em.movement_no).to.exist;",
+              "    });",
+              "    pm.test('From location has GPS stored on TML', function () {",
+              "        pm.expect(em.from_location.latitude).to.exist;",
+              "        pm.expect(em.from_location.longitude).to.exist;",
+              "        pm.expect(em.from_location.label).to.exist;",
+              "    });",
+              "    pm.test('To location has GPS stored on TML', function () {",
+              "        pm.expect(em.to_location.latitude).to.exist;",
+              "        pm.expect(em.to_location.longitude).to.exist;",
+              "        pm.expect(em.to_location.label).to.exist;",
+              "    });",
+              "    pm.test('workflow_started is false until driver runs EM1', function () {",
+              "        pm.expect(em.workflow_started).to.eql(false);",
+              "    });",
+              "}"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "02b — Create Empty Move (Tenant Location UUIDs + GPS)",
       "request": {
         "method": "POST",
         "header": [
@@ -324,7 +427,7 @@
           }
         },
         "url": "{{base_url}}/driver/empty-moves/",
-        "description": "POST /driver/empty-moves/ — creates TML + auto EM1.\n\nPREREQUISITE: Run 02a first to set pickup_location_id and delivery_location_id.\n\nfrom_location_id / to_location_id must be UUIDs from 02a (not map numeric IDs).\nGPS fields are mobile device coordinates."
+        "description": "POST /driver/empty-moves/ — creates TML in Scheduled status.\n\nPREREQUISITE: Run 02a for pickup_location_id and delivery_location_id UUIDs.\n\nDriver starts pickup manually via 04a EM1."
       },
       "event": [
         {
@@ -340,9 +443,9 @@
               "    pm.test(\"Empty move created\", function() {",
               "        pm.expect(em.movement_no).to.exist;",
               "    });",
-              "    if (em.workflow_started) {",
-              "        pm.test(\"EM1 auto-started\", function() { pm.expect(em.workflow_started).to.eql(true); });",
-              "    }",
+              "    pm.test('workflow_started is false until driver runs EM1', function() {",
+              "        pm.expect(em.workflow_started).to.eql(false);",
+              "    });",
               "}"
             ]
           }
@@ -360,7 +463,7 @@
           }
         ],
         "url": "{{base_url}}/driver/jobs/movement/{{movement_job_id}}/",
-        "description": "GET empty move detail after 02b create.\nEM1 is already fired — status should be In Progress.\nSaves content_hash and workflow_version for EM2+ execute calls.\nAssert allowed actions include EM2 (not EM1)."
+        "description": "GET empty move detail after 02b create.\nStatus should be Scheduled until EM1.\nSaves content_hash and workflow_version for execute calls.\nAssert allowed actions include EM1 (Start at Pickup)."
       },
       "event": [
         {
@@ -369,6 +472,9 @@
             "type": "text/javascript",
             "exec": [
               "var resp = pm.response.json();",
+              "if (resp.data && resp.data.job && resp.data.job.job_id) {",
+              "    pm.collectionVariables.set('movement_job_id', resp.data.job.job_id);",
+              "}",
               "if (resp.data && resp.data.sync_metadata) {",
               "    pm.collectionVariables.set(",
               "        \"content_hash\",",
@@ -385,12 +491,17 @@
               "        }",
               "    );",
               "}",
-              "pm.test(\"Allowed actions contains EM2 (EM1 already auto-fired)\", function() {",
+              "pm.test(\"Allowed actions contains EM1 (pickup start)\", function() {",
               "    var allowed = (resp.data && resp.data.workflow && resp.data.workflow.allowed_actions) || [];",
               "    var codes = allowed.map(function(a) { return a.action_code; });",
-              "    pm.expect(codes).to.include(\"EM2\");",
-              "    pm.expect(codes).to.not.include(\"EM1\");",
-              "});"
+              "    pm.expect(codes).to.include(\"EM1\");",
+              "});",
+              "if (resp.data && resp.data.workflow && resp.data.workflow.workflow_status) {",
+              "    pm.test(\"Pickup step not completed before EM1\", function() {",
+              "        var pickup = resp.data.workflow.workflow_status.find(function(s) { return s.step_key === 'pickup'; });",
+              "        pm.expect(pickup && pickup.completed).to.eql(false);",
+              "    });",
+              "}"
             ]
           }
         }
@@ -411,6 +522,71 @@
       }
     },
     {
+      "name": "04a — Execute EM1 Start at Pickup",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{access_token}}"
+          },
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"client_action_id\": \"{{execute_client_action_id}}\",\n  \"workflow_version\": \"{{workflow_version}}\",\n  \"content_hash\": \"{{content_hash}}\",\n  \"latitude\": {{pickup_latitude}},\n  \"longitude\": {{pickup_longitude}},\n  \"notes\": \"Start empty move at Pickup\"\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        },
+        "url": "{{base_url}}/driver/jobs/movement/{{movement_job_id}}/actions/EM1/execute/",
+        "description": "Driver confirms pickup / starts movement. Pickup step turns green after this."
+      },
+      "event": [
+        {
+          "listen": "prerequest",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "function requireVar(name) {",
+              "    var v = pm.collectionVariables.get(name) || '';",
+              "    if (!v || String(v).indexOf('{{') >= 0) { throw new Error(name + ' missing — run 01, 02b, 03 first.'); }",
+              "}",
+              "requireVar('movement_job_id'); requireVar('content_hash'); requireVar('workflow_version'); requireVar('access_token');",
+              "pm.collectionVariables.set('execute_client_action_id', 'em-start-' + pm.variables.replaceIn('{{$guid}}'));"
+            ]
+          }
+        },
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "var resp = pm.response.json();",
+              "var exec = (resp.data && resp.data.execution) || {};",
+              "pm.test('Status 200 or 201', function () { pm.expect(pm.response.code).to.be.oneOf([200, 201]); });",
+              "pm.test('Not a cross-job replay', function () {",
+              "    if (exec.replayed) { pm.expect(exec.replayed).to.eql(false); }",
+              "});",
+              "pm.test('Next action is EM2', function () {",
+              "    var next = (resp.data.workflow && resp.data.workflow.next_action) || {};",
+              "    pm.expect(next.action_code).to.eql('EM2');",
+              "});",
+              "if (resp.status === 1 && resp.data && resp.data.sync_metadata) {",
+              "    pm.collectionVariables.set('content_hash', resp.data.sync_metadata.content_hash);",
+              "    pm.collectionVariables.set('workflow_version', resp.data.sync_metadata.workflow_version);",
+              "}"
+            ]
+          }
+        }
+      ]
+    },
+    {
       "name": "05 — Execute EM2 Depart Empty",
       "request": {
         "method": "POST",
@@ -426,7 +602,7 @@
         ],
         "body": {
           "mode": "raw",
-          "raw": "{\n  \"client_action_id\": \"em-depart-{{$guid}}\",\n  \"workflow_version\": \"{{workflow_version}}\",\n  \"content_hash\": \"{{content_hash}}\",\n  \"latitude\": {{pickup_latitude}},\n  \"longitude\": {{pickup_longitude}},\n  \"notes\": \"Departing empty from Pickup (Jeddah)\"\n}",
+          "raw": "{\n  \"client_action_id\": \"{{execute_client_action_id}}\",\n  \"workflow_version\": \"{{workflow_version}}\",\n  \"content_hash\": \"{{content_hash}}\",\n  \"latitude\": {{pickup_latitude}},\n  \"longitude\": {{pickup_longitude}},\n  \"notes\": \"Departing empty from Pickup (Jeddah)\"\n}",
           "options": {
             "raw": {
               "language": "json"
@@ -434,16 +610,48 @@
           }
         },
         "url": "{{base_url}}/driver/jobs/movement/{{movement_job_id}}/actions/EM2/execute/",
-        "description": "Fires EM2 action to log departure."
+        "description": "Fires EM2 action to log departure.\n\nPREREQUISITE: Run 04a EM1 first so pickup is complete.\nUse a fresh client_action_id each run (Postman {{$guid}})."
       },
       "event": [
+        {
+          "listen": "prerequest",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "function requireVar(name) {",
+              "    var v = pm.collectionVariables.get(name) || '';",
+              "    if (!v || String(v).indexOf('{{') >= 0) {",
+              "        throw new Error(name + ' is missing. Run 01 Login, then 02 Dashboard (or 02b Create), then 03 Job Detail before EM2.');",
+              "    }",
+              "    return v;",
+              "}",
+              "requireVar('movement_job_id');",
+              "requireVar('content_hash');",
+              "requireVar('workflow_version');",
+              "requireVar('access_token');",
+              "pm.collectionVariables.set('execute_client_action_id', 'em-depart-' + pm.variables.replaceIn('{{$guid}}'));"
+            ]
+          }
+        },
         {
           "listen": "test",
           "script": {
             "type": "text/javascript",
             "exec": [
               "var resp = pm.response.json();",
-              "pm.test(\"Status code is 200\", function () { pm.response.to.have.status(200); });",
+              "var exec = (resp.data && resp.data.execution) || {};",
+              "pm.test('Status code is 200 or 201', function () { pm.expect(pm.response.code).to.be.oneOf([200, 201]); });",
+              "pm.test('EM2 not a stale cross-job replay', function () {",
+              "    if (exec.replayed) {",
+              "        var steps = (resp.data.workflow && resp.data.workflow.workflow_status) || [];",
+              "        var inTransit = steps.find(function(s) { return s.step_key === 'in_transit'; });",
+              "        pm.expect(inTransit && inTransit.completed, 'Replay must belong to this movement').to.eql(true);",
+              "    } else { pm.expect(exec.replayed).to.eql(false); }",
+              "});",
+              "pm.test('Next action advances past EM2', function () {",
+              "    var next = (resp.data.workflow && resp.data.workflow.next_action) || {};",
+              "    pm.expect(next.action_code).to.eql('EM3');",
+              "});",
               "if (resp.status === 1 && resp.data && resp.data.sync_metadata) {",
               "    pm.collectionVariables.set(\"content_hash\", resp.data.sync_metadata.content_hash);",
               "    pm.collectionVariables.set(\"workflow_version\", resp.data.sync_metadata.workflow_version);",
@@ -505,7 +713,7 @@
         ],
         "body": {
           "mode": "raw",
-          "raw": "{\n  \"client_action_id\": \"em-arrive-{{$guid}}\",\n  \"workflow_version\": \"{{workflow_version}}\",\n  \"content_hash\": \"{{content_hash}}\",\n  \"latitude\": {{delivery_latitude}},\n  \"longitude\": {{delivery_longitude}},\n  \"notes\": \"Arriving at Delivery (Makkah)\"\n}",
+          "raw": "{\n  \"client_action_id\": \"{{execute_client_action_id}}\",\n  \"workflow_version\": \"{{workflow_version}}\",\n  \"content_hash\": \"{{content_hash}}\",\n  \"latitude\": {{delivery_latitude}},\n  \"longitude\": {{delivery_longitude}},\n  \"notes\": \"Arriving at Delivery (Makkah)\"\n}",
           "options": {
             "raw": {
               "language": "json"
@@ -513,20 +721,38 @@
           }
         },
         "url": "{{base_url}}/driver/jobs/movement/{{movement_job_id}}/actions/EM3/execute/",
-        "description": "Fires EM3 action to log arrival."
+        "description": "EM3 — arrive at delivery. Use fresh client_action_id (prerequest)."
       },
       "event": [
+        {
+          "listen": "prerequest",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "function requireVar(name) {",
+              "    var v = pm.collectionVariables.get(name) || '';",
+              "    if (!v || String(v).indexOf('{{') >= 0) { throw new Error(name + ' missing — run prior steps first.'); }",
+              "}",
+              "requireVar('movement_job_id'); requireVar('content_hash'); requireVar('workflow_version'); requireVar('access_token');",
+              "pm.collectionVariables.set('execute_client_action_id', 'em-arrive-' + pm.variables.replaceIn('{{$guid}}'));"
+            ]
+          }
+        },
         {
           "listen": "test",
           "script": {
             "type": "text/javascript",
             "exec": [
               "var resp = pm.response.json();",
-              "pm.test(\"Status code is 200\", function () { pm.response.to.have.status(200); });",
+              "var exec = (resp.data && resp.data.execution) || {};",
+              "pm.test('Status 200 or 201', function () { pm.expect(pm.response.code).to.be.oneOf([200, 201]); });",
+              "pm.test('Next action is EM4', function () {",
+              "    var next = (resp.data.workflow && resp.data.workflow.next_action) || {};",
+              "    pm.expect(next.action_code).to.eql('EM4');",
+              "});",
               "if (resp.status === 1 && resp.data && resp.data.sync_metadata) {",
-              "    pm.collectionVariables.set(\"content_hash\", resp.data.sync_metadata.content_hash);",
-              "    pm.collectionVariables.set(\"workflow_version\", resp.data.sync_metadata.workflow_version);",
-              "    pm.test(\"Sync hash updated from empty move execute\", function() { pm.expect(resp.data.sync_metadata.content_hash).to.exist; });",
+              "    pm.collectionVariables.set('content_hash', resp.data.sync_metadata.content_hash);",
+              "    pm.collectionVariables.set('workflow_version', resp.data.sync_metadata.workflow_version);",
               "}"
             ]
           }
@@ -534,7 +760,7 @@
       ]
     },
     {
-      "name": "05c — Refresh Job Detail (Post EM3)",
+      "name": "05d — Refresh Job Detail (Post EM3)",
       "request": {
         "method": "GET",
         "header": [
@@ -584,7 +810,7 @@
         ],
         "body": {
           "mode": "raw",
-          "raw": "{\n  \"client_action_id\": \"em-complete-{{$guid}}\",\n  \"workflow_version\": \"{{workflow_version}}\",\n  \"content_hash\": \"{{content_hash}}\",\n  \"latitude\": {{delivery_latitude}},\n  \"longitude\": {{delivery_longitude}},\n  \"notes\": \"Complete empty move at Delivery (Makkah)\"\n}",
+          "raw": "{\n  \"client_action_id\": \"{{execute_client_action_id}}\",\n  \"workflow_version\": \"{{workflow_version}}\",\n  \"content_hash\": \"{{content_hash}}\",\n  \"latitude\": {{delivery_latitude}},\n  \"longitude\": {{delivery_longitude}},\n  \"notes\": \"Complete empty move at Delivery (Makkah)\"\n}",
           "options": {
             "raw": {
               "language": "json"
@@ -592,20 +818,38 @@
           }
         },
         "url": "{{base_url}}/driver/jobs/movement/{{movement_job_id}}/actions/EM4/execute/",
-        "description": "STEP 6 — DRIVER ARRIVES AT DESTINATION. EMPTY MOVE DONE.\nFires EM4 action to transition status In Progress -> Completed."
+        "description": "EM4 — complete empty move. Status becomes Completed."
       },
       "event": [
+        {
+          "listen": "prerequest",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "function requireVar(name) {",
+              "    var v = pm.collectionVariables.get(name) || '';",
+              "    if (!v || String(v).indexOf('{{') >= 0) { throw new Error(name + ' missing — run prior steps first.'); }",
+              "}",
+              "requireVar('movement_job_id'); requireVar('content_hash'); requireVar('workflow_version'); requireVar('access_token');",
+              "pm.collectionVariables.set('execute_client_action_id', 'em-complete-' + pm.variables.replaceIn('{{$guid}}'));"
+            ]
+          }
+        },
         {
           "listen": "test",
           "script": {
             "type": "text/javascript",
             "exec": [
               "var resp = pm.response.json();",
-              "pm.test(\"Status code is 200\", function () { pm.response.to.have.status(200); });",
+              "pm.test('Status 200 or 201', function () { pm.expect(pm.response.code).to.be.oneOf([200, 201]); });",
+              "pm.test('Job closed or no further actions', function () {",
+              "    var allowed = (resp.data.workflow && resp.data.workflow.allowed_actions) || [];",
+              "    var hint = (resp.data.next_action_hint || {});",
+              "    pm.expect(allowed.length === 0 || hint.job_closed === true).to.eql(true);",
+              "});",
               "if (resp.status === 1 && resp.data && resp.data.sync_metadata) {",
-              "    pm.collectionVariables.set(\"content_hash\", resp.data.sync_metadata.content_hash);",
-              "    pm.collectionVariables.set(\"workflow_version\", resp.data.sync_metadata.workflow_version);",
-              "    pm.test(\"Sync hash updated from empty move execute\", function() { pm.expect(resp.data.sync_metadata.content_hash).to.exist; });",
+              "    pm.collectionVariables.set('content_hash', resp.data.sync_metadata.content_hash);",
+              "    pm.collectionVariables.set('workflow_version', resp.data.sync_metadata.workflow_version);",
               "}"
             ]
           }
@@ -662,7 +906,7 @@
         ],
         "body": {
           "mode": "raw",
-          "raw": "{\n  \"client_action_id\": \"em-cancel-{{$guid}}\",\n  \"workflow_version\": \"{{workflow_version}}\",\n  \"content_hash\": \"{{content_hash}}\",\n  \"latitude\": 24.7136,\n  \"longitude\": 46.6753,\n  \"notes\": \"Empty move cancelled — plan changed\"\n}",
+          "raw": "{\n  \"client_action_id\": \"{{execute_client_action_id}}\",\n  \"workflow_version\": \"{{workflow_version}}\",\n  \"content_hash\": \"{{content_hash}}\",\n  \"latitude\": 24.7136,\n  \"longitude\": 46.6753,\n  \"notes\": \"Empty move cancelled — plan changed\"\n}",
           "options": {
             "raw": {
               "language": "json"
@@ -673,6 +917,15 @@
         "description": "OPTIONAL STEP — CANCEL BEFORE STARTING ONLY.\nNOTE: action_code for empty move cancel may be named differently.\nCheck Action Master in database for the exact code where:\n  scope = On_Call AND category = Empty_Move AND sequence_number = 3\nReplace A_EMPTY_CANCEL in URL with that exact code.\nIMPORTANT RULES:\n  - Cancel is ONLY allowed when status is Scheduled.\n  - Once In Progress cancel is NOT allowed.\n  - Once Completed cancel is NOT allowed.\nWhen cancelled:\n  Movement Log status = Cancelled\n  Row stays in storage for audit (never deleted)\n  Row is excluded from all KPI calculations\nUse this if the trip was planned but never happened.\n\nPREREQUISITE: Run empty move execute requests in order and do not skip steps. content_hash/workflow_version auto-update after each successful execute. If you get 409 stale_content_hash, re-run Request 03 then retry."
       },
       "event": [
+        {
+          "listen": "prerequest",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.collectionVariables.set('execute_client_action_id', 'em-cancel-' + pm.variables.replaceIn('{{$guid}}'));"
+            ]
+          }
+        },
         {
           "listen": "test",
           "script": {

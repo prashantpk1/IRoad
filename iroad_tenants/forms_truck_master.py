@@ -61,7 +61,13 @@ class TruckMasterForm(ArabicTextFormMixin, forms.ModelForm):
                 }
             ),
             'saudi_plate_number': forms.TextInput(
-                attrs={'class': 'form-control', 'placeholder': _('Numeric part')}
+                attrs={
+                    'class': 'form-control',
+                    'placeholder': _('Numeric part'),
+                    'inputmode': 'numeric',
+                    'pattern': '[0-9]*',
+                    'autocomplete': 'off',
+                }
             ),
             'saudi_english_letters': forms.TextInput(
                 attrs={
@@ -361,6 +367,15 @@ class TruckMasterForm(ArabicTextFormMixin, forms.ModelForm):
                 raise ValidationError(
                     {'saudi_plate_number': _('Saudi plate number is required')}
                 )
+            if not sp.isdigit():
+                raise ValidationError(
+                    {
+                        'saudi_plate_number': _(
+                            'Saudi plate number must contain digits only.'
+                        )
+                    }
+                )
+            cleaned['saudi_plate_number'] = sp
             english_letters = (cleaned.get('saudi_english_letters') or '').strip().upper()
             cleaned['saudi_english_letters'] = english_letters
             if not english_letters:

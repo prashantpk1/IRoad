@@ -24,6 +24,8 @@ STAGE_ARRIVED = 'arrived'
 STAGE_COMPLETED = 'completed'
 STAGE_CANCELLED = 'cancelled'
 
+MOVEMENT_COLUMN_SCHEDULED = TenantTruckMovementLog.Status.SCHEDULED
+
 _MOVEMENT_STATUS_RANK = {
     TenantTruckMovementLog.Status.SCHEDULED: 10,
     TenantTruckMovementLog.Status.IN_PROGRESS: 20,

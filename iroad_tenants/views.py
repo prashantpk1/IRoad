@@ -229,12 +229,14 @@ from iroad_tenants.shipment_cancel import (
 )
 from iroad_tenants.shipment_pod_form import (
     action_log_attachment_meta as _tenant_shipment_pod_action_log_attachment_meta,
+    action_log_attachment_storage_path as _tenant_shipment_pod_action_log_attachment_storage_path,
     action_log_map_url as _tenant_shipment_pod_action_log_map_url,
     action_log_option_rows as _tenant_shipment_pod_action_log_option_rows_v2,
     apply_doc_no_linkage as _tenant_shipment_pod_apply_doc_no_linkage,
     delivery_note_doc_no_options as _tenant_shipment_pod_doc_no_options,
     doc_ref_options_map as _tenant_shipment_pod_doc_ref_options_map,
 )
+from iroad_tenants.shipment_pod_evidence import resolve_pod_page_display_row
 from iroad_tenants.operation_action_form import (
     ACTION_SCOPE_CHOICES,
     SEQUENCE_CATEGORY_CHOICES,
@@ -266,6 +268,8 @@ from iroad_tenants.fleet_operational_eligibility import (
     booking_eligible_trucks_queryset,
     driver_is_available_for_operations,
     driver_operational_block_reason,
+    operation_driver_options_payload,
+    operation_truck_options_payload,
     organization_profile_owner_fields,
     truck_is_available_for_operations,
     truck_operational_block_reason,
@@ -9045,9 +9049,7 @@ class TenantOperationShipmentPodCreateView(View):
         if not pod_form_data.get('receiver_user_id') and default_receiver_user_id:
             pod_form_data['receiver_user_id'] = default_receiver_user_id
         if line_rows is None and document is not None:
-            line_rows = list(
-                document.pod_pages.select_related('source_page', 'action_log').order_by('line_no')
-            )
+            line_rows = _tenant_shipment_pod_form_page_rows(document)
         source_document = None
         linked_shipment = None
         if document is not None and document.shipment_id:
@@ -9255,13 +9257,20 @@ class TenantOperationShipmentPodCreateView(View):
                 )
                 map_url = str(row.get('map_url') or '').strip()
                 attachment_label = str(row.get('attachment_label') or '').strip()
+                attachment_storage_path = str(row.get('attachment_storage_path') or '').strip()
                 if action_log is not None:
                     if not map_url:
                         map_url = _tenant_shipment_pod_action_log_map_url(action_log)
-                    if not attachment_label:
-                        attachment_label, _attachment_url = (
-                            _tenant_shipment_pod_action_log_attachment_meta(action_log)
+                    if not attachment_label or not attachment_storage_path:
+                        meta_label, _meta_url = _tenant_shipment_pod_action_log_attachment_meta(
+                            action_log
                         )
+                        if not attachment_label:
+                            attachment_label = meta_label
+                        if not attachment_storage_path:
+                            attachment_storage_path = (
+                                _tenant_shipment_pod_action_log_attachment_storage_path(action_log)
+                            )
                 values = {
                     'source_page': source_page,
                     'doc_page': doc_page_label,
@@ -9271,6 +9280,7 @@ class TenantOperationShipmentPodCreateView(View):
                     'soft_copy_status': '',
                     'digital_evidence_status': '',
                     'map_url': map_url,
+                    'attachment_storage_path': attachment_storage_path,
                     'attachment_label': attachment_label,
                 }
                 if not any(
@@ -9279,6 +9289,7 @@ class TenantOperationShipmentPodCreateView(View):
                         values['doc_page'],
                         values['action_log'],
                         values['map_url'],
+                        values['attachment_storage_path'],
                         values['attachment_label'],
                     ]
                 ):
@@ -10440,27 +10451,16 @@ def _tenant_truck_movement_form_context(tenant_registry, form_data=None, form_er
         'movement_form_errors': form_errors or {},
         'booking_options': booking_options,
         'shipment_options': shipments,
-        'truck_options': [
-            {
-                'truck_id': str(truck.pk),
-                'truck_number': truck.truck_code,
-                'label': f'{truck.truck_code} - {truck.plate_number}' if truck.plate_number else truck.truck_code,
-                'default_driver_id': str(truck.default_driver_id) if truck.default_driver_id else '',
-            }
-            for truck in TruckMaster.active_objects.select_related('default_driver_id').order_by('truck_code')[:500]
-        ],
-        'driver_options': [
-            {
-                'driver_id': str(driver.pk),
-                'username': driver.driver_code,
-                'label': (
-                    f'{driver.driver_code} - {driver.english_name or driver.arabic_name}'
-                    if (driver.english_name or driver.arabic_name)
-                    else driver.driver_code
-                ),
-            }
-            for driver in DriverMaster.active_objects.order_by('driver_code')[:500]
-        ],
+        'truck_options': operation_truck_options_payload(
+            include_truck_ids=[
+                (form_data or {}).get('truck_id'),
+            ],
+        ),
+        'driver_options': operation_driver_options_payload(
+            include_driver_ids=[
+                (form_data or {}).get('driver_id'),
+            ],
+        ),
         'location_options': location_options,
         'location_option_values': location_option_values,
         'movement_route_pair_options': route_pairs,
@@ -11504,8 +11504,9 @@ def _tenant_operation_action_log_lookup_context(
         else:
             shipment_row['booking_item_label'] = shipment_no or '-'
 
+    linkage_movement = movement
     movement_options = []
-    for movement in TenantTruckMovementLog.objects.select_related(
+    for movement_row in TenantTruckMovementLog.objects.select_related(
         'booking',
         'shipment',
         'truck',
@@ -11513,42 +11514,45 @@ def _tenant_operation_action_log_lookup_context(
     ).order_by('-created_at')[:500]:
         movement_options.append(
             {
-                'movement_id': str(movement.movement_id),
-                'movement_no': movement.movement_no,
-                'booking_id': str(movement.booking_id) if movement.booking_id else '',
-                'booking_no': movement.booking.booking_no if movement.booking_id else '',
-                'shipment_id': str(movement.shipment_id) if movement.shipment_id else '',
-                'shipment_no': movement.shipment.shipment_no if movement.shipment_id else '',
-                'booking_item': movement.shipment.booking_item_ref if movement.shipment_id else '',
-                'truck_id': str(movement.truck_id) if movement.truck_id else '',
-                'driver_id': str(movement.driver_id) if movement.driver_id else '',
+                'movement_id': str(movement_row.movement_id),
+                'movement_no': movement_row.movement_no,
+                'booking_id': str(movement_row.booking_id) if movement_row.booking_id else '',
+                'booking_no': movement_row.booking.booking_no if movement_row.booking_id else '',
+                'shipment_id': str(movement_row.shipment_id) if movement_row.shipment_id else '',
+                'shipment_no': movement_row.shipment.shipment_no if movement_row.shipment_id else '',
+                'booking_item': movement_row.shipment.booking_item_ref if movement_row.shipment_id else '',
+                'truck_id': str(movement_row.truck_id) if movement_row.truck_id else '',
+                'driver_id': str(movement_row.driver_id) if movement_row.driver_id else '',
             }
         )
+
+    include_truck_ids = [
+        getattr(linkage_movement, 'truck_id', None) if linkage_movement else None,
+        getattr(shipment, 'truck_id', None) if shipment else None,
+        (form_data or {}).get('truck_id'),
+        (form_data or {}).get('truck'),
+    ]
+    include_driver_ids = [
+        getattr(linkage_movement, 'driver_id', None) if linkage_movement else None,
+        getattr(shipment, 'driver_id', None) if shipment else None,
+        (form_data or {}).get('driver_id'),
+        (form_data or {}).get('driver'),
+    ]
+    if action_log is not None:
+        include_truck_ids.append(getattr(action_log, 'truck_id', None))
+        include_driver_ids.append(getattr(action_log, 'driver_id', None))
 
     return {
         'booking_options': booking_options,
         'booking_line_birth_options': _tenant_operation_action_log_booking_line_birth_options(),
         'shipment_options': shipments,
         'movement_options': movement_options,
-        'truck_options': [
-            {
-                'truck_id': str(truck.pk),
-                'label': f'{truck.truck_code} - {truck.plate_number}' if truck.plate_number else truck.truck_code,
-                'default_driver_id': str(truck.default_driver_id_id) if truck.default_driver_id_id else '',
-            }
-            for truck in TruckMaster.active_objects.select_related('default_driver_id').order_by('truck_code')[:500]
-        ],
-        'driver_options': [
-            {
-                'driver_id': str(driver.pk),
-                'label': (
-                    f'{driver.driver_code} - {driver.english_name or driver.arabic_name}'
-                    if (driver.english_name or driver.arabic_name)
-                    else driver.driver_code
-                ),
-            }
-            for driver in DriverMaster.active_objects.order_by('driver_code')[:500]
-        ],
+        'truck_options': operation_truck_options_payload(
+            include_truck_ids=include_truck_ids,
+        ),
+        'driver_options': operation_driver_options_payload(
+            include_driver_ids=include_driver_ids,
+        ),
         'action_options': action_options_payload(list(action_dropdown_options)),
         'action_allowed_context_label': action_dropdown_context_label(
             booking=booking,
@@ -14681,6 +14685,7 @@ def _tenant_shipment_pod_birth_from_action_log(action_log, *, created_by_label='
             soft_copy_status=row.get('soft_copy_status') or 'Not Collected',
             digital_evidence_status=row.get('digital_evidence_status') or 'Not Collected',
             map_url=row.get('map_url') or '',
+            attachment_storage_path=row.get('attachment_storage_path') or '',
             attachment_label=row.get('attachment_label') or '',
         )
 
@@ -19126,6 +19131,34 @@ def _tenant_shipment_pod_save_attachment(uploaded_file, document_id, line_no):
     )
 
 
+def _tenant_shipment_pod_enriched_form_row(line):
+    display = resolve_pod_page_display_row(
+        line,
+        file_url_builder=_tenant_shipment_document_pod_file_url,
+        attachment_meta_resolver=_tenant_shipment_pod_action_log_attachment_meta,
+    )
+    return {
+        'line_no': line.line_no,
+        'source_page_id': str(line.source_page_id) if line.source_page_id else '',
+        'doc_page': line.doc_page,
+        'source': line.source,
+        'action_log_id': str(line.action_log_id) if line.action_log_id else '',
+        'map_url': display['map_url'],
+        'attachment_label': display['attachment_label'],
+        'attachment_url': display['attachment_url'],
+        'attachment_storage_path': display['attachment_storage_path'],
+    }
+
+
+def _tenant_shipment_pod_form_page_rows(document):
+    if document is None:
+        return []
+    return [
+        _tenant_shipment_pod_enriched_form_row(line)
+        for line in document.pod_pages.select_related('source_page', 'action_log').order_by('line_no')
+    ]
+
+
 def _tenant_shipment_document_pod_file_url(storage_path):
     if not storage_path:
         return ''
@@ -19136,24 +19169,15 @@ def _tenant_shipment_document_pod_file_url(storage_path):
 
 
 def _tenant_shipment_pod_detail_page_rows(document):
-    """POD analysis detail rows with resolved attachment URLs."""
-    rows = []
-    for line in document.pod_pages.all().order_by('line_no'):
-        storage_path = (line.map_url or '').strip()
-        rows.append(
-            {
-                'source': line.source,
-                'soft_copy_status': line.soft_copy_status,
-                'digital_evidence_status': line.digital_evidence_status,
-                'physical_location': line.physical_location,
-                'map_url': _tenant_shipment_document_pod_file_url(storage_path)
-                if storage_path
-                else '',
-                'attachment_label': line.attachment_label,
-                'action_log': line.action_log,
-            }
+    """POD analysis detail rows with resolved map links and attachment URLs."""
+    return [
+        resolve_pod_page_display_row(
+            line,
+            file_url_builder=_tenant_shipment_document_pod_file_url,
+            attachment_meta_resolver=_tenant_shipment_pod_action_log_attachment_meta,
         )
-    return rows
+        for line in document.pod_pages.select_related('action_log').order_by('line_no')
+    ]
 
 
 def _tenant_shipment_document_refresh_shipment_pod(shipment):
@@ -19249,7 +19273,11 @@ def _tenant_shipment_document_detail_line_rows(document):
             })
         return rows
     for line in page_lines:
-        storage_path = (line.map_url or '').strip()
+        display = resolve_pod_page_display_row(
+            line,
+            file_url_builder=_tenant_shipment_document_pod_file_url,
+            attachment_meta_resolver=_tenant_shipment_pod_action_log_attachment_meta,
+        )
         rows.append({
             'line_no': line.line_no,
             'doc_ref_no': line.source or document.document_ref_no or '—',
@@ -19259,8 +19287,9 @@ def _tenant_shipment_document_detail_line_rows(document):
             'page_no': line.doc_page or '—',
             'status': line.soft_copy_status or '—',
             'signer_location': line.physical_location or '—',
-            'attachment_label': line.attachment_label or '',
-            'attachment_url': _tenant_shipment_document_pod_file_url(storage_path) if storage_path else '',
+            'attachment_label': display['attachment_label'] or '',
+            'attachment_url': display['attachment_url'] or '',
+            'map_url': display['map_url'] or '',
         })
     return rows
 
@@ -20043,7 +20072,14 @@ def _shipment_pod_display_data(document, shipment=None):
         'pod_status': pod_status,
         'physical_location': document.physical_location,
         'user_label': user_label,
-        'pod_pages': pod_pages,
+        'pod_pages': [
+            resolve_pod_page_display_row(
+                line,
+                file_url_builder=_tenant_shipment_document_pod_file_url,
+                attachment_meta_resolver=_tenant_shipment_pod_action_log_attachment_meta,
+            )
+            for line in pod_pages
+        ],
         'activity_log': activity_log,
     }
 
@@ -20237,9 +20273,7 @@ class TenantOperationShipmentPodCreateView(View):
         if not pod_form_data.get('receiver_user_id') and default_receiver_user_id:
             pod_form_data['receiver_user_id'] = default_receiver_user_id
         if line_rows is None and document is not None:
-            line_rows = list(
-                document.pod_pages.select_related('source_page', 'action_log').order_by('line_no')
-            )
+            line_rows = _tenant_shipment_pod_form_page_rows(document)
         source_document = None
         linked_shipment = None
         if document is not None and document.shipment_id:
@@ -20447,13 +20481,20 @@ class TenantOperationShipmentPodCreateView(View):
                 )
                 map_url = str(row.get('map_url') or '').strip()
                 attachment_label = str(row.get('attachment_label') or '').strip()
+                attachment_storage_path = str(row.get('attachment_storage_path') or '').strip()
                 if action_log is not None:
                     if not map_url:
                         map_url = _tenant_shipment_pod_action_log_map_url(action_log)
-                    if not attachment_label:
-                        attachment_label, _attachment_url = (
-                            _tenant_shipment_pod_action_log_attachment_meta(action_log)
+                    if not attachment_label or not attachment_storage_path:
+                        meta_label, _meta_url = _tenant_shipment_pod_action_log_attachment_meta(
+                            action_log
                         )
+                        if not attachment_label:
+                            attachment_label = meta_label
+                        if not attachment_storage_path:
+                            attachment_storage_path = (
+                                _tenant_shipment_pod_action_log_attachment_storage_path(action_log)
+                            )
                 values = {
                     'source_page': source_page,
                     'doc_page': doc_page_label,
@@ -20463,6 +20504,7 @@ class TenantOperationShipmentPodCreateView(View):
                     'soft_copy_status': '',
                     'digital_evidence_status': '',
                     'map_url': map_url,
+                    'attachment_storage_path': attachment_storage_path,
                     'attachment_label': attachment_label,
                 }
                 if not any(
@@ -20471,6 +20513,7 @@ class TenantOperationShipmentPodCreateView(View):
                         values['doc_page'],
                         values['action_log'],
                         values['map_url'],
+                        values['attachment_storage_path'],
                         values['attachment_label'],
                     ]
                 ):
@@ -27019,6 +27062,35 @@ def _redirect_after_truck_detail_save(request, truck_id, tab, list_redirect):
     return list_redirect(request) if callable(list_redirect) else list_redirect
 
 
+def _truck_master_create_form_context(
+    context,
+    *,
+    form,
+    settings,
+    tenant_registry,
+    code_preview=None,
+    subscription_resource_limit=None,
+):
+    """Shared create-form context — always includes Organization Profile owner snapshot."""
+    payload = {
+        'form': form,
+        'settings_default_status_effective': _settings_effective_truck_status(
+            settings.default_truck_status
+        ),
+        'settings_driver_assignment_required': bool(settings.driver_assignment_required),
+        'page_title': 'Add Truck',
+        'is_edit': False,
+        'tenant_schema_name': getattr(tenant_registry, 'schema_name', ''),
+        'organization_owner_fields': organization_profile_owner_fields(),
+    }
+    if code_preview is not None:
+        payload['code_preview'] = code_preview
+    if subscription_resource_limit is not None:
+        payload['subscription_resource_limit'] = subscription_resource_limit
+    context.update(payload)
+    return context
+
+
 def _truck_form_return_extras(
     request,
     truck=None,
@@ -27415,18 +27487,12 @@ class TruckMasterCreateView(View):
                     form_label='Truck Master',
                     prefix='TR',
                 )
-                context.update(
-                    {
-                        'form': form,
-                        'code_preview': code_preview,
-                        'settings_default_status_effective': _settings_effective_truck_status(
-                            settings.default_truck_status
-                        ),
-                        'settings_driver_assignment_required': bool(settings.driver_assignment_required),
-                        'page_title': 'Add Truck',
-                        'is_edit': False,
-                        'tenant_schema_name': getattr(tenant_registry, 'schema_name', ''),
-                    }
+                _truck_master_create_form_context(
+                    context,
+                    form=form,
+                    settings=settings,
+                    tenant_registry=tenant_registry,
+                    code_preview=code_preview,
                 )
                 messages.error(request, 'Please fix the highlighted errors.', extra_tags='tenant')
                 return render(request, self.template_name, context)
@@ -27443,18 +27509,12 @@ class TruckMasterCreateView(View):
                     form_label='Truck Master',
                     prefix='TR',
                 )
-                context.update(
-                    {
-                        'form': form,
-                        'code_preview': code_preview,
-                        'settings_default_status_effective': _settings_effective_truck_status(
-                            settings.default_truck_status
-                        ),
-                        'settings_driver_assignment_required': bool(settings.driver_assignment_required),
-                        'page_title': 'Add Truck',
-                        'is_edit': False,
-                        'tenant_schema_name': getattr(tenant_registry, 'schema_name', ''),
-                    }
+                _truck_master_create_form_context(
+                    context,
+                    form=form,
+                    settings=settings,
+                    tenant_registry=tenant_registry,
+                    code_preview=code_preview,
                 )
                 messages.error(request, 'Please fix the highlighted errors.', extra_tags='tenant')
                 return render(request, self.template_name, context)
@@ -27481,24 +27541,16 @@ class TruckMasterCreateView(View):
                         form_label='Truck Master',
                         prefix='TR',
                     )
-                    context.update(
-                        {
-                            'form': form,
-                            'code_preview': code_preview,
-                            'settings_default_status_effective': effective_status,
-                            'settings_driver_assignment_required': bool(
-                                settings.driver_assignment_required
-                            ),
-                            'page_title': 'Add Truck',
-                            'is_edit': False,
-                            'tenant_schema_name': getattr(
-                                tenant_registry, 'schema_name', ''
-                            ),
-                            'subscription_resource_limit': subscription_limit_status(
-                                context['tenant'],
-                                RESOURCE_INTERNAL_TRUCKS,
-                            ),
-                        }
+                    _truck_master_create_form_context(
+                        context,
+                        form=form,
+                        settings=settings,
+                        tenant_registry=tenant_registry,
+                        code_preview=code_preview,
+                        subscription_resource_limit=subscription_limit_status(
+                            context['tenant'],
+                            RESOURCE_INTERNAL_TRUCKS,
+                        ),
                     )
                     messages.error(request, limit_msg, extra_tags='tenant')
                     return render(request, self.template_name, context)
@@ -27535,18 +27587,12 @@ class TruckMasterCreateView(View):
                         code='truck_master_integrity',
                     ),
                 )
-                context.update(
-                    {
-                        'form': form,
-                        'code_preview': code_preview,
-                        'settings_default_status_effective': _settings_effective_truck_status(
-                            settings.default_truck_status
-                        ),
-                        'settings_driver_assignment_required': bool(settings.driver_assignment_required),
-                        'page_title': 'Add Truck',
-                        'is_edit': False,
-                        'tenant_schema_name': getattr(tenant_registry, 'schema_name', ''),
-                    }
+                _truck_master_create_form_context(
+                    context,
+                    form=form,
+                    settings=settings,
+                    tenant_registry=tenant_registry,
+                    code_preview=code_preview,
                 )
                 messages.error(request, 'Could not save the truck.', extra_tags='tenant')
                 return render(request, self.template_name, context)
@@ -27561,18 +27607,12 @@ class TruckMasterCreateView(View):
                 else:
                     for msg in getattr(ve, 'messages', []) or [str(ve)]:
                         form.add_error(None, msg)
-                context.update(
-                    {
-                        'form': form,
-                        'code_preview': code_preview,
-                        'settings_default_status_effective': _settings_effective_truck_status(
-                            settings.default_truck_status
-                        ),
-                        'settings_driver_assignment_required': bool(settings.driver_assignment_required),
-                        'page_title': 'Add Truck',
-                        'is_edit': False,
-                        'tenant_schema_name': getattr(tenant_registry, 'schema_name', ''),
-                    }
+                _truck_master_create_form_context(
+                    context,
+                    form=form,
+                    settings=settings,
+                    tenant_registry=tenant_registry,
+                    code_preview=code_preview,
                 )
                 messages.error(request, 'Could not save the truck.', extra_tags='tenant')
                 return render(request, self.template_name, context)

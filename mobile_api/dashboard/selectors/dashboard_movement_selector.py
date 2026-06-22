@@ -45,12 +45,6 @@ class DashboardMovementSelector:
                 shipment_id__isnull=True,
                 movement_date__gte=cutoff,
             )
-            .exclude(
-                status__in=(
-                    TenantTruckMovementLog.Status.COMPLETED,
-                    TenantTruckMovementLog.Status.CANCELLED,
-                ),
-            )
             .exclude(movement_source__iexact='loaded')
             .order_by('movement_date', 'movement_sequence', 'created_at')[
                 :DASHBOARD_MOVEMENT_CANDIDATE_LIMIT
@@ -91,6 +85,7 @@ class DashboardMovementSelector:
         _ = (shipment, tenant_schema, driver)
         return None
 
+    @staticmethod
     @staticmethod
     def _result_from_movement(movement: Any) -> DriverEmptyMoveSelectionResult:
         stage = policy.movement_execution_stage(movement)

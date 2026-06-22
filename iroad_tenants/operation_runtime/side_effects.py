@@ -703,6 +703,8 @@ def apply_execution_side_effects(action_log, *, created_by_label='') -> None:
 
     if truck_movement is not None and shipment is None:
         from iroad_tenants.operation_runtime.movement_state_machine import (
+            is_movement_arrived_action,
+            is_movement_in_transit_action,
             is_movement_start_action,
         )
         from iroad_tenants.operation_runtime.movement_stage_derivation import (
@@ -711,8 +713,12 @@ def apply_execution_side_effects(action_log, *, created_by_label='') -> None:
         )
 
         if (
-            is_movement_start_action(action)
-            and truck_movement.status == truck_movement.Status.SCHEDULED
+            truck_movement.status == truck_movement.Status.SCHEDULED
+            and (
+                is_movement_start_action(action)
+                or is_movement_in_transit_action(action)
+                or is_movement_arrived_action(action)
+            )
         ):
             truck_movement.status = truck_movement.Status.IN_PROGRESS
             truck_movement.save(update_fields=['status', 'updated_at'])

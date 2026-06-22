@@ -16,6 +16,7 @@ from iroad_tenants.operation_runtime.constants import (
     SHIPMENT_POD_REF_PREFIX,
 )
 from iroad_tenants.operation_runtime.impacts import operation_action_matches
+from iroad_tenants.shipment_pod_evidence import action_log_map_url
 from tenant_workspace.models import (
     resolve_operation_action_log_for_pod,
     TenantShipment,
@@ -356,6 +357,7 @@ def birth_pod_from_action_log(action_log, *, created_by_label=''):
             soft_copy_status=row.get('soft_copy_status') or 'Not Collected',
             digital_evidence_status=row.get('digital_evidence_status') or 'Not Collected',
             map_url=row.get('map_url') or '',
+            attachment_storage_path=row.get('attachment_storage_path') or '',
             attachment_label=row.get('attachment_label') or '',
         )
 
@@ -518,6 +520,7 @@ def _sync_a7_action_log_media_to_pod_pages(
         )
     )
     action_log_obj = action_log if getattr(action_log, 'pk', None) else None
+    resolved_map_url = action_log_map_url(action_log_obj)
     for idx, (storage_path, label) in enumerate(evidence_rows, start=1):
         if idx <= len(pod_lines):
             pod_line = pod_lines[idx - 1]
@@ -534,8 +537,9 @@ def _sync_a7_action_log_media_to_pod_pages(
             )
             pod_lines.append(pod_line)
 
-        pod_line.map_url = storage_path
+        pod_line.attachment_storage_path = storage_path
         pod_line.attachment_label = label
+        pod_line.map_url = resolved_map_url
         pod_line.soft_copy_status = 'Collected'
         pod_line.digital_evidence_status = 'Collected'
         if action_log_obj is not None:
@@ -543,6 +547,7 @@ def _sync_a7_action_log_media_to_pod_pages(
         pod_line.save(
             update_fields=[
                 'map_url',
+                'attachment_storage_path',
                 'attachment_label',
                 'soft_copy_status',
                 'digital_evidence_status',

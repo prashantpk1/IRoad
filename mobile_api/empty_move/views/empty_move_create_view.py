@@ -32,6 +32,18 @@ from mobile_api.views.base import MobileAPIView
 
 logger = logging.getLogger('mobile_api.empty_move')
 
+_DEBUG = '[EMPTY_MOVE_DEBUG]'
+
+
+def _log_debug(step: str, **fields) -> None:
+    """Console-visible debug line for empty-move create failures (grep EMPTY_MOVE_DEBUG)."""
+    parts = [f'{_DEBUG} {step}']
+    for key, value in fields.items():
+        parts.append(f'{key}={value!r}')
+    line = ' | '.join(parts)
+    logger.warning(line)
+    print(line, flush=True)
+
 
 class EmptyMoveCreateAPIView(MobileAPIView):
     """
@@ -53,8 +65,18 @@ class EmptyMoveCreateAPIView(MobileAPIView):
         self._service = EmptyMoveCreateService()
 
     def post(self, request):
+        _log_debug(
+            'request_received',
+            keys=sorted(request.data.keys()) if hasattr(request.data, 'keys') else type(request.data).__name__,
+            reason=request.data.get('empty_move_reason'),
+            has_from_uuid=bool(request.data.get('from_location_id')),
+            has_to_uuid=bool(request.data.get('to_location_id')),
+            has_from_address=bool(request.data.get('from_address')),
+            has_to_address=bool(request.data.get('to_address')),
+        )
         serializer = EmptyMoveCreateRequestSerializer(data=request.data)
         if not serializer.is_valid():
+            _log_debug('validation_failed', errors=dict(serializer.errors))
             return self.validation_error(serializer)
 
         tenant_schema = tenant_schema_for_request(request)
@@ -64,6 +86,12 @@ class EmptyMoveCreateAPIView(MobileAPIView):
             jwt_payload,
         )
         if driver is None:
+            _log_debug(
+                'driver_session_failed',
+                err_code=err_code,
+                err_msg=str(err_msg or ''),
+                tenant_schema=tenant_schema,
+            )
             return self.auth_error(
                 message=str(err_msg or _('mobile.auth.unauthorized')),
                 code=str(err_code or 'unauthorized'),
@@ -71,6 +99,11 @@ class EmptyMoveCreateAPIView(MobileAPIView):
             )
 
         if not tenant_schema:
+            _log_debug(
+                'tenant_required',
+                driver_id=getattr(driver, 'pk', ''),
+                jwt_tenant=jwt_payload.get('tenant_schema') if jwt_payload else None,
+            )
             return self.error(
                 message=_('mobile.auth.tenant_required'),
                 code='tenant_required',
@@ -78,6 +111,12 @@ class EmptyMoveCreateAPIView(MobileAPIView):
                 http_code=400,
             )
 
+        _log_debug(
+            'create_start',
+            tenant_schema=tenant_schema,
+            driver_id=getattr(driver, 'pk', ''),
+            driver_code=getattr(driver, 'driver_code', ''),
+        )
         try:
             data = self._service.create_empty_move(
                 driver=driver,
@@ -88,6 +127,13 @@ class EmptyMoveCreateAPIView(MobileAPIView):
                 jwt_payload=jwt_payload,
             )
         except EmptyMoveError as exc:
+            _log_debug(
+                'business_error',
+                code=exc.code,
+                http_status=exc.http_status,
+                message=str(exc),
+                message_key=exc.message_key,
+            )
             return self.error(
                 message=str(exc),
                 code=exc.code,
@@ -96,12 +142,13 @@ class EmptyMoveCreateAPIView(MobileAPIView):
             )
 
         movement = data.get('empty_move') or {}
-        logger.info(
-            'empty_move_create tenant=%s driver=%s movement=%s started=%s',
-            tenant_schema,
-            getattr(driver, 'pk', ''),
-            movement.get('movement_id'),
-            movement.get('workflow_started'),
+        _log_debug(
+            'create_success',
+            tenant_schema=tenant_schema,
+            driver_id=getattr(driver, 'pk', ''),
+            movement_id=movement.get('movement_id'),
+            movement_no=movement.get('movement_no'),
+            workflow_started=movement.get('workflow_started'),
         )
 
         return self.success(

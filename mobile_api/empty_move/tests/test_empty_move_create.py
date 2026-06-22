@@ -109,7 +109,7 @@ class EmptyMoveCreateServiceTests(SimpleTestCase):
     @patch(
         'mobile_api.empty_move.services.empty_move_create_service.DashboardBookingSelector'
     )
-    def test_always_auto_starts_em1_on_create(
+    def test_does_not_auto_start_em1_on_create(
         self,
         mock_booking_cls,
         mock_movement_cls,
@@ -156,8 +156,8 @@ class EmptyMoveCreateServiceTests(SimpleTestCase):
                     },
                 )
 
-        mock_start.assert_called_once()
-        self.assertTrue(result['empty_move']['workflow_started'])
+        mock_start.assert_not_called()
+        self.assertFalse(result['empty_move']['workflow_started'])
         mock_apply_links.assert_called_once()
 
     @patch('mobile_api.empty_move.services.empty_move_create_service.transaction')
@@ -180,7 +180,7 @@ class EmptyMoveCreateServiceTests(SimpleTestCase):
     @patch(
         'mobile_api.empty_move.services.empty_move_create_service.DashboardBookingSelector'
     )
-    def test_create_applies_route_gps_and_passes_start_coords_to_em1(
+    def test_create_applies_route_gps(
         self,
         mock_booking_cls,
         mock_movement_cls,
@@ -216,31 +216,26 @@ class EmptyMoveCreateServiceTests(SimpleTestCase):
         ) as mock_model:
             mock_model.objects.select_related.return_value.get.return_value = movement
             service = EmptyMoveCreateService()
-            with patch.object(service, '_auto_start_movement', return_value=True) as mock_start:
-                result = service.create_empty_move(
-                    driver=_driver(),
-                    tenant_user=SimpleNamespace(pk=uuid4()),
-                    tenant_schema='tenant_test',
-                    payload={
-                        'empty_move_reason': 'reposition',
-                        'from_location_id': uuid4(),
-                        'to_location_id': uuid4(),
-                        'from_latitude': 24.7136,
-                        'from_longitude': 46.6753,
-                        'to_latitude': 21.4858,
-                        'to_longitude': 39.1925,
-                    },
-                )
+            result = service.create_empty_move(
+                driver=_driver(),
+                tenant_user=SimpleNamespace(pk=uuid4()),
+                tenant_schema='tenant_test',
+                payload={
+                    'empty_move_reason': 'reposition',
+                    'from_location_id': uuid4(),
+                    'to_location_id': uuid4(),
+                    'from_latitude': 24.7136,
+                    'from_longitude': 46.6753,
+                    'to_latitude': 21.4858,
+                    'to_longitude': 39.1925,
+                },
+            )
 
         mock_apply_links.assert_called_once()
         link_kwargs = mock_apply_links.call_args.kwargs
         self.assertEqual(link_kwargs['from_latitude'], '24.7136')
         self.assertEqual(link_kwargs['to_longitude'], '39.1925')
-        mock_start.assert_called_once()
-        start_kwargs = mock_start.call_args.kwargs
-        self.assertEqual(start_kwargs['latitude'], '24.7136')
-        self.assertEqual(start_kwargs['longitude'], '46.6753')
-        self.assertTrue(result['empty_move']['workflow_started'])
+        self.assertFalse(result['empty_move']['workflow_started'])
 
     @patch('mobile_api.empty_move.services.empty_move_create_service.transaction')
     @patch(

@@ -159,7 +159,7 @@
                   <label class="form-label">POD Type</label>
                   <p class="detail-view-value">
                     <span class="status-badge in-transit"
-                      ><i class="bi bi-cloud-arrow-up"></i> {{ pod_detail.pod_type }} Copy</span
+                      ><i class="bi bi-cloud-arrow-up"></i> {{ pod_detail.pod_type }}</span
                     >
                   </p>
                 </div>
@@ -216,7 +216,7 @@
                 <span class="detail-field-label">POD Type</span>
                 <span class="detail-field-value">
                   <span class="status-badge in-transit"
-                    ><i class="bi bi-cloud-arrow-up"></i> {{ pod_detail.pod_type }} Copy</span
+                    ><i class="bi bi-cloud-arrow-up"></i> {{ pod_detail.pod_type }}</span
                   >
                 </span>
               </div>
@@ -315,15 +315,18 @@
                   <td>{% if row.action_log %}{{ row.action_log.log_no }}{% else %}-{% endif %}</td>
                   <td>
                     {% if row.map_url %}
-                    <a href="{{ row.map_url }}" style="color: var(--primary-color)" title="Open Map" target="_blank" rel="noopener">
-                      <i class="bi bi-geo-alt"></i>
+                    <a href="{{ row.map_url }}" class="pod-map-link" title="Open in Google Maps" target="_blank" rel="noopener noreferrer">
+                      <i class="bi bi-geo-alt-fill"></i>
+                      <span class="visually-hidden">Open map</span>
                     </a>
                     {% else %}
                     -
                     {% endif %}
                   </td>
                   <td>
-                    {% if row.attachment_label %}
+                    {% if row.attachment_url %}
+                    {% include 'partials/attachment_preview_link.html' with file_url=row.attachment_url label=row.attachment_label file_name=row.attachment_label link_class='status-badge in-transit' only %}
+                    {% elif row.attachment_label %}
                     <span class="status-badge in-transit"><i class="bi bi-paperclip"></i> {{ row.attachment_label }}</span>
                     {% else %}
                     -

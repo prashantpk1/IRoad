@@ -1094,6 +1094,11 @@ class TruckMaster(models.Model):
                 add('plate_number', _('Plate number is required for Saudi-registered trucks.'))
             if not saudi_plate:
                 add('saudi_plate_number', _('Saudi plate number is required for Saudi Arabia.'))
+            elif not saudi_plate.isdigit():
+                add(
+                    'saudi_plate_number',
+                    _('Saudi plate number must contain digits only.'),
+                )
             english_letters = (self.saudi_english_letters or '').strip()
             if not english_letters:
                 add(
@@ -4023,7 +4028,8 @@ class TenantShipmentDocument(models.Model):
                 physical_location=page.signer_location,
                 soft_copy_status=page.completion_status,
                 attachment_label=page.attachment_label,
-                map_url=page.attachment_storage_path,
+                attachment_storage_path=page.attachment_storage_path,
+                map_url='',
             )
 
     def save(self, *args, **kwargs):
@@ -4145,6 +4151,7 @@ class TenantShipmentPodPage(models.Model):
     soft_copy_status = models.CharField(max_length=64, blank=True, default='')
     digital_evidence_status = models.CharField(max_length=64, blank=True, default='')
     map_url = models.URLField(blank=True, default='')
+    attachment_storage_path = models.CharField(max_length=500, blank=True, default='')
     attachment_label = models.CharField(max_length=255, blank=True, default='')
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)

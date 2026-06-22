@@ -7,6 +7,8 @@ from contextlib import contextmanager
 from types import SimpleNamespace
 from unittest.mock import MagicMock, patch
 
+from uuid import uuid4
+
 from django.test import SimpleTestCase
 
 from mobile_api.execution.dto.execute_action_context import ExecuteActionContext
@@ -225,6 +227,7 @@ class ExecutionValidationTests(SimpleTestCase):
         ctx = _context()
         existing_log = SimpleNamespace(
             operation_action=SimpleNamespace(action_code='A2'),
+            shipment_id='ship-1',
         )
         guard = ExecutionIdempotencyGuard(
             log_lookup=lambda _keys: existing_log,
@@ -233,6 +236,37 @@ class ExecutionValidationTests(SimpleTestCase):
         self.assertTrue(guard.detect_idempotent_replay(ctx, keys))
         self.assertTrue(ctx.idempotent_replay)
         self.assertTrue(ctx.reused_existing)
+
+    def test_replay_rejected_when_log_belongs_to_other_movement(self):
+        ctx = _context(action_code='EM2', job_type='movement')
+        ctx.movement = SimpleNamespace(pk=uuid4())
+        other_movement_id = uuid4()
+        existing_log = SimpleNamespace(
+            operation_action=SimpleNamespace(action_code='EM2'),
+            truck_movement_id=other_movement_id,
+        )
+        guard = ExecutionIdempotencyGuard(
+            log_lookup=lambda _keys: existing_log,
+        )
+        keys = IdempotencyKeys(idempotency_key='em-depart-shared-key', source_ref='')
+        with self.assertRaises(ExecuteActionError) as exc:
+            guard.detect_idempotent_replay(ctx, keys)
+        self.assertEqual(exc.exception.code, 'idempotency_key_scope_mismatch')
+
+    def test_replay_allowed_when_log_belongs_to_same_movement(self):
+        movement_id = uuid4()
+        ctx = _context(action_code='EM2', job_type='movement')
+        ctx.movement = SimpleNamespace(pk=movement_id)
+        existing_log = SimpleNamespace(
+            operation_action=SimpleNamespace(action_code='EM2'),
+            truck_movement_id=movement_id,
+        )
+        guard = ExecutionIdempotencyGuard(
+            log_lookup=lambda _keys: existing_log,
+        )
+        keys = IdempotencyKeys(idempotency_key='em-depart-same', source_ref='')
+        self.assertTrue(guard.detect_idempotent_replay(ctx, keys))
+        self.assertTrue(ctx.idempotent_replay)
 
     def test_idempotent_replay_short_circuits_validation(self):
         ctx = _context()

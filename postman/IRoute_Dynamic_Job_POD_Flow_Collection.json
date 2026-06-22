@@ -1,0 +1,4229 @@
+{
+  "info": {
+    "_postman_id": "a3f8c2e1-9b4d-4f7a-8e6c-1d2b3c4d5e6f",
+    "name": "IRoute — Dynamic Job + POD Flow (no hardcoded A1/A2)",
+    "description": "# Dynamic Job + POD Flow (v2)\n\nUses `workflow.allowed_actions[0].action_code` — **no hardcoded A1/A2/OA codes**.\n\n## Before run (portal)\n1. Booking **Confirmed**, truck + driver assigned\n2. Action Master must include **preshipment** steps for booking:\n   Start Job → Pickup → Loading → Confirm Loaded (**Auto Shipment ON**)\n3. Set `driver_email`, `driver_password`, `mobile_cod_amount` (COD)\n4. Set `base_url` if not `http://127.0.0.1:8000/api/v1/mobile`\n\n## Run order\nRun folder **00** then **01** cycles in order (or Run Collection).\nEach cycle: **01a Job Detail** sets `execute_action_code` → **01b/01c Execute**.\n\n## If execute_action_code empty\nCheck Tests tab on Job Detail — message explains `context_label` from API.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {
+      "key": "base_url",
+      "value": "http://127.0.0.1:8000/api/v1/mobile"
+    },
+    {
+      "key": "_iroute_dynamic_helpers",
+      "value": "function irouteSaveSync(data) {\n  if (!data || !data.sync_metadata) return;\n  var sm = data.sync_metadata;\n  pm.collectionVariables.set('content_hash', sm.content_hash || '');\n  pm.collectionVariables.set('workflow_version', sm.workflow_version || '');\n  try { pm.environment.set('content_hash', sm.content_hash || ''); } catch (e) {}\n  try { pm.environment.set('workflow_version', sm.workflow_version || ''); } catch (e) {}\n}\nfunction irouteSavePodSync(data) {\n  if (!data) return;\n  pm.collectionVariables.set('pod_content_hash', data.content_hash || '');\n  pm.collectionVariables.set('pod_workflow_version', data.workflow_version || '');\n}\nfunction irouteAssertToken() {\n  var t = pm.variables.get('access_token') || '';\n  if (!t || String(t).indexOf('{{') >= 0) throw new Error('Run 00 → 01 Login first.');\n}\nfunction irouteLogHint(hint, label) {\n  hint = hint || {};\n  console.log('=== ' + (label || 'HINT') + ' ===');\n  console.log('action:', hint.action, '| code:', hint.action_code, '| screen:', hint.screen);\n  console.log('reason:', hint.reason);\n  console.log('capture_mode:', hint.capture_mode, '| job_closed:', hint.job_closed);\n}\nfunction irouteSaveDashboardJob(d) {\n  d = d || {};\n  var active = d.active_job || {};\n  var current = d.current_job || {};\n  if (active.job_id) {\n    var jt = active.job_type || 'shipment';\n    pm.collectionVariables.set('job_id', active.job_id);\n    pm.collectionVariables.set('job_type', jt);\n    try { pm.environment.set('job_id', active.job_id); pm.environment.set('job_type', jt); } catch (e) {}\n    if (jt === 'booking') {\n      pm.collectionVariables.set('booking_id', active.job_id);\n      try { pm.environment.set('booking_id', active.job_id); } catch (e) {}\n    }\n    if (jt === 'shipment') {\n      pm.collectionVariables.set('shipment_id', active.job_id);\n      try { pm.environment.set('shipment_id', active.job_id); } catch (e) {}\n    }\n  }\n  if (current.booking_id) pm.collectionVariables.set('booking_id', current.booking_id);\n  if (active.job_no) {\n    pm.collectionVariables.set('shipment_no', active.job_no);\n    try { pm.environment.set('shipment_no', active.job_no); } catch (e) {}\n  }\n}\nfunction irouteTransitionToShipment(d) {\n  var active = (d || {}).active_job || {};\n  if (active.job_type === 'shipment' && active.job_id) {\n    pm.collectionVariables.set('job_id', active.job_id);\n    pm.collectionVariables.set('job_type', 'shipment');\n    pm.collectionVariables.set('shipment_id', active.job_id);\n    pm.collectionVariables.set('shipment_born', 'true');\n    try {\n      pm.environment.set('job_id', active.job_id);\n      pm.environment.set('job_type', 'shipment');\n      pm.environment.set('shipment_id', active.job_id);\n    } catch (e) {}\n  }\n}\nfunction iroutePickNextAction(data) {\n  data = data || {};\n  var hint = data.next_action_hint || {};\n  var wf = data.workflow || {};\n  var allowed = wf.allowed_actions || [];\n  var primary = wf.primary_action || wf.next_action || {};\n  var row = {};\n  if (hint.action_code) {\n    var match = allowed.find(function (a) { return a.action_code === hint.action_code; }) || {};\n    row = {\n      action_code: hint.action_code,\n      execution_label: match.execution_label || match.action_name || hint.action_code,\n      execution_requirements: match.execution_requirements || {}\n    };\n  }\n  if (!row.action_code && primary && primary.action_code) row = primary;\n  if (!row.action_code && allowed.length) row = allowed[0];\n  return row || {};\n}\nfunction irouteSyncJobDetail(data) {\n  data = data || {};\n  var job = data.job || {};\n  var wf = data.workflow || {};\n  var meta = wf.workflow_metadata || {};\n  var allowed = wf.allowed_actions || [];\n  irouteSaveSync(data);\n  var pod = data.pod_cod || {};\n  var hint = data.next_action_hint || {};\n  var hard = pod.hard_pod_pending === true || ((pod.hard_copy_confirmation || {}).required === true);\n  pm.collectionVariables.set('hard_pod_required', hard ? 'true' : 'false');\n  pm.collectionVariables.set('pod_branch', hard ? 'hard_pod' : 'digital_only');\n  pm.collectionVariables.set('workflow_context_label', meta.context_label || '');\n  pm.collectionVariables.set('allowed_action_count', String(meta.allowed_action_count != null ? meta.allowed_action_count : allowed.length));\n  if (job.job_id) {\n    pm.collectionVariables.set('job_id', job.job_id);\n    pm.collectionVariables.set('job_type', job.job_type || pm.collectionVariables.get('job_type') || 'shipment');\n    if (job.job_type === 'booking') pm.collectionVariables.set('booking_id', job.job_id);\n    if (job.job_type === 'shipment') pm.collectionVariables.set('shipment_id', job.job_id);\n    if (job.job_no) pm.collectionVariables.set('shipment_no', job.job_no);\n  }\n  var row = iroutePickNextAction(data);\n  var code = (row.action_code || '').trim();\n  var req = row.execution_requirements || {};\n  pm.collectionVariables.set('execute_action_code', code);\n  pm.collectionVariables.set('execute_action_label', row.execution_label || row.action_name || code);\n  pm.collectionVariables.set('execute_use_multipart', (req.auto_shipment_post || (req.photo && (req.photo_min_count || 0) >= 1)) ? 'true' : 'false');\n  pm.collectionVariables.set('execute_use_cod', (job.order_type === 'COD' && req.auto_treasury_post) ? 'true' : 'false');\n  pm.collectionVariables.set('needs_pod_capture', (hint.action === 'go_to_pod_capture' && hint.capture_mode === 'digital_evidence') ? 'true' : 'false');\n  pm.collectionVariables.set('needs_hard_pod_confirm', (hint.capture_mode === 'hard_copy_confirmation' || hint.ui_mode === 'hard_pod_collection_confirmation') ? 'true' : 'false');\n  if (req.auto_pod_post || hint.action === 'go_to_pod_capture') {\n    pm.collectionVariables.set('pod_upload_action_code', code || pm.collectionVariables.get('pod_upload_action_code') || '');\n  }\n  if (hint.capture_mode === 'hard_copy_confirmation' || hint.ui_mode === 'hard_pod_collection_confirmation') {\n    pm.collectionVariables.set('hard_copy_action_code', hint.action_code || code);\n  }\n  pm.collectionVariables.set('job_closed', hint.job_closed === true ? 'true' : 'false');\n  pm.collectionVariables.set('execute_client_action_id', (code || 'act').toLowerCase().replace(/[^a-z0-9]+/g, '-') + '-' + pm.variables.replaceIn('{{$guid}}'));\n  console.log('execute_action_code:', code || '(empty)');\n  console.log('context:', meta.context_label || '(none)');\n  console.log('allowed_action_count:', pm.collectionVariables.get('allowed_action_count'));\n  irouteLogHint(hint, 'SYNC');\n  return code;\n}\nfunction irouteAssertExecuteAction(data, optional) {\n  var code = pm.variables.get('execute_action_code');\n  var hint = (data || {}).next_action_hint || {};\n  if (code || hint.job_closed === true) return;\n  if (optional) return;\n  var label = pm.variables.get('workflow_context_label') || '';\n  var help = label.indexOf('no shipment') >= 0\n    ? 'Booking has no preshipment actions. Portal: add Start Job + Pickup + Loading + Confirm Loaded (Auto Shipment ON), assign driver, booking Confirmed.'\n    : 'API returned allowed_actions=[]. Check Action Master + job assignment.';\n  pm.test('execute_action_code set — ' + help, function () {\n    pm.expect(code, help + ' | context: ' + label).to.be.ok;\n  });\n}\nfunction irouteNewClientActionId() {\n  var code = (pm.variables.get('execute_action_code') || 'act').toLowerCase();\n  return code.replace(/[^a-z0-9]+/g, '-') + '-' + pm.variables.replaceIn('{{$guid}}');\n}\nfunction irouteSkipIfNoAction() {\n  if (!pm.variables.get('execute_action_code') || pm.variables.get('job_closed') === 'true') {\n    if (pm.execution && pm.execution.skipRequest) pm.execution.skipRequest();\n  }\n}\nfunction irouteSkipUnless(flag) {\n  if (pm.variables.get(flag) !== 'true') {\n    if (pm.execution && pm.execution.skipRequest) pm.execution.skipRequest();\n  }\n}\nfunction irouteSkipIfDelegatedCapture() {\n  if (pm.variables.get('needs_pod_capture') === 'true' || pm.variables.get('needs_hard_pod_confirm') === 'true') {\n    if (pm.execution && pm.execution.skipRequest) pm.execution.skipRequest();\n  }\n}\nfunction irouteBuildExecuteBody() {\n  var body = {\n    client_action_id: pm.variables.get('execute_client_action_id'),\n    workflow_version: pm.variables.get('workflow_version'),\n    content_hash: pm.variables.get('content_hash'),\n    latitude: 21.3891,\n    longitude: 39.8579,\n    notes: 'Dynamic ' + pm.variables.get('execute_action_code') + ' — ' + pm.variables.get('shipment_no')\n  };\n  if (pm.variables.get('execute_use_cod') === 'true') {\n    var amt = parseFloat(pm.variables.get('mobile_cod_amount') || '0');\n    body.mobile_cod_amount = isNaN(amt) ? 0 : amt;\n  }\n  return JSON.stringify(body, null, 2);\n}"
+    },
+    {
+      "key": "driver_email",
+      "value": ""
+    },
+    {
+      "key": "driver_password",
+      "value": ""
+    },
+    {
+      "key": "access_token",
+      "value": ""
+    },
+    {
+      "key": "booking_id",
+      "value": ""
+    },
+    {
+      "key": "shipment_id",
+      "value": ""
+    },
+    {
+      "key": "job_id",
+      "value": ""
+    },
+    {
+      "key": "job_type",
+      "value": "booking"
+    },
+    {
+      "key": "shipment_no",
+      "value": ""
+    },
+    {
+      "key": "content_hash",
+      "value": ""
+    },
+    {
+      "key": "workflow_version",
+      "value": ""
+    },
+    {
+      "key": "execute_action_code",
+      "value": ""
+    },
+    {
+      "key": "execute_action_label",
+      "value": ""
+    },
+    {
+      "key": "execute_client_action_id",
+      "value": ""
+    },
+    {
+      "key": "execute_use_multipart",
+      "value": "false"
+    },
+    {
+      "key": "execute_use_cod",
+      "value": "false"
+    },
+    {
+      "key": "needs_pod_capture",
+      "value": "false"
+    },
+    {
+      "key": "needs_hard_pod_confirm",
+      "value": "false"
+    },
+    {
+      "key": "hard_pod_required",
+      "value": "false"
+    },
+    {
+      "key": "pod_upload_action_code",
+      "value": ""
+    },
+    {
+      "key": "hard_copy_action_code",
+      "value": ""
+    },
+    {
+      "key": "job_closed",
+      "value": "false"
+    },
+    {
+      "key": "workflow_context_label",
+      "value": ""
+    },
+    {
+      "key": "allowed_action_count",
+      "value": "0"
+    },
+    {
+      "key": "capture_bundle_id",
+      "value": ""
+    },
+    {
+      "key": "pod_content_hash",
+      "value": ""
+    },
+    {
+      "key": "pod_workflow_version",
+      "value": ""
+    },
+    {
+      "key": "pod_video_duration_seconds",
+      "value": "8"
+    },
+    {
+      "key": "hard_pod_confirmed_pages_json",
+      "value": "[]"
+    },
+    {
+      "key": "hard_pod_custody_submission_id",
+      "value": ""
+    },
+    {
+      "key": "hard_pod_client_submission_id",
+      "value": ""
+    },
+    {
+      "key": "hard_pod_receiver_name",
+      "value": "Receiver Name"
+    },
+    {
+      "key": "hard_pod_receiver_contact",
+      "value": "0500000000"
+    },
+    {
+      "key": "hard_pod_handoff_notes",
+      "value": "Hard copy DN collected"
+    },
+    {
+      "key": "mobile_cod_amount",
+      "value": "100"
+    },
+    {
+      "key": "accept_language",
+      "value": "en"
+    }
+  ],
+  "event": [
+    {
+      "listen": "prerequest",
+      "script": {
+        "type": "text/javascript",
+        "exec": [
+          "eval(pm.collectionVariables.get('_iroute_dynamic_helpers') || '');"
+        ]
+      }
+    }
+  ],
+  "item": [
+    {
+      "name": "00 — Login & Dashboard",
+      "description": "Login → Dashboard picks active job → Job Detail syncs first action code.",
+      "item": [
+        {
+          "name": "01 — Login",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept-Language",
+                "value": "{{accept_language}}"
+              }
+            ],
+            "url": "{{base_url}}/driver/auth/login/",
+            "body": {
+              "mode": "raw",
+              "raw": "{\"email\": \"{{driver_email}}\", \"password\": \"{{driver_password}}\"}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "var r = pm.response.json();",
+                  "pm.test('Login OK', function () { pm.expect(r.status).to.eql(1); });",
+                  "pm.collectionVariables.set('access_token', r.data.access_token);",
+                  "try { pm.environment.set('access_token', r.data.access_token); } catch (e) {}"
+                ]
+              }
+            }
+          ],
+          "id": "dba5d3b4-68b5-46bd-a7ff-12d0e03d4b78"
+        },
+        {
+          "name": "02 — Dashboard",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              },
+              {
+                "key": "Accept-Language",
+                "value": "{{accept_language}}"
+              }
+            ],
+            "url": "{{base_url}}/driver/dashboard/"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "eval(pm.collectionVariables.get('_iroute_dynamic_helpers') || '');",
+                  "var d = pm.response.json().data || {};",
+                  "irouteSaveDashboardJob(d);",
+                  "irouteTransitionToShipment(d);",
+                  "pm.test('dashboard OK', function () { pm.expect(pm.response.code).to.eql(200); });"
+                ]
+              }
+            }
+          ],
+          "id": "8a09d044-1b05-469f-81a9-88efb96c8c19"
+        },
+        {
+          "name": "03 — Initial Job Detail (sets execute_action_code)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              },
+              {
+                "key": "Accept-Language",
+                "value": "{{accept_language}}"
+              }
+            ],
+            "url": "{{base_url}}/driver/jobs/{{job_type}}/{{job_id}}/"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "eval(pm.collectionVariables.get('_iroute_dynamic_helpers') || '');",
+                  "pm.test('HTTP 200', function () { pm.response.to.have.status(200); });",
+                  "var data = (pm.response.json().data || {});",
+                  "irouteSyncJobDetail(data);",
+                  "pm.test('status success', function () { pm.expect(pm.response.json().status).to.eql(1); });",
+                  "irouteAssertExecuteAction(data, false);"
+                ]
+              }
+            }
+          ],
+          "id": "bc39bc1c-f1a1-48a4-a05c-32591a046310"
+        }
+      ],
+      "id": "5695fb1a-b217-44f8-954e-73199073660a"
+    },
+    {
+      "name": "01 — Dynamic Workflow Cycles",
+      "description": "Always run **01a** before **01b/01c**. `execute_action_code` comes from `allowed_actions[0]`.",
+      "item": [
+        {
+          "name": "Cycle 01 — Job Detail + Execute",
+          "item": [
+            {
+              "name": "01a — Job Detail (sync next action)",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{access_token}}"
+                  },
+                  {
+                    "key": "Accept-Language",
+                    "value": "{{accept_language}}"
+                  }
+                ],
+                "url": "{{base_url}}/driver/jobs/{{job_type}}/{{job_id}}/"
+              },
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "eval(pm.collectionVariables.get('_iroute_dynamic_helpers') || '');",
+                      "pm.test('HTTP 200', function () { pm.response.to.have.status(200); });",
+                      "var data = (pm.response.json().data || {});",
+                      "irouteSyncJobDetail(data);",
+                      "pm.test('status success', function () { pm.expect(pm.response.json().status).to.eql(1); });",
+                      "irouteAssertExecuteAction(data, false);"
+                    ]
+                  }
+                }
+              ],
+              "id": "9a88b319-2f2a-4dfc-90ea-4756d2460b44"
+            },
+            {
+              "name": "01b — Execute Next (multipart if required)",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{access_token}}"
+                  },
+                  {
+                    "key": "Accept-Language",
+                    "value": "{{accept_language}}"
+                  }
+                ],
+                "url": "{{base_url}}/driver/jobs/{{job_type}}/{{job_id}}/actions/{{execute_action_code}}/execute/",
+                "body": {
+                  "mode": "formdata",
+                  "formdata": [
+                    {
+                      "key": "client_action_id",
+                      "value": "{{execute_client_action_id}}",
+                      "type": "text"
+                    },
+                    {
+                      "key": "workflow_version",
+                      "value": "{{workflow_version}}",
+                      "type": "text"
+                    },
+                    {
+                      "key": "content_hash",
+                      "value": "{{content_hash}}",
+                      "type": "text"
+                    },
+                    {
+                      "key": "latitude",
+                      "value": "21.4858",
+                      "type": "text"
+                    },
+                    {
+                      "key": "longitude",
+                      "value": "39.1925",
+                      "type": "text"
+                    },
+                    {
+                      "key": "notes",
+                      "value": "Dynamic multipart {{execute_action_code}}",
+                      "type": "text"
+                    },
+                    {
+                      "key": "media[0][media_type]",
+                      "value": "photo",
+                      "type": "text"
+                    },
+                    {
+                      "key": "media[0][file_ref]",
+                      "type": "file",
+                      "src": []
+                    },
+                    {
+                      "key": "media[1][media_type]",
+                      "value": "photo",
+                      "type": "text"
+                    },
+                    {
+                      "key": "media[1][file_ref]",
+                      "type": "file",
+                      "src": []
+                    }
+                  ]
+                }
+              },
+              "event": [
+                {
+                  "listen": "prerequest",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "eval(pm.collectionVariables.get('_iroute_dynamic_helpers') || '');",
+                      "irouteSkipUnless('execute_use_multipart');",
+                      "irouteSkipIfDelegatedCapture();",
+                      "irouteSkipIfNoAction();",
+                      "pm.collectionVariables.set('execute_client_action_id', irouteNewClientActionId());"
+                    ]
+                  }
+                },
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "eval(pm.collectionVariables.get('_iroute_dynamic_helpers') || '');",
+                      "if (pm.response.code === 204 || !pm.response.text()) return;",
+                      "var resp = pm.response.json();",
+                      "pm.test('Multipart execute OK', function () { pm.expect([200,201]).to.include(pm.response.code); });",
+                      "if (resp.status === 1 && resp.data) { irouteSyncJobDetail(resp.data); irouteTransitionToShipment({active_job: resp.data.job}); }"
+                    ]
+                  }
+                }
+              ],
+              "id": "e394df18-558e-4ca4-8a8f-4200df32f11e"
+            },
+            {
+              "name": "01c — Execute Next (JSON)",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{access_token}}"
+                  },
+                  {
+                    "key": "Accept-Language",
+                    "value": "{{accept_language}}"
+                  }
+                ],
+                "url": "{{base_url}}/driver/jobs/{{job_type}}/{{job_id}}/actions/{{execute_action_code}}/execute/",
+                "body": {
+                  "mode": "raw",
+                  "raw": "{}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                }
+              },
+              "event": [
+                {
+                  "listen": "prerequest",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "eval(pm.collectionVariables.get('_iroute_dynamic_helpers') || '');",
+                      "irouteAssertToken();",
+                      "if (pm.variables.get('execute_use_multipart') === 'true') { if (pm.execution && pm.execution.skipRequest) pm.execution.skipRequest(); }",
+                      "irouteSkipIfDelegatedCapture();",
+                      "irouteSkipIfNoAction();",
+                      "pm.collectionVariables.set('execute_client_action_id', irouteNewClientActionId());",
+                      "pm.request.body.raw = irouteBuildExecuteBody();"
+                    ]
+                  }
+                },
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "eval(pm.collectionVariables.get('_iroute_dynamic_helpers') || '');",
+                      "if (pm.response.code === 204 || !pm.response.text()) return;",
+                      "var resp = pm.response.json();",
+                      "if (resp.status === 1 && resp.data) {",
+                      "  irouteSyncJobDetail(resp.data);",
+                      "  irouteTransitionToShipment({active_job: resp.data.job});",
+                      "}",
+                      "pm.test('Execute OK or skipped', function () { pm.expect([200,201,204]).to.include(pm.response.code); });"
+                    ]
+                  }
+                }
+              ],
+              "id": "96576afc-5826-461a-a0d4-93eac3ad6236"
+            },
+            {
+              "name": "01d — Dashboard (pick shipment if born)",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{access_token}}"
+                  },
+                  {
+                    "key": "Accept-Language",
+                    "value": "{{accept_language}}"
+                  }
+                ],
+                "url": "{{base_url}}/driver/dashboard/"
+              },
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "eval(pm.collectionVariables.get('_iroute_dynamic_helpers') || '');",
+                      "var d = pm.response.json().data || {};",
+                      "irouteSaveDashboardJob(d);",
+                      "irouteTransitionToShipment(d);"
+                    ]
+                  }
+                }
+              ],
+              "id": "a3ba9afc-ba27-4974-992e-0d10713cd3ad"
+            }
+          ],
+          "id": "c9b4fb48-2483-43d5-81bc-88c0879ba361"
+        },
+        {
+          "name": "Cycle 02 — Job Detail + Execute",
+          "item": [
+            {
+              "name": "02a — Job Detail (sync next action)",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{access_token}}"
+                  },
+                  {
+                    "key": "Accept-Language",
+                    "value": "{{accept_language}}"
+                  }
+                ],
+                "url": "{{base_url}}/driver/jobs/{{job_type}}/{{job_id}}/"
+              },
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "eval(pm.collectionVariables.get('_iroute_dynamic_helpers') || '');",
+                      "pm.test('HTTP 200', function () { pm.response.to.have.status(200); });",
+                      "var data = (pm.response.json().data || {});",
+                      "irouteSyncJobDetail(data);",
+                      "pm.test('status success', function () { pm.expect(pm.response.json().status).to.eql(1); });",
+                      "irouteAssertExecuteAction(data, false);"
+                    ]
+                  }
+                }
+              ],
+              "id": "7eeadbb8-7680-44ef-854a-59da0d9c2f1a"
+            },
+            {
+              "name": "02b — Execute Next (multipart if required)",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{access_token}}"
+                  },
+                  {
+                    "key": "Accept-Language",
+                    "value": "{{accept_language}}"
+                  }
+                ],
+                "url": "{{base_url}}/driver/jobs/{{job_type}}/{{job_id}}/actions/{{execute_action_code}}/execute/",
+                "body": {
+                  "mode": "formdata",
+                  "formdata": [
+                    {
+                      "key": "client_action_id",
+                      "value": "{{execute_client_action_id}}",
+                      "type": "text"
+                    },
+                    {
+                      "key": "workflow_version",
+                      "value": "{{workflow_version}}",
+                      "type": "text"
+                    },
+                    {
+                      "key": "content_hash",
+                      "value": "{{content_hash}}",
+                      "type": "text"
+                    },
+                    {
+                      "key": "latitude",
+                      "value": "21.4858",
+                      "type": "text"
+                    },
+                    {
+                      "key": "longitude",
+                      "value": "39.1925",
+                      "type": "text"
+                    },
+                    {
+                      "key": "notes",
+                      "value": "Dynamic multipart {{execute_action_code}}",
+                      "type": "text"
+                    },
+                    {
+                      "key": "media[0][media_type]",
+                      "value": "photo",
+                      "type": "text"
+                    },
+                    {
+                      "key": "media[0][file_ref]",
+                      "type": "file",
+                      "src": []
+                    },
+                    {
+                      "key": "media[1][media_type]",
+                      "value": "photo",
+                      "type": "text"
+                    },
+                    {
+                      "key": "media[1][file_ref]",
+                      "type": "file",
+                      "src": []
+                    }
+                  ]
+                }
+              },
+              "event": [
+                {
+                  "listen": "prerequest",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "eval(pm.collectionVariables.get('_iroute_dynamic_helpers') || '');",
+                      "irouteSkipUnless('execute_use_multipart');",
+                      "irouteSkipIfDelegatedCapture();",
+                      "irouteSkipIfNoAction();",
+                      "pm.collectionVariables.set('execute_client_action_id', irouteNewClientActionId());"
+                    ]
+                  }
+                },
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "eval(pm.collectionVariables.get('_iroute_dynamic_helpers') || '');",
+                      "if (pm.response.code === 204 || !pm.response.text()) return;",
+                      "var resp = pm.response.json();",
+                      "pm.test('Multipart execute OK', function () { pm.expect([200,201]).to.include(pm.response.code); });",
+                      "if (resp.status === 1 && resp.data) { irouteSyncJobDetail(resp.data); irouteTransitionToShipment({active_job: resp.data.job}); }"
+                    ]
+                  }
+                }
+              ],
+              "id": "9b887cec-8a3a-40a8-bd92-37ad4943feb7"
+            },
+            {
+              "name": "02c — Execute Next (JSON)",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{access_token}}"
+                  },
+                  {
+                    "key": "Accept-Language",
+                    "value": "{{accept_language}}"
+                  }
+                ],
+                "url": "{{base_url}}/driver/jobs/{{job_type}}/{{job_id}}/actions/{{execute_action_code}}/execute/",
+                "body": {
+                  "mode": "raw",
+                  "raw": "{}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                }
+              },
+              "event": [
+                {
+                  "listen": "prerequest",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "eval(pm.collectionVariables.get('_iroute_dynamic_helpers') || '');",
+                      "irouteAssertToken();",
+                      "if (pm.variables.get('execute_use_multipart') === 'true') { if (pm.execution && pm.execution.skipRequest) pm.execution.skipRequest(); }",
+                      "irouteSkipIfDelegatedCapture();",
+                      "irouteSkipIfNoAction();",
+                      "pm.collectionVariables.set('execute_client_action_id', irouteNewClientActionId());",
+                      "pm.request.body.raw = irouteBuildExecuteBody();"
+                    ]
+                  }
+                },
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "eval(pm.collectionVariables.get('_iroute_dynamic_helpers') || '');",
+                      "if (pm.response.code === 204 || !pm.response.text()) return;",
+                      "var resp = pm.response.json();",
+                      "if (resp.status === 1 && resp.data) {",
+                      "  irouteSyncJobDetail(resp.data);",
+                      "  irouteTransitionToShipment({active_job: resp.data.job});",
+                      "}",
+                      "pm.test('Execute OK or skipped', function () { pm.expect([200,201,204]).to.include(pm.response.code); });"
+                    ]
+                  }
+                }
+              ],
+              "id": "ceb89532-a6db-4852-8db8-9b8cce276ff4"
+            },
+            {
+              "name": "02d — Dashboard (pick shipment if born)",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{access_token}}"
+                  },
+                  {
+                    "key": "Accept-Language",
+                    "value": "{{accept_language}}"
+                  }
+                ],
+                "url": "{{base_url}}/driver/dashboard/"
+              },
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "eval(pm.collectionVariables.get('_iroute_dynamic_helpers') || '');",
+                      "var d = pm.response.json().data || {};",
+                      "irouteSaveDashboardJob(d);",
+                      "irouteTransitionToShipment(d);"
+                    ]
+                  }
+                }
+              ],
+              "id": "3e8ed99e-332d-4033-a38b-19643f279ed6"
+            }
+          ],
+          "id": "0b2a2f2b-be1b-42eb-9435-a775520ad3c4"
+        },
+        {
+          "name": "Cycle 03 — Job Detail + Execute",
+          "item": [
+            {
+              "name": "03a — Job Detail (sync next action)",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{access_token}}"
+                  },
+                  {
+                    "key": "Accept-Language",
+                    "value": "{{accept_language}}"
+                  }
+                ],
+                "url": "{{base_url}}/driver/jobs/{{job_type}}/{{job_id}}/"
+              },
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "eval(pm.collectionVariables.get('_iroute_dynamic_helpers') || '');",
+                      "pm.test('HTTP 200', function () { pm.response.to.have.status(200); });",
+                      "var data = (pm.response.json().data || {});",
+                      "irouteSyncJobDetail(data);",
+                      "pm.test('status success', function () { pm.expect(pm.response.json().status).to.eql(1); });",
+                      "irouteAssertExecuteAction(data, false);"
+                    ]
+                  }
+                }
+              ],
+              "id": "af230285-8092-4928-bef7-86646fcf0853"
+            },
+            {
+              "name": "03b — Execute Next (multipart if required)",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{access_token}}"
+                  },
+                  {
+                    "key": "Accept-Language",
+                    "value": "{{accept_language}}"
+                  }
+                ],
+                "url": "{{base_url}}/driver/jobs/{{job_type}}/{{job_id}}/actions/{{execute_action_code}}/execute/",
+                "body": {
+                  "mode": "formdata",
+                  "formdata": [
+                    {
+                      "key": "client_action_id",
+                      "value": "{{execute_client_action_id}}",
+                      "type": "text"
+                    },
+                    {
+                      "key": "workflow_version",
+                      "value": "{{workflow_version}}",
+                      "type": "text"
+                    },
+                    {
+                      "key": "content_hash",
+                      "value": "{{content_hash}}",
+                      "type": "text"
+                    },
+                    {
+                      "key": "latitude",
+                      "value": "21.4858",
+                      "type": "text"
+                    },
+                    {
+                      "key": "longitude",
+                      "value": "39.1925",
+                      "type": "text"
+                    },
+                    {
+                      "key": "notes",
+                      "value": "Dynamic multipart {{execute_action_code}}",
+                      "type": "text"
+                    },
+                    {
+                      "key": "media[0][media_type]",
+                      "value": "photo",
+                      "type": "text"
+                    },
+                    {
+                      "key": "media[0][file_ref]",
+                      "type": "file",
+                      "src": []
+                    },
+                    {
+                      "key": "media[1][media_type]",
+                      "value": "photo",
+                      "type": "text"
+                    },
+                    {
+                      "key": "media[1][file_ref]",
+                      "type": "file",
+                      "src": []
+                    }
+                  ]
+                }
+              },
+              "event": [
+                {
+                  "listen": "prerequest",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "eval(pm.collectionVariables.get('_iroute_dynamic_helpers') || '');",
+                      "irouteSkipUnless('execute_use_multipart');",
+                      "irouteSkipIfDelegatedCapture();",
+                      "irouteSkipIfNoAction();",
+                      "pm.collectionVariables.set('execute_client_action_id', irouteNewClientActionId());"
+                    ]
+                  }
+                },
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "eval(pm.collectionVariables.get('_iroute_dynamic_helpers') || '');",
+                      "if (pm.response.code === 204 || !pm.response.text()) return;",
+                      "var resp = pm.response.json();",
+                      "pm.test('Multipart execute OK', function () { pm.expect([200,201]).to.include(pm.response.code); });",
+                      "if (resp.status === 1 && resp.data) { irouteSyncJobDetail(resp.data); irouteTransitionToShipment({active_job: resp.data.job}); }"
+                    ]
+                  }
+                }
+              ],
+              "id": "f1ef0db9-7959-4335-9afa-e4814f383ff2"
+            },
+            {
+              "name": "03c — Execute Next (JSON)",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{access_token}}"
+                  },
+                  {
+                    "key": "Accept-Language",
+                    "value": "{{accept_language}}"
+                  }
+                ],
+                "url": "{{base_url}}/driver/jobs/{{job_type}}/{{job_id}}/actions/{{execute_action_code}}/execute/",
+                "body": {
+                  "mode": "raw",
+                  "raw": "{}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                }
+              },
+              "event": [
+                {
+                  "listen": "prerequest",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "eval(pm.collectionVariables.get('_iroute_dynamic_helpers') || '');",
+                      "irouteAssertToken();",
+                      "if (pm.variables.get('execute_use_multipart') === 'true') { if (pm.execution && pm.execution.skipRequest) pm.execution.skipRequest(); }",
+                      "irouteSkipIfDelegatedCapture();",
+                      "irouteSkipIfNoAction();",
+                      "pm.collectionVariables.set('execute_client_action_id', irouteNewClientActionId());",
+                      "pm.request.body.raw = irouteBuildExecuteBody();"
+                    ]
+                  }
+                },
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "eval(pm.collectionVariables.get('_iroute_dynamic_helpers') || '');",
+                      "if (pm.response.code === 204 || !pm.response.text()) return;",
+                      "var resp = pm.response.json();",
+                      "if (resp.status === 1 && resp.data) {",
+                      "  irouteSyncJobDetail(resp.data);",
+                      "  irouteTransitionToShipment({active_job: resp.data.job});",
+                      "}",
+                      "pm.test('Execute OK or skipped', function () { pm.expect([200,201,204]).to.include(pm.response.code); });"
+                    ]
+                  }
+                }
+              ],
+              "id": "1af4390f-41ab-4e34-b544-5d3e4e651f9e"
+            },
+            {
+              "name": "03d — Dashboard (pick shipment if born)",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{access_token}}"
+                  },
+                  {
+                    "key": "Accept-Language",
+                    "value": "{{accept_language}}"
+                  }
+                ],
+                "url": "{{base_url}}/driver/dashboard/"
+              },
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "eval(pm.collectionVariables.get('_iroute_dynamic_helpers') || '');",
+                      "var d = pm.response.json().data || {};",
+                      "irouteSaveDashboardJob(d);",
+                      "irouteTransitionToShipment(d);"
+                    ]
+                  }
+                }
+              ],
+              "id": "34a60c50-cdd8-4845-8a3d-bcc3511aa3a3"
+            }
+          ],
+          "id": "8b044c2f-5e61-4936-a117-4a70815c5f7b"
+        },
+        {
+          "name": "Cycle 04 — Job Detail + Execute",
+          "item": [
+            {
+              "name": "04a — Job Detail (sync next action)",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{access_token}}"
+                  },
+                  {
+                    "key": "Accept-Language",
+                    "value": "{{accept_language}}"
+                  }
+                ],
+                "url": "{{base_url}}/driver/jobs/{{job_type}}/{{job_id}}/"
+              },
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "eval(pm.collectionVariables.get('_iroute_dynamic_helpers') || '');",
+                      "pm.test('HTTP 200', function () { pm.response.to.have.status(200); });",
+                      "var data = (pm.response.json().data || {});",
+                      "irouteSyncJobDetail(data);",
+                      "pm.test('status success', function () { pm.expect(pm.response.json().status).to.eql(1); });",
+                      "irouteAssertExecuteAction(data, false);"
+                    ]
+                  }
+                }
+              ],
+              "id": "c1916df4-6959-43f1-a83d-2607ef4aee13"
+            },
+            {
+              "name": "04b — Execute Next (multipart if required)",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{access_token}}"
+                  },
+                  {
+                    "key": "Accept-Language",
+                    "value": "{{accept_language}}"
+                  }
+                ],
+                "url": "{{base_url}}/driver/jobs/{{job_type}}/{{job_id}}/actions/{{execute_action_code}}/execute/",
+                "body": {
+                  "mode": "formdata",
+                  "formdata": [
+                    {
+                      "key": "client_action_id",
+                      "value": "{{execute_client_action_id}}",
+                      "type": "text"
+                    },
+                    {
+                      "key": "workflow_version",
+                      "value": "{{workflow_version}}",
+                      "type": "text"
+                    },
+                    {
+                      "key": "content_hash",
+                      "value": "{{content_hash}}",
+                      "type": "text"
+                    },
+                    {
+                      "key": "latitude",
+                      "value": "21.4858",
+                      "type": "text"
+                    },
+                    {
+                      "key": "longitude",
+                      "value": "39.1925",
+                      "type": "text"
+                    },
+                    {
+                      "key": "notes",
+                      "value": "Dynamic multipart {{execute_action_code}}",
+                      "type": "text"
+                    },
+                    {
+                      "key": "media[0][media_type]",
+                      "value": "photo",
+                      "type": "text"
+                    },
+                    {
+                      "key": "media[0][file_ref]",
+                      "type": "file",
+                      "src": []
+                    },
+                    {
+                      "key": "media[1][media_type]",
+                      "value": "photo",
+                      "type": "text"
+                    },
+                    {
+                      "key": "media[1][file_ref]",
+                      "type": "file",
+                      "src": []
+                    }
+                  ]
+                }
+              },
+              "event": [
+                {
+                  "listen": "prerequest",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "eval(pm.collectionVariables.get('_iroute_dynamic_helpers') || '');",
+                      "irouteSkipUnless('execute_use_multipart');",
+                      "irouteSkipIfDelegatedCapture();",
+                      "irouteSkipIfNoAction();",
+                      "pm.collectionVariables.set('execute_client_action_id', irouteNewClientActionId());"
+                    ]
+                  }
+                },
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "eval(pm.collectionVariables.get('_iroute_dynamic_helpers') || '');",
+                      "if (pm.response.code === 204 || !pm.response.text()) return;",
+                      "var resp = pm.response.json();",
+                      "pm.test('Multipart execute OK', function () { pm.expect([200,201]).to.include(pm.response.code); });",
+                      "if (resp.status === 1 && resp.data) { irouteSyncJobDetail(resp.data); irouteTransitionToShipment({active_job: resp.data.job}); }"
+                    ]
+                  }
+                }
+              ],
+              "id": "7b3b1db1-186c-46ce-87d3-6f391dee8421"
+            },
+            {
+              "name": "04c — Execute Next (JSON)",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{access_token}}"
+                  },
+                  {
+                    "key": "Accept-Language",
+                    "value": "{{accept_language}}"
+                  }
+                ],
+                "url": "{{base_url}}/driver/jobs/{{job_type}}/{{job_id}}/actions/{{execute_action_code}}/execute/",
+                "body": {
+                  "mode": "raw",
+                  "raw": "{}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                }
+              },
+              "event": [
+                {
+                  "listen": "prerequest",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "eval(pm.collectionVariables.get('_iroute_dynamic_helpers') || '');",
+                      "irouteAssertToken();",
+                      "if (pm.variables.get('execute_use_multipart') === 'true') { if (pm.execution && pm.execution.skipRequest) pm.execution.skipRequest(); }",
+                      "irouteSkipIfDelegatedCapture();",
+                      "irouteSkipIfNoAction();",
+                      "pm.collectionVariables.set('execute_client_action_id', irouteNewClientActionId());",
+                      "pm.request.body.raw = irouteBuildExecuteBody();"
+                    ]
+                  }
+                },
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "eval(pm.collectionVariables.get('_iroute_dynamic_helpers') || '');",
+                      "if (pm.response.code === 204 || !pm.response.text()) return;",
+                      "var resp = pm.response.json();",
+                      "if (resp.status === 1 && resp.data) {",
+                      "  irouteSyncJobDetail(resp.data);",
+                      "  irouteTransitionToShipment({active_job: resp.data.job});",
+                      "}",
+                      "pm.test('Execute OK or skipped', function () { pm.expect([200,201,204]).to.include(pm.response.code); });"
+                    ]
+                  }
+                }
+              ],
+              "id": "a48a94cb-e141-4c2f-a40f-af311344534b"
+            },
+            {
+              "name": "04d — Dashboard (pick shipment if born)",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{access_token}}"
+                  },
+                  {
+                    "key": "Accept-Language",
+                    "value": "{{accept_language}}"
+                  }
+                ],
+                "url": "{{base_url}}/driver/dashboard/"
+              },
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "eval(pm.collectionVariables.get('_iroute_dynamic_helpers') || '');",
+                      "var d = pm.response.json().data || {};",
+                      "irouteSaveDashboardJob(d);",
+                      "irouteTransitionToShipment(d);"
+                    ]
+                  }
+                }
+              ],
+              "id": "e9dfcfed-69a6-425c-a04e-4dbd3b7272ab"
+            }
+          ],
+          "id": "2ac0a683-7f18-4818-bd66-1bbe1ed51420"
+        },
+        {
+          "name": "Cycle 05 — Job Detail + Execute",
+          "item": [
+            {
+              "name": "05a — Job Detail (sync next action)",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{access_token}}"
+                  },
+                  {
+                    "key": "Accept-Language",
+                    "value": "{{accept_language}}"
+                  }
+                ],
+                "url": "{{base_url}}/driver/jobs/{{job_type}}/{{job_id}}/"
+              },
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "eval(pm.collectionVariables.get('_iroute_dynamic_helpers') || '');",
+                      "pm.test('HTTP 200', function () { pm.response.to.have.status(200); });",
+                      "var data = (pm.response.json().data || {});",
+                      "irouteSyncJobDetail(data);",
+                      "pm.test('status success', function () { pm.expect(pm.response.json().status).to.eql(1); });",
+                      "irouteAssertExecuteAction(data, false);"
+                    ]
+                  }
+                }
+              ],
+              "id": "d4d2f08c-7b04-400c-8695-59c26b9d892e"
+            },
+            {
+              "name": "05b — Execute Next (multipart if required)",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{access_token}}"
+                  },
+                  {
+                    "key": "Accept-Language",
+                    "value": "{{accept_language}}"
+                  }
+                ],
+                "url": "{{base_url}}/driver/jobs/{{job_type}}/{{job_id}}/actions/{{execute_action_code}}/execute/",
+                "body": {
+                  "mode": "formdata",
+                  "formdata": [
+                    {
+                      "key": "client_action_id",
+                      "value": "{{execute_client_action_id}}",
+                      "type": "text"
+                    },
+                    {
+                      "key": "workflow_version",
+                      "value": "{{workflow_version}}",
+                      "type": "text"
+                    },
+                    {
+                      "key": "content_hash",
+                      "value": "{{content_hash}}",
+                      "type": "text"
+                    },
+                    {
+                      "key": "latitude",
+                      "value": "21.4858",
+                      "type": "text"
+                    },
+                    {
+                      "key": "longitude",
+                      "value": "39.1925",
+                      "type": "text"
+                    },
+                    {
+                      "key": "notes",
+                      "value": "Dynamic multipart {{execute_action_code}}",
+                      "type": "text"
+                    },
+                    {
+                      "key": "media[0][media_type]",
+                      "value": "photo",
+                      "type": "text"
+                    },
+                    {
+                      "key": "media[0][file_ref]",
+                      "type": "file",
+                      "src": []
+                    },
+                    {
+                      "key": "media[1][media_type]",
+                      "value": "photo",
+                      "type": "text"
+                    },
+                    {
+                      "key": "media[1][file_ref]",
+                      "type": "file",
+                      "src": []
+                    }
+                  ]
+                }
+              },
+              "event": [
+                {
+                  "listen": "prerequest",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "eval(pm.collectionVariables.get('_iroute_dynamic_helpers') || '');",
+                      "irouteSkipUnless('execute_use_multipart');",
+                      "irouteSkipIfDelegatedCapture();",
+                      "irouteSkipIfNoAction();",
+                      "pm.collectionVariables.set('execute_client_action_id', irouteNewClientActionId());"
+                    ]
+                  }
+                },
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "eval(pm.collectionVariables.get('_iroute_dynamic_helpers') || '');",
+                      "if (pm.response.code === 204 || !pm.response.text()) return;",
+                      "var resp = pm.response.json();",
+                      "pm.test('Multipart execute OK', function () { pm.expect([200,201]).to.include(pm.response.code); });",
+                      "if (resp.status === 1 && resp.data) { irouteSyncJobDetail(resp.data); irouteTransitionToShipment({active_job: resp.data.job}); }"
+                    ]
+                  }
+                }
+              ],
+              "id": "2f8597ca-1b4a-41a1-8caa-f972780ba7bc"
+            },
+            {
+              "name": "05c — Execute Next (JSON)",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{access_token}}"
+                  },
+                  {
+                    "key": "Accept-Language",
+                    "value": "{{accept_language}}"
+                  }
+                ],
+                "url": "{{base_url}}/driver/jobs/{{job_type}}/{{job_id}}/actions/{{execute_action_code}}/execute/",
+                "body": {
+                  "mode": "raw",
+                  "raw": "{}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                }
+              },
+              "event": [
+                {
+                  "listen": "prerequest",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "eval(pm.collectionVariables.get('_iroute_dynamic_helpers') || '');",
+                      "irouteAssertToken();",
+                      "if (pm.variables.get('execute_use_multipart') === 'true') { if (pm.execution && pm.execution.skipRequest) pm.execution.skipRequest(); }",
+                      "irouteSkipIfDelegatedCapture();",
+                      "irouteSkipIfNoAction();",
+                      "pm.collectionVariables.set('execute_client_action_id', irouteNewClientActionId());",
+                      "pm.request.body.raw = irouteBuildExecuteBody();"
+                    ]
+                  }
+                },
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "eval(pm.collectionVariables.get('_iroute_dynamic_helpers') || '');",
+                      "if (pm.response.code === 204 || !pm.response.text()) return;",
+                      "var resp = pm.response.json();",
+                      "if (resp.status === 1 && resp.data) {",
+                      "  irouteSyncJobDetail(resp.data);",
+                      "  irouteTransitionToShipment({active_job: resp.data.job});",
+                      "}",
+                      "pm.test('Execute OK or skipped', function () { pm.expect([200,201,204]).to.include(pm.response.code); });"
+                    ]
+                  }
+                }
+              ],
+              "id": "9cfbb124-2fb4-41f5-99d9-d91e9cf4fa14"
+            },
+            {
+              "name": "05d — Dashboard (pick shipment if born)",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{access_token}}"
+                  },
+                  {
+                    "key": "Accept-Language",
+                    "value": "{{accept_language}}"
+                  }
+                ],
+                "url": "{{base_url}}/driver/dashboard/"
+              },
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "eval(pm.collectionVariables.get('_iroute_dynamic_helpers') || '');",
+                      "var d = pm.response.json().data || {};",
+                      "irouteSaveDashboardJob(d);",
+                      "irouteTransitionToShipment(d);"
+                    ]
+                  }
+                }
+              ],
+              "id": "cdbc5aef-0b4a-4031-ae0f-d998a1947dd9"
+            }
+          ],
+          "id": "6e1ce7c0-ef4a-46ea-a0ad-f4e50309f980"
+        },
+        {
+          "name": "Cycle 06 — Job Detail + Execute",
+          "item": [
+            {
+              "name": "06a — Job Detail (sync next action)",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{access_token}}"
+                  },
+                  {
+                    "key": "Accept-Language",
+                    "value": "{{accept_language}}"
+                  }
+                ],
+                "url": "{{base_url}}/driver/jobs/{{job_type}}/{{job_id}}/"
+              },
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "eval(pm.collectionVariables.get('_iroute_dynamic_helpers') || '');",
+                      "pm.test('HTTP 200', function () { pm.response.to.have.status(200); });",
+                      "var data = (pm.response.json().data || {});",
+                      "irouteSyncJobDetail(data);",
+                      "pm.test('status success', function () { pm.expect(pm.response.json().status).to.eql(1); });",
+                      "irouteAssertExecuteAction(data, false);"
+                    ]
+                  }
+                }
+              ],
+              "id": "2ab895d5-fa41-46ca-999d-3a2391cd7a31"
+            },
+            {
+              "name": "06b — Execute Next (multipart if required)",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{access_token}}"
+                  },
+                  {
+                    "key": "Accept-Language",
+                    "value": "{{accept_language}}"
+                  }
+                ],
+                "url": "{{base_url}}/driver/jobs/{{job_type}}/{{job_id}}/actions/{{execute_action_code}}/execute/",
+                "body": {
+                  "mode": "formdata",
+                  "formdata": [
+                    {
+                      "key": "client_action_id",
+                      "value": "{{execute_client_action_id}}",
+                      "type": "text"
+                    },
+                    {
+                      "key": "workflow_version",
+                      "value": "{{workflow_version}}",
+                      "type": "text"
+                    },
+                    {
+                      "key": "content_hash",
+                      "value": "{{content_hash}}",
+                      "type": "text"
+                    },
+                    {
+                      "key": "latitude",
+                      "value": "21.4858",
+                      "type": "text"
+                    },
+                    {
+                      "key": "longitude",
+                      "value": "39.1925",
+                      "type": "text"
+                    },
+                    {
+                      "key": "notes",
+                      "value": "Dynamic multipart {{execute_action_code}}",
+                      "type": "text"
+                    },
+                    {
+                      "key": "media[0][media_type]",
+                      "value": "photo",
+                      "type": "text"
+                    },
+                    {
+                      "key": "media[0][file_ref]",
+                      "type": "file",
+                      "src": []
+                    },
+                    {
+                      "key": "media[1][media_type]",
+                      "value": "photo",
+                      "type": "text"
+                    },
+                    {
+                      "key": "media[1][file_ref]",
+                      "type": "file",
+                      "src": []
+                    }
+                  ]
+                }
+              },
+              "event": [
+                {
+                  "listen": "prerequest",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "eval(pm.collectionVariables.get('_iroute_dynamic_helpers') || '');",
+                      "irouteSkipUnless('execute_use_multipart');",
+                      "irouteSkipIfDelegatedCapture();",
+                      "irouteSkipIfNoAction();",
+                      "pm.collectionVariables.set('execute_client_action_id', irouteNewClientActionId());"
+                    ]
+                  }
+                },
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "eval(pm.collectionVariables.get('_iroute_dynamic_helpers') || '');",
+                      "if (pm.response.code === 204 || !pm.response.text()) return;",
+                      "var resp = pm.response.json();",
+                      "pm.test('Multipart execute OK', function () { pm.expect([200,201]).to.include(pm.response.code); });",
+                      "if (resp.status === 1 && resp.data) { irouteSyncJobDetail(resp.data); irouteTransitionToShipment({active_job: resp.data.job}); }"
+                    ]
+                  }
+                }
+              ],
+              "id": "c753b71b-f11e-499c-beb6-b5298884f862"
+            },
+            {
+              "name": "06c — Execute Next (JSON)",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{access_token}}"
+                  },
+                  {
+                    "key": "Accept-Language",
+                    "value": "{{accept_language}}"
+                  }
+                ],
+                "url": "{{base_url}}/driver/jobs/{{job_type}}/{{job_id}}/actions/{{execute_action_code}}/execute/",
+                "body": {
+                  "mode": "raw",
+                  "raw": "{}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                }
+              },
+              "event": [
+                {
+                  "listen": "prerequest",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "eval(pm.collectionVariables.get('_iroute_dynamic_helpers') || '');",
+                      "irouteAssertToken();",
+                      "if (pm.variables.get('execute_use_multipart') === 'true') { if (pm.execution && pm.execution.skipRequest) pm.execution.skipRequest(); }",
+                      "irouteSkipIfDelegatedCapture();",
+                      "irouteSkipIfNoAction();",
+                      "pm.collectionVariables.set('execute_client_action_id', irouteNewClientActionId());",
+                      "pm.request.body.raw = irouteBuildExecuteBody();"
+                    ]
+                  }
+                },
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "eval(pm.collectionVariables.get('_iroute_dynamic_helpers') || '');",
+                      "if (pm.response.code === 204 || !pm.response.text()) return;",
+                      "var resp = pm.response.json();",
+                      "if (resp.status === 1 && resp.data) {",
+                      "  irouteSyncJobDetail(resp.data);",
+                      "  irouteTransitionToShipment({active_job: resp.data.job});",
+                      "}",
+                      "pm.test('Execute OK or skipped', function () { pm.expect([200,201,204]).to.include(pm.response.code); });"
+                    ]
+                  }
+                }
+              ],
+              "id": "8feb89d9-0cd0-43e8-8f0a-1f8dbf3a3b3f"
+            },
+            {
+              "name": "06d — Dashboard (pick shipment if born)",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{access_token}}"
+                  },
+                  {
+                    "key": "Accept-Language",
+                    "value": "{{accept_language}}"
+                  }
+                ],
+                "url": "{{base_url}}/driver/dashboard/"
+              },
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "eval(pm.collectionVariables.get('_iroute_dynamic_helpers') || '');",
+                      "var d = pm.response.json().data || {};",
+                      "irouteSaveDashboardJob(d);",
+                      "irouteTransitionToShipment(d);"
+                    ]
+                  }
+                }
+              ],
+              "id": "11d8b38b-7581-477e-87ac-fd82ac73559a"
+            }
+          ],
+          "id": "6786d09d-75c0-4808-9863-de4c692d5032"
+        },
+        {
+          "name": "Cycle 07 — Job Detail + Execute",
+          "item": [
+            {
+              "name": "07a — Job Detail (sync next action)",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{access_token}}"
+                  },
+                  {
+                    "key": "Accept-Language",
+                    "value": "{{accept_language}}"
+                  }
+                ],
+                "url": "{{base_url}}/driver/jobs/{{job_type}}/{{job_id}}/"
+              },
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "eval(pm.collectionVariables.get('_iroute_dynamic_helpers') || '');",
+                      "pm.test('HTTP 200', function () { pm.response.to.have.status(200); });",
+                      "var data = (pm.response.json().data || {});",
+                      "irouteSyncJobDetail(data);",
+                      "pm.test('status success', function () { pm.expect(pm.response.json().status).to.eql(1); });",
+                      "irouteAssertExecuteAction(data, false);"
+                    ]
+                  }
+                }
+              ],
+              "id": "905a4fcc-d2a5-4455-8c0c-61f0d1f3d426"
+            },
+            {
+              "name": "07b — Execute Next (multipart if required)",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{access_token}}"
+                  },
+                  {
+                    "key": "Accept-Language",
+                    "value": "{{accept_language}}"
+                  }
+                ],
+                "url": "{{base_url}}/driver/jobs/{{job_type}}/{{job_id}}/actions/{{execute_action_code}}/execute/",
+                "body": {
+                  "mode": "formdata",
+                  "formdata": [
+                    {
+                      "key": "client_action_id",
+                      "value": "{{execute_client_action_id}}",
+                      "type": "text"
+                    },
+                    {
+                      "key": "workflow_version",
+                      "value": "{{workflow_version}}",
+                      "type": "text"
+                    },
+                    {
+                      "key": "content_hash",
+                      "value": "{{content_hash}}",
+                      "type": "text"
+                    },
+                    {
+                      "key": "latitude",
+                      "value": "21.4858",
+                      "type": "text"
+                    },
+                    {
+                      "key": "longitude",
+                      "value": "39.1925",
+                      "type": "text"
+                    },
+                    {
+                      "key": "notes",
+                      "value": "Dynamic multipart {{execute_action_code}}",
+                      "type": "text"
+                    },
+                    {
+                      "key": "media[0][media_type]",
+                      "value": "photo",
+                      "type": "text"
+                    },
+                    {
+                      "key": "media[0][file_ref]",
+                      "type": "file",
+                      "src": []
+                    },
+                    {
+                      "key": "media[1][media_type]",
+                      "value": "photo",
+                      "type": "text"
+                    },
+                    {
+                      "key": "media[1][file_ref]",
+                      "type": "file",
+                      "src": []
+                    }
+                  ]
+                }
+              },
+              "event": [
+                {
+                  "listen": "prerequest",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "eval(pm.collectionVariables.get('_iroute_dynamic_helpers') || '');",
+                      "irouteSkipUnless('execute_use_multipart');",
+                      "irouteSkipIfDelegatedCapture();",
+                      "irouteSkipIfNoAction();",
+                      "pm.collectionVariables.set('execute_client_action_id', irouteNewClientActionId());"
+                    ]
+                  }
+                },
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "eval(pm.collectionVariables.get('_iroute_dynamic_helpers') || '');",
+                      "if (pm.response.code === 204 || !pm.response.text()) return;",
+                      "var resp = pm.response.json();",
+                      "pm.test('Multipart execute OK', function () { pm.expect([200,201]).to.include(pm.response.code); });",
+                      "if (resp.status === 1 && resp.data) { irouteSyncJobDetail(resp.data); irouteTransitionToShipment({active_job: resp.data.job}); }"
+                    ]
+                  }
+                }
+              ],
+              "id": "f9d18e21-6617-405c-89a1-4c97b6b9728d"
+            },
+            {
+              "name": "07c — Execute Next (JSON)",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{access_token}}"
+                  },
+                  {
+                    "key": "Accept-Language",
+                    "value": "{{accept_language}}"
+                  }
+                ],
+                "url": "{{base_url}}/driver/jobs/{{job_type}}/{{job_id}}/actions/{{execute_action_code}}/execute/",
+                "body": {
+                  "mode": "raw",
+                  "raw": "{}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                }
+              },
+              "event": [
+                {
+                  "listen": "prerequest",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "eval(pm.collectionVariables.get('_iroute_dynamic_helpers') || '');",
+                      "irouteAssertToken();",
+                      "if (pm.variables.get('execute_use_multipart') === 'true') { if (pm.execution && pm.execution.skipRequest) pm.execution.skipRequest(); }",
+                      "irouteSkipIfDelegatedCapture();",
+                      "irouteSkipIfNoAction();",
+                      "pm.collectionVariables.set('execute_client_action_id', irouteNewClientActionId());",
+                      "pm.request.body.raw = irouteBuildExecuteBody();"
+                    ]
+                  }
+                },
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "eval(pm.collectionVariables.get('_iroute_dynamic_helpers') || '');",
+                      "if (pm.response.code === 204 || !pm.response.text()) return;",
+                      "var resp = pm.response.json();",
+                      "if (resp.status === 1 && resp.data) {",
+                      "  irouteSyncJobDetail(resp.data);",
+                      "  irouteTransitionToShipment({active_job: resp.data.job});",
+                      "}",
+                      "pm.test('Execute OK or skipped', function () { pm.expect([200,201,204]).to.include(pm.response.code); });"
+                    ]
+                  }
+                }
+              ],
+              "id": "c8239e2d-3763-4b8d-81a3-95f3a1c57319"
+            },
+            {
+              "name": "07d — Dashboard (pick shipment if born)",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{access_token}}"
+                  },
+                  {
+                    "key": "Accept-Language",
+                    "value": "{{accept_language}}"
+                  }
+                ],
+                "url": "{{base_url}}/driver/dashboard/"
+              },
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "eval(pm.collectionVariables.get('_iroute_dynamic_helpers') || '');",
+                      "var d = pm.response.json().data || {};",
+                      "irouteSaveDashboardJob(d);",
+                      "irouteTransitionToShipment(d);"
+                    ]
+                  }
+                }
+              ],
+              "id": "986b0662-85a2-4597-9f61-dd5100b6437d"
+            }
+          ],
+          "id": "f83cb4bb-e635-4dbf-8b36-96f6f6246215"
+        },
+        {
+          "name": "Cycle 08 — Job Detail + Execute",
+          "item": [
+            {
+              "name": "08a — Job Detail (sync next action)",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{access_token}}"
+                  },
+                  {
+                    "key": "Accept-Language",
+                    "value": "{{accept_language}}"
+                  }
+                ],
+                "url": "{{base_url}}/driver/jobs/{{job_type}}/{{job_id}}/"
+              },
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "eval(pm.collectionVariables.get('_iroute_dynamic_helpers') || '');",
+                      "pm.test('HTTP 200', function () { pm.response.to.have.status(200); });",
+                      "var data = (pm.response.json().data || {});",
+                      "irouteSyncJobDetail(data);",
+                      "pm.test('status success', function () { pm.expect(pm.response.json().status).to.eql(1); });",
+                      "irouteAssertExecuteAction(data, false);"
+                    ]
+                  }
+                }
+              ],
+              "id": "ae306119-2dd6-4d4d-ad6d-04a89ede093a"
+            },
+            {
+              "name": "08b — Execute Next (multipart if required)",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{access_token}}"
+                  },
+                  {
+                    "key": "Accept-Language",
+                    "value": "{{accept_language}}"
+                  }
+                ],
+                "url": "{{base_url}}/driver/jobs/{{job_type}}/{{job_id}}/actions/{{execute_action_code}}/execute/",
+                "body": {
+                  "mode": "formdata",
+                  "formdata": [
+                    {
+                      "key": "client_action_id",
+                      "value": "{{execute_client_action_id}}",
+                      "type": "text"
+                    },
+                    {
+                      "key": "workflow_version",
+                      "value": "{{workflow_version}}",
+                      "type": "text"
+                    },
+                    {
+                      "key": "content_hash",
+                      "value": "{{content_hash}}",
+                      "type": "text"
+                    },
+                    {
+                      "key": "latitude",
+                      "value": "21.4858",
+                      "type": "text"
+                    },
+                    {
+                      "key": "longitude",
+                      "value": "39.1925",
+                      "type": "text"
+                    },
+                    {
+                      "key": "notes",
+                      "value": "Dynamic multipart {{execute_action_code}}",
+                      "type": "text"
+                    },
+                    {
+                      "key": "media[0][media_type]",
+                      "value": "photo",
+                      "type": "text"
+                    },
+                    {
+                      "key": "media[0][file_ref]",
+                      "type": "file",
+                      "src": []
+                    },
+                    {
+                      "key": "media[1][media_type]",
+                      "value": "photo",
+                      "type": "text"
+                    },
+                    {
+                      "key": "media[1][file_ref]",
+                      "type": "file",
+                      "src": []
+                    }
+                  ]
+                }
+              },
+              "event": [
+                {
+                  "listen": "prerequest",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "eval(pm.collectionVariables.get('_iroute_dynamic_helpers') || '');",
+                      "irouteSkipUnless('execute_use_multipart');",
+                      "irouteSkipIfDelegatedCapture();",
+                      "irouteSkipIfNoAction();",
+                      "pm.collectionVariables.set('execute_client_action_id', irouteNewClientActionId());"
+                    ]
+                  }
+                },
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "eval(pm.collectionVariables.get('_iroute_dynamic_helpers') || '');",
+                      "if (pm.response.code === 204 || !pm.response.text()) return;",
+                      "var resp = pm.response.json();",
+                      "pm.test('Multipart execute OK', function () { pm.expect([200,201]).to.include(pm.response.code); });",
+                      "if (resp.status === 1 && resp.data) { irouteSyncJobDetail(resp.data); irouteTransitionToShipment({active_job: resp.data.job}); }"
+                    ]
+                  }
+                }
+              ],
+              "id": "ba385054-86fc-4a81-a18e-728f638f6584"
+            },
+            {
+              "name": "08c — Execute Next (JSON)",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{access_token}}"
+                  },
+                  {
+                    "key": "Accept-Language",
+                    "value": "{{accept_language}}"
+                  }
+                ],
+                "url": "{{base_url}}/driver/jobs/{{job_type}}/{{job_id}}/actions/{{execute_action_code}}/execute/",
+                "body": {
+                  "mode": "raw",
+                  "raw": "{}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                }
+              },
+              "event": [
+                {
+                  "listen": "prerequest",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "eval(pm.collectionVariables.get('_iroute_dynamic_helpers') || '');",
+                      "irouteAssertToken();",
+                      "if (pm.variables.get('execute_use_multipart') === 'true') { if (pm.execution && pm.execution.skipRequest) pm.execution.skipRequest(); }",
+                      "irouteSkipIfDelegatedCapture();",
+                      "irouteSkipIfNoAction();",
+                      "pm.collectionVariables.set('execute_client_action_id', irouteNewClientActionId());",
+                      "pm.request.body.raw = irouteBuildExecuteBody();"
+                    ]
+                  }
+                },
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "eval(pm.collectionVariables.get('_iroute_dynamic_helpers') || '');",
+                      "if (pm.response.code === 204 || !pm.response.text()) return;",
+                      "var resp = pm.response.json();",
+                      "if (resp.status === 1 && resp.data) {",
+                      "  irouteSyncJobDetail(resp.data);",
+                      "  irouteTransitionToShipment({active_job: resp.data.job});",
+                      "}",
+                      "pm.test('Execute OK or skipped', function () { pm.expect([200,201,204]).to.include(pm.response.code); });"
+                    ]
+                  }
+                }
+              ],
+              "id": "b65afcff-e5ab-4b2b-902a-efda34b9f6ae"
+            },
+            {
+              "name": "08d — Dashboard (pick shipment if born)",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{access_token}}"
+                  },
+                  {
+                    "key": "Accept-Language",
+                    "value": "{{accept_language}}"
+                  }
+                ],
+                "url": "{{base_url}}/driver/dashboard/"
+              },
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "eval(pm.collectionVariables.get('_iroute_dynamic_helpers') || '');",
+                      "var d = pm.response.json().data || {};",
+                      "irouteSaveDashboardJob(d);",
+                      "irouteTransitionToShipment(d);"
+                    ]
+                  }
+                }
+              ],
+              "id": "b8a6369b-f1fd-471d-8528-11497e0c2ff1"
+            }
+          ],
+          "id": "34031df0-a3d5-4165-80f7-1c7e02b151f5"
+        },
+        {
+          "name": "Cycle 09 — Job Detail + Execute",
+          "item": [
+            {
+              "name": "09a — Job Detail (sync next action)",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{access_token}}"
+                  },
+                  {
+                    "key": "Accept-Language",
+                    "value": "{{accept_language}}"
+                  }
+                ],
+                "url": "{{base_url}}/driver/jobs/{{job_type}}/{{job_id}}/"
+              },
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "eval(pm.collectionVariables.get('_iroute_dynamic_helpers') || '');",
+                      "pm.test('HTTP 200', function () { pm.response.to.have.status(200); });",
+                      "var data = (pm.response.json().data || {});",
+                      "irouteSyncJobDetail(data);",
+                      "pm.test('status success', function () { pm.expect(pm.response.json().status).to.eql(1); });",
+                      "irouteAssertExecuteAction(data, false);"
+                    ]
+                  }
+                }
+              ],
+              "id": "ed868561-26df-46cf-b0be-0fdb02a8c0ae"
+            },
+            {
+              "name": "09b — Execute Next (multipart if required)",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{access_token}}"
+                  },
+                  {
+                    "key": "Accept-Language",
+                    "value": "{{accept_language}}"
+                  }
+                ],
+                "url": "{{base_url}}/driver/jobs/{{job_type}}/{{job_id}}/actions/{{execute_action_code}}/execute/",
+                "body": {
+                  "mode": "formdata",
+                  "formdata": [
+                    {
+                      "key": "client_action_id",
+                      "value": "{{execute_client_action_id}}",
+                      "type": "text"
+                    },
+                    {
+                      "key": "workflow_version",
+                      "value": "{{workflow_version}}",
+                      "type": "text"
+                    },
+                    {
+                      "key": "content_hash",
+                      "value": "{{content_hash}}",
+                      "type": "text"
+                    },
+                    {
+                      "key": "latitude",
+                      "value": "21.4858",
+                      "type": "text"
+                    },
+                    {
+                      "key": "longitude",
+                      "value": "39.1925",
+                      "type": "text"
+                    },
+                    {
+                      "key": "notes",
+                      "value": "Dynamic multipart {{execute_action_code}}",
+                      "type": "text"
+                    },
+                    {
+                      "key": "media[0][media_type]",
+                      "value": "photo",
+                      "type": "text"
+                    },
+                    {
+                      "key": "media[0][file_ref]",
+                      "type": "file",
+                      "src": []
+                    },
+                    {
+                      "key": "media[1][media_type]",
+                      "value": "photo",
+                      "type": "text"
+                    },
+                    {
+                      "key": "media[1][file_ref]",
+                      "type": "file",
+                      "src": []
+                    }
+                  ]
+                }
+              },
+              "event": [
+                {
+                  "listen": "prerequest",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "eval(pm.collectionVariables.get('_iroute_dynamic_helpers') || '');",
+                      "irouteSkipUnless('execute_use_multipart');",
+                      "irouteSkipIfDelegatedCapture();",
+                      "irouteSkipIfNoAction();",
+                      "pm.collectionVariables.set('execute_client_action_id', irouteNewClientActionId());"
+                    ]
+                  }
+                },
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "eval(pm.collectionVariables.get('_iroute_dynamic_helpers') || '');",
+                      "if (pm.response.code === 204 || !pm.response.text()) return;",
+                      "var resp = pm.response.json();",
+                      "pm.test('Multipart execute OK', function () { pm.expect([200,201]).to.include(pm.response.code); });",
+                      "if (resp.status === 1 && resp.data) { irouteSyncJobDetail(resp.data); irouteTransitionToShipment({active_job: resp.data.job}); }"
+                    ]
+                  }
+                }
+              ],
+              "id": "fd2e6321-b91b-4567-bc22-64c17d5bbe66"
+            },
+            {
+              "name": "09c — Execute Next (JSON)",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{access_token}}"
+                  },
+                  {
+                    "key": "Accept-Language",
+                    "value": "{{accept_language}}"
+                  }
+                ],
+                "url": "{{base_url}}/driver/jobs/{{job_type}}/{{job_id}}/actions/{{execute_action_code}}/execute/",
+                "body": {
+                  "mode": "raw",
+                  "raw": "{}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                }
+              },
+              "event": [
+                {
+                  "listen": "prerequest",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "eval(pm.collectionVariables.get('_iroute_dynamic_helpers') || '');",
+                      "irouteAssertToken();",
+                      "if (pm.variables.get('execute_use_multipart') === 'true') { if (pm.execution && pm.execution.skipRequest) pm.execution.skipRequest(); }",
+                      "irouteSkipIfDelegatedCapture();",
+                      "irouteSkipIfNoAction();",
+                      "pm.collectionVariables.set('execute_client_action_id', irouteNewClientActionId());",
+                      "pm.request.body.raw = irouteBuildExecuteBody();"
+                    ]
+                  }
+                },
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "eval(pm.collectionVariables.get('_iroute_dynamic_helpers') || '');",
+                      "if (pm.response.code === 204 || !pm.response.text()) return;",
+                      "var resp = pm.response.json();",
+                      "if (resp.status === 1 && resp.data) {",
+                      "  irouteSyncJobDetail(resp.data);",
+                      "  irouteTransitionToShipment({active_job: resp.data.job});",
+                      "}",
+                      "pm.test('Execute OK or skipped', function () { pm.expect([200,201,204]).to.include(pm.response.code); });"
+                    ]
+                  }
+                }
+              ],
+              "id": "610759a3-db9b-45e7-94e1-bc0a42b1d3bc"
+            },
+            {
+              "name": "09d — Dashboard (pick shipment if born)",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{access_token}}"
+                  },
+                  {
+                    "key": "Accept-Language",
+                    "value": "{{accept_language}}"
+                  }
+                ],
+                "url": "{{base_url}}/driver/dashboard/"
+              },
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "eval(pm.collectionVariables.get('_iroute_dynamic_helpers') || '');",
+                      "var d = pm.response.json().data || {};",
+                      "irouteSaveDashboardJob(d);",
+                      "irouteTransitionToShipment(d);"
+                    ]
+                  }
+                }
+              ],
+              "id": "99d9bded-247d-4a1a-86d9-e983cf1cfe3e"
+            }
+          ],
+          "id": "3ab0d3cd-3e06-4a08-a54d-231bbb3c99b6"
+        },
+        {
+          "name": "Cycle 10 — Job Detail + Execute",
+          "item": [
+            {
+              "name": "10a — Job Detail (sync next action)",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{access_token}}"
+                  },
+                  {
+                    "key": "Accept-Language",
+                    "value": "{{accept_language}}"
+                  }
+                ],
+                "url": "{{base_url}}/driver/jobs/{{job_type}}/{{job_id}}/"
+              },
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "eval(pm.collectionVariables.get('_iroute_dynamic_helpers') || '');",
+                      "pm.test('HTTP 200', function () { pm.response.to.have.status(200); });",
+                      "var data = (pm.response.json().data || {});",
+                      "irouteSyncJobDetail(data);",
+                      "pm.test('status success', function () { pm.expect(pm.response.json().status).to.eql(1); });",
+                      "irouteAssertExecuteAction(data, false);"
+                    ]
+                  }
+                }
+              ],
+              "id": "4d461f1b-d560-41e7-b773-33d9fe61ecff"
+            },
+            {
+              "name": "10b — Execute Next (multipart if required)",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{access_token}}"
+                  },
+                  {
+                    "key": "Accept-Language",
+                    "value": "{{accept_language}}"
+                  }
+                ],
+                "url": "{{base_url}}/driver/jobs/{{job_type}}/{{job_id}}/actions/{{execute_action_code}}/execute/",
+                "body": {
+                  "mode": "formdata",
+                  "formdata": [
+                    {
+                      "key": "client_action_id",
+                      "value": "{{execute_client_action_id}}",
+                      "type": "text"
+                    },
+                    {
+                      "key": "workflow_version",
+                      "value": "{{workflow_version}}",
+                      "type": "text"
+                    },
+                    {
+                      "key": "content_hash",
+                      "value": "{{content_hash}}",
+                      "type": "text"
+                    },
+                    {
+                      "key": "latitude",
+                      "value": "21.4858",
+                      "type": "text"
+                    },
+                    {
+                      "key": "longitude",
+                      "value": "39.1925",
+                      "type": "text"
+                    },
+                    {
+                      "key": "notes",
+                      "value": "Dynamic multipart {{execute_action_code}}",
+                      "type": "text"
+                    },
+                    {
+                      "key": "media[0][media_type]",
+                      "value": "photo",
+                      "type": "text"
+                    },
+                    {
+                      "key": "media[0][file_ref]",
+                      "type": "file",
+                      "src": []
+                    },
+                    {
+                      "key": "media[1][media_type]",
+                      "value": "photo",
+                      "type": "text"
+                    },
+                    {
+                      "key": "media[1][file_ref]",
+                      "type": "file",
+                      "src": []
+                    }
+                  ]
+                }
+              },
+              "event": [
+                {
+                  "listen": "prerequest",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "eval(pm.collectionVariables.get('_iroute_dynamic_helpers') || '');",
+                      "irouteSkipUnless('execute_use_multipart');",
+                      "irouteSkipIfDelegatedCapture();",
+                      "irouteSkipIfNoAction();",
+                      "pm.collectionVariables.set('execute_client_action_id', irouteNewClientActionId());"
+                    ]
+                  }
+                },
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "eval(pm.collectionVariables.get('_iroute_dynamic_helpers') || '');",
+                      "if (pm.response.code === 204 || !pm.response.text()) return;",
+                      "var resp = pm.response.json();",
+                      "pm.test('Multipart execute OK', function () { pm.expect([200,201]).to.include(pm.response.code); });",
+                      "if (resp.status === 1 && resp.data) { irouteSyncJobDetail(resp.data); irouteTransitionToShipment({active_job: resp.data.job}); }"
+                    ]
+                  }
+                }
+              ],
+              "id": "ff41f46e-7822-4277-af43-420b5bd167e9"
+            },
+            {
+              "name": "10c — Execute Next (JSON)",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{access_token}}"
+                  },
+                  {
+                    "key": "Accept-Language",
+                    "value": "{{accept_language}}"
+                  }
+                ],
+                "url": "{{base_url}}/driver/jobs/{{job_type}}/{{job_id}}/actions/{{execute_action_code}}/execute/",
+                "body": {
+                  "mode": "raw",
+                  "raw": "{}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                }
+              },
+              "event": [
+                {
+                  "listen": "prerequest",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "eval(pm.collectionVariables.get('_iroute_dynamic_helpers') || '');",
+                      "irouteAssertToken();",
+                      "if (pm.variables.get('execute_use_multipart') === 'true') { if (pm.execution && pm.execution.skipRequest) pm.execution.skipRequest(); }",
+                      "irouteSkipIfDelegatedCapture();",
+                      "irouteSkipIfNoAction();",
+                      "pm.collectionVariables.set('execute_client_action_id', irouteNewClientActionId());",
+                      "pm.request.body.raw = irouteBuildExecuteBody();"
+                    ]
+                  }
+                },
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "eval(pm.collectionVariables.get('_iroute_dynamic_helpers') || '');",
+                      "if (pm.response.code === 204 || !pm.response.text()) return;",
+                      "var resp = pm.response.json();",
+                      "if (resp.status === 1 && resp.data) {",
+                      "  irouteSyncJobDetail(resp.data);",
+                      "  irouteTransitionToShipment({active_job: resp.data.job});",
+                      "}",
+                      "pm.test('Execute OK or skipped', function () { pm.expect([200,201,204]).to.include(pm.response.code); });"
+                    ]
+                  }
+                }
+              ],
+              "id": "069a7e59-0176-4632-9267-5eae0b91f74b"
+            },
+            {
+              "name": "10d — Dashboard (pick shipment if born)",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{access_token}}"
+                  },
+                  {
+                    "key": "Accept-Language",
+                    "value": "{{accept_language}}"
+                  }
+                ],
+                "url": "{{base_url}}/driver/dashboard/"
+              },
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "eval(pm.collectionVariables.get('_iroute_dynamic_helpers') || '');",
+                      "var d = pm.response.json().data || {};",
+                      "irouteSaveDashboardJob(d);",
+                      "irouteTransitionToShipment(d);"
+                    ]
+                  }
+                }
+              ],
+              "id": "720824df-b7ce-44fb-abc8-b8a818493d7f"
+            }
+          ],
+          "id": "463f3a9f-c208-4a3c-8294-a224c92fd0b9"
+        },
+        {
+          "name": "Cycle 11 — Job Detail + Execute",
+          "item": [
+            {
+              "name": "11a — Job Detail (sync next action)",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{access_token}}"
+                  },
+                  {
+                    "key": "Accept-Language",
+                    "value": "{{accept_language}}"
+                  }
+                ],
+                "url": "{{base_url}}/driver/jobs/{{job_type}}/{{job_id}}/"
+              },
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "eval(pm.collectionVariables.get('_iroute_dynamic_helpers') || '');",
+                      "pm.test('HTTP 200', function () { pm.response.to.have.status(200); });",
+                      "var data = (pm.response.json().data || {});",
+                      "irouteSyncJobDetail(data);",
+                      "pm.test('status success', function () { pm.expect(pm.response.json().status).to.eql(1); });",
+                      "irouteAssertExecuteAction(data, false);"
+                    ]
+                  }
+                }
+              ],
+              "id": "df74d7b0-1c80-41d3-b425-7191b8a9ecef"
+            },
+            {
+              "name": "11b — Execute Next (multipart if required)",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{access_token}}"
+                  },
+                  {
+                    "key": "Accept-Language",
+                    "value": "{{accept_language}}"
+                  }
+                ],
+                "url": "{{base_url}}/driver/jobs/{{job_type}}/{{job_id}}/actions/{{execute_action_code}}/execute/",
+                "body": {
+                  "mode": "formdata",
+                  "formdata": [
+                    {
+                      "key": "client_action_id",
+                      "value": "{{execute_client_action_id}}",
+                      "type": "text"
+                    },
+                    {
+                      "key": "workflow_version",
+                      "value": "{{workflow_version}}",
+                      "type": "text"
+                    },
+                    {
+                      "key": "content_hash",
+                      "value": "{{content_hash}}",
+                      "type": "text"
+                    },
+                    {
+                      "key": "latitude",
+                      "value": "21.4858",
+                      "type": "text"
+                    },
+                    {
+                      "key": "longitude",
+                      "value": "39.1925",
+                      "type": "text"
+                    },
+                    {
+                      "key": "notes",
+                      "value": "Dynamic multipart {{execute_action_code}}",
+                      "type": "text"
+                    },
+                    {
+                      "key": "media[0][media_type]",
+                      "value": "photo",
+                      "type": "text"
+                    },
+                    {
+                      "key": "media[0][file_ref]",
+                      "type": "file",
+                      "src": []
+                    },
+                    {
+                      "key": "media[1][media_type]",
+                      "value": "photo",
+                      "type": "text"
+                    },
+                    {
+                      "key": "media[1][file_ref]",
+                      "type": "file",
+                      "src": []
+                    }
+                  ]
+                }
+              },
+              "event": [
+                {
+                  "listen": "prerequest",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "eval(pm.collectionVariables.get('_iroute_dynamic_helpers') || '');",
+                      "irouteSkipUnless('execute_use_multipart');",
+                      "irouteSkipIfDelegatedCapture();",
+                      "irouteSkipIfNoAction();",
+                      "pm.collectionVariables.set('execute_client_action_id', irouteNewClientActionId());"
+                    ]
+                  }
+                },
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "eval(pm.collectionVariables.get('_iroute_dynamic_helpers') || '');",
+                      "if (pm.response.code === 204 || !pm.response.text()) return;",
+                      "var resp = pm.response.json();",
+                      "pm.test('Multipart execute OK', function () { pm.expect([200,201]).to.include(pm.response.code); });",
+                      "if (resp.status === 1 && resp.data) { irouteSyncJobDetail(resp.data); irouteTransitionToShipment({active_job: resp.data.job}); }"
+                    ]
+                  }
+                }
+              ],
+              "id": "9b0444de-b076-44c9-af3a-438427b83d2c"
+            },
+            {
+              "name": "11c — Execute Next (JSON)",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{access_token}}"
+                  },
+                  {
+                    "key": "Accept-Language",
+                    "value": "{{accept_language}}"
+                  }
+                ],
+                "url": "{{base_url}}/driver/jobs/{{job_type}}/{{job_id}}/actions/{{execute_action_code}}/execute/",
+                "body": {
+                  "mode": "raw",
+                  "raw": "{}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                }
+              },
+              "event": [
+                {
+                  "listen": "prerequest",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "eval(pm.collectionVariables.get('_iroute_dynamic_helpers') || '');",
+                      "irouteAssertToken();",
+                      "if (pm.variables.get('execute_use_multipart') === 'true') { if (pm.execution && pm.execution.skipRequest) pm.execution.skipRequest(); }",
+                      "irouteSkipIfDelegatedCapture();",
+                      "irouteSkipIfNoAction();",
+                      "pm.collectionVariables.set('execute_client_action_id', irouteNewClientActionId());",
+                      "pm.request.body.raw = irouteBuildExecuteBody();"
+                    ]
+                  }
+                },
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "eval(pm.collectionVariables.get('_iroute_dynamic_helpers') || '');",
+                      "if (pm.response.code === 204 || !pm.response.text()) return;",
+                      "var resp = pm.response.json();",
+                      "if (resp.status === 1 && resp.data) {",
+                      "  irouteSyncJobDetail(resp.data);",
+                      "  irouteTransitionToShipment({active_job: resp.data.job});",
+                      "}",
+                      "pm.test('Execute OK or skipped', function () { pm.expect([200,201,204]).to.include(pm.response.code); });"
+                    ]
+                  }
+                }
+              ],
+              "id": "685f8942-a92a-4ca6-b947-079194ee61c6"
+            },
+            {
+              "name": "11d — Dashboard (pick shipment if born)",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{access_token}}"
+                  },
+                  {
+                    "key": "Accept-Language",
+                    "value": "{{accept_language}}"
+                  }
+                ],
+                "url": "{{base_url}}/driver/dashboard/"
+              },
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "eval(pm.collectionVariables.get('_iroute_dynamic_helpers') || '');",
+                      "var d = pm.response.json().data || {};",
+                      "irouteSaveDashboardJob(d);",
+                      "irouteTransitionToShipment(d);"
+                    ]
+                  }
+                }
+              ],
+              "id": "2d56ef4c-3737-45d5-920b-0848ed1191f4"
+            }
+          ],
+          "id": "52447954-e964-4562-ac3b-c7670e611747"
+        },
+        {
+          "name": "Cycle 12 — Job Detail + Execute",
+          "item": [
+            {
+              "name": "12a — Job Detail (sync next action)",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{access_token}}"
+                  },
+                  {
+                    "key": "Accept-Language",
+                    "value": "{{accept_language}}"
+                  }
+                ],
+                "url": "{{base_url}}/driver/jobs/{{job_type}}/{{job_id}}/"
+              },
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "eval(pm.collectionVariables.get('_iroute_dynamic_helpers') || '');",
+                      "pm.test('HTTP 200', function () { pm.response.to.have.status(200); });",
+                      "var data = (pm.response.json().data || {});",
+                      "irouteSyncJobDetail(data);",
+                      "pm.test('status success', function () { pm.expect(pm.response.json().status).to.eql(1); });",
+                      "irouteAssertExecuteAction(data, false);"
+                    ]
+                  }
+                }
+              ],
+              "id": "3451e9bf-7b61-4391-bf27-01fbf8833f1d"
+            },
+            {
+              "name": "12b — Execute Next (multipart if required)",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{access_token}}"
+                  },
+                  {
+                    "key": "Accept-Language",
+                    "value": "{{accept_language}}"
+                  }
+                ],
+                "url": "{{base_url}}/driver/jobs/{{job_type}}/{{job_id}}/actions/{{execute_action_code}}/execute/",
+                "body": {
+                  "mode": "formdata",
+                  "formdata": [
+                    {
+                      "key": "client_action_id",
+                      "value": "{{execute_client_action_id}}",
+                      "type": "text"
+                    },
+                    {
+                      "key": "workflow_version",
+                      "value": "{{workflow_version}}",
+                      "type": "text"
+                    },
+                    {
+                      "key": "content_hash",
+                      "value": "{{content_hash}}",
+                      "type": "text"
+                    },
+                    {
+                      "key": "latitude",
+                      "value": "21.4858",
+                      "type": "text"
+                    },
+                    {
+                      "key": "longitude",
+                      "value": "39.1925",
+                      "type": "text"
+                    },
+                    {
+                      "key": "notes",
+                      "value": "Dynamic multipart {{execute_action_code}}",
+                      "type": "text"
+                    },
+                    {
+                      "key": "media[0][media_type]",
+                      "value": "photo",
+                      "type": "text"
+                    },
+                    {
+                      "key": "media[0][file_ref]",
+                      "type": "file",
+                      "src": []
+                    },
+                    {
+                      "key": "media[1][media_type]",
+                      "value": "photo",
+                      "type": "text"
+                    },
+                    {
+                      "key": "media[1][file_ref]",
+                      "type": "file",
+                      "src": []
+                    }
+                  ]
+                }
+              },
+              "event": [
+                {
+                  "listen": "prerequest",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "eval(pm.collectionVariables.get('_iroute_dynamic_helpers') || '');",
+                      "irouteSkipUnless('execute_use_multipart');",
+                      "irouteSkipIfDelegatedCapture();",
+                      "irouteSkipIfNoAction();",
+                      "pm.collectionVariables.set('execute_client_action_id', irouteNewClientActionId());"
+                    ]
+                  }
+                },
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "eval(pm.collectionVariables.get('_iroute_dynamic_helpers') || '');",
+                      "if (pm.response.code === 204 || !pm.response.text()) return;",
+                      "var resp = pm.response.json();",
+                      "pm.test('Multipart execute OK', function () { pm.expect([200,201]).to.include(pm.response.code); });",
+                      "if (resp.status === 1 && resp.data) { irouteSyncJobDetail(resp.data); irouteTransitionToShipment({active_job: resp.data.job}); }"
+                    ]
+                  }
+                }
+              ],
+              "id": "f9114835-380b-4eb3-be89-e8e66bf547a7"
+            },
+            {
+              "name": "12c — Execute Next (JSON)",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{access_token}}"
+                  },
+                  {
+                    "key": "Accept-Language",
+                    "value": "{{accept_language}}"
+                  }
+                ],
+                "url": "{{base_url}}/driver/jobs/{{job_type}}/{{job_id}}/actions/{{execute_action_code}}/execute/",
+                "body": {
+                  "mode": "raw",
+                  "raw": "{}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                }
+              },
+              "event": [
+                {
+                  "listen": "prerequest",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "eval(pm.collectionVariables.get('_iroute_dynamic_helpers') || '');",
+                      "irouteAssertToken();",
+                      "if (pm.variables.get('execute_use_multipart') === 'true') { if (pm.execution && pm.execution.skipRequest) pm.execution.skipRequest(); }",
+                      "irouteSkipIfDelegatedCapture();",
+                      "irouteSkipIfNoAction();",
+                      "pm.collectionVariables.set('execute_client_action_id', irouteNewClientActionId());",
+                      "pm.request.body.raw = irouteBuildExecuteBody();"
+                    ]
+                  }
+                },
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "eval(pm.collectionVariables.get('_iroute_dynamic_helpers') || '');",
+                      "if (pm.response.code === 204 || !pm.response.text()) return;",
+                      "var resp = pm.response.json();",
+                      "if (resp.status === 1 && resp.data) {",
+                      "  irouteSyncJobDetail(resp.data);",
+                      "  irouteTransitionToShipment({active_job: resp.data.job});",
+                      "}",
+                      "pm.test('Execute OK or skipped', function () { pm.expect([200,201,204]).to.include(pm.response.code); });"
+                    ]
+                  }
+                }
+              ],
+              "id": "a7b28bad-3f3a-477e-9d92-dea448f04996"
+            },
+            {
+              "name": "12d — Dashboard (pick shipment if born)",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{access_token}}"
+                  },
+                  {
+                    "key": "Accept-Language",
+                    "value": "{{accept_language}}"
+                  }
+                ],
+                "url": "{{base_url}}/driver/dashboard/"
+              },
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "eval(pm.collectionVariables.get('_iroute_dynamic_helpers') || '');",
+                      "var d = pm.response.json().data || {};",
+                      "irouteSaveDashboardJob(d);",
+                      "irouteTransitionToShipment(d);"
+                    ]
+                  }
+                }
+              ],
+              "id": "7d79876b-3e0b-4c11-a5c5-65a2965fe9ff"
+            }
+          ],
+          "id": "3f222833-21a1-410f-bb06-2a18bedc4f45"
+        }
+      ],
+      "id": "8de75236-4531-42d9-a80b-005a427e42fc"
+    },
+    {
+      "name": "02 — POD Digital Capture",
+      "item": [
+        {
+          "name": "01 — POD Capture Sync",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              },
+              {
+                "key": "Accept-Language",
+                "value": "{{accept_language}}"
+              }
+            ],
+            "url": "{{base_url}}/driver/jobs/shipments/{{shipment_id}}/pod/capture/"
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "eval(pm.collectionVariables.get('_iroute_dynamic_helpers') || '');",
+                  "irouteSkipUnless('needs_pod_capture');"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "eval(pm.collectionVariables.get('_iroute_dynamic_helpers') || '');",
+                  "if (pm.response.code === 204 || !pm.response.text()) return;",
+                  "irouteSavePodSync(pm.response.json().data || {});"
+                ]
+              }
+            }
+          ],
+          "id": "1f053eca-a510-4e5b-8294-7056f20151d4"
+        },
+        {
+          "name": "02 — POD Capture POST",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              },
+              {
+                "key": "Accept-Language",
+                "value": "{{accept_language}}"
+              }
+            ],
+            "url": "{{base_url}}/driver/jobs/shipments/{{shipment_id}}/pod/capture/",
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "client_capture_id",
+                  "value": "pod-{{$guid}}",
+                  "type": "text"
+                },
+                {
+                  "key": "content_hash",
+                  "value": "{{pod_content_hash}}",
+                  "type": "text"
+                },
+                {
+                  "key": "workflow_version",
+                  "value": "{{pod_workflow_version}}",
+                  "type": "text"
+                },
+                {
+                  "key": "pod_type",
+                  "value": "digital",
+                  "type": "text"
+                },
+                {
+                  "key": "target_action_code",
+                  "value": "{{pod_upload_action_code}}",
+                  "type": "text"
+                },
+                {
+                  "key": "latitude",
+                  "value": "21.3891",
+                  "type": "text"
+                },
+                {
+                  "key": "longitude",
+                  "value": "39.8579",
+                  "type": "text"
+                },
+                {
+                  "key": "media[0][media_type]",
+                  "value": "photo",
+                  "type": "text"
+                },
+                {
+                  "key": "media[0][file_ref]",
+                  "type": "file",
+                  "src": []
+                },
+                {
+                  "key": "media[1][media_type]",
+                  "value": "signature",
+                  "type": "text"
+                },
+                {
+                  "key": "media[1][file_ref]",
+                  "type": "file",
+                  "src": []
+                },
+                {
+                  "key": "media[2][media_type]",
+                  "value": "video",
+                  "type": "text"
+                },
+                {
+                  "key": "media[2][duration_seconds]",
+                  "value": "{{pod_video_duration_seconds}}",
+                  "type": "text"
+                },
+                {
+                  "key": "media[2][file_ref]",
+                  "type": "file",
+                  "src": []
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "eval(pm.collectionVariables.get('_iroute_dynamic_helpers') || '');",
+                  "irouteSkipUnless('needs_pod_capture');"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (pm.response.code === 204 || !pm.response.text()) return;",
+                  "var d = pm.response.json().data || {};",
+                  "var id = (d.capture_bundle || {}).capture_bundle_id || d.capture_bundle_id || '';",
+                  "pm.collectionVariables.set('capture_bundle_id', id);"
+                ]
+              }
+            }
+          ],
+          "id": "a4272caf-52cd-4a78-8926-04049e1c9159"
+        },
+        {
+          "name": "03 — Execute POD upload (dynamic code)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              },
+              {
+                "key": "Accept-Language",
+                "value": "{{accept_language}}"
+              }
+            ],
+            "url": "{{base_url}}/driver/jobs/shipment/{{shipment_id}}/actions/{{pod_upload_action_code}}/execute/",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"client_action_id\": \"{{execute_client_action_id}}\",\n  \"workflow_version\": \"{{workflow_version}}\",\n  \"content_hash\": \"{{content_hash}}\",\n  \"latitude\": 21.3891,\n  \"longitude\": 39.8579,\n  \"notes\": \"Dynamic POD upload\",\n  \"capture_bundle_id\": \"{{capture_bundle_id}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "eval(pm.collectionVariables.get('_iroute_dynamic_helpers') || '');",
+                  "irouteSkipUnless('needs_pod_capture');",
+                  "pm.collectionVariables.set('execute_client_action_id', irouteNewClientActionId());"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "eval(pm.collectionVariables.get('_iroute_dynamic_helpers') || '');",
+                  "if (pm.response.code === 204 || !pm.response.text()) return;",
+                  "irouteSyncJobDetail((pm.response.json().data || {}));"
+                ]
+              }
+            }
+          ],
+          "id": "c2f9e834-e032-4181-a92e-b94d6f918aab"
+        }
+      ],
+      "id": "8eabd3aa-846d-4b33-8bd3-650b242e1200"
+    },
+    {
+      "name": "03 — Hard POD Branch",
+      "item": [
+        {
+          "name": "01 — Hard POD Documents",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              },
+              {
+                "key": "Accept-Language",
+                "value": "{{accept_language}}"
+              }
+            ],
+            "url": "{{base_url}}/driver/jobs/shipments/{{shipment_id}}/hard-pod/documents/"
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "eval(pm.collectionVariables.get('_iroute_dynamic_helpers') || '');",
+                  "irouteSkipUnless('hard_pod_required');"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (pm.response.code === 204 || !pm.response.text()) return;",
+                  "var pages = (pm.response.json().data || {}).pages || [];",
+                  "var confirmed = pages.map(function (p) { return { page_id: p.page_id, document_id: p.document_id, line_no: p.line_no || 1, confirmed: true }; });",
+                  "pm.collectionVariables.set('hard_pod_confirmed_pages_json', JSON.stringify(confirmed));",
+                  "pm.collectionVariables.set('hard_pod_client_submission_id', 'hard-' + Date.now());"
+                ]
+              }
+            }
+          ],
+          "id": "e635a02c-9a2d-4311-8432-4ff5f360f491"
+        },
+        {
+          "name": "02 — Hard POD Submit",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              },
+              {
+                "key": "Accept-Language",
+                "value": "{{accept_language}}"
+              }
+            ],
+            "url": "{{base_url}}/driver/hard-pod/submit/",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"client_submission_id\": \"{{hard_pod_client_submission_id}}\",\n  \"shipment_id\": \"{{shipment_id}}\",\n  \"receiver_name\": \"{{hard_pod_receiver_name}}\",\n  \"receiver_contact\": \"{{hard_pod_receiver_contact}}\",\n  \"handoff_notes\": \"{{hard_pod_handoff_notes}}\",\n  \"latitude\": 21.3891,\n  \"longitude\": 39.8579,\n  \"confirmed_pages\": {{hard_pod_confirmed_pages_json}},\n  \"media\": []\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "eval(pm.collectionVariables.get('_iroute_dynamic_helpers') || '');",
+                  "irouteSkipUnless('hard_pod_required');"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (pm.response.code === 204 || !pm.response.text()) return;",
+                  "var sub = (pm.response.json().data || {}).custody_submission || {};",
+                  "pm.collectionVariables.set('hard_pod_custody_submission_id', sub.submission_id || '');"
+                ]
+              }
+            }
+          ],
+          "id": "c527b51c-390f-4625-ad79-3e76d6f2fb60"
+        },
+        {
+          "name": "03 — Job Detail (hard-copy action)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              },
+              {
+                "key": "Accept-Language",
+                "value": "{{accept_language}}"
+              }
+            ],
+            "url": "{{base_url}}/driver/jobs/{{job_type}}/{{job_id}}/"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "eval(pm.collectionVariables.get('_iroute_dynamic_helpers') || '');",
+                  "pm.test('HTTP 200', function () { pm.response.to.have.status(200); });",
+                  "var data = (pm.response.json().data || {});",
+                  "irouteSyncJobDetail(data);",
+                  "pm.test('status success', function () { pm.expect(pm.response.json().status).to.eql(1); });",
+                  "irouteAssertExecuteAction(data, true);"
+                ]
+              }
+            }
+          ],
+          "id": "80bea28f-5367-44cf-85f8-a13a17f147ba"
+        },
+        {
+          "name": "04 — Execute Hard Copy (dynamic code)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              },
+              {
+                "key": "Accept-Language",
+                "value": "{{accept_language}}"
+              }
+            ],
+            "url": "{{base_url}}/driver/jobs/shipment/{{shipment_id}}/actions/{{hard_copy_action_code}}/execute/",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"client_action_id\": \"{{execute_client_action_id}}\",\n  \"workflow_version\": \"{{workflow_version}}\",\n  \"content_hash\": \"{{content_hash}}\",\n  \"latitude\": 21.3891,\n  \"longitude\": 39.8579,\n  \"notes\": \"Hard copy confirmation\",\n  \"custody_submission_id\": \"{{hard_pod_custody_submission_id}}\",\n  \"client_submission_id\": \"{{hard_pod_client_submission_id}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "eval(pm.collectionVariables.get('_iroute_dynamic_helpers') || '');",
+                  "irouteSkipUnless('hard_pod_required');",
+                  "if (!pm.variables.get('hard_copy_action_code')) pm.collectionVariables.set('hard_copy_action_code', pm.variables.get('execute_action_code'));",
+                  "pm.collectionVariables.set('execute_client_action_id', irouteNewClientActionId());"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "eval(pm.collectionVariables.get('_iroute_dynamic_helpers') || '');",
+                  "if (pm.response.code === 204 || !pm.response.text()) return;",
+                  "irouteSyncJobDetail((pm.response.json().data || {}));"
+                ]
+              }
+            }
+          ],
+          "id": "510c405c-352c-48f4-8605-0966510da0a5"
+        }
+      ],
+      "id": "5e69300f-996e-4b71-8fd7-9158d380f3b0"
+    },
+    {
+      "name": "04 — Closeout Cycles",
+      "item": [
+        {
+          "name": "Cycle 13 — Job Detail + Execute",
+          "item": [
+            {
+              "name": "13a — Job Detail (sync next action)",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{access_token}}"
+                  },
+                  {
+                    "key": "Accept-Language",
+                    "value": "{{accept_language}}"
+                  }
+                ],
+                "url": "{{base_url}}/driver/jobs/{{job_type}}/{{job_id}}/"
+              },
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "eval(pm.collectionVariables.get('_iroute_dynamic_helpers') || '');",
+                      "pm.test('HTTP 200', function () { pm.response.to.have.status(200); });",
+                      "var data = (pm.response.json().data || {});",
+                      "irouteSyncJobDetail(data);",
+                      "pm.test('status success', function () { pm.expect(pm.response.json().status).to.eql(1); });",
+                      "irouteAssertExecuteAction(data, false);"
+                    ]
+                  }
+                }
+              ],
+              "id": "4f5cf96f-7728-47c9-90df-bb28ebcbebb1"
+            },
+            {
+              "name": "13b — Execute Next (multipart if required)",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{access_token}}"
+                  },
+                  {
+                    "key": "Accept-Language",
+                    "value": "{{accept_language}}"
+                  }
+                ],
+                "url": "{{base_url}}/driver/jobs/{{job_type}}/{{job_id}}/actions/{{execute_action_code}}/execute/",
+                "body": {
+                  "mode": "formdata",
+                  "formdata": [
+                    {
+                      "key": "client_action_id",
+                      "value": "{{execute_client_action_id}}",
+                      "type": "text"
+                    },
+                    {
+                      "key": "workflow_version",
+                      "value": "{{workflow_version}}",
+                      "type": "text"
+                    },
+                    {
+                      "key": "content_hash",
+                      "value": "{{content_hash}}",
+                      "type": "text"
+                    },
+                    {
+                      "key": "latitude",
+                      "value": "21.4858",
+                      "type": "text"
+                    },
+                    {
+                      "key": "longitude",
+                      "value": "39.1925",
+                      "type": "text"
+                    },
+                    {
+                      "key": "notes",
+                      "value": "Dynamic multipart {{execute_action_code}}",
+                      "type": "text"
+                    },
+                    {
+                      "key": "media[0][media_type]",
+                      "value": "photo",
+                      "type": "text"
+                    },
+                    {
+                      "key": "media[0][file_ref]",
+                      "type": "file",
+                      "src": []
+                    },
+                    {
+                      "key": "media[1][media_type]",
+                      "value": "photo",
+                      "type": "text"
+                    },
+                    {
+                      "key": "media[1][file_ref]",
+                      "type": "file",
+                      "src": []
+                    }
+                  ]
+                }
+              },
+              "event": [
+                {
+                  "listen": "prerequest",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "eval(pm.collectionVariables.get('_iroute_dynamic_helpers') || '');",
+                      "irouteSkipUnless('execute_use_multipart');",
+                      "irouteSkipIfDelegatedCapture();",
+                      "irouteSkipIfNoAction();",
+                      "pm.collectionVariables.set('execute_client_action_id', irouteNewClientActionId());"
+                    ]
+                  }
+                },
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "eval(pm.collectionVariables.get('_iroute_dynamic_helpers') || '');",
+                      "if (pm.response.code === 204 || !pm.response.text()) return;",
+                      "var resp = pm.response.json();",
+                      "pm.test('Multipart execute OK', function () { pm.expect([200,201]).to.include(pm.response.code); });",
+                      "if (resp.status === 1 && resp.data) { irouteSyncJobDetail(resp.data); irouteTransitionToShipment({active_job: resp.data.job}); }"
+                    ]
+                  }
+                }
+              ],
+              "id": "24fdbc5c-dfc4-400a-9281-9bccde69ddb5"
+            },
+            {
+              "name": "13c — Execute Next (JSON)",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{access_token}}"
+                  },
+                  {
+                    "key": "Accept-Language",
+                    "value": "{{accept_language}}"
+                  }
+                ],
+                "url": "{{base_url}}/driver/jobs/{{job_type}}/{{job_id}}/actions/{{execute_action_code}}/execute/",
+                "body": {
+                  "mode": "raw",
+                  "raw": "{}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                }
+              },
+              "event": [
+                {
+                  "listen": "prerequest",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "eval(pm.collectionVariables.get('_iroute_dynamic_helpers') || '');",
+                      "irouteAssertToken();",
+                      "if (pm.variables.get('execute_use_multipart') === 'true') { if (pm.execution && pm.execution.skipRequest) pm.execution.skipRequest(); }",
+                      "irouteSkipIfDelegatedCapture();",
+                      "irouteSkipIfNoAction();",
+                      "pm.collectionVariables.set('execute_client_action_id', irouteNewClientActionId());",
+                      "pm.request.body.raw = irouteBuildExecuteBody();"
+                    ]
+                  }
+                },
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "eval(pm.collectionVariables.get('_iroute_dynamic_helpers') || '');",
+                      "if (pm.response.code === 204 || !pm.response.text()) return;",
+                      "var resp = pm.response.json();",
+                      "if (resp.status === 1 && resp.data) {",
+                      "  irouteSyncJobDetail(resp.data);",
+                      "  irouteTransitionToShipment({active_job: resp.data.job});",
+                      "}",
+                      "pm.test('Execute OK or skipped', function () { pm.expect([200,201,204]).to.include(pm.response.code); });"
+                    ]
+                  }
+                }
+              ],
+              "id": "24c5752d-b58c-4ffa-9d92-89d99cb759af"
+            },
+            {
+              "name": "13d — Dashboard (pick shipment if born)",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{access_token}}"
+                  },
+                  {
+                    "key": "Accept-Language",
+                    "value": "{{accept_language}}"
+                  }
+                ],
+                "url": "{{base_url}}/driver/dashboard/"
+              },
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "eval(pm.collectionVariables.get('_iroute_dynamic_helpers') || '');",
+                      "var d = pm.response.json().data || {};",
+                      "irouteSaveDashboardJob(d);",
+                      "irouteTransitionToShipment(d);"
+                    ]
+                  }
+                }
+              ],
+              "id": "bf57fd89-d135-43ea-81e7-f0112ebb5b9a"
+            }
+          ],
+          "id": "cf6259e9-14ae-48d1-aba9-dab0c659db35"
+        },
+        {
+          "name": "Cycle 14 — Job Detail + Execute",
+          "item": [
+            {
+              "name": "14a — Job Detail (sync next action)",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{access_token}}"
+                  },
+                  {
+                    "key": "Accept-Language",
+                    "value": "{{accept_language}}"
+                  }
+                ],
+                "url": "{{base_url}}/driver/jobs/{{job_type}}/{{job_id}}/"
+              },
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "eval(pm.collectionVariables.get('_iroute_dynamic_helpers') || '');",
+                      "pm.test('HTTP 200', function () { pm.response.to.have.status(200); });",
+                      "var data = (pm.response.json().data || {});",
+                      "irouteSyncJobDetail(data);",
+                      "pm.test('status success', function () { pm.expect(pm.response.json().status).to.eql(1); });",
+                      "irouteAssertExecuteAction(data, false);"
+                    ]
+                  }
+                }
+              ],
+              "id": "ab460122-5522-4127-ac6e-b200b0f50124"
+            },
+            {
+              "name": "14b — Execute Next (multipart if required)",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{access_token}}"
+                  },
+                  {
+                    "key": "Accept-Language",
+                    "value": "{{accept_language}}"
+                  }
+                ],
+                "url": "{{base_url}}/driver/jobs/{{job_type}}/{{job_id}}/actions/{{execute_action_code}}/execute/",
+                "body": {
+                  "mode": "formdata",
+                  "formdata": [
+                    {
+                      "key": "client_action_id",
+                      "value": "{{execute_client_action_id}}",
+                      "type": "text"
+                    },
+                    {
+                      "key": "workflow_version",
+                      "value": "{{workflow_version}}",
+                      "type": "text"
+                    },
+                    {
+                      "key": "content_hash",
+                      "value": "{{content_hash}}",
+                      "type": "text"
+                    },
+                    {
+                      "key": "latitude",
+                      "value": "21.4858",
+                      "type": "text"
+                    },
+                    {
+                      "key": "longitude",
+                      "value": "39.1925",
+                      "type": "text"
+                    },
+                    {
+                      "key": "notes",
+                      "value": "Dynamic multipart {{execute_action_code}}",
+                      "type": "text"
+                    },
+                    {
+                      "key": "media[0][media_type]",
+                      "value": "photo",
+                      "type": "text"
+                    },
+                    {
+                      "key": "media[0][file_ref]",
+                      "type": "file",
+                      "src": []
+                    },
+                    {
+                      "key": "media[1][media_type]",
+                      "value": "photo",
+                      "type": "text"
+                    },
+                    {
+                      "key": "media[1][file_ref]",
+                      "type": "file",
+                      "src": []
+                    }
+                  ]
+                }
+              },
+              "event": [
+                {
+                  "listen": "prerequest",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "eval(pm.collectionVariables.get('_iroute_dynamic_helpers') || '');",
+                      "irouteSkipUnless('execute_use_multipart');",
+                      "irouteSkipIfDelegatedCapture();",
+                      "irouteSkipIfNoAction();",
+                      "pm.collectionVariables.set('execute_client_action_id', irouteNewClientActionId());"
+                    ]
+                  }
+                },
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "eval(pm.collectionVariables.get('_iroute_dynamic_helpers') || '');",
+                      "if (pm.response.code === 204 || !pm.response.text()) return;",
+                      "var resp = pm.response.json();",
+                      "pm.test('Multipart execute OK', function () { pm.expect([200,201]).to.include(pm.response.code); });",
+                      "if (resp.status === 1 && resp.data) { irouteSyncJobDetail(resp.data); irouteTransitionToShipment({active_job: resp.data.job}); }"
+                    ]
+                  }
+                }
+              ],
+              "id": "c875d8cb-41f0-4d39-ab59-f9dd21968a37"
+            },
+            {
+              "name": "14c — Execute Next (JSON)",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{access_token}}"
+                  },
+                  {
+                    "key": "Accept-Language",
+                    "value": "{{accept_language}}"
+                  }
+                ],
+                "url": "{{base_url}}/driver/jobs/{{job_type}}/{{job_id}}/actions/{{execute_action_code}}/execute/",
+                "body": {
+                  "mode": "raw",
+                  "raw": "{}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                }
+              },
+              "event": [
+                {
+                  "listen": "prerequest",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "eval(pm.collectionVariables.get('_iroute_dynamic_helpers') || '');",
+                      "irouteAssertToken();",
+                      "if (pm.variables.get('execute_use_multipart') === 'true') { if (pm.execution && pm.execution.skipRequest) pm.execution.skipRequest(); }",
+                      "irouteSkipIfDelegatedCapture();",
+                      "irouteSkipIfNoAction();",
+                      "pm.collectionVariables.set('execute_client_action_id', irouteNewClientActionId());",
+                      "pm.request.body.raw = irouteBuildExecuteBody();"
+                    ]
+                  }
+                },
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "eval(pm.collectionVariables.get('_iroute_dynamic_helpers') || '');",
+                      "if (pm.response.code === 204 || !pm.response.text()) return;",
+                      "var resp = pm.response.json();",
+                      "if (resp.status === 1 && resp.data) {",
+                      "  irouteSyncJobDetail(resp.data);",
+                      "  irouteTransitionToShipment({active_job: resp.data.job});",
+                      "}",
+                      "pm.test('Execute OK or skipped', function () { pm.expect([200,201,204]).to.include(pm.response.code); });"
+                    ]
+                  }
+                }
+              ],
+              "id": "04095e41-b2f3-4580-a774-508c8b4f3305"
+            },
+            {
+              "name": "14d — Dashboard (pick shipment if born)",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{access_token}}"
+                  },
+                  {
+                    "key": "Accept-Language",
+                    "value": "{{accept_language}}"
+                  }
+                ],
+                "url": "{{base_url}}/driver/dashboard/"
+              },
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "eval(pm.collectionVariables.get('_iroute_dynamic_helpers') || '');",
+                      "var d = pm.response.json().data || {};",
+                      "irouteSaveDashboardJob(d);",
+                      "irouteTransitionToShipment(d);"
+                    ]
+                  }
+                }
+              ],
+              "id": "1454c5ea-58db-4779-9a80-3a65ab964fce"
+            }
+          ],
+          "id": "f2890469-0b55-42b3-8492-852d9af09727"
+        },
+        {
+          "name": "Cycle 15 — Job Detail + Execute",
+          "item": [
+            {
+              "name": "15a — Job Detail (sync next action)",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{access_token}}"
+                  },
+                  {
+                    "key": "Accept-Language",
+                    "value": "{{accept_language}}"
+                  }
+                ],
+                "url": "{{base_url}}/driver/jobs/{{job_type}}/{{job_id}}/"
+              },
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "eval(pm.collectionVariables.get('_iroute_dynamic_helpers') || '');",
+                      "pm.test('HTTP 200', function () { pm.response.to.have.status(200); });",
+                      "var data = (pm.response.json().data || {});",
+                      "irouteSyncJobDetail(data);",
+                      "pm.test('status success', function () { pm.expect(pm.response.json().status).to.eql(1); });",
+                      "irouteAssertExecuteAction(data, false);"
+                    ]
+                  }
+                }
+              ],
+              "id": "06db51de-4571-4b45-b261-8588d605f39d"
+            },
+            {
+              "name": "15b — Execute Next (multipart if required)",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{access_token}}"
+                  },
+                  {
+                    "key": "Accept-Language",
+                    "value": "{{accept_language}}"
+                  }
+                ],
+                "url": "{{base_url}}/driver/jobs/{{job_type}}/{{job_id}}/actions/{{execute_action_code}}/execute/",
+                "body": {
+                  "mode": "formdata",
+                  "formdata": [
+                    {
+                      "key": "client_action_id",
+                      "value": "{{execute_client_action_id}}",
+                      "type": "text"
+                    },
+                    {
+                      "key": "workflow_version",
+                      "value": "{{workflow_version}}",
+                      "type": "text"
+                    },
+                    {
+                      "key": "content_hash",
+                      "value": "{{content_hash}}",
+                      "type": "text"
+                    },
+                    {
+                      "key": "latitude",
+                      "value": "21.4858",
+                      "type": "text"
+                    },
+                    {
+                      "key": "longitude",
+                      "value": "39.1925",
+                      "type": "text"
+                    },
+                    {
+                      "key": "notes",
+                      "value": "Dynamic multipart {{execute_action_code}}",
+                      "type": "text"
+                    },
+                    {
+                      "key": "media[0][media_type]",
+                      "value": "photo",
+                      "type": "text"
+                    },
+                    {
+                      "key": "media[0][file_ref]",
+                      "type": "file",
+                      "src": []
+                    },
+                    {
+                      "key": "media[1][media_type]",
+                      "value": "photo",
+                      "type": "text"
+                    },
+                    {
+                      "key": "media[1][file_ref]",
+                      "type": "file",
+                      "src": []
+                    }
+                  ]
+                }
+              },
+              "event": [
+                {
+                  "listen": "prerequest",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "eval(pm.collectionVariables.get('_iroute_dynamic_helpers') || '');",
+                      "irouteSkipUnless('execute_use_multipart');",
+                      "irouteSkipIfDelegatedCapture();",
+                      "irouteSkipIfNoAction();",
+                      "pm.collectionVariables.set('execute_client_action_id', irouteNewClientActionId());"
+                    ]
+                  }
+                },
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "eval(pm.collectionVariables.get('_iroute_dynamic_helpers') || '');",
+                      "if (pm.response.code === 204 || !pm.response.text()) return;",
+                      "var resp = pm.response.json();",
+                      "pm.test('Multipart execute OK', function () { pm.expect([200,201]).to.include(pm.response.code); });",
+                      "if (resp.status === 1 && resp.data) { irouteSyncJobDetail(resp.data); irouteTransitionToShipment({active_job: resp.data.job}); }"
+                    ]
+                  }
+                }
+              ],
+              "id": "207b33d3-ce9d-4779-96e9-1a9bde787bad"
+            },
+            {
+              "name": "15c — Execute Next (JSON)",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{access_token}}"
+                  },
+                  {
+                    "key": "Accept-Language",
+                    "value": "{{accept_language}}"
+                  }
+                ],
+                "url": "{{base_url}}/driver/jobs/{{job_type}}/{{job_id}}/actions/{{execute_action_code}}/execute/",
+                "body": {
+                  "mode": "raw",
+                  "raw": "{}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                }
+              },
+              "event": [
+                {
+                  "listen": "prerequest",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "eval(pm.collectionVariables.get('_iroute_dynamic_helpers') || '');",
+                      "irouteAssertToken();",
+                      "if (pm.variables.get('execute_use_multipart') === 'true') { if (pm.execution && pm.execution.skipRequest) pm.execution.skipRequest(); }",
+                      "irouteSkipIfDelegatedCapture();",
+                      "irouteSkipIfNoAction();",
+                      "pm.collectionVariables.set('execute_client_action_id', irouteNewClientActionId());",
+                      "pm.request.body.raw = irouteBuildExecuteBody();"
+                    ]
+                  }
+                },
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "eval(pm.collectionVariables.get('_iroute_dynamic_helpers') || '');",
+                      "if (pm.response.code === 204 || !pm.response.text()) return;",
+                      "var resp = pm.response.json();",
+                      "if (resp.status === 1 && resp.data) {",
+                      "  irouteSyncJobDetail(resp.data);",
+                      "  irouteTransitionToShipment({active_job: resp.data.job});",
+                      "}",
+                      "pm.test('Execute OK or skipped', function () { pm.expect([200,201,204]).to.include(pm.response.code); });"
+                    ]
+                  }
+                }
+              ],
+              "id": "c36a8a5f-217c-4acc-8617-cb9bca0c2fb5"
+            },
+            {
+              "name": "15d — Dashboard (pick shipment if born)",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{access_token}}"
+                  },
+                  {
+                    "key": "Accept-Language",
+                    "value": "{{accept_language}}"
+                  }
+                ],
+                "url": "{{base_url}}/driver/dashboard/"
+              },
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "eval(pm.collectionVariables.get('_iroute_dynamic_helpers') || '');",
+                      "var d = pm.response.json().data || {};",
+                      "irouteSaveDashboardJob(d);",
+                      "irouteTransitionToShipment(d);"
+                    ]
+                  }
+                }
+              ],
+              "id": "860552d6-7f58-4b5a-a8b0-0bbf4864ff2b"
+            }
+          ],
+          "id": "a45b753d-3b6a-45ba-9280-212104258ad9"
+        }
+      ],
+      "id": "b0ed47ba-a979-4ca9-930e-7c5e26bcc85b"
+    },
+    {
+      "name": "05 — Verify Job Closed",
+      "item": [
+        {
+          "name": "Final Job Detail",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              },
+              {
+                "key": "Accept-Language",
+                "value": "{{accept_language}}"
+              }
+            ],
+            "url": "{{base_url}}/driver/jobs/{{job_type}}/{{job_id}}/"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "eval(pm.collectionVariables.get('_iroute_dynamic_helpers') || '');",
+                  "var data = pm.response.json().data || {};",
+                  "irouteSyncJobDetail(data);",
+                  "pm.test('job closed', function () { pm.expect((data.next_action_hint || {}).job_closed).to.eql(true); });"
+                ]
+              }
+            }
+          ],
+          "id": "ed6c6077-5d5d-4bb2-91a8-8ec553ca8de3"
+        }
+      ],
+      "id": "9471596e-46bb-4f2c-a29d-a679f4c739ab"
+    }
+  ],
+  "id": "d409d2a2-a806-4883-9187-3112139dd49a"
+}

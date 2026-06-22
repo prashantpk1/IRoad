@@ -58,9 +58,17 @@ def is_active_empty_move(movement: Any) -> bool:
         return False
     if is_shipment_linked_loaded_movement(movement):
         return False
-    if is_movement_completed(movement) or is_movement_cancelled(movement):
+    status = (movement.status or '').strip()
+    if status == TenantTruckMovementLog.Status.COMPLETED:
         return False
-    if is_terminal_movement_status((movement.status or '').strip()):
+    if status == TenantTruckMovementLog.Status.CANCELLED:
+        return False
+    flags = movement_log_milestone_flags(movement)
+    if flags.get('complete_done'):
+        return False
+    if is_movement_cancelled(movement):
+        return False
+    if is_terminal_movement_status(status):
         return False
     return True
 

@@ -22,6 +22,9 @@ from mobile_api.job_detail.dto.job_detail_context import JobDetailContext
 from mobile_api.job_detail.helpers.booking_job_context import (
     resolve_booking_job_execution_context,
 )
+from mobile_api.job_detail.projections.movement_workflow_status_projection import (
+    build_movement_workflow_status,
+)
 from mobile_api.job_detail.services.job_detail_projection_cache import (
     get_projection_cache,
 )
@@ -89,6 +92,7 @@ def build_workflow_section(
             workflow = _build_movement_workflow(
                 context,
                 request=request,
+                authoritative_status=auth_status,
                 prefetched_logs=prefetched,
             )
 
@@ -179,13 +183,17 @@ def _build_movement_workflow(
     context: JobDetailContext,
     *,
     request: Any | None,
+    authoritative_status: str,
     prefetched_logs: list | None,
 ) -> dict[str, Any]:
     movement = context.movement
     movement_id = getattr(movement, 'movement_id', None) or getattr(movement, 'pk', None)
 
-    stage_block = derive_job_execution_stage(movement=movement)
-    _ = prefetched_logs
+    stage_block = derive_job_execution_stage(
+        movement=movement,
+        authoritative_movement_status=authoritative_status or None,
+        prefetched_logs=prefetched_logs,
+    )
 
     engine_payload = OperationExecutionService.get_allowed_driver_actions(
         booking=None,
@@ -196,11 +204,22 @@ def _build_movement_workflow(
         job_id=str(movement_id) if movement_id is not None else context.job_id,
         job_no=str(getattr(movement, 'movement_no', '') or ''),
     )
-    return _map_engine_payload(
+    workflow = _map_engine_payload(
         engine_payload,
         stage_block=stage_block,
         entity_type='movement',
     )
+    logs = list(prefetched_logs or [])
+    if not logs:
+        cache = get_projection_cache(context)
+        if cache is not None:
+            logs = list(cache.movement_logs or [])
+    workflow['workflow_status'] = build_movement_workflow_status(
+        movement,
+        logs,
+        request=request,
+    )
+    return workflow
 
 
 def _map_engine_payload(

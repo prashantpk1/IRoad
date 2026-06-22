@@ -40,6 +40,7 @@ def build_empty_move_card(
 
         {
             "movement_id": "",
+            "job_id": "",
             "movement_no": "",
             "movement_stage": "",
             "movement_status": "",
@@ -53,15 +54,25 @@ def build_empty_move_card(
 
     if selection is not None:
         movement = selection.movement
+        live_status = str(getattr(movement, 'status', '') or '')
+        if live_status and live_status != selection.movement_status:
+            movement_stage = policy.movement_execution_stage(movement)
+            progress_percentage = policy.movement_progress_percentage(movement)
+            movement_status = live_status
+        else:
+            movement_stage = selection.movement_stage
+            progress_percentage = selection.progress_percentage
+            movement_status = live_status or selection.movement_status
         card = {
             'movement_id': str(
                 getattr(movement, 'movement_id', None) or movement.pk or ''
             ),
             'movement_no': str(getattr(movement, 'movement_no', '') or ''),
-            'movement_stage': selection.movement_stage,
-            'movement_status': selection.movement_status,
-            'progress_percentage': selection.progress_percentage,
+            'movement_stage': movement_stage,
+            'movement_status': movement_status,
+            'progress_percentage': progress_percentage,
         }
+        card['job_id'] = card['movement_id']
     else:
         card = {
             'movement_id': str(
@@ -72,6 +83,7 @@ def build_empty_move_card(
             'movement_status': str(getattr(movement, 'status', '') or ''),
             'progress_percentage': policy.movement_progress_percentage(movement),
         }
+        card['job_id'] = card['movement_id']
 
     card.update(_empty_move_location_fields(movement, request=request))
     return card
