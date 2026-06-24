@@ -3,7 +3,9 @@ from unittest.mock import MagicMock, patch
 
 from iroad_tenants.operation_action_form import (
     apply_confirmed_sequence_swap,
+    format_job_operation_action_code,
     normalize_operation_action_sequencing,
+    recommended_operation_action_code,
     recommended_sequence_number,
     sequence_category_field_active,
     sequence_number_field_active,
@@ -68,6 +70,31 @@ class OperationActionFormTests(unittest.TestCase):
     def test_recommended_sequence_number_returns_one_for_empty_category(self, mock_existing):
         mock_existing.return_value = []
         self.assertEqual(recommended_sequence_number('job'), 1)
+
+    def test_format_job_operation_action_code(self):
+        self.assertEqual(format_job_operation_action_code(7), 'OA-0007')
+
+    @patch('iroad_tenants.operation_action_form._max_existing_oa_action_suffix')
+    @patch('iroad_tenants.operation_action_form.existing_sequenced_numbers')
+    def test_recommended_operation_action_code_uses_max_suffix(
+        self,
+        mock_existing,
+        mock_max_suffix,
+    ):
+        mock_existing.return_value = [1, 2, 3, 4, 5, 6, 7, 8]
+        mock_max_suffix.return_value = 8
+        self.assertEqual(recommended_operation_action_code('job'), 'OA-0009')
+
+    @patch('iroad_tenants.operation_action_form._max_existing_oa_action_suffix')
+    @patch('iroad_tenants.operation_action_form.existing_sequenced_numbers')
+    def test_recommended_operation_action_code_empty_for_empty_move(
+        self,
+        mock_existing,
+        mock_max_suffix,
+    ):
+        mock_existing.return_value = [1, 2]
+        mock_max_suffix.return_value = 0
+        self.assertEqual(recommended_operation_action_code('empty_move'), '')
 
     @patch('iroad_tenants.operation_action_form.find_sequence_peer')
     @patch('iroad_tenants.operation_action_form.existing_sequenced_numbers')

@@ -6,6 +6,7 @@ from __future__ import annotations
 from typing import Any
 
 from mobile_api.helpers.backload_booking_redirect import (
+    pivot_booking_to_active_shipment,
     pivot_context_to_backload_booking,
 )
 from mobile_api.job_detail.dto.job_detail_context import JobDetailContext
@@ -75,6 +76,11 @@ def resolve_job_detail_entity(
         context.booking = result.booking
         if result.resolve_context is not None:
             context.resolver_meta = result.resolve_context.to_resolver_meta()
+        pivot_booking_to_active_shipment(
+            driver=context.driver,
+            booking=context.booking,
+            context=context,
+        )
         return
 
     result = movement_resolver.resolve(

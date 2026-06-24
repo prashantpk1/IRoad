@@ -54,6 +54,19 @@ class CanonicalPodActionRegistryTests(SimpleTestCase):
         self.assertFalse(is_delivered_status_action(a7))
         self.assertEqual(classify_pod_action_role(a7), PodActionRole.POD_UPLOAD)
 
+    def test_combined_oa_0008_maps_to_pod_upload_for_log_evidence(self) -> None:
+        oa8 = _action(
+            code='OA-0008',
+            label='POD',
+            auto_pod=True,
+            hard_copy=True,
+        )
+        self.assertTrue(is_pod_upload_action(oa8))
+        self.assertEqual(classify_pod_action_role(oa8), PodActionRole.POD_UPLOAD)
+        flags = log_evidence_flags([SimpleNamespace(operation_action=oa8)])
+        self.assertTrue(flags['pod_uploaded'])
+        self.assertFalse(flags['hard_pod_log'])
+
     def test_a8_maps_to_unloading_not_pod_upload(self) -> None:
         a8 = _action(code='A8', label='Unloading')
         self.assertTrue(is_unloading_action(a8))

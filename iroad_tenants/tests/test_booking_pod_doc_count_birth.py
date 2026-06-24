@@ -114,6 +114,60 @@ class BookingPodDocCountTests(SimpleTestCase):
 
         self.assertEqual(created.pod_doc_count, 2)
 
+    def test_auto_birth_inherits_digital_pod_type_from_booking(self):
+        booking = _booking(pod_type=TenantShipment.PodType.DIGITAL)
+        matched_line = {
+            'booking_item': 'SV-1',
+            'booking_item_type': 'Outbound',
+            'route_display': 'jeddah To Makkah',
+            'order_type': 'Credit',
+            'sourcing_mode': TenantShipment.SourcingMode.IN_SOURCE,
+            'loading_address_id': booking.loading_address_id,
+            'delivery_address_id': booking.delivery_address_id,
+            'cargo_id': booking.cargo_id,
+            'cod_amount': 0,
+            'pod_doc_count': 1,
+            'truck': SimpleNamespace(status='Active'),
+            'driver': SimpleNamespace(driver_status='Active'),
+            'cargo_qty': booking.cargo_qty,
+            'cargo_weight': booking.cargo_weight,
+            'cargo_unit': booking.cargo_unit,
+        }
+        created = SimpleNamespace(pod_doc_count=0)
+
+        def _capture_shipment(**kwargs):
+            nonlocal created
+            created = SimpleNamespace(**kwargs)
+            created.full_clean = MagicMock()
+            created.save = MagicMock()
+            return created
+
+        with patch(
+            'iroad_tenants.views._tenant_shipment_validate_submission',
+            return_value=({}, 'Credit'),
+        ), patch(
+            'iroad_tenants.views._next_auto_number_for_form',
+            return_value=('SH-901', 1),
+        ), patch(
+            'iroad_tenants.views.TenantShipment',
+            side_effect=_capture_shipment,
+        ), patch(
+            'iroad_tenants.views._tenant_shipment_apply_foreign_keys',
+        ), patch(
+            'iroad_tenants.views._tenant_shipment_apply_booking_line_to_form',
+        ), patch(
+            'iroad_tenants.views.TenantAddressMaster',
+        ), patch(
+            'iroad_tenants.views.TenantCargoMaster',
+        ), patch(
+            'iroad_tenants.views._tenant_booking_sync_pod_doc_counts_to_shipments',
+        ), patch(
+            'iroad_tenants.operation_runtime.pod_action._birth_delivery_note_scaffold',
+        ):
+            _tenant_shipment_birth_from_booking_line(booking, matched_line)
+
+        self.assertEqual(created.pod_type, TenantShipment.PodType.DIGITAL)
+
     def test_backload_stored_count(self):
         booking = _booking()
         self.assertEqual(

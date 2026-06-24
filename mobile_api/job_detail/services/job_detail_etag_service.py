@@ -26,7 +26,10 @@ __all__ = [
     'build_invalidation_fingerprint',
     'etag_matches_request',
     'fingerprint_digest',
+    'JOB_DETAIL_NAVIGATION_CONTRACT_VERSION',
 ]
+
+JOB_DETAIL_NAVIGATION_CONTRACT_VERSION = '3'
 
 
 def _reconciliation_versions(context: JobDetailContext) -> dict[str, str]:
@@ -116,6 +119,7 @@ def build_content_fingerprint(
     timeline = context.timeline or {}
     fp['timeline_preview_count'] = len(timeline.get('timeline_preview') or [])
     fp['timeline_cursor'] = (timeline.get('timeline_cursor') or '').strip()
+    fp['navigation_contract_version'] = JOB_DETAIL_NAVIGATION_CONTRACT_VERSION
     wi = (context.reconciliation or {}).get('workflow_integrity') or {}
     fp['workflow_integrity_state'] = (wi.get('workflow_integrity_state') or '').strip()
     fp.update(_reconciliation_versions(context))

@@ -242,17 +242,20 @@ from iroad_tenants.operation_action_form import (
     SEQUENCE_CATEGORY_CHOICES,
     SEQUENCED_CATEGORIES,
     apply_confirmed_sequence_swap,
+    allocate_operation_action_code,
     default_auto_movement_post_enabled,
     find_sequence_peer,
     operation_action_sequence_registry,
     operation_action_booking_status_choices,
     operation_action_movement_status_choices,
     operation_action_shipment_status_choices,
+    recommended_operation_action_code,
     recommended_sequence_number,
     repack_sequence_category,
     resolve_sequence_swap_peer,
     sequencing_is_active,
     SINGLETON_TOGGLE_FIELDS,
+    sync_operation_action_auto_number_sequence,
     validate_category_sequence_integrity,
     validate_configuration_toggles,
     validate_operation_action_sequencing,
@@ -10483,9 +10486,14 @@ def _tenant_operation_action_form_context(
         prefix=OPERATION_ACTION_REF_PREFIX,
     )
     operation_action_form_data = dict(form_data or {})
-    operation_action_form_data.setdefault('action_code_preview', preview_action_code)
-    operation_action_form_data.setdefault('status', TenantOperationAction.Status.ACTIVE)
     exclude_action_id = getattr(action, 'action_id', None) if action else None
+    if mode == 'create':
+        sync_operation_action_auto_number_sequence()
+        preview_action_code = _preview_next_auto_number_for_form(
+            form_code=OPERATION_ACTION_AUTO_FORM_CODE,
+            form_label=OPERATION_ACTION_AUTO_FORM_LABEL,
+            prefix=OPERATION_ACTION_REF_PREFIX,
+        )
     if mode == 'create' and not form_data:
         operation_action_form_data.setdefault('action_scope', 'job')
         operation_action_form_data.setdefault('sequence_category', 'job')
@@ -10495,12 +10503,23 @@ def _tenant_operation_action_form_context(
         if sequencing_is_active(scope, category):
             operation_action_form_data['sequence_number'] = str(
                 recommended_sequence_number(
-                    category,
+                    category or 'job',
                     exclude_action_id=exclude_action_id,
                 )
             )
         else:
             operation_action_form_data['sequence_number'] = '1'
+    if mode == 'create':
+        sequential_preview = recommended_operation_action_code(
+            'job',
+            exclude_action_id=exclude_action_id,
+        )
+        operation_action_form_data['action_code_preview'] = (
+            sequential_preview or preview_action_code
+        )
+    else:
+        operation_action_form_data.setdefault('action_code_preview', preview_action_code)
+    operation_action_form_data.setdefault('status', TenantOperationAction.Status.ACTIVE)
     operation_action_form_data.setdefault(
         'auto_movement_post',
         default_auto_movement_post_enabled(exclude_action_id=exclude_action_id),
@@ -10555,6 +10574,44 @@ def _tenant_operation_action_form_context(
             )
             for category in SEQUENCED_CATEGORIES
         },
+        'operation_action_recommended_action_codes': {
+            category: (
+                recommended_operation_action_code(
+                    category,
+                    exclude_action_id=exclude_action_id,
+                )
+                or preview_action_code
+            )
+            for category in SEQUENCED_CATEGORIES
+        },
+        'operation_action_create_defaults': (
+            {
+                'action_scope': 'job',
+                'sequence_category': 'job',
+                'sequence_number': str(
+                    recommended_sequence_number(
+                        'job',
+                        exclude_action_id=exclude_action_id,
+                    )
+                ),
+                'action_code_preview': (
+                    recommended_operation_action_code(
+                        'job',
+                        exclude_action_id=exclude_action_id,
+                    )
+                    or preview_action_code
+                ),
+                'status': TenantOperationAction.Status.ACTIVE,
+                'auto_movement_post': default_auto_movement_post_enabled(
+                    exclude_action_id=exclude_action_id,
+                ),
+                'auto_shipment_post': False,
+                'auto_pod_post': False,
+                'hard_copy_collection': False,
+            }
+            if mode == 'create'
+            else None
+        ),
         'operation_action_editing_action_id': str(action.action_id) if action else '',
         'tenant_schema_name': tenant_registry.schema_name,
     }
@@ -10868,15 +10925,19 @@ class TenantOperationActionsCreateView(View):
                         sequence_number=sequence_number,
                     )
 
-                    action_code = ''
-                    for _ in range(10):
-                        action_code, _ = _next_auto_number_for_form(
-                            form_code=OPERATION_ACTION_AUTO_FORM_CODE,
-                            form_label=OPERATION_ACTION_AUTO_FORM_LABEL,
-                            prefix=OPERATION_ACTION_REF_PREFIX,
-                        )
-                        if not TenantOperationAction.objects.filter(action_code=action_code).exists():
-                            break
+                    action_code = allocate_operation_action_code(
+                        (form_data.get('sequence_category') or '').strip(),
+                        sequence_number,
+                    )
+                    if not action_code:
+                        for _ in range(10):
+                            action_code, _ = _next_auto_number_for_form(
+                                form_code=OPERATION_ACTION_AUTO_FORM_CODE,
+                                form_label=OPERATION_ACTION_AUTO_FORM_LABEL,
+                                prefix=OPERATION_ACTION_REF_PREFIX,
+                            )
+                            if not TenantOperationAction.objects.filter(action_code=action_code).exists():
+                                break
                     if TenantOperationAction.objects.filter(action_code=action_code).exists():
                         raise ValueError(
                             'Unable to allocate a unique Action Code. Please check Auto Number Configuration.'
@@ -10903,6 +10964,7 @@ class TenantOperationActionsCreateView(View):
                     )
                     if integrity_error:
                         raise ValueError(integrity_error)
+                    sync_operation_action_auto_number_sequence()
             except (IntegrityError, ValueError) as exc:
                 context.update(
                     _tenant_operation_action_form_context(
@@ -14605,100 +14667,6 @@ def _tenant_shipment_pod_assert_unique_source(source_document, form_errors, *, e
         )
 
 
-def _tenant_shipment_pod_birth_from_action_log(action_log, *, created_by_label=''):
-    """Action 7 / auto_pod_post — one POD record per delivery-note document."""
-    shipment = action_log.shipment
-    if shipment is None:
-        return None
-    source_document = (
-        TenantShipmentDocument.objects.filter(
-            shipment=shipment,
-            is_delivery_note=True,
-        )
-        .order_by('-created_at')
-        .first()
-    )
-    if source_document is None:
-        raise ValidationError(
-            'Auto POD Post requires at least one delivery-note document on the shipment.'
-        )
-    existing_pod = TenantShipmentDocument.objects.filter(
-        source_document_id=source_document.pk,
-    ).first()
-    if existing_pod is not None:
-        return existing_pod
-
-    record_no, record_sequence = _next_auto_number_for_form(
-        form_code=SHIPMENT_POD_AUTO_FORM_CODE,
-        form_label=SHIPMENT_POD_AUTO_FORM_LABEL,
-        prefix=SHIPMENT_POD_REF_PREFIX,
-    )
-    pod_user = getattr(action_log, 'created_by', None)
-    pod_user_label = (created_by_label or '')[:200]
-    if pod_user is not None:
-        pod_user_label = (pod_user.username or pod_user.full_name or pod_user_label)[:200]
-    else:
-        resolved_user = _tenant_operation_action_log_resolve_user(created_by_label)
-        if resolved_user is not None:
-            pod_user_label = (
-                resolved_user.username or resolved_user.full_name or pod_user_label
-            )[:200]
-    document = TenantShipmentDocument(
-        record_no=record_no,
-        record_sequence=record_sequence,
-        record_date=timezone.localdate(),
-        document_type='pod',
-        document_ref_no=source_document.document_ref_no,
-        document_date=source_document.document_date or timezone.localdate(),
-        physical_location='With Driver',
-        page_count=source_document.page_count or 1,
-        status=TenantShipmentDocument.Status.DRAFT,
-        source_document=source_document,
-        receiver_user=pod_user,
-        created_by_label=pod_user_label,
-    )
-    _tenant_shipment_document_apply_foreign_keys(
-        document,
-        booking=shipment.booking if shipment.booking_id else None,
-        shipment=shipment,
-    )
-    document.save()
-
-    line_payload = _tenant_shipment_pod_build_line_rows_from_source(source_document)
-    TenantShipmentPodPage.objects.filter(document=document).delete()
-    for idx, row in enumerate(line_payload, start=1):
-        if not isinstance(row, dict):
-            continue
-        source_page = _tenant_shipment_pod_resolve_line_source_page(
-            row.get('doc_page'),
-            source_document,
-            {},
-        )
-        TenantShipmentPodPage.objects.create(
-            document=document,
-            line_no=idx,
-            source_page=source_page,
-            doc_page=_tenant_shipment_pod_page_label(source_page) if source_page else row.get('doc_page', ''),
-            source=row.get('source') or 'Action Log',
-            action_log=row.get('action_log') or action_log.log_no,
-            physical_location=row.get('physical_location') or 'With Driver',
-            soft_copy_status=row.get('soft_copy_status') or 'Not Collected',
-            digital_evidence_status=row.get('digital_evidence_status') or 'Not Collected',
-            map_url=row.get('map_url') or '',
-            attachment_storage_path=row.get('attachment_storage_path') or '',
-            attachment_label=row.get('attachment_label') or '',
-        )
-
-    if _tenant_operation_action_matches(action_log.operation_action, 'upload pod', 'a7', 'action 7'):
-        from iroad_tenants.operation_runtime.pod_action import (
-            apply_a7_shipment_pod_type_classification,
-        )
-
-        apply_a7_shipment_pod_type_classification(shipment)
-
-    return document
-
-
 def _tenant_shipment_document_guard_mutable(document, *, new_status=None):
     """Doc §6 — edit/delete only while header is Draft (anti-delete when Verified)."""
     if document is None:
@@ -14918,8 +14886,11 @@ def _tenant_operation_action_log_apply_side_effects(action_log, *, created_by_la
         and action.hard_copy_collection
         and _tenant_operation_action_matches(action, 'upload pod', 'a7', 'action 7', 'confirm loaded', 'a4')
     ):
-        shipment.pod_type = TenantShipment.PodType.HARD
-        shipment.save(update_fields=['pod_type', 'updated_at'])
+        from iroad_tenants.operation_field_catalog import operation_shipment_uses_hard_copy_pod
+
+        if operation_shipment_uses_hard_copy_pod(shipment):
+            shipment.pod_type = TenantShipment.PodType.HARD
+            shipment.save(update_fields=['pod_type', 'updated_at'])
 
 
 def _tenant_shipment_birth_from_booking_line(booking, matched_line, *, shipment_date=None, created_by_label=''):
@@ -15009,7 +14980,7 @@ def _tenant_shipment_birth_from_booking_line(booking, matched_line, *, shipment_
 
     pod_type = _normalize_shipment_pod_type(
         matched_line.get('pod_type') or booking.pod_type,
-        default=TenantShipment.PodType.SOFT,
+        default=TenantShipment.PodType.DIGITAL,
     )
     pod_status = booking.pod_status or TenantShipment.PodStatus.NOT_COMPLETED
     if pod_status not in {choice[0] for choice in TenantShipment.PodStatus.choices}:
@@ -15059,9 +15030,10 @@ def _tenant_shipment_birth_from_booking_line(booking, matched_line, *, shipment_
     _tenant_booking_sync_pod_doc_counts_to_shipments(booking)
     from iroad_tenants.operation_runtime.pod_action import (
         _birth_delivery_note_scaffold,
+        _shipment_target_pod_doc_count,
     )
 
-    if int(shipment.pod_doc_count or 0) > 0:
+    if _shipment_target_pod_doc_count(shipment) > 0:
         _birth_delivery_note_scaffold(
             shipment,
             created_by_label=created_by_label,
@@ -15876,9 +15848,11 @@ def _tenant_booking_line_assignment(request, line_no, has_table):
 
 def _tenant_booking_normalize_cod_line_amounts(request, *, trip_type, order_type, sell_price):
     """Apply COD booking line defaults: line 1 = sell price; Round line 2 = remainder."""
+    if (order_type or '').strip() != 'COD':
+        return Decimal('0'), Decimal('0')
     outbound_cod = _decimal_from_request(request, 'booking_line_cod_amount_1')
     backload_cod = _decimal_from_request(request, 'booking_line_cod_amount_2')
-    if (order_type or '').strip() != 'COD' or sell_price <= 0:
+    if sell_price <= 0:
         return outbound_cod, backload_cod
     sell_price = sell_price.quantize(Decimal('0.01'))
     if trip_type == 'Round':

@@ -153,9 +153,16 @@ class PodCaptureResponseBuilder:
     ) -> dict[str, Any]:
         requires_execute = bundle.is_promotable() and not bundle.is_promoted()
         hard_block = dict((pod_section or {}).get('hard_copy_confirmation') or {})
+        digital_block = dict((pod_section or {}).get('digital_evidence') or {})
         has_hard_copy_step = bool(hard_block.get('applicable') or hard_block.get('required'))
         shipment_pk = getattr(context, 'shipment_id', '') or ''
         base_capture = f'/api/v1/mobile/driver/jobs/shipments/{shipment_pk}/pod/capture/'
+        digital_code = (
+            (context.target_action_code or '').strip()
+            or (digital_block.get('execute_action_code') or '').strip()
+            or (digital_block.get('action_code') or '').strip()
+        )
+        hard_copy_code = (hard_block.get('execute_action_code') or '').strip()
 
         step: dict[str, Any] = {
             'requires_execute_action': requires_execute,
@@ -166,8 +173,8 @@ class PodCaptureResponseBuilder:
                 'latitude': 'from device GPS',
                 'longitude': 'from device GPS',
             },
-            'target_action_code': (context.target_action_code or '').strip() or 'A7',
-            'execute_action_code': 'A7',
+            'target_action_code': digital_code,
+            'execute_action_code': digital_code,
             'execute_ready': bundle.is_promotable(),
         }
         if has_hard_copy_step:
@@ -177,7 +184,7 @@ class PodCaptureResponseBuilder:
                     'wizard_next_get_endpoint': f'{base_capture}?step=hard_copy_confirmation',
                     'documents_endpoint': hard_block.get('documents_endpoint') or '',
                     'custody_submit_endpoint': hard_block.get('submit_endpoint') or '',
-                    'after_custody_execute_action_code': 'A7H',
+                    'after_custody_execute_action_code': hard_copy_code,
                     'complete_upload_after_execute': False,
                 },
             )

@@ -125,8 +125,20 @@ def reconcile_pod_cod_compliance(
 
     logs = _logs_for_shipment(context)
     evidence = _log_evidence_flags(logs)
+    evidence = pod_cod_policy.enrich_log_evidence_hard_pod(
+        evidence,
+        shipment,
+        tenant_schema=(getattr(context, 'tenant_schema', None) or ''),
+        driver=context.driver,
+        logs=logs,
+    )
     column_flags = dict(
-        pod_cod_policy.derive_pod_cod_flags(shipment, driver=context.driver)
+        pod_cod_policy.derive_pod_cod_flags(
+            shipment,
+            driver=context.driver,
+            log_evidence=evidence,
+            tenant_schema=(getattr(context, 'tenant_schema', None) or ''),
+        )
     )
     log_count = len(logs)
 

@@ -104,7 +104,7 @@ def build_booking_card(
     else:
         is_backload_bootstrap = policy.is_backload_leg_pending(
             booking,
-            ordered_shipments,
+            shipments,
         )
         if is_backload_bootstrap and driver is not None:
             is_backload_bootstrap = policy.driver_owns_backload_leg(driver, booking)
@@ -188,7 +188,7 @@ def _round_trip_meta(
         'legs': ['Outbound', 'Backload'],
         'next_executable_booking_item_type': next_type or '',
     }
-    if policy.is_backload_leg_pending(booking, ordered):
+    if policy.is_backload_leg_pending(booking, shipments):
         meta['backload_bootstrap_pending'] = True
         meta['next_executable_booking_item_type'] = 'Backload'
     elif next_type:

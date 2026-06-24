@@ -37,3 +37,17 @@ class LegIsBackloadForAddressesTests(TestCase):
             ),
         )
         self.assertEqual(resolve_pending_booking_item_type(booking), 'Backload')
+
+    def test_cancelled_outbound_resolves_to_backload(self):
+        booking = SimpleNamespace(
+            trip_type='Round',
+            shipments=SimpleNamespace(
+                all=lambda: [
+                    SimpleNamespace(
+                        shipment_status='Cancelled',
+                        booking_item_type='Outbound',
+                    ),
+                ],
+            ),
+        )
+        self.assertEqual(resolve_pending_booking_item_type(booking), 'Backload')

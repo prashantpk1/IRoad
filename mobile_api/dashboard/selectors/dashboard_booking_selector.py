@@ -38,6 +38,12 @@ _ROUND_TRIP_BACKLOAD_REOPEN = Q(trip_type__iexact='Round') & Q(
     shipments__shipment_status=TenantShipment.ShipmentStatus.CLOSED,
 )
 
+# Round-trip: outbound cancelled (R1) — backload line may still be Confirmed on mobile.
+_ROUND_TRIP_CANCELLED_OUTBOUND = Q(trip_type__iexact='Round') & Q(
+    shipments__booking_item_type__iexact='Outbound',
+    shipments__shipment_status=TenantShipment.ShipmentStatus.CANCELLED,
+)
+
 
 class DashboardBookingSelector:
     """
@@ -60,7 +66,7 @@ class DashboardBookingSelector:
         allow_booking_bootstrap = self._auto_shipment_bootstrap_enabled()
         shipment_visibility_filter = Q(
             shipments__shipment_status__in=_OPEN_SHIPMENT_STATUSES,
-        ) | _ROUND_TRIP_BACKLOAD_REOPEN
+        ) | _ROUND_TRIP_BACKLOAD_REOPEN | _ROUND_TRIP_CANCELLED_OUTBOUND
         if allow_booking_bootstrap:
             shipment_visibility_filter |= Q(shipments__isnull=True)
 
@@ -131,7 +137,7 @@ class DashboardBookingSelector:
                 ordered,
             )
             stage = policy.derive_booking_execution_stage(
-                booking, ordered, driver=driver
+                booking, shipments, driver=driver
             )
             return DriverBookingSelectionResult(
                 booking=booking,

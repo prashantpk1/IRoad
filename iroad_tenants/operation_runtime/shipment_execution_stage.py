@@ -8,7 +8,10 @@ Shipment-linked mobile Job Detail executes pickup/loading against the shipment r
 from __future__ import annotations
 
 from tenant_workspace.models import TenantOperationActionLog, TenantShipment
-from iroad_tenants.operation_runtime.impacts import operation_action_matches
+from iroad_tenants.operation_runtime.impacts import (
+    operation_action_matches,
+    resolve_shipment_status_impact,
+)
 
 # Sub-stages before / beside shipment_status column values.
 STAGE_PICKUP = 'pickup'
@@ -71,6 +74,127 @@ def is_loading_action(action) -> bool:
 
 def is_pickup_or_loading_action(action) -> bool:
     return is_pickup_action(action) or is_loading_action(action)
+
+
+def is_unloading_action(action) -> bool:
+    if action is None:
+        return False
+    code = (getattr(action, 'action_code', '') or '').strip().upper()
+    if code in {'A8', 'OA-0007'}:
+        return True
+    return operation_action_matches(
+        action,
+        'unloading',
+        'start unloading',
+        'a8',
+        'action 8',
+    )
+
+
+def is_delivery_arrival_action(action) -> bool:
+    if action is None or is_unloading_action(action):
+        return False
+    code = (getattr(action, 'action_code', '') or '').strip().upper()
+    if code in {'A6', 'OA-0006'}:
+        return True
+    impact = resolve_shipment_status_impact(
+        (getattr(action, 'shipment_status_impact', None) or '').strip(),
+    )
+    if impact == TenantShipment.ShipmentStatus.AT_DELIVERY:
+        return True
+    return operation_action_matches(
+        action,
+        'delivery arrival',
+        'arrival at delivery',
+        'a6',
+        'action 6',
+    )
+
+
+def _delivery_milestones_from_log_rows(log_rows) -> tuple[bool, bool]:
+    delivery_done = False
+    unloading_done = False
+    for log in log_rows:
+        action = getattr(log, 'operation_action', None)
+        if action is None:
+            continue
+        if is_unloading_action(action):
+            unloading_done = True
+        elif is_delivery_arrival_action(action):
+            delivery_done = True
+        if delivery_done and unloading_done:
+            break
+    return delivery_done, unloading_done
+
+
+def _shipment_delivery_milestones_done(
+    shipment,
+    *,
+    exclude_log_id=None,
+    prefetched_logs=None,
+) -> tuple[bool, bool]:
+    if shipment is None:
+        return False, False
+    if prefetched_logs is not None:
+        rows = list(prefetched_logs)
+        if exclude_log_id:
+            rows = [
+                row
+                for row in rows
+                if str(getattr(row, 'log_id', None) or getattr(row, 'pk', '') or '')
+                != str(exclude_log_id)
+            ]
+        return _delivery_milestones_from_log_rows(rows)
+
+    shipment_id = getattr(shipment, 'pk', None) or getattr(shipment, 'shipment_id', None)
+    if not shipment_id:
+        return False, False
+    qs = TenantOperationActionLog.objects.filter(
+        shipment_id=shipment_id,
+    ).select_related('operation_action').order_by('log_date', 'created_at')
+    if exclude_log_id:
+        qs = qs.exclude(pk=exclude_log_id)
+    return _delivery_milestones_from_log_rows(qs)
+
+
+def shipment_unloading_done(
+    shipment,
+    *,
+    exclude_log_id=None,
+    prefetched_logs=None,
+) -> bool:
+    """True when Start Unloading (OA-0007 / A8) was logged on this shipment."""
+    _delivery_done, unloading_done = _shipment_delivery_milestones_done(
+        shipment,
+        exclude_log_id=exclude_log_id,
+        prefetched_logs=prefetched_logs,
+    )
+    return unloading_done
+
+
+def shipment_allows_unloading_action(
+    action,
+    shipment,
+    *,
+    exclude_log_id=None,
+) -> bool:
+    """
+    Shipment-bound Start Unloading (OA-0007).
+
+    Requires Delivery Arrival logged first; one explicit unload log per shipment.
+    """
+    if shipment is None or action is None or not is_unloading_action(action):
+        return False
+    current = shipment.shipment_status or ''
+    if current in _TERMINAL_SHIPMENT_STATUSES:
+        return False
+    if current != TenantShipment.ShipmentStatus.AT_DELIVERY:
+        return False
+    delivery_done, unloading_done = _shipment_delivery_milestones_done(
+        shipment,
+        exclude_log_id=exclude_log_id,
+    )
+    return delivery_done and not unloading_done
 
 
 def _pickup_loading_from_log_rows(

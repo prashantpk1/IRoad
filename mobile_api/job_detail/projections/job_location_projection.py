@@ -9,7 +9,11 @@ from typing import Any, Literal
 
 from django.db.utils import OperationalError, ProgrammingError
 
-from mobile_api.helpers.booking_endpoint_addresses import resolve_leg_endpoint_addresses
+from mobile_api.helpers.booking_endpoint_addresses import (
+    leg_is_backload_line,
+    resolve_leg_endpoint_addresses,
+    should_swap_leg_endpoint_addresses,
+)
 from mobile_api.helpers.job_location_serialization import (
     serialize_address,
     serialize_route,
@@ -128,7 +132,39 @@ def build_shipment_location_block(
     line_type = str(getattr(shipment, 'booking_item_type', '') or '').strip()
     trip = (getattr(booking, 'trip_type', None) or '').strip().casefold() if booking else ''
 
-    if booking is not None and trip == 'round' and getattr(booking, 'route', None) is not None:
+    booking_execution_stage = ''
+    show_backload_route = False
+    backload_bootstrap = False
+    if booking is not None:
+        from mobile_api.dashboard.selectors import booking_selection_policy as policy
+        from mobile_api.job_detail.helpers.booking_job_context import (
+            load_booking_shipments_for_policy,
+        )
+
+        shipments_all = load_booking_shipments_for_policy(booking)
+        booking_execution_stage = policy.derive_booking_execution_stage(
+            booking,
+            shipments_all,
+        )
+        show_backload_route = policy.should_display_backload_route(
+            booking,
+            shipments_all,
+            active=shipment,
+            booking_stage=booking_execution_stage,
+        )
+        backload_bootstrap = policy.is_backload_leg_pending(booking, shipments_all)
+
+    swap_leg_addresses = should_swap_leg_endpoint_addresses(
+        booking_item_type=line_type,
+        booking_execution_stage=booking_execution_stage,
+        show_backload_route=show_backload_route,
+        backload_bootstrap=backload_bootstrap,
+    )
+    use_booking_leg_endpoints = booking is not None and (
+        trip == 'round' or leg_is_backload_line(line_type) or swap_leg_addresses
+    )
+
+    if use_booking_leg_endpoints:
         pickup_address, drop_address = resolve_leg_endpoint_addresses(
             booking,
             booking_item_type=line_type,

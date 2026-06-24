@@ -63,9 +63,10 @@ class CodAmountHelperTests(SimpleTestCase):
                 'allowed_actions': [],
                 'next_action': {'action_code': 'A9'},
             },
-            pod_cod={'cod_collected': False, 'cod_pending': False},
+            pod_cod={'cod_collected': False, 'cod_pending': False, 'pod_pending': False, 'pod_compliant': True},
             order_type='COD',
             shipment=shipment,
         )
         self.assertEqual(hint['screen'], 'collect_payment')
+        self.assertEqual(hint['action'], 'go_to_payment_collection')
         self.assertEqual(hint['amount_due'], '100.00')

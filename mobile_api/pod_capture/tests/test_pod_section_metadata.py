@@ -30,8 +30,12 @@ def _mock_a7_action():
 
 class PodSectionMetadataTests(TestCase):
     @patch(
-        'mobile_api.pod_capture.services.pod_section_metadata.resolve_default_pod_action',
+        'mobile_api.pod_capture.services.pod_section_metadata.resolve_digital_pod_action',
         return_value=_mock_a7_action(),
+    )
+    @patch(
+        'mobile_api.pod_capture.services.pod_section_metadata.resolve_hard_copy_pod_action',
+        return_value=SimpleNamespace(action_code='A7H', hard_copy_collection=True),
     )
     @patch(
         'mobile_api.pod_capture.services.pod_section_metadata._shipment_has_delivery_note',
@@ -44,7 +48,13 @@ class PodSectionMetadataTests(TestCase):
             'pages': [{'label': 'IMG-(ABC-001)', 'page_id': '1'}],
         },
     )
-    def test_hard_shipment_includes_confirmation_step(self, _mock_pages, _mock_dn, _mock_a7):
+    def test_hard_shipment_includes_confirmation_step(
+        self,
+        _mock_pages,
+        _mock_dn,
+        _mock_hard,
+        _mock_a7,
+    ):
         shipment = SimpleNamespace(
             pk=uuid.uuid4(),
             pod_type=TenantShipment.PodType.HARD,
@@ -89,8 +99,12 @@ class PodSectionMetadataTests(TestCase):
         self.assertIn('physical receipt', ui['checklist'][1]['confirmation_text'])
 
     @patch(
-        'mobile_api.pod_capture.services.pod_section_metadata.resolve_default_pod_action',
+        'mobile_api.pod_capture.services.pod_section_metadata.resolve_digital_pod_action',
         return_value=_mock_a7_action(),
+    )
+    @patch(
+        'mobile_api.pod_capture.services.pod_section_metadata.resolve_hard_copy_pod_action',
+        return_value=SimpleNamespace(action_code='A7H', hard_copy_collection=True),
     )
     @patch(
         'mobile_api.pod_capture.services.pod_section_metadata._shipment_has_delivery_note',
@@ -103,7 +117,13 @@ class PodSectionMetadataTests(TestCase):
             'pages': [{'label': 'DN-1020', 'page_id': '1'}],
         },
     )
-    def test_hard_shipment_still_pending_after_digital_a7_compliant(self, _mock_pages, _mock_dn, _mock_a7):
+    def test_hard_shipment_still_pending_after_digital_a7_compliant(
+        self,
+        _mock_pages,
+        _mock_dn,
+        _mock_hard,
+        _mock_a7,
+    ):
         shipment = SimpleNamespace(
             pk=uuid.uuid4(),
             pod_type=TenantShipment.PodType.HARD,
@@ -124,10 +144,18 @@ class PodSectionMetadataTests(TestCase):
         self.assertEqual(len(section['hard_copy_confirmation']['pages']), 1)
 
     @patch(
-        'mobile_api.pod_capture.services.pod_section_metadata.resolve_default_pod_action',
+        'mobile_api.pod_capture.services.pod_section_metadata.resolve_digital_pod_action',
         return_value=_mock_a7_action(),
     )
-    def test_digital_evidence_includes_required_video_for_pod_capture(self, _mock_action):
+    @patch(
+        'mobile_api.pod_capture.services.pod_section_metadata.resolve_hard_copy_pod_action',
+        return_value=SimpleNamespace(action_code='A7H', hard_copy_collection=True),
+    )
+    def test_digital_evidence_includes_required_video_for_pod_capture(
+        self,
+        _mock_hard,
+        _mock_action,
+    ):
         shipment = SimpleNamespace(
             pk=uuid.uuid4(),
             pod_type=TenantShipment.PodType.SOFT,
@@ -165,14 +193,23 @@ class PodSectionMetadataTests(TestCase):
         self.assertEqual(section_ids, ['evidence_photos', 'evidence_video', 'note'])
 
     @patch(
-        'mobile_api.pod_capture.services.pod_section_metadata.resolve_default_pod_action',
+        'mobile_api.pod_capture.services.pod_section_metadata.resolve_digital_pod_action',
         return_value=_mock_a7_action(),
+    )
+    @patch(
+        'mobile_api.pod_capture.services.pod_section_metadata.resolve_hard_copy_pod_action',
+        return_value=SimpleNamespace(action_code='A7H', hard_copy_collection=True),
     )
     @patch(
         'mobile_api.pod_capture.services.pod_section_metadata._shipment_has_delivery_note',
         return_value=True,
     )
-    def test_hard_shipment_at_delivery_includes_wizard_steps_before_a7(self, _mock_dn, _mock_a7):
+    def test_hard_shipment_at_delivery_includes_wizard_steps_before_a7(
+        self,
+        _mock_dn,
+        _mock_hard,
+        _mock_a7,
+    ):
         shipment = SimpleNamespace(
             pk=uuid.uuid4(),
             pod_type=TenantShipment.PodType.HARD,
@@ -199,10 +236,14 @@ class PodSectionMetadataTests(TestCase):
         self.assertFalse(digital_ui['primary_button']['complete_upload_after_execute'])
 
     @patch(
-        'mobile_api.pod_capture.services.pod_section_metadata.resolve_default_pod_action',
+        'mobile_api.pod_capture.services.pod_section_metadata.resolve_digital_pod_action',
         return_value=_mock_a7_action(),
     )
-    def test_soft_shipment_digital_only_steps(self, _mock_a7):
+    @patch(
+        'mobile_api.pod_capture.services.pod_section_metadata.resolve_hard_copy_pod_action',
+        return_value=SimpleNamespace(action_code='A7H', hard_copy_collection=True),
+    )
+    def test_soft_shipment_digital_only_steps(self, _mock_hard, _mock_a7):
         shipment = SimpleNamespace(
             pk=uuid.uuid4(),
             pod_type=TenantShipment.PodType.SOFT,

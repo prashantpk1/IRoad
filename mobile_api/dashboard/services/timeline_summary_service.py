@@ -46,6 +46,14 @@ def build_timeline_summary(context: DriverDashboardContext) -> dict[str, Any]:
                 scope='movement',
             )
         return _timeline_for_movement(movement, driver_pk=driver_pk)
+    booking = context.active_booking
+    if booking is not None:
+        if cache is not None and cache.booking_logs:
+            return _format_timeline_result(
+                cache.timeline_logs(scope='booking'),
+                scope='booking',
+            )
+        return _timeline_for_booking(booking, driver_pk=driver_pk)
     return _empty_timeline()
 
 
@@ -73,6 +81,23 @@ def _timeline_for_movement(movement: Any, *, driver_pk: Any) -> dict[str, Any]:
         .order_by('-log_date', '-created_at', '-log_id')[:_DASHBOARD_TIMELINE_LIMIT]
     )
     return _format_timeline_result(logs, scope='movement')
+
+
+def _timeline_for_booking(booking: Any, *, driver_pk: Any) -> dict[str, Any]:
+    from iroad_tenants.operation_runtime.booking_preshipment_cycle import (
+        scoped_preshipment_action_logs,
+    )
+    from mobile_api.job_detail.helpers.booking_job_context import (
+        resolve_booking_preshipment_item_type,
+    )
+
+    logs = scoped_preshipment_action_logs(
+        booking,
+        booking_item_type=resolve_booking_preshipment_item_type(booking),
+        driver_id=driver_pk,
+        scan_limit=_DASHBOARD_TIMELINE_LIMIT,
+    )
+    return _format_timeline_result(logs, scope='booking')
 
 
 def _format_timeline_result(logs, *, scope: str) -> dict[str, Any]:

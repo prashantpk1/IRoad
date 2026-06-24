@@ -30,11 +30,13 @@ from mobile_api.job_detail.timeline.timeline_cursor_service import (
 )
 from mobile_api.job_detail.timeline.timeline_event_mapper import (
     dedupe_timeline_events,
+    filter_hidden_timeline_events,
     merge_actions_with_timeline_logs,
+    sort_timeline_display_order,
     map_logs_to_timeline_events,
     sort_logs_newest_first,
 )
-from iroad_tenants.operation_execution import _is_hard_copy_collection_action
+from iroad_tenants.operation_execution import _is_standalone_hard_copy_collection_action
 from iroad_tenants.services.timeline_service import TimelineService
 from iroad_tenants.operation_runtime.impacts import operation_action_matches
 from tenant_workspace.models import TenantOperationAction
@@ -160,8 +162,19 @@ class JobDetailTimelineService:
             limit=limit,
             request=request,
         )
+        events = page.timeline_preview
+        if context.job_type == 'shipment' and context.shipment is not None:
+            from mobile_api.helpers.action_navigation_metadata import (
+                finalize_timeline_preview_navigation,
+            )
+
+            events = finalize_timeline_preview_navigation(
+                events,
+                shipment=context.shipment,
+                tenant_schema=(context.tenant_schema or ''),
+            )
         return {
-            'events': page.timeline_preview,
+            'events': events,
             'next_cursor': page.timeline_cursor,
             'has_more': page.has_more,
         }
@@ -258,9 +271,7 @@ class JobDetailTimelineService:
         Keep only workflow actions applicable to this job type/context.
 
         - Shipment timelines do not show booking-start action (A1).
-        - Credit shipments do not show COD collection action (A9).
-        - Booking-scoped jobs (pre auto-shipment birth) use the same full
-          shipment timeline (Pickup → Unloading).
+        - Booking-scoped jobs (outbound and backload preshipment) include Start Job.
         """
         if not actions:
             return []
@@ -290,8 +301,9 @@ class JobDetailTimelineService:
         *,
         context: JobDetailContext,
     ) -> list[Any]:
-        """Shipment-style timeline rows (excludes A1 / empty-move / hard POD)."""
+        """Shipment-style timeline rows; booking jobs keep Start Job (A1)."""
         is_cod = False
+        is_booking_job = context.job_type == 'booking'
         if context.shipment is not None:
             is_cod = (
                 getattr(context.shipment, 'order_type', '') or ''
@@ -307,7 +319,10 @@ class JobDetailTimelineService:
             code = (getattr(action, 'action_code', '') or '').strip().upper()
             if cat == 'empty_move' or code.startswith('EM'):
                 continue
-            if operation_action_matches(action, 'start job', 'a1', 'action 1'):
+            if (
+                not is_booking_job
+                and operation_action_matches(action, 'start job', 'a1', 'action 1')
+            ):
                 continue
             if (not is_cod) and operation_action_matches(
                 action,
@@ -317,7 +332,7 @@ class JobDetailTimelineService:
                 'cod',
             ):
                 continue
-            if _is_hard_copy_collection_action(action):
+            if _is_standalone_hard_copy_collection_action(action):
                 continue
             filtered.append(action)
         return filtered
@@ -347,6 +362,8 @@ class JobDetailTimelineService:
             log_id = str(getattr(log, 'log_id', None) or getattr(log, 'pk', '') or '')
             if not log_id or log_id in existing_log_ids:
                 continue
+            if channel in AUTO_ACTION_CHANNELS:
+                code = 'A_POD_VERIFY'
             log_date = getattr(log, 'log_date', None)
             out.append(
                 {
@@ -401,7 +418,7 @@ class JobDetailTimelineService:
             shipment=shipment,
             tenant_schema=(context.tenant_schema or ''),
         )
-        return self._append_system_auto_events(events, logs, request=request)
+        return sort_timeline_display_order(events)
 
     def _bundle_from_workflow_events(
         self,
@@ -445,13 +462,15 @@ class JobDetailTimelineService:
             )
 
         if context.job_type == 'booking' and context.booking is not None:
-            from iroad_tenants.operation_runtime.latest_action_aggregator import (
-                scoped_booking_action_logs,
+            from iroad_tenants.operation_runtime.booking_preshipment_cycle import (
+                scoped_preshipment_action_logs,
             )
 
+            exec_ctx = resolve_booking_job_execution_context(context)
             logs = list(
-                scoped_booking_action_logs(
+                scoped_preshipment_action_logs(
                     context.booking,
+                    booking_item_type=str(exec_ctx.get('booking_item_type') or ''),
                     driver_id=driver_id,
                     scan_limit=max(len(actions) * 3, limit + 1),
                 )
@@ -488,7 +507,9 @@ class JobDetailTimelineService:
         has_more = len(window) > limit
         page_logs = window[:limit]
         events = dedupe_timeline_events(
-            map_logs_to_timeline_events(page_logs, request=request),
+            filter_hidden_timeline_events(
+                map_logs_to_timeline_events(page_logs, request=request),
+            ),
         )
         next_cursor = ''
         if has_more and page_logs:
@@ -530,7 +551,9 @@ class JobDetailTimelineService:
         has_more = len(rows) > limit
         page_rows = rows[:limit]
         events = dedupe_timeline_events(
-            map_logs_to_timeline_events(page_rows, request=request),
+            filter_hidden_timeline_events(
+                map_logs_to_timeline_events(page_rows, request=request),
+            ),
         )
         next_cursor = ''
         if has_more and page_rows:

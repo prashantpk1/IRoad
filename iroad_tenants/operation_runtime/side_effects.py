@@ -19,11 +19,14 @@ from iroad_tenants.operation_runtime.booking_impact import apply_booking_status_
 from iroad_tenants.operation_runtime.impacts import (
     operation_action_matches,
     resolve_movement_status_impact,
+    resolve_shipment_status_impact,
 )
 from iroad_tenants.operation_runtime.latest_state import (
+    after_shipment_status_side_effects,
     apply_hard_copy_pod_type_if_needed,
     apply_hard_copy_received_if_needed,
     apply_shipment_status_impact,
+    resolve_effective_shipment_status_for_action,
 )
 from iroad_tenants.operation_runtime.movement_ops import birth_movement_for_shipment
 from iroad_tenants.operation_runtime.pod_action import (
@@ -110,13 +113,50 @@ def _mobile_log_evidence_for_shipment(shipment) -> dict[str, bool]:
 
 
 def _mobile_pod_compliance_satisfied(shipment) -> bool:
-    """Action Log + column — Hard POD needs A7H (hard_pod_log), not digital A7 alone."""
+    """Action Log + column — Hard POD needs custody complete, not column alone."""
+    if shipment is None:
+        return False
+    from mobile_api.dashboard.selectors.pod_cod_policy import (
+        is_hard_pod_custody_complete,
+        shipment_requires_hard_copy,
+    )
+
+    evidence = _mobile_log_evidence_for_shipment(shipment)
+    try:
+        from django.db import connection
+
+        schema = (getattr(connection, 'schema_name', None) or '').strip()
+    except Exception:
+        schema = ''
+    evidence = dict(evidence)
+    try:
+        from mobile_api.dashboard.selectors import pod_cod_policy as policy
+
+        logs = list(
+            TenantOperationActionLog.objects.filter(shipment_id=shipment.pk)
+            .select_related('operation_action')
+            .order_by('-log_date', '-created_at')[:100],
+        )
+        evidence = policy.enrich_log_evidence_hard_pod(
+            evidence,
+            shipment,
+            tenant_schema=schema,
+            driver=getattr(shipment, 'driver', None),
+            logs=logs,
+        )
+    except Exception:
+        pass
+    if shipment_requires_hard_copy(shipment):
+        if not is_hard_pod_custody_complete(
+            shipment,
+            log_evidence=evidence,
+            tenant_schema=schema,
+            driver=getattr(shipment, 'driver', None),
+        ):
+            return False
+        return bool(evidence.get('pod_uploaded')) or _pod_status_is_complete(shipment)
     if _pod_status_is_complete(shipment):
         return True
-    evidence = _mobile_log_evidence_for_shipment(shipment)
-    pod_type = (getattr(shipment, 'pod_type', None) or '').strip().casefold()
-    if pod_type == TenantShipment.PodType.HARD.casefold():
-        return bool(evidence.get('hard_pod_log'))
     return bool(evidence.get('pod_uploaded'))
 
 
@@ -284,6 +324,13 @@ def maybe_advance_delivered_when_job_close_ready(
     current = (shipment.shipment_status or '').strip()
     if current != TenantShipment.ShipmentStatus.POD_SUBMITTED:
         return False
+    try:
+        from mobile_api.dashboard.selectors.pod_cod_policy import derive_hard_pod_pending
+
+        if derive_hard_pod_pending(shipment):
+            return False
+    except Exception:
+        pass
     if not _shipment_job_close_gates_satisfied_for_advance(shipment):
         return False
     anchor_log = (
@@ -452,25 +499,48 @@ def maybe_auto_close_delivered_shipment(shipment, *, created_by_label: str = '')
     )
 
 
+def _preshipment_logs_before_confirm_loaded(action_log) -> Any:
+    """Logs that count toward A1–A3 prerequisites for Confirm Loaded (A4)."""
+    from iroad_tenants.operation_runtime.booking_preshipment_cycle import (
+        booking_preshipment_logs_queryset,
+        is_backload_preshipment_cycle,
+    )
+
+    booking = action_log.booking
+    if booking is None:
+        return TenantOperationActionLog.objects.none()
+
+    booking_item_type = (
+        getattr(action_log, '_birth_booking_item_type', None)
+        or getattr(action_log, 'booking_item_type', '')
+        or ''
+    ).strip()
+
+    if is_backload_preshipment_cycle(booking, booking_item_type):
+        return booking_preshipment_logs_queryset(
+            booking,
+            booking_item_type=booking_item_type,
+            exclude_log_id=action_log.pk,
+        )
+
+    qs = TenantOperationActionLog.objects.filter(booking_id=booking.pk).exclude(
+        pk=action_log.pk,
+    )
+    if booking_item_type:
+        qs = qs.filter(
+            models.Q(shipment__isnull=True)
+            | models.Q(shipment__booking_item_type__iexact=booking_item_type)
+        )
+    return qs
+
+
 def _assert_a3_fired_for_a4(action_log) -> None:
     if not _is_confirm_loaded_action(action_log.operation_action):
         return
     booking = action_log.booking
     if booking is None:
         raise ValidationError('Booking is required before Confirm Loaded can create a shipment.')
-    qs = TenantOperationActionLog.objects.filter(booking_id=booking.pk).exclude(
-        pk=action_log.pk,
-    )
-    booking_item_type = (
-        getattr(action_log, '_birth_booking_item_type', None)
-        or getattr(action_log, 'booking_item_type', '')
-        or ''
-    ).strip()
-    if booking_item_type:
-        qs = qs.filter(
-            models.Q(shipment__isnull=True)
-            | models.Q(shipment__booking_item_type__iexact=booking_item_type)
-        )
+    qs = _preshipment_logs_before_confirm_loaded(action_log)
 
     if not qs.filter(
         models.Q(operation_action__action_code__iexact='A1')
@@ -521,6 +591,106 @@ def _require_loaded_movement_for_action(action_log, shipment):
     return None
 
 
+def _peer_ready_for_round_trip_cascade_close(shipment) -> bool:
+    """
+    Sibling leg may be closed when the driver closes the final round-trip leg.
+
+    Unlike driver-initiated A10 on outbound, cascade close ignores
+    ``round_trip_defers_job_close`` — outbound stays Delivered until backload
+    job close runs.
+    """
+    if shipment is None:
+        return False
+    current = (shipment.shipment_status or '').strip()
+    if current in {
+        TenantShipment.ShipmentStatus.CANCELLED,
+        TenantShipment.ShipmentStatus.CLOSED,
+    }:
+        return False
+    if current not in {
+        TenantShipment.ShipmentStatus.POD_SUBMITTED,
+        TenantShipment.ShipmentStatus.DELIVERED,
+    }:
+        return False
+    if not _mobile_pod_compliance_satisfied(shipment):
+        return False
+    if (shipment.order_type or '').strip().upper() == 'COD':
+        if (
+            getattr(shipment, 'collection_status', None)
+            != TenantShipment.CollectionStatus.COLLECTED
+        ):
+            return False
+    return True
+
+
+def close_round_trip_peer_shipments_on_job_close(
+    shipment,
+    *,
+    action,
+    action_log: TenantOperationActionLog | None = None,
+    created_by_label: str = '',
+) -> int:
+    """
+    When the driver closes the final round-trip leg, close every sibling leg
+    that already finished delivery (POD + COD when applicable).
+    """
+    from mobile_api.dashboard.selectors.booking_selection_policy import (
+        normalized_trip_type,
+    )
+
+    if shipment is None or action is None:
+        return 0
+    impact = resolve_effective_shipment_status_for_action(
+        action=action,
+        shipment=shipment,
+    )
+    if impact != TenantShipment.ShipmentStatus.CLOSED:
+        return 0
+
+    booking = getattr(shipment, 'booking', None) or getattr(action_log, 'booking', None)
+    if booking is None and getattr(shipment, 'booking_id', None):
+        from tenant_workspace.models import TenantBooking
+
+        booking = TenantBooking.objects.filter(pk=shipment.booking_id).first()
+    if booking is None:
+        return 0
+    if normalized_trip_type(booking).casefold() != 'round':
+        return 0
+
+    anchor_code = str(
+        getattr(shipment, 'shipment_no', None)
+        or getattr(shipment, 'shipment_code', None)
+        or getattr(shipment, 'pk', '')
+    )
+    closed_count = 0
+    peers = (
+        TenantShipment.objects.filter(booking_id=booking.pk)
+        .exclude(pk=shipment.pk)
+        .exclude(shipment_status=TenantShipment.ShipmentStatus.CANCELLED)
+    )
+    for peer in peers:
+        if not _peer_ready_for_round_trip_cascade_close(peer):
+            continue
+        _ensure_auto_close_job_log(
+            peer,
+            action_log=action_log,
+            created_by_label=created_by_label,
+            source_channel='round_trip_cascade_job_close',
+            notes=f'Round-trip cascade job close from leg {anchor_code}',
+        )
+        peer.shipment_status = TenantShipment.ShipmentStatus.CLOSED
+        peer.save(update_fields=['shipment_status', 'updated_at'])
+        after_shipment_status_side_effects(peer)
+        closed_count += 1
+
+    if closed_count:
+        apply_booking_status_impact(
+            booking,
+            getattr(action, 'booking_status_impact', '') or '',
+        )
+    return closed_count
+
+
 def apply_execution_side_effects(action_log, *, created_by_label='') -> None:
     """
     Apply Action Master impacts after log save (doc Ch.2–4).
@@ -562,17 +732,18 @@ def apply_execution_side_effects(action_log, *, created_by_label='') -> None:
         booking_item_type_hint = (
             getattr(action_log, '_birth_booking_item_type', None) or ''
         ).strip()
-        from iroad_tenants.operation_runtime.auto_shipment_line import (
-            resolve_auto_shipment_target_line,
-        )
 
         target_line = resolve_auto_shipment_target_line(
             booking,
             booking_item_type_hint=booking_item_type_hint,
         )
         if target_line is None:
+            from iroad_tenants.operation_runtime.auto_shipment_line import (
+                format_auto_shipment_birth_error,
+            )
+
             raise ValidationError(
-                'Auto Shipment Post requires a confirmed booking line without an active shipment.'
+                format_auto_shipment_birth_error(booking, booking_item_type_hint)
             )
         shipment = _tenant_shipment_birth_from_booking_line(
             booking,
@@ -614,7 +785,32 @@ def apply_execution_side_effects(action_log, *, created_by_label='') -> None:
                 'Transaction will roll back.'
             )
 
-    if shipment is not None and action.auto_pod_post:
+    hard_first_pod_execute = False
+    if shipment is not None and getattr(action, 'hard_copy_collection', False):
+        from iroad_tenants.operation_execution import _pending_hard_pod_custody_exists
+        from iroad_tenants.operation_runtime.hard_pod_promotion import (
+            promote_pending_hard_pod_custody_for_action_log,
+        )
+        from iroad_tenants.operation_runtime.latest_state import (
+            apply_hard_copy_pod_type_if_needed,
+            apply_hard_copy_received_if_needed,
+        )
+
+        had_pending_custody = _pending_hard_pod_custody_exists(shipment)
+        apply_hard_copy_pod_type_if_needed(shipment=shipment, action=action)
+        promoted = promote_pending_hard_pod_custody_for_action_log(
+            action_log=action_log,
+            shipment=shipment,
+            action=action,
+            created_by_label=created_by_label,
+        )
+        hard_first_pod_execute = bool(had_pending_custody and promoted)
+        if promoted:
+            shipment.refresh_from_db()
+        apply_hard_copy_received_if_needed(shipment=shipment, action=action)
+        shipment.refresh_from_db()
+
+    if shipment is not None and action.auto_pod_post and not hard_first_pod_execute:
         pod_document = birth_pod_from_action_log(
             action_log,
             created_by_label=created_by_label,
@@ -627,11 +823,40 @@ def apply_execution_side_effects(action_log, *, created_by_label='') -> None:
         )
 
     if shipment is not None and (action.shipment_status_impact or '').strip():
-        apply_shipment_status_impact(
-            shipment=shipment,
-            action=action,
-            created_by_label=created_by_label,
+        from iroad_tenants.operation_runtime.latest_state import (
+            resolve_effective_shipment_status_for_action,
         )
+
+        impact_status = resolve_effective_shipment_status_for_action(
+            action=action,
+            shipment=shipment,
+        )
+        defer_delivered_for_hard_pod = False
+        if impact_status == TenantShipment.ShipmentStatus.DELIVERED:
+            if hard_first_pod_execute and getattr(action, 'auto_pod_post', False):
+                defer_delivered_for_hard_pod = True
+            elif (
+                getattr(action, 'hard_copy_collection', False)
+                and getattr(action, 'auto_pod_post', False)
+                and (getattr(shipment, 'pod_type', None) or '').strip().casefold()
+                == TenantShipment.PodType.HARD.casefold()
+            ):
+                evidence = _mobile_log_evidence_for_shipment(shipment)
+                if not evidence.get('hard_pod_log'):
+                    defer_delivered_for_hard_pod = True
+        if not defer_delivered_for_hard_pod:
+            apply_shipment_status_impact(
+                shipment=shipment,
+                action=action,
+                created_by_label=created_by_label,
+            )
+            if impact_status == TenantShipment.ShipmentStatus.CLOSED:
+                close_round_trip_peer_shipments_on_job_close(
+                    shipment,
+                    action=action,
+                    action_log=action_log,
+                    created_by_label=created_by_label,
+                )
     elif _should_auto_mark_delivered_for_credit(action, shipment):
         _ensure_auto_delivered_verify_log(
             shipment,
@@ -732,7 +957,4 @@ def apply_execution_side_effects(action_log, *, created_by_label='') -> None:
 
         sync_movement_route_evidence_from_action_log(action_log)
 
-    if shipment is not None:
-        apply_hard_copy_pod_type_if_needed(shipment=shipment, action=action)
-        apply_hard_copy_received_if_needed(shipment=shipment, action=action)
-        # Job close (A10) is driver-initiated only — never auto-close after payment/POD.
+    # Job close (A10) is driver-initiated only — never auto-close after payment/POD.

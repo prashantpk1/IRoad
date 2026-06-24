@@ -227,6 +227,9 @@ class ExecutionIdempotencyGuard:
                 log,
                 booking_item_type='Backload',
             )
+        # Outbound preshipment: never replay a log that already birthed a shipment.
+        if getattr(log, 'shipment_id', None):
+            return False
         return True
 
     def _resolve_existing_log(

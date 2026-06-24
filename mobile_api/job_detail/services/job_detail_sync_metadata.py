@@ -24,7 +24,7 @@ from mobile_api.job_detail.services.job_detail_status_reconciler import (
     authoritative_entity_status,
 )
 
-JOB_DETAIL_PROJECTION_VERSION = '1'
+JOB_DETAIL_PROJECTION_VERSION = '2'
 WORKFLOW_VERSION_SCHEME = '1'
 
 

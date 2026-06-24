@@ -1,6 +1,8 @@
 """Operation Action Master form rules — PCS §9.1–§9.3."""
 from __future__ import annotations
 
+import re
+
 from iroad_tenants.status_impact_resolution import (
     STATUS_IMPACT_DO_NOTHING_LABEL,
     STATUS_IMPACT_DO_NOTHING_VALUE,
@@ -31,6 +33,9 @@ SEQUENCED_ACTION_SCOPES = frozenset({'job', 'on_call'})
 SEQUENCED_CATEGORIES = frozenset({'job', 'empty_move'})
 VALID_ACTION_SCOPES = frozenset(scope for scope, _ in ACTION_SCOPE_CHOICES)
 VALID_SEQUENCE_CATEGORIES = frozenset(cat for cat, _ in SEQUENCE_CATEGORY_CHOICES)
+OA_ACTION_CODE_PATTERN = re.compile(r'^OA-(\d+)$', re.IGNORECASE)
+JOB_ACTION_CODE_PREFIX = 'OA'
+OPERATION_ACTION_AUTO_FORM_CODE = 'operation-actions'
 
 EXCLUSIVE_MAX_ONE_TOGGLES = {
     'auto_shipment_post': 'Auto Shipment Post',
@@ -261,6 +266,81 @@ def recommended_sequence_number(sequence_category: str, *, exclude_action_id=Non
     if not numbers:
         return 1
     return numbers[-1] + 1
+
+
+def _max_existing_oa_action_suffix() -> int:
+    from tenant_workspace.models import TenantOperationAction
+
+    max_suffix = 0
+    for code in TenantOperationAction.objects.filter(
+        action_code__istartswith=f'{JOB_ACTION_CODE_PREFIX}-',
+    ).values_list('action_code', flat=True):
+        match = OA_ACTION_CODE_PATTERN.match((code or '').strip())
+        if match:
+            max_suffix = max(max_suffix, int(match.group(1)))
+    return max_suffix
+
+
+def format_job_operation_action_code(sequence_number: int) -> str:
+    return f'{JOB_ACTION_CODE_PREFIX}-{int(sequence_number):04d}'
+
+
+def recommended_operation_action_code(sequence_category: str, *, exclude_action_id=None) -> str:
+    """Preview next OA code aligned with the next job sequence slot."""
+    if sequence_category != 'job':
+        return ''
+    seq = recommended_sequence_number('job', exclude_action_id=exclude_action_id)
+    seq = max(seq, _max_existing_oa_action_suffix() + 1)
+    return format_job_operation_action_code(seq)
+
+
+def resolve_operation_action_code(sequence_category: str, sequence_number: int) -> str | None:
+    """Use OA-{seq:04d} for job actions when the code slot is still free."""
+    if sequence_category != 'job':
+        return None
+    from tenant_workspace.models import TenantOperationAction
+
+    candidate = format_job_operation_action_code(sequence_number)
+    if TenantOperationAction.objects.filter(action_code__iexact=candidate).exists():
+        return None
+    return candidate
+
+
+def sync_operation_action_auto_number_sequence() -> int:
+    """Keep the OA auto-number counter at or above the next sequential slot."""
+    from tenant_workspace.models import AutoNumberSequence
+
+    next_required = max(_max_existing_oa_action_suffix() + 1, 1)
+    sequence, _ = AutoNumberSequence.objects.get_or_create(
+        form_code=OPERATION_ACTION_AUTO_FORM_CODE,
+        defaults={'next_number': next_required},
+    )
+    current = int(sequence.next_number or 1)
+    if current < next_required:
+        sequence.next_number = next_required
+        sequence.save(update_fields=['next_number', 'updated_at'])
+        return next_required
+    return current
+
+
+def allocate_operation_action_code(
+    sequence_category: str,
+    sequence_number: int,
+) -> str | None:
+    """Pick the next sequential OA code for job actions before auto-number fallback."""
+    code = resolve_operation_action_code(sequence_category, sequence_number)
+    if code:
+        return code
+    if sequence_category != 'job':
+        return None
+    next_code = recommended_operation_action_code('job')
+    if not next_code:
+        return None
+    from tenant_workspace.models import TenantOperationAction
+
+    if TenantOperationAction.objects.filter(action_code__iexact=next_code).exists():
+        return None
+    return next_code
 
 
 def validate_category_sequence_integrity(sequence_category: str) -> str | None:

@@ -81,6 +81,138 @@ class HardPodExecuteIntegrationTests(TransactionTestCase):
             HardPodExecuteIntegrationService().validate_execute_requirements(context)
         self.assertEqual(exc.exception.code, 'hard_pod_submission_required')
 
+    @patch(
+        'iroad_tenants.operation_runtime.side_effects._mobile_log_evidence_for_shipment',
+        return_value={'hard_pod_log': False, 'pod_uploaded': False},
+    )
+    def test_combined_pod_digital_first_skips_custody_bind(self, _mock_evidence) -> None:
+        combined_action = SimpleNamespace(
+            action_code='OA-0008',
+            pk=uuid4(),
+            auto_pod_post=True,
+            hard_copy_collection=True,
+            status='Active',
+        )
+        context = ExecuteActionContext(
+            driver=self.driver,
+            tenant_schema=self.tenant_schema,
+            user_id='user-1',
+            job_type='shipment',
+            job_id=self.shipment.pk,
+            action_code='OA-0008',
+            payload={'notes': 'digital pod'},
+        )
+        context.shipment = self.shipment
+        context.operation_action = combined_action
+        context.idempotent_replay = False
+
+        service = HardPodExecuteIntegrationService()
+        service.validate_execute_requirements(context)
+        linked = service.bind_action_log(context, self.action_log)
+        self.assertIsNone(linked)
+
+    def test_combined_pod_digital_first_validate_without_capture_bundle(self) -> None:
+        combined_action = SimpleNamespace(
+            action_code='OA-0008',
+            pk=uuid4(),
+            auto_pod_post=True,
+            hard_copy_collection=True,
+            status='Active',
+        )
+        context = ExecuteActionContext(
+            driver=self.driver,
+            tenant_schema=self.tenant_schema,
+            user_id='user-1',
+            job_type='shipment',
+            job_id=self.shipment.pk,
+            action_code='OA-0008',
+            payload={},
+        )
+        context.shipment = self.shipment
+        context.operation_action = combined_action
+
+        HardPodExecuteIntegrationService().validate_execute_requirements(context)
+
+    def test_oa_0008_without_auto_pod_flag_still_allows_digital_first(self) -> None:
+        """Tenant rows missing auto_pod_post must not block digital evidence execute."""
+        combined_action = SimpleNamespace(
+            action_code='OA-0008',
+            pk=uuid4(),
+            auto_pod_post=False,
+            hard_copy_collection=True,
+            status='Active',
+        )
+        context = ExecuteActionContext(
+            driver=self.driver,
+            tenant_schema=self.tenant_schema,
+            user_id='user-1',
+            job_type='shipment',
+            job_id=self.shipment.pk,
+            action_code='OA-0008',
+            payload={},
+        )
+        context.shipment = self.shipment
+        context.operation_action = combined_action
+
+        HardPodExecuteIntegrationService().validate_execute_requirements(context)
+
+    @patch(
+        'tenant_workspace.models.TenantOperationActionLog.objects.filter',
+    )
+    def test_digital_first_allowed_even_when_prior_oa_0008_log_exists(
+        self,
+        mock_log_filter,
+    ) -> None:
+        """Failed retries must not force custody on digital evidence step."""
+        mock_log_filter.return_value.exists.return_value = True
+        combined_action = SimpleNamespace(
+            action_code='OA-0008',
+            pk=uuid4(),
+            auto_pod_post=True,
+            hard_copy_collection=True,
+            status='Active',
+        )
+        context = ExecuteActionContext(
+            driver=self.driver,
+            tenant_schema=self.tenant_schema,
+            user_id='user-1',
+            job_type='shipment',
+            job_id=self.shipment.pk,
+            action_code='OA-0008',
+            payload={},
+        )
+        context.shipment = SimpleNamespace(
+            pk='2b651e01-901b-464d-909a-8bf50b1283ef',
+            shipment_id='2b651e01-901b-464d-909a-8bf50b1283ef',
+        )
+        context.operation_action = combined_action
+
+        HardPodExecuteIntegrationService().validate_execute_requirements(context)
+
+    def test_hard_copy_step_still_requires_custody_reference(self) -> None:
+        combined_action = SimpleNamespace(
+            action_code='OA-0008',
+            pk=uuid4(),
+            auto_pod_post=True,
+            hard_copy_collection=True,
+            status='Active',
+        )
+        context = ExecuteActionContext(
+            driver=self.driver,
+            tenant_schema=self.tenant_schema,
+            user_id='user-1',
+            job_type='shipment',
+            job_id=self.shipment.pk,
+            action_code='OA-0008',
+            payload={'capture_mode': 'hard_copy_confirmation'},
+        )
+        context.shipment = self.shipment
+        context.operation_action = combined_action
+
+        with self.assertRaises(ExecuteActionError) as exc:
+            HardPodExecuteIntegrationService().validate_execute_requirements(context)
+        self.assertEqual(exc.exception.code, 'hard_pod_submission_required')
+
     def test_hard_pod_execute_validation_still_reaches_workflow_gate(self) -> None:
         context = ExecuteActionContext(
             driver=self.driver,

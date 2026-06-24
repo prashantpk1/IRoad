@@ -201,7 +201,38 @@ class ExecutionValidationService:
         normalized = {c.casefold() for c in allowed_codes if c}
         if code.casefold() in normalized:
             return True
+        if self._combined_pod_execute_allowed(context, operation_action):
+            return True
         return self._hard_copy_execute_allowed(context, operation_action)
+
+    def _combined_pod_execute_allowed(
+        self,
+        context: ExecuteActionContext,
+        operation_action: Any,
+    ) -> bool:
+        """OA-0008 step 2 — hard-copy confirmation after digital POD execute."""
+        from iroad_tenants.operation_execution import (
+            _combined_pod_allows_hard_copy_retry,
+            _is_combined_upload_pod_action,
+        )
+
+        if not _is_combined_upload_pod_action(operation_action):
+            return False
+        if context.shipment is None:
+            return False
+        if not _combined_pod_allows_hard_copy_retry(
+            operation_action,
+            context.shipment,
+        ):
+            return False
+        policy_error = OperationExecutionService.validate_operation_action_allowed(
+            operation_action,
+            booking=context.booking,
+            shipment=context.shipment,
+            movement=context.movement,
+            booking_item_type=self._booking_item_type(context),
+        )
+        return policy_error is None
 
     def _hard_copy_execute_allowed(
         self,
@@ -321,6 +352,7 @@ class ExecutionValidationService:
             shipment=context.shipment,
             booking=context.booking,
             driver=context.driver,
+            tenant_schema=(getattr(context, 'tenant_schema', None) or ''),
         )
 
     @staticmethod

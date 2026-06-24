@@ -589,6 +589,16 @@ class ExecuteActionOrchestrator:
         )
 
         booking_item_type = self._validation_service._booking_item_type(context)
+        birth_booking_item_type = booking_item_type
+        if context.booking is not None:
+            from iroad_tenants.operation_runtime.booking_preshipment_cycle import (
+                resolve_preshipment_booking_item_type,
+            )
+
+            birth_booking_item_type = resolve_preshipment_booking_item_type(
+                context.booking,
+                booking_item_type,
+            )
         truck = self._resolve_truck(context)
         created_by_label = self._driver_label(context.driver)
 
@@ -613,10 +623,16 @@ class ExecuteActionOrchestrator:
                         latitude=str(payload.get('latitude') or ''),
                         longitude=str(payload.get('longitude') or ''),
                         map_link=str(payload.get('map_link') or ''),
-                        birth_booking_item_type=booking_item_type,
+                        birth_booking_item_type=birth_booking_item_type,
                         skip_recent_duplicate_guard=True,
                         sync_shipment_after=True,
                         mobile_cod_amount=payload.get('mobile_cod_amount'),
+                        hard_pod_custody_submission_id=str(
+                            payload.get('custody_submission_id') or ''
+                        ).strip(),
+                        hard_pod_client_submission_id=str(
+                            payload.get('client_submission_id') or ''
+                        ).strip(),
                     )
         except DjangoValidationError as exc:
             logger.warning(

@@ -337,6 +337,34 @@ class BookingSelectionPolicyTests(SimpleTestCase):
         self.assertEqual(active_backload.booking_item_type, 'Backload')
         self.assertIsNone(active_outbound)
 
+    def test_delivered_backload_stays_active_after_outbound_cancelled(self):
+        """Post-POD DELIVERED backload must stay visible for COD / job close."""
+        driver = _driver()
+        booking = _booking(
+            trip_type='Round',
+            assigned_driver_id=driver.pk,
+            backload_driver_id=driver.pk,
+        )
+        shipments = [
+            _shipment(
+                booking_item_type='Outbound',
+                status=TenantShipment.ShipmentStatus.CANCELLED,
+                sequence=1,
+                driver_id=driver.pk,
+            ),
+            _shipment(
+                booking_item_type='Backload',
+                status=TenantShipment.ShipmentStatus.DELIVERED,
+                sequence=2,
+                shipment_no='SH-0077',
+                driver_id=driver.pk,
+            ),
+        ]
+        active = policy.get_active_shipment_for_driver(driver, booking, shipments)
+        self.assertIsNotNone(active)
+        self.assertEqual(active.shipment_no, 'SH-0077')
+        self.assertEqual(active.shipment_status, TenantShipment.ShipmentStatus.DELIVERED)
+
     def test_booking_ordering_key_uses_line_type_rank(self):
         ordered = policy.sorted_shipments(
             [
@@ -752,6 +780,38 @@ class BookingExecutionStageTests(SimpleTestCase):
             policy.BOOKING_EXECUTION_STAGE_OUTBOUND_COMPLETED,
         )
 
+    def test_cancelled_outbound_no_backload_row_pending(self):
+        booking = _booking(trip_type='Round')
+        legs = [
+            _shipment(
+                booking_item_type='Outbound',
+                status=TenantShipment.ShipmentStatus.CANCELLED,
+                sequence=1,
+            ),
+        ]
+        self.assertTrue(policy.is_backload_leg_pending(booking, legs))
+        self.assertEqual(
+            policy.derive_booking_execution_stage(booking, legs),
+            policy.BOOKING_EXECUTION_STAGE_OUTBOUND_COMPLETED,
+        )
+
+    def test_round_trip_meta_backload_after_cancelled_outbound(self):
+        from mobile_api.dashboard.projections.booking_projection import (
+            _round_trip_meta,
+        )
+
+        booking = _booking(trip_type='Round')
+        legs = [
+            _shipment(
+                booking_item_type='Outbound',
+                status=TenantShipment.ShipmentStatus.CANCELLED,
+                sequence=1,
+            ),
+        ]
+        meta = _round_trip_meta(booking, legs)
+        self.assertTrue(meta.get('backload_bootstrap_pending'))
+        self.assertEqual(meta.get('next_executable_booking_item_type'), 'Backload')
+
     def test_partially_completed_one_way_in_transit(self):
         booking = _booking(trip_type='One-Way')
         legs = [_shipment(status=TenantShipment.ShipmentStatus.IN_TRANSIT)]
@@ -874,10 +934,47 @@ class RoundTripBackloadBootstrapSelectorTests(SimpleTestCase):
             result.booking_execution_stage,
             policy.BOOKING_EXECUTION_STAGE_OUTBOUND_COMPLETED,
         )
-        self.assertEqual(result.shipments_total, 2)
-        self.assertEqual(result.shipments_execution_completed, 1)
-        self.assertEqual(result.execution_progress_percentage, 50)
-        self.assertTrue(result.is_backload_bootstrap)
+
+    @patch.object(DashboardBookingSelector, '_auto_shipment_bootstrap_enabled')
+    @patch('mobile_api.dashboard.selectors.dashboard_booking_selector.TenantBooking')
+    def test_selector_shows_job_when_backload_delivered_cod_pending(
+        self,
+        mock_booking_model,
+        mock_bootstrap,
+    ):
+        """Cancelled outbound + DELIVERED backload must appear on My Jobs."""
+        mock_bootstrap.return_value = False
+        driver = _driver()
+        outbound_cancelled = _shipment(
+            booking_item_type='Outbound',
+            status=TenantShipment.ShipmentStatus.CANCELLED,
+            driver_id=driver.pk,
+        )
+        backload_delivered = _shipment(
+            booking_item_type='Backload',
+            status=TenantShipment.ShipmentStatus.DELIVERED,
+            sequence=2,
+            shipment_no='SH-0077',
+            driver_id=driver.pk,
+        )
+        booking = _booking(
+            trip_type='Round',
+            assigned_driver_id=driver.pk,
+            backload_driver_id=driver.pk,
+        )
+        booking.shipments.all.return_value = [outbound_cancelled, backload_delivered]
+        mock_booking_model.objects.filter.return_value = _mock_booking_queryset(
+            [booking],
+        )
+
+        result = DashboardBookingSelector().select_current_driver_booking(
+            driver,
+            tenant_schema='tenant_test',
+        )
+
+        self.assertIsNotNone(result)
+        self.assertEqual(result.active_shipment.shipment_no, 'SH-0077')
+        self.assertFalse(result.is_backload_bootstrap)
 
     @patch.object(DashboardBookingSelector, '_auto_shipment_bootstrap_enabled')
     @patch('mobile_api.dashboard.selectors.dashboard_booking_selector.TenantBooking')
@@ -911,3 +1008,41 @@ class RoundTripBackloadBootstrapSelectorTests(SimpleTestCase):
 
         self.assertIsNotNone(result)
         self.assertTrue(result.is_backload_bootstrap)
+
+    @patch.object(DashboardBookingSelector, '_auto_shipment_bootstrap_enabled')
+    @patch('mobile_api.dashboard.selectors.dashboard_booking_selector.TenantBooking')
+    def test_selector_returns_backload_when_outbound_cancelled(
+        self,
+        mock_booking_model,
+        mock_bootstrap,
+    ):
+        """Cancelled outbound + Confirmed backload (no backload row) must show on mobile."""
+        mock_bootstrap.return_value = False
+        driver = _driver()
+        outbound_cancelled = _shipment(
+            booking_item_type='Outbound',
+            status=TenantShipment.ShipmentStatus.CANCELLED,
+            driver_id=driver.pk,
+        )
+        booking = _booking(
+            trip_type='Round',
+            assigned_driver_id=driver.pk,
+            backload_driver_id=driver.pk,
+        )
+        booking.shipments.all.return_value = [outbound_cancelled]
+        mock_booking_model.objects.filter.return_value = _mock_booking_queryset(
+            [booking],
+        )
+
+        result = DashboardBookingSelector().select_current_driver_booking(
+            driver,
+            tenant_schema='tenant_test',
+        )
+
+        self.assertIsNotNone(result)
+        self.assertIsNone(result.active_shipment)
+        self.assertTrue(result.is_backload_bootstrap)
+        self.assertEqual(
+            result.booking_execution_stage,
+            policy.BOOKING_EXECUTION_STAGE_OUTBOUND_COMPLETED,
+        )

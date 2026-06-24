@@ -104,10 +104,14 @@ def booking_preshipment_projection(
     qs: QuerySet,
     booking_id,
     *,
+    shipment=None,
     cursor: TimelineCursor | None = None,
 ) -> QuerySet:
     """
     Booking-scoped logs before the first shipment leg exists (A1–A3 on Auto Shipment).
+
+    When ``shipment`` is provided, only logs for the current preshipment cycle are
+    included (outbound A2/A3 must not appear on a backload shipment job).
     """
     if not booking_id:
         return qs.none()
@@ -115,6 +119,23 @@ def booking_preshipment_projection(
         booking_id=booking_id,
         shipment__isnull=True,
     )
+    if shipment is not None:
+        from tenant_workspace.models import TenantBooking
+
+        from iroad_tenants.operation_runtime.booking_preshipment_cycle import (
+            booking_preshipment_logs_queryset,
+        )
+
+        booking = getattr(shipment, 'booking', None)
+        if booking is None:
+            booking = TenantBooking.objects.filter(pk=booking_id).first()
+        if booking is not None:
+            line = (getattr(shipment, 'booking_item_type', None) or '').strip()
+            cycle_log_ids = booking_preshipment_logs_queryset(
+                booking,
+                booking_item_type=line,
+            ).values_list('log_id', flat=True)
+            branch = branch.filter(log_id__in=cycle_log_ids)
     if cursor is not None:
         branch = apply_timeline_cursor_filter(branch, cursor)
     return branch
@@ -153,6 +174,7 @@ def scoped_shipment_action_log_queryset(
     via_booking = booking_preshipment_projection(
         base,
         getattr(shipment, 'booking_id', None),
+        shipment=shipment,
         cursor=cursor,
     )
     return union_shipment_timeline_querysets(direct, via_movement, via_booking)

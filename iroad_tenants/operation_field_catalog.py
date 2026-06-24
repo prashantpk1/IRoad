@@ -86,6 +86,38 @@ def normalize_operation_pod_type(value, default=''):
     return value if value in valid_values else default
 
 
+def operation_shipment_uses_hard_copy_pod(
+    shipment=None,
+    *,
+    booking=None,
+) -> bool:
+    """
+    Physical hard-copy custody (mobile step 2) applies only for Hard Copy POD.
+
+    Booking POD type is authoritative — Digital bookings never use hard-copy UI,
+    even when Action Master rows carry ``hard_copy_collection`` for other tenants.
+    """
+    booking = booking or (getattr(shipment, 'booking', None) if shipment else None)
+    if booking is not None:
+        booking_pod = normalize_operation_pod_type(
+            getattr(booking, 'pod_type', None),
+            default='',
+        )
+        if booking_pod == TenantShipment.PodType.DIGITAL:
+            return False
+        if booking_pod == TenantShipment.PodType.HARD:
+            return True
+    if shipment is None:
+        return False
+    shipment_pod = normalize_operation_pod_type(
+        getattr(shipment, 'pod_type', None),
+        default='',
+    )
+    if shipment_pod == TenantShipment.PodType.DIGITAL:
+        return False
+    return shipment_pod == TenantShipment.PodType.HARD
+
+
 def normalize_operation_pod_status(value, default=None):
     """Canonical POD status for all operational forms."""
     if default is None:

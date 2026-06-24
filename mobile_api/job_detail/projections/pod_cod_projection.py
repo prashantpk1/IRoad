@@ -63,6 +63,7 @@ def build_pod_cod_section(
         evidence,
         integrity,
         driver=context.driver,
+        tenant_schema=(context.tenant_schema or '').strip(),
     )
     display_flags['compliance_integrity'] = integrity
     display_flags.update(
@@ -77,6 +78,7 @@ def build_pod_cod_section(
         tenant_schema=(context.tenant_schema or '').strip(),
         log_evidence=evidence,
     )
+    display_flags['pod_type'] = (getattr(context.shipment, 'pod_type', None) or '').strip()
     return display_flags
 
 
@@ -87,6 +89,7 @@ def _resolve_display_flags(
     integrity: dict[str, Any],
     *,
     driver: Any | None,
+    tenant_schema: str = '',
 ) -> dict[str, bool]:
     """
     Merge column flags with Action Log evidence when logs are authoritative.
@@ -99,26 +102,31 @@ def _resolve_display_flags(
         has_logs and not integrity.get('compliance_drift')
     )
 
-    pod_complete = policy.pod_status_is_complete(
-        getattr(shipment, 'pod_status', None),
-    )
-    pod_type = (getattr(shipment, 'pod_type', None) or '').strip().casefold()
-    hard_pod_type = pod_type == TenantShipment.PodType.HARD.casefold()
+    hard_pod_shipment = policy.shipment_requires_hard_copy(shipment)
     hard_pod_log = bool(evidence.get('hard_pod_log', False))
+    custody_complete = policy.is_hard_pod_custody_complete(
+        shipment,
+        log_evidence=evidence,
+        tenant_schema=tenant_schema,
+        driver=driver,
+    )
 
     if log_primary or evidence.get('pod_uploaded'):
         if evidence.get('pod_uploaded'):
             flags['pod_pending'] = False
-            if hard_pod_type:
-                flags['hard_pod_pending'] = not hard_pod_log
-                flags['pod_compliant'] = hard_pod_log or pod_complete
+            if hard_pod_shipment:
+                flags['hard_pod_pending'] = not custody_complete
+                flags['pod_compliant'] = custody_complete and (
+                    hard_pod_log or evidence.get('pod_uploaded')
+                )
             else:
                 flags['pod_compliant'] = True
                 flags['hard_pod_pending'] = False
-    elif hard_pod_type and not hard_pod_log:
+    elif hard_pod_shipment and not custody_complete:
         flags['hard_pod_pending'] = policy.derive_hard_pod_pending(
             shipment,
             log_evidence=evidence,
+            tenant_schema=tenant_schema,
         )
 
     if log_primary or evidence.get('cod_collected_log'):

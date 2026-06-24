@@ -30,23 +30,9 @@ def _shipment_requires_hard_pod_mode(shipment) -> bool:
     """Hard POD compliance must survive A7 digital evidence posting."""
     if shipment is None:
         return False
-    current = (getattr(shipment, 'pod_type', None) or '').strip()
-    if current == TenantShipment.PodType.HARD:
-        return True
-    booking = getattr(shipment, 'booking', None)
-    if booking is None and getattr(shipment, 'booking_id', None):
-        from tenant_workspace.models import TenantBooking
+    from iroad_tenants.operation_field_catalog import operation_shipment_uses_hard_copy_pod
 
-        booking = TenantBooking.objects.filter(pk=shipment.booking_id).only('pod_type').first()
-    if booking is not None:
-        booking_pod = (getattr(booking, 'pod_type', None) or '').strip()
-        if booking_pod == TenantShipment.PodType.HARD:
-            return True
-    from iroad_tenants.operation_execution import _pending_hard_pod_custody_exists
-
-    if _pending_hard_pod_custody_exists(shipment):
-        return True
-    return False
+    return operation_shipment_uses_hard_copy_pod(shipment)
 
 
 def _find_existing_pod_for_source(*, shipment, source_document):
@@ -237,12 +223,14 @@ def birth_pod_from_action_log(action_log, *, created_by_label=''):
     shipment = action_log.shipment
     if shipment is None:
         return None
+    action = action_log.operation_action
     is_upload_pod_action = operation_action_matches(
-        action_log.operation_action,
+        action,
         'upload pod',
         'a7',
         'action 7',
     )
+    is_auto_pod_post = bool(getattr(action, 'auto_pod_post', False))
     source_document = (
         TenantShipmentDocument.objects.filter(
             shipment=shipment,
@@ -252,7 +240,7 @@ def birth_pod_from_action_log(action_log, *, created_by_label=''):
         .first()
     )
     if source_document is None:
-        if is_upload_pod_action:
+        if is_upload_pod_action or is_auto_pod_post:
             source_document = _auto_create_delivery_note_for_a7(
                 action_log,
                 shipment=shipment,

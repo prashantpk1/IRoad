@@ -82,9 +82,9 @@ def lookup_booking_by_reference(reference: str) -> TenantBooking | None:
     token = (reference or '').strip()
     if not token:
         return None
-    shipments_qs = TenantShipment.objects.exclude(
-        shipment_status=TenantShipment.ShipmentStatus.CANCELLED,
-    ).order_by('shipment_sequence', 'shipment_no')
+    # Include cancelled legs — dashboard selector does; policy needs them for
+    # round-trip backload handoff when outbound was cancelled (R1).
+    shipments_qs = TenantShipment.objects.order_by('shipment_sequence', 'shipment_no')
     qs = (
         TenantBooking.objects.select_related(*_BOOKING_SELECT)
         .defer(*_BOOKING_ADDRESS_DEFER)

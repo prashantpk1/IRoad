@@ -59,6 +59,15 @@ def classify_pod_action_role(action: Any | None) -> PodActionRole:
 
     if is_cod_collect_action(action):
         return PodActionRole.COD_COLLECT
+    # Combined Upload POD (digital + hard copy) logs as digital upload until custody promotes.
+    if is_pod_upload_action(action) and (
+        getattr(action, 'auto_pod_post', False)
+        or (
+            getattr(action, 'hard_copy_collection', False)
+            and (getattr(action, 'action_code', '') or '').strip().upper() in {'OA-0008', 'A7'}
+        )
+    ):
+        return PodActionRole.POD_UPLOAD
     if is_hard_pod_action(action):
         return PodActionRole.HARD_POD
     if is_delivered_status_action(action):
@@ -75,11 +84,17 @@ def action_has_role(action: Any | None, role: PodActionRole) -> bool:
 
 
 def is_pod_upload_action(action: Any | None) -> bool:
-    """A7 / Upload POD — includes ``auto_pod_post`` actions."""
+    """A7 / Upload POD — includes ``auto_pod_post`` and combined OA-0008 rows."""
     if action is None:
         return False
     if getattr(action, 'auto_pod_post', False):
         return True
+    # Hard-copy-only (A7H) — not digital upload.
+    if getattr(action, 'hard_copy_collection', False):
+        code = (getattr(action, 'action_code', '') or '').strip().upper()
+        if code in {'OA-0008', 'A7'}:
+            return True
+        return False
     if operation_action_matches(action, *A7_UPLOAD_POD_NEEDLES):
         return True
     return operation_action_matches(action, *POD_UPLOAD_LABEL_NEEDLES)

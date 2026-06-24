@@ -9,10 +9,16 @@ from dataclasses import dataclass
 from typing import Any, TypedDict
 
 from mobile_api.execution.dto.execute_action_context import ExecuteActionContext
+from mobile_api.helpers.action_navigation_metadata import enrich_workflow_pod_navigation
 from mobile_api.job_detail.services.hard_pod_workflow_overlay import (
     apply_hard_pod_workflow_overlay,
+    enrich_pod_cod_hard_copy_gate,
+    finalize_pod_cod_hard_copy_navigation,
 )
-from mobile_api.utils.next_action_hint_builder import build_next_action_hint
+from mobile_api.utils.next_action_hint_builder import (
+    align_next_action_hint_with_workflow,
+    build_next_action_hint,
+)
 
 _EMPTY_TIMELINE_PREVIEW: dict[str, Any] = {
     'scope': '',
@@ -51,7 +57,19 @@ class ExecuteActionResponseBuilder:
     def build(self, context: ExecuteActionContext) -> ExecuteActionApiPayload:
         workflow = self._build_workflow(context)
         pod_cod = self._build_pod_cod(context)
+        evidence = dict(
+            ((context.reconciliation or {}).get('pod_cod') or {}).get('log_evidence') or {}
+        )
+        if context.job_type == 'shipment' and context.shipment is not None:
+            workflow = enrich_workflow_pod_navigation(
+                workflow,
+                shipment=context.shipment,
+                tenant_schema=(context.tenant_schema or '').strip(),
+                log_evidence=evidence,
+            )
         workflow = apply_hard_pod_workflow_overlay(workflow, pod_cod)
+        pod_cod = enrich_pod_cod_hard_copy_gate(pod_cod)
+        pod_cod = finalize_pod_cod_hard_copy_navigation(pod_cod)
         execution = self._build_execution(context)
 
         order_type = ''
@@ -72,7 +90,39 @@ class ExecuteActionResponseBuilder:
             shipment=getattr(context, 'shipment', None),
             booking=getattr(context, 'booking', None),
             driver=getattr(context, 'driver', None),
+            tenant_schema=(getattr(context, 'tenant_schema', None) or ''),
         )
+        next_hint = align_next_action_hint_with_workflow(
+            next_hint,
+            workflow,
+            pod_cod,
+            tenant_schema=(getattr(context, 'tenant_schema', None) or ''),
+            shipment=getattr(context, 'shipment', None),
+            booking=getattr(context, 'booking', None),
+            driver=getattr(context, 'driver', None),
+        )
+        if (
+            next_hint.get('booking_continues')
+            and (
+                next_hint.get('job_closed')
+                or next_hint.get('leg_completed')
+            )
+        ):
+            workflow = {
+                'current_stage': '',
+                'next_action': {},
+                'primary_action': {},
+                'allowed_actions': [],
+                'workflow_source': workflow.get('workflow_source', ''),
+                'workflow_metadata': {
+                    'context_label': (
+                        'Outbound leg complete — open booking job for backload preshipment.'
+                    ),
+                },
+            }
+            pod_cod = {}
+        elif next_hint.get('job_closed'):
+            pod_cod = finalize_pod_cod_hard_copy_navigation(pod_cod)
         execution['job_closed'] = next_hint.get('job_closed', False)
         execution['next_step'] = next_hint.get('action', 'refresh_job_detail')
 

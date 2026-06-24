@@ -31,6 +31,7 @@ from mobile_api.job_detail.services.booking_job_resolver import BookingJobResolv
 from mobile_api.job_detail.services.movement_job_resolver import MovementJobResolver
 from mobile_api.job_detail.services.shipment_job_resolver import ShipmentJobResolver
 from mobile_api.helpers.backload_booking_redirect import (
+    pivot_booking_to_active_shipment,
     pivot_context_to_backload_booking,
 )
 
@@ -127,6 +128,13 @@ class ExecutionOwnershipGuard:
                     message_key='mobile.jobs.not_found',
                 )
             if not shipment_is_driver_accessible(shipment):
+                if context.booking is not None and pivot_context_to_backload_booking(
+                    driver=context.driver,
+                    booking=context.booking,
+                    shipment=shipment,
+                    context=context,
+                ):
+                    return
                 raise ExecuteActionError(
                     str(_('mobile.jobs.inactive')),
                     code='job_inactive',
@@ -248,6 +256,11 @@ class ExecutionOwnershipGuard:
         context.booking = result.booking
         if result.resolve_context is not None:
             context.resolver_meta = result.resolve_context.to_resolver_meta()
+        pivot_booking_to_active_shipment(
+            driver=context.driver,
+            booking=context.booking,
+            context=context,
+        )
 
     def _resolve_movement(self, context: ExecuteActionContext, job_id: str) -> None:
         result = self._movement_resolver.resolve(

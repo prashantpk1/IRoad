@@ -89,8 +89,57 @@ class ActionExecutionMetadataTests(TestCase):
         self.assertFalse(row['requires_photo'])
         self.assertFalse(row['requires_video'])
         self.assertFalse(row['requires_note'])
+        self.assertEqual(row['action'], 'execute_action')
+        self.assertEqual(row['screen'], 'job_detail')
         self.assertFalse(row['execution_requirements']['gps'])
         self.assertFalse(row['execution_requirements']['note'])
+
+    def test_oa_0010_job_closed_has_no_capture_requirements(self):
+        action = _action(
+            action_code='OA-0010',
+            english_label='Job Closed',
+            booking_status_impact='Executed',
+            shipment_status_impact='Closed',
+            sequence_number=10,
+        )
+        req = build_execution_requirements(action)
+        self.assertFalse(req['note'])
+        self.assertTrue(req.get('direct_execute'))
+
+        row = project_allowed_action_row(action)
+        self.assertEqual(row['action'], 'execute_action')
+        self.assertEqual(row['screen'], 'job_detail')
+        self.assertEqual(row.get('ui_mode'), 'job_close')
+        self.assertEqual(row.get('screen_title'), 'Job Close')
+        self.assertTrue(row.get('direct_execute'))
+        self.assertFalse(row['requires_note'])
+
+    def test_oa_0009_primary_action_routes_to_collect_payment_screen(self):
+        from decimal import Decimal
+        from unittest.mock import MagicMock
+
+        action = _action(
+            action_code='OA-0009',
+            english_label='Collect Payment',
+            auto_treasury_post=True,
+            sequence_number=9,
+        )
+        shipment = MagicMock()
+        shipment.order_type = 'COD'
+        shipment.cod_amount = Decimal('1500.00')
+        row = project_allowed_action_row(
+            action,
+            shipment=shipment,
+            tenant_schema='tenant_a',
+        )
+        self.assertEqual(row['action'], 'go_to_payment_collection')
+        self.assertEqual(row['screen'], 'collect_payment')
+        self.assertEqual(row['action_code'], 'OA-0009')
+        self.assertEqual(
+            row['payment_collect_endpoint'],
+            '/api/v1/mobile/driver/payments/collect/',
+        )
+        self.assertFalse(row.get('direct_execute'))
 
     def test_a9_note_not_required(self):
         req = build_execution_requirements(
@@ -102,6 +151,22 @@ class ActionExecutionMetadataTests(TestCase):
             ),
         )
         self.assertFalse(req['note_required'])
+
+    def test_combined_pod_row_uses_tenant_action_code_in_capture_ui(self):
+        row = project_allowed_action_row(
+            _action(
+                action_code='OA-0008',
+                english_label='POD',
+                auto_pod_post=True,
+                hard_copy_collection=True,
+            ),
+            tenant_schema='tenant_test',
+        )
+        capture_ui = row['capture_ui']
+        button = capture_ui['primary_button']
+        self.assertEqual(button['execute_action_code'], 'OA-0008')
+        self.assertEqual(button['wizard_next_step'], 'hard_copy_confirmation')
+        self.assertFalse(button['complete_upload_after_execute'])
 
     def test_a1_start_job_has_no_capture_requirements(self):
         action = _action(

@@ -18,6 +18,33 @@ CARGO_UOM_CHOICES = [
     ('Pieces', _('Pieces')),
 ]
 
+_CARGO_UOM_ALIASES = {
+    'box': 'Boxes',
+    'boxs': 'Boxes',
+    'boxes': 'Boxes',
+    'pallet': 'Pallets',
+    'pallets': 'Pallets',
+    'kg': 'Kilograms',
+    'kilogram': 'Kilograms',
+    'kilograms': 'Kilograms',
+    'piece': 'Pieces',
+    'pieces': 'Pieces',
+    'pcs': 'Pieces',
+    'place': 'Pieces',
+    'places': 'Pieces',
+}
+
+
+def normalize_cargo_uom(value: str) -> str:
+    """Map legacy / mistyped UOM text to canonical cargo-master choices."""
+    stripped = (value or '').strip()
+    if not stripped:
+        return ''
+    valid = {choice[0] for choice in CARGO_UOM_CHOICES if choice[0]}
+    if stripped in valid:
+        return stripped
+    return _CARGO_UOM_ALIASES.get(stripped.casefold(), stripped)
+
 
 class TenantCargoCategoryForm(ArabicTextFormMixin, forms.ModelForm):
     category_code_preview = forms.CharField(
@@ -242,9 +269,11 @@ class TenantCargoMasterForm(ArabicTextFormMixin, forms.ModelForm):
         uom_choices = list(CARGO_UOM_CHOICES)
         current_uom = ''
         if self.instance.pk:
-            current_uom = (self.instance.uom or '').strip()
+            current_uom = normalize_cargo_uom(self.instance.uom or '')
         if self.is_bound:
-            current_uom = (self.data.get(self.add_prefix('uom')) or current_uom or '').strip()
+            current_uom = normalize_cargo_uom(
+                self.data.get(self.add_prefix('uom')) or current_uom or '',
+            )
         valid_uom_keys = {value for value, _ in uom_choices if value}
         if current_uom and current_uom not in valid_uom_keys:
             uom_choices.append((current_uom, current_uom))
@@ -258,7 +287,7 @@ class TenantCargoMasterForm(ArabicTextFormMixin, forms.ModelForm):
             self.fields['uom'].initial = current_uom
 
     def clean_uom(self):
-        uom = (self.cleaned_data.get('uom') or '').strip()
+        uom = normalize_cargo_uom(self.cleaned_data.get('uom') or '')
         if not uom:
             raise ValidationError(_('Select a unit of measure.'))
         return uom

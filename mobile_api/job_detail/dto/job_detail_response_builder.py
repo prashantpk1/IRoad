@@ -11,8 +11,19 @@ from typing import Any, TypedDict
 from mobile_api.job_detail.dto.job_detail_context import JobDetailContext
 from mobile_api.job_detail.services.hard_pod_workflow_overlay import (
     apply_hard_pod_workflow_overlay,
+    enrich_pod_cod_hard_copy_gate,
+    finalize_pod_cod_hard_copy_navigation,
 )
-from mobile_api.utils.next_action_hint_builder import build_next_action_hint
+from mobile_api.helpers.action_navigation_metadata import (
+    enrich_workflow_pod_navigation,
+    finalize_timeline_preview_navigation,
+    sync_workflow_primary_from_next_hint,
+)
+from mobile_api.job_detail.timeline.timeline_event_mapper import sort_timeline_display_order
+from mobile_api.utils.next_action_hint_builder import (
+    align_next_action_hint_with_workflow,
+    build_next_action_hint,
+)
 
 _EMPTY_JOB: dict[str, Any] = {
     'job_type': '',
@@ -63,7 +74,19 @@ class JobDetailResponseBuilder:
         visibility = self._build_operational_issues_visibility(context)
         workflow = self._build_workflow(context)
         pod_cod = self._build_pod_cod(context)
+        evidence = dict(
+            ((context.reconciliation or {}).get('pod_cod') or {}).get('log_evidence') or {}
+        )
+        if context.job_type == 'shipment' and context.shipment is not None:
+            workflow = enrich_workflow_pod_navigation(
+                workflow,
+                shipment=context.shipment,
+                tenant_schema=(getattr(context, 'tenant_schema', None) or ''),
+                log_evidence=evidence,
+            )
         workflow = apply_hard_pod_workflow_overlay(workflow, pod_cod)
+        pod_cod = enrich_pod_cod_hard_copy_gate(pod_cod)
+        pod_cod = finalize_pod_cod_hard_copy_navigation(pod_cod)
         timeline = self._build_timeline(context)
         workflow = self._attach_booking_timeline_to_workflow(
             context,
@@ -89,6 +112,22 @@ class JobDetailResponseBuilder:
             shipment=getattr(context, 'shipment', None),
             booking=getattr(context, 'booking', None),
             driver=getattr(context, 'driver', None),
+            tenant_schema=(getattr(context, 'tenant_schema', None) or ''),
+        )
+        next_hint = align_next_action_hint_with_workflow(
+            next_hint,
+            workflow,
+            pod_cod,
+            tenant_schema=(getattr(context, 'tenant_schema', None) or ''),
+            shipment=getattr(context, 'shipment', None),
+            booking=getattr(context, 'booking', None),
+            driver=getattr(context, 'driver', None),
+        )
+        workflow = sync_workflow_primary_from_next_hint(workflow, next_hint)
+        timeline = self._finalize_timeline_navigation(
+            context,
+            timeline,
+            pod_cod=pod_cod,
         )
 
         return JobDetailApiPayload(
@@ -116,6 +155,27 @@ class JobDetailResponseBuilder:
     def _build_timeline(self, context: JobDetailContext) -> dict[str, Any]:
         return dict(context.timeline or {})
 
+    def _finalize_timeline_navigation(
+        self,
+        context: JobDetailContext,
+        timeline: dict[str, Any],
+        *,
+        pod_cod: dict[str, Any],
+    ) -> dict[str, Any]:
+        if context.job_type != 'shipment' or context.shipment is None:
+            return timeline
+        out = dict(timeline or {})
+        evidence = dict(pod_cod.get('log_evidence') or {})
+        preview = finalize_timeline_preview_navigation(
+            list(out.get('timeline_preview') or []),
+            shipment=context.shipment,
+            tenant_schema=(getattr(context, 'tenant_schema', None) or ''),
+            log_evidence=evidence,
+        )
+        if preview:
+            out['timeline_preview'] = sort_timeline_display_order(preview)
+        return out
+
     @staticmethod
     def _attach_booking_timeline_to_workflow(
         context: JobDetailContext,
@@ -123,17 +183,17 @@ class JobDetailResponseBuilder:
         timeline: dict[str, Any],
     ) -> dict[str, Any]:
         """
-        Booking-scoped jobs: mirror full timeline steps on workflow for clients
-        that render the stepper from ``workflow`` instead of ``timeline``.
+        Mirror full timeline steps on workflow for clients that render the stepper
+        from ``workflow`` instead of ``timeline`` (booking + shipment jobs).
         """
-        if context.job_type != 'booking':
-            return workflow
         preview = list(timeline.get('timeline_preview') or [])
         if not preview:
             return workflow
+        if context.job_type not in {'booking', 'shipment'}:
+            return workflow
         out = dict(workflow or {})
-        out['timeline_preview'] = preview
-        out['timeline_step_count'] = len(preview)
+        out['timeline_preview'] = sort_timeline_display_order(preview)
+        out['timeline_step_count'] = len(out['timeline_preview'])
         return out
 
     def _build_pod_cod(self, context: JobDetailContext) -> dict[str, Any]:

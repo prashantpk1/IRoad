@@ -250,7 +250,7 @@
 
   <div class="form-actions-bar">
     <div class="form-actions-left">
-      <button type="reset" class="btn btn-outline-secondary">
+      <button type="button" class="btn btn-outline-secondary" id="operationActionResetBtn">
         <i class="bi bi-arrow-counterclockwise"></i>
         Reset Form
       </button>
@@ -285,6 +285,8 @@
 
 {{ operation_action_sequence_registry|json_script:"operation-action-sequence-registry" }}
 {{ operation_action_recommended_sequence_numbers|json_script:"operation-action-recommended-sequences" }}
+{{ operation_action_recommended_action_codes|json_script:"operation-action-recommended-action-codes" }}
+{{ operation_action_create_defaults|json_script:"operation-action-create-defaults" }}
 {% endblock %}
 
 {% block extra_js %}
@@ -301,8 +303,14 @@
     var isViewMode = {{ operation_action_is_view|yesno:"true,false" }};
     var sequenceRegistryNode = document.getElementById("operation-action-sequence-registry");
     var recommendedSequenceNode = document.getElementById("operation-action-recommended-sequences");
+    var recommendedActionCodeNode = document.getElementById("operation-action-recommended-action-codes");
+    var createDefaultsNode = document.getElementById("operation-action-create-defaults");
+    var actionCode = document.getElementById("actionCode");
+    var resetBtn = document.getElementById("operationActionResetBtn");
     var sequenceRegistry = {};
     var recommendedSequenceNumbers = {};
+    var recommendedActionCodes = {};
+    var createDefaults = {};
     if (sequenceRegistryNode && sequenceRegistryNode.textContent) {
       try {
         sequenceRegistry = JSON.parse(sequenceRegistryNode.textContent);
@@ -315,6 +323,20 @@
         recommendedSequenceNumbers = JSON.parse(recommendedSequenceNode.textContent);
       } catch (parseError) {
         recommendedSequenceNumbers = {};
+      }
+    }
+    if (recommendedActionCodeNode && recommendedActionCodeNode.textContent) {
+      try {
+        recommendedActionCodes = JSON.parse(recommendedActionCodeNode.textContent);
+      } catch (parseError) {
+        recommendedActionCodes = {};
+      }
+    }
+    if (createDefaultsNode && createDefaultsNode.textContent) {
+      try {
+        createDefaults = JSON.parse(createDefaultsNode.textContent);
+      } catch (parseError) {
+        createDefaults = {};
       }
     }
     var editingActionId = "{{ operation_action_editing_action_id|default:''|escapejs }}";
@@ -442,6 +464,77 @@
       });
     }
 
+    function formatJobActionCode(sequenceValue) {
+      var num = parseInt(sequenceValue, 10);
+      if (!num || num < 1) return "";
+      return "OA-" + String(num).padStart(4, "0");
+    }
+
+    function syncActionCodePreview() {
+      if (!actionCode || isViewMode || editingActionId) return;
+      var categoryValue = sequenceCategory ? sequenceCategory.value || "" : "";
+      if (categoryValue === "job") {
+        var seqValue = sequenceNumber ? sequenceNumber.value || "" : "";
+        var fromSequence = formatJobActionCode(seqValue);
+        if (fromSequence) {
+          actionCode.value = fromSequence;
+          return;
+        }
+      }
+      var recommendedCode = recommendedActionCodes[categoryValue];
+      if (recommendedCode) {
+        actionCode.value = recommendedCode;
+      }
+    }
+
+    function applyCreateDefaultsIfNeeded() {
+      if (isViewMode || editingActionId || !createDefaults || !createDefaults.action_scope) return;
+      if (actionScope && !actionScope.value) {
+        actionScope.value = createDefaults.action_scope;
+      }
+      if (sequenceCategory && !sequenceCategory.value && createDefaults.sequence_category) {
+        sequenceCategory.value = createDefaults.sequence_category;
+      }
+      if (sequenceNumber && !sequenceNumber.value && createDefaults.sequence_number) {
+        sequenceNumber.value = createDefaults.sequence_number;
+      }
+      if (actionCode && !actionCode.value && createDefaults.action_code_preview) {
+        actionCode.value = createDefaults.action_code_preview;
+      }
+      var statusSelect = document.getElementById("status");
+      if (statusSelect && !statusSelect.value && createDefaults.status) {
+        statusSelect.value = createDefaults.status;
+      }
+    }
+
+    function restoreCreateDefaults() {
+      if (!form || isViewMode || editingActionId || !createDefaults.action_scope) {
+        if (form) form.reset();
+        return;
+      }
+      if (actionScope) actionScope.value = createDefaults.action_scope || "";
+      if (sequenceCategory) sequenceCategory.value = createDefaults.sequence_category || "";
+      if (sequenceNumber) sequenceNumber.value = createDefaults.sequence_number || "";
+      if (actionCode) actionCode.value = createDefaults.action_code_preview || "";
+      var statusSelect = document.getElementById("status");
+      if (statusSelect) statusSelect.value = createDefaults.status || "";
+      ["autoMovementPost", "autoShipmentPost", "autoPodPost", "hardCopyCollection"].forEach(function (fieldId) {
+        var input = document.getElementById(fieldId);
+        if (!input) return;
+        if (fieldId === "autoMovementPost") input.checked = !!createDefaults.auto_movement_post;
+        if (fieldId === "autoShipmentPost") input.checked = !!createDefaults.auto_shipment_post;
+        if (fieldId === "autoPodPost") input.checked = !!createDefaults.auto_pod_post;
+        if (fieldId === "hardCopyCollection") input.checked = !!createDefaults.hard_copy_collection;
+        var label = input.closest(".setting-toggle");
+        if (label) {
+          var toggleLabel = label.querySelector(".toggle-label");
+          if (toggleLabel) toggleLabel.textContent = input.checked ? "Enabled" : "Disabled";
+        }
+      });
+      if (confirmSequenceSwap) confirmSequenceSwap.value = "0";
+      syncSequencingFields();
+    }
+
     function syncRecommendedSequenceNumber() {
       if (!sequenceNumber || isViewMode || editingActionId) return;
       var scopeValue = actionScope ? actionScope.value || "" : "";
@@ -452,6 +545,7 @@
       if (recommended) {
         sequenceNumber.value = String(recommended);
       }
+      syncActionCodePreview();
     }
 
     function syncSequencingFields() {
@@ -467,8 +561,10 @@
         categoryValue = "without";
         sequenceNumber.value = "1";
       } else if (!categoryActive) {
-        sequenceCategory.value = "";
-        sequenceNumber.value = "1";
+        if (!actionScope.value) {
+          sequenceCategory.value = "";
+          sequenceNumber.value = "1";
+        }
       } else if (categoryValue === "without") {
         sequenceCategory.value = "";
         categoryValue = "";
@@ -492,12 +588,15 @@
           : "Disabled when Action Scope or Sequence Category is Without.";
       }
       syncRecommendedSequenceNumber();
+      syncActionCodePreview();
     }
 
+    applyCreateDefaultsIfNeeded();
     if (actionScope) actionScope.addEventListener("change", syncSequencingFields);
     if (sequenceCategory) sequenceCategory.addEventListener("change", syncSequencingFields);
     if (sequenceNumber) sequenceNumber.addEventListener("input", function () {
       if (confirmSequenceSwap) confirmSequenceSwap.value = "0";
+      syncActionCodePreview();
     });
     if (actionScope) actionScope.addEventListener("change", function () {
       if (confirmSequenceSwap) confirmSequenceSwap.value = "0";
@@ -506,6 +605,10 @@
       if (confirmSequenceSwap) confirmSequenceSwap.value = "0";
     });
     syncSequencingFields();
+
+    if (resetBtn) {
+      resetBtn.addEventListener("click", restoreCreateDefaults);
+    }
 
     if (sequenceSwapConfirmBtn) {
       sequenceSwapConfirmBtn.addEventListener("click", submitWithSequenceSwap);

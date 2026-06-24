@@ -41,6 +41,27 @@ class ProjectionCacheTests(SimpleTestCase):
         cache2 = load_projection_cache(ctx)
         self.assertIs(cache2, cache)
 
+    @patch(
+        'mobile_api.dashboard.services.dashboard_projection_cache.scoped_preshipment_action_logs',
+    )
+    def test_booking_only_loads_preshipment_logs(self, mock_scoped):
+        log = MagicMock()
+        log.log_id = 'log-backload-1'
+        mock_scoped.return_value = [log]
+
+        booking = MagicMock()
+        booking.pk = 10
+        ctx = DriverDashboardContext(
+            driver=MagicMock(pk=5, driver_id=5),
+            tenant_schema='t',
+            user_id='u',
+            active_booking=booking,
+        )
+        cache = load_projection_cache(ctx)
+        self.assertEqual(cache.latest_action_log_id, 'log-backload-1')
+        self.assertEqual(len(cache.booking_logs), 1)
+        mock_scoped.assert_called_once()
+
     def test_timeline_reuses_logs(self):
         logs = [MagicMock() for _ in range(7)]
         cache = DashboardProjectionCache(shipment_logs=logs)

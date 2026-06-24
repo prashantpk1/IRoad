@@ -1884,16 +1884,24 @@
         function setCodInputReadOnlyState() {
           var tbody = getBookingLinesTbody();
           if (!tbody) return;
-          var line1Input = tbody.querySelector("input[name='booking_line_cod_amount_1']");
-          var line2Input = tbody.querySelector("input[name='booking_line_cod_amount_2']");
           var codBooking = isCodBooking();
           var roundTrip = isRoundTripBooking();
-          if (line1Input) {
-            line1Input.readOnly = codBooking && !roundTrip;
-          }
-          if (line2Input) {
-            line2Input.readOnly = codBooking && roundTrip;
-          }
+          tbody.querySelectorAll(".booking-line-cod-input").forEach(function (input) {
+            var fieldName = input.name || "";
+            var isBackloadLine = fieldName.endsWith("_2");
+            if (!codBooking) {
+              input.disabled = true;
+              input.readOnly = false;
+              input.setAttribute("aria-disabled", "true");
+              input.title = "COD amount applies only when order type is COD.";
+              return;
+            }
+            input.disabled = false;
+            input.removeAttribute("aria-disabled");
+            input.removeAttribute("title");
+            // Round-trip backload leg is auto-calculated from sell price minus outbound.
+            input.readOnly = roundTrip && isBackloadLine;
+          });
         }
 
         function distributeRoundCodFromFirstLine() {
@@ -1929,10 +1937,10 @@
             if (!hasServerValidationErrors || !hasPostedCodAmounts()) {
               codInputs.forEach(function (input) {
                 input.value = "";
-                input.readOnly = false;
                 delete input.dataset.userEdited;
               });
             }
+            setCodInputReadOnlyState();
             return;
           }
 

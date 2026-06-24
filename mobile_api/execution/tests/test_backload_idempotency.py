@@ -8,6 +8,7 @@ from unittest.mock import MagicMock, patch
 from uuid import uuid4
 
 from mobile_api.execution.dto.execute_action_context import ExecuteActionContext
+from mobile_api.execution.exceptions import ExecuteActionError
 from mobile_api.execution.guards.execution_idempotency_guard import (
     ExecutionIdempotencyGuard,
     IdempotencyKeys,
@@ -58,14 +59,52 @@ class BackloadIdempotencyGuardTests(TestCase):
             'iroad_tenants.operation_runtime.booking_preshipment_cycle.booking_preshipment_log_in_cycle',
             return_value=False,
         ):
-            replay = guard.detect_idempotent_replay(
+            with self.assertRaises(ExecuteActionError) as raised:
+                guard.detect_idempotent_replay(
+                    ctx,
+                    IdempotencyKeys(
+                        idempotency_key='same-client-key',
+                        source_ref='booking:1:Backload:A1',
+                    ),
+                )
+        self.assertEqual(raised.exception.code, 'idempotency_key_scope_mismatch')
+        self.assertIsNone(ctx.action_log)
+
+    def test_outbound_a4_shipment_log_does_not_replay_for_booking_execute(self):
+        outbound_log = SimpleNamespace(
+            log_id=uuid4(),
+            pk=uuid4(),
+            shipment_id=uuid4(),
+            operation_action=SimpleNamespace(action_code='A4'),
+        )
+        booking = SimpleNamespace(
+            booking_id=uuid4(),
+            pk=uuid4(),
+            trip_type='One-Way',
+            shipments=SimpleNamespace(all=lambda: []),
+        )
+        ctx = ExecuteActionContext(
+            driver=_driver(),
+            tenant_schema='tenant_test',
+            user_id='u1',
+            job_type='booking',
+            job_id=str(booking.pk),
+            action_code='A4',
+            payload={'client_action_id': 'oa-0004-reused-key'},
+            booking=booking,
+        )
+        guard = ExecutionIdempotencyGuard(
+            log_lookup=lambda _keys: outbound_log,
+        )
+        with self.assertRaises(ExecuteActionError) as raised:
+            guard.detect_idempotent_replay(
                 ctx,
                 IdempotencyKeys(
-                    idempotency_key='same-client-key',
-                    source_ref='booking:1:Backload:A1',
+                    idempotency_key='oa-0004-reused-key',
+                    source_ref='booking:1:Outbound:A4',
                 ),
             )
-        self.assertFalse(replay)
+        self.assertEqual(raised.exception.code, 'idempotency_key_scope_mismatch')
         self.assertIsNone(ctx.action_log)
 
     def test_source_ref_includes_backload_leg(self):

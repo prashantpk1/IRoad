@@ -26,6 +26,9 @@ from mobile_api.hard_pod.services.hard_pod_custody_service import HardPodCustody
 from mobile_api.hard_pod.services.hard_pod_idempotency_service import HardPodIdempotencyService
 from mobile_api.job_detail.guards.ownership import driver_pk
 from mobile_api.pod_capture.models import PODCaptureBundle
+from mobile_api.pod_capture.services.pod_capture_action_resolver import (
+    resolve_hard_copy_pod_action_code,
+)
 
 
 def _driver_label(driver: Any) -> str:
@@ -144,7 +147,11 @@ class HardPodSubmitService:
                     tenant_schema=schema,
                     integrity_checksum=integrity_checksum,
                 )
-                return self._build_response(existing, replayed=True)
+                return self._build_response(
+                    existing,
+                    replayed=True,
+                    tenant_schema=schema,
+                )
 
             capture_bundle_id = self._resolve_capture_bundle_id(
                 tenant_schema=schema,
@@ -175,7 +182,7 @@ class HardPodSubmitService:
                         tenant_schema=schema,
                         integrity_checksum=integrity_checksum,
                     )
-                    return self._build_response(submission, replayed=True)
+                    return self._build_response(submission, replayed=True, tenant_schema=schema)
 
                 actor_label = _driver_label(driver)
                 self._custody.record_collected(
@@ -203,7 +210,7 @@ class HardPodSubmitService:
                 if media_items:
                     self._custody.persist_media_rows(submission, media_items)
 
-            return self._build_response(submission, replayed=False)
+            return self._build_response(submission, replayed=False, tenant_schema=schema)
 
     def _resolve_capture_bundle_id(
         self,
@@ -228,6 +235,7 @@ class HardPodSubmitService:
         submission: Any,
         *,
         replayed: bool,
+        tenant_schema: str = '',
     ) -> dict[str, Any]:
         custody_payload = self._custody.build_submission_payload(
             submission,
@@ -239,7 +247,7 @@ class HardPodSubmitService:
             'timeline_preview': timeline,
             'next_step': {
                 'requires_execute_action': True,
-                'execute_action_code': 'A7H',
+                'execute_action_code': resolve_hard_copy_pod_action_code(tenant_schema),
                 'complete_upload_after_execute': True,
                 'reason': 'hard_pod_workflow_progression',
             },

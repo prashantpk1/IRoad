@@ -119,17 +119,18 @@ def build_dashboard_active_job(
         shipments = list(
             booking.shipments.all() if hasattr(booking, 'shipments') else []
         )
-        ordered = policy.sorted_countable_shipments(shipments)
-        stage = policy.derive_booking_execution_stage(booking, ordered)
+        stage = policy.derive_booking_execution_stage(
+            booking, shipments, driver=driver
+        )
         show_backload_route = policy.should_display_backload_route(
             booking,
-            ordered,
+            shipments,
             booking_stage=stage,
         )
         route_booking = booking
         if show_backload_route:
             route_booking = backload_route_booking_proxy(booking)
-        is_backload_bootstrap = policy.is_backload_leg_pending(booking, ordered)
+        is_backload_bootstrap = policy.is_backload_leg_pending(booking, shipments)
         if is_backload_bootstrap and driver is not None:
             is_backload_bootstrap = policy.driver_owns_backload_leg(driver, booking)
         pickup_address, drop_address = resolve_booking_endpoint_addresses(

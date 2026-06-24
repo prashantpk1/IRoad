@@ -127,6 +127,55 @@ def _is_secondary_line_type(shipment: TenantShipment | Any) -> bool:
     }
 
 
+def _is_outbound_line_type(shipment: TenantShipment | Any) -> bool:
+    line = _norm_line_type(getattr(shipment, 'booking_item_type', None))
+    if line in {'backload', 'inbound'}:
+        return False
+    return line == 'outbound' or line == ''
+
+
+def round_trip_defers_job_close(
+    booking: TenantBooking | Any | None,
+    shipment: TenantShipment | Any | None = None,
+    *,
+    shipments: Sequence[TenantShipment | Any] | None = None,
+) -> bool:
+    """
+    Round-trip bookings use one Job Close on the final leg only.
+
+    After outbound POD/COD the driver continues the return leg — Job Close must
+    not appear on the first leg (avoids tapping Job Closed twice).
+    """
+    if booking is None:
+        return False
+    if normalized_trip_type(booking).casefold() != 'round':
+        return False
+
+    rows = list(shipments) if shipments is not None else []
+    if not rows:
+        try:
+            manager = getattr(booking, 'shipments', None)
+            if manager is not None:
+                rows = list(countable_shipments(manager.all()))
+        except Exception:
+            rows = []
+
+    if is_backload_leg_pending(booking, rows):
+        return True
+    if is_booking_fully_complete(rows, booking=booking):
+        return False
+    if shipment is None:
+        return True
+    if _is_outbound_line_type(shipment):
+        return True
+    if _is_secondary_line_type(shipment):
+        nxt = get_next_executable_shipment(booking, rows)
+        if nxt is None:
+            return False
+        return getattr(nxt, 'pk', None) != getattr(shipment, 'pk', None)
+    return True
+
+
 def _round_trip_primary_secondary_segments(
     legs: Sequence[Any],
 ) -> tuple[list[Any], list[Any]]:
@@ -202,6 +251,35 @@ def _has_backload_shipment_row(shipments: Sequence[TenantShipment | Any]) -> boo
     )
 
 
+def _outbound_shipments_all(shipments: Sequence[TenantShipment | Any]) -> list[Any]:
+    return [
+        s
+        for s in (shipments or [])
+        if _norm_line_type(getattr(s, 'booking_item_type', None)) == 'outbound'
+    ]
+
+
+def _outbound_primary_resolved(
+    booking: TenantBooking | Any,
+    shipments: Sequence[TenantShipment | Any],
+) -> bool:
+    """
+    Outbound leg is finished for backload handoff (execution-complete or cancelled).
+
+    Used when cancelled outbound rows are excluded from countable legs but backload
+  is still Confirmed with no shipment row yet.
+    """
+    if normalized_trip_type(booking).casefold() != 'round':
+        return False
+    outbound_rows = _outbound_shipments_all(shipments)
+    if not outbound_rows:
+        return False
+    return all(
+        is_shipment_cancelled(s) or is_shipment_execution_complete(s)
+        for s in outbound_rows
+    )
+
+
 def is_backload_leg_pending(
     booking: TenantBooking | Any,
     shipments: Sequence[TenantShipment | Any],
@@ -209,7 +287,8 @@ def is_backload_leg_pending(
     """
     Round-trip backload is planned but no shipment row exists yet.
 
-    Matches portal booking line ``Planned`` after outbound is executed/closed.
+    Matches portal booking line ``Planned`` after outbound is executed/closed,
+    or after outbound shipment was cancelled (R1) while backload stays Confirmed.
     """
     if normalized_trip_type(booking).casefold() != 'round':
         return False
@@ -218,8 +297,11 @@ def is_backload_leg_pending(
     legs = _countable_sorted(shipments)
     primary, _ = _round_trip_primary_secondary_segments(legs)
     if not primary:
-        return False
-    return all(is_shipment_execution_complete(s) for s in primary)
+        return _outbound_primary_resolved(booking, shipments)
+    return all(
+        is_shipment_execution_complete(s) or is_shipment_cancelled(s)
+        for s in primary
+    )
 
 
 def driver_owns_backload_leg(
@@ -396,19 +478,26 @@ def get_active_shipment_for_driver(
     shipments: Sequence[TenantShipment | Any],
 ) -> Any | None:
     """
-    At most one active executable shipment for this driver on this booking.
+    At most one active focus shipment for this driver on this booking.
 
-    Uses **booking-wide blocking**: the only executable focus is
-    ``get_next_executable_shipment`` (deterministic order). This driver sees an
-    active leg **only** when they own that next leg — so split-driver round trips
-    stay isolated (e.g. backload driver gets ``None`` until outbound is
-    execution-complete and the next leg is theirs).
+    Uses **booking-wide blocking** for execution sequencing: the next
+    execution-incomplete leg must be owned by this driver. When that leg is
+    already ``DELIVERED`` / ``CLOSED`` but the booking is still open (COD,
+    job close, portal finalization), return the driver's latest leg that is not
+    yet business-complete (``CLOSED``).
     """
     next_executable = get_next_executable_shipment(booking, shipments)
-    if next_executable is None:
+    if next_executable is not None:
+        if driver_owns_shipment_leg(driver, booking, next_executable):
+            return next_executable
         return None
-    if driver_owns_shipment_leg(driver, booking, next_executable):
-        return next_executable
+
+    ordered = _countable_sorted(shipments)
+    for shipment in reversed(ordered):
+        if not driver_owns_shipment_leg(driver, booking, shipment):
+            continue
+        if not is_shipment_business_complete(shipment):
+            return shipment
     return None
 
 
@@ -434,6 +523,11 @@ def derive_booking_execution_stage(
     """
     legs = _countable_sorted(shipments)
     if not legs:
+        if (
+            normalized_trip_type(booking).casefold() == 'round'
+            and is_backload_leg_pending(booking, shipments)
+        ):
+            return BOOKING_EXECUTION_STAGE_OUTBOUND_COMPLETED
         return BOOKING_EXECUTION_STAGE_NOT_STARTED
 
     if is_booking_fully_complete(shipments, booking=booking):
@@ -459,7 +553,7 @@ def derive_booking_execution_stage(
                     return BOOKING_EXECUTION_STAGE_OUTBOUND_COMPLETED
                 return BOOKING_EXECUTION_STAGE_BACKLOAD_ACTIVE
 
-    if is_round and is_backload_leg_pending(booking, legs):
+    if is_round and is_backload_leg_pending(booking, shipments):
         return BOOKING_EXECUTION_STAGE_OUTBOUND_COMPLETED
 
     # NOT_STARTED: no execution-complete leg yet; every incomplete leg pre-road.

@@ -121,12 +121,9 @@ def build_round_trip_section(
 
 
 def _load_countable_shipments(booking: Any) -> list[Any]:
-    if hasattr(booking, 'shipments'):
-        try:
-            return list(booking.shipments.all())
-        except Exception:
-            return list(getattr(booking, 'shipments', []) or [])
-    return []
+    from mobile_api.job_detail.helpers.booking_job_context import load_booking_shipments
+
+    return load_booking_shipments(booking)
 
 
 def _progression_mode(booking: Any) -> str:

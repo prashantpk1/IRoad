@@ -169,7 +169,12 @@ def build_booking_workflow(
         return dict(_EMPTY_WORKFLOW)
 
     booking_id = getattr(booking, 'booking_id', None) or getattr(booking, 'pk', None)
-    booking_item_type = resolve_pending_booking_item_type(booking)
+    from iroad_tenants.operation_runtime.booking_preshipment_cycle import (
+        resolve_preshipment_booking_item_type,
+    )
+
+    leg_hint = resolve_pending_booking_item_type(booking)
+    booking_item_type = resolve_preshipment_booking_item_type(booking, leg_hint)
     engine_payload = OperationExecutionService.get_allowed_driver_actions(
         booking=booking,
         shipment=None,
@@ -192,12 +197,10 @@ def build_booking_workflow(
         entity_type='booking',
     )
     workflow['booking_item_type'] = booking_item_type
-    if policy.is_backload_leg_pending(
-        booking,
-        policy.sorted_countable_shipments(
-            list(booking.shipments.all() if hasattr(booking, 'shipments') else []),
-        ),
-    ):
+    shipments_all = list(
+        booking.shipments.all() if hasattr(booking, 'shipments') else []
+    )
+    if policy.is_backload_leg_pending(booking, shipments_all):
         workflow['backload_bootstrap_pending'] = True
     return workflow
 

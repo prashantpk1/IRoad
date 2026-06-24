@@ -26,10 +26,14 @@ from mobile_api.job_detail.timeline.timeline_event_mapper import (
     EVENT_POD,
     classify_event_type,
     dedupe_timeline_events,
+    filter_hidden_timeline_events,
     map_action_to_pending_timeline_event,
     map_log_to_timeline_event,
     merge_actions_with_timeline_logs,
+    pin_job_close_timeline_last,
+    sort_timeline_display_order,
     sort_logs_newest_first,
+    timeline_event_is_pod_verified,
 )
 from tenant_workspace.models import TenantShipment
 from mobile_api.job_detail.timeline.timeline_service import JobDetailTimelineService
@@ -47,6 +51,8 @@ def _action(*, code='A1', label='Start', **flags):
     a.action_code = code
     a.english_label = label
     a.arabic_label = ''
+    a.action_id = flags.get('action_id', uuid4())
+    a.sequence_number = flags.get('sequence_number', 0)
     a.shipment_status_impact = flags.get('shipment_status_impact', '')
     a.movement_status_impact = flags.get('movement_status_impact', '')
     a.auto_pod_post = flags.get('auto_pod_post', False)
@@ -104,6 +110,63 @@ class TimelineEventMapperTests(SimpleTestCase):
         ordered = sort_logs_newest_first([old, new])
         self.assertEqual(ordered[0].log_no, 'new')
 
+    def test_filter_hidden_timeline_events_removes_pod_verified(self):
+        events = [
+            {'action_code': 'OA-0008', 'action_label': 'POD'},
+            {
+                'action_code': 'A_POD_VERIFY',
+                'action_label': 'POD Verified',
+                'source_channel': 'auto_cod_verify',
+            },
+        ]
+        filtered = filter_hidden_timeline_events(events)
+        self.assertEqual(len(filtered), 1)
+        self.assertEqual(filtered[0]['action_code'], 'OA-0008')
+        self.assertTrue(
+            timeline_event_is_pod_verified(
+                {'action_label': 'POD Verified'},
+            ),
+        )
+
+    def test_pin_job_close_timeline_last_after_system_auto(self):
+        events = [
+            {'action_code': 'OA-0009', 'sequence_number': 9},
+            {'action_code': 'OA-0010', 'sequence_number': 10, 'action_label': 'Job Closed'},
+            {
+                'action_code': 'A_POD_VERIFY',
+                'sequence_number': 999,
+                'is_system_auto': True,
+                'source_channel': 'auto_cod_verify',
+            },
+        ]
+        ordered = sort_timeline_display_order(events)
+        self.assertEqual(
+            [row['action_code'] for row in ordered],
+            ['OA-0009', 'OA-0010'],
+        )
+
+    def test_job_close_last_when_detected_by_closed_status_impact(self):
+        events = [
+            {'action_code': 'OA-0009', 'sequence_number': 9},
+            {
+                'action_code': 'OA-0010',
+                'sequence_number': 10,
+                'action_label': 'Close Job',
+                'status_impact': 'Closed',
+            },
+            {
+                'action_code': 'A_POD_VERIFY',
+                'sequence_number': 75,
+                'action_label': 'POD Verified',
+                'is_system_auto': True,
+            },
+        ]
+        ordered = sort_timeline_display_order(events)
+        self.assertEqual(
+            [row['action_code'] for row in ordered],
+            ['OA-0009', 'OA-0010'],
+        )
+
     def test_map_log_authority_fields(self):
         event = map_log_to_timeline_event(_log(action=_action()))
         self.assertEqual(event['authority'], 'action_log')
@@ -151,18 +214,64 @@ class TimelineEventMapperTests(SimpleTestCase):
         self.assertEqual(event['action'], 'execute_action')
         self.assertNotIn('capture_mode', event)
 
+    def test_pending_oa_0008_hard_pod_routes_digital_first(self):
+        action = _action(
+            code='OA-0008',
+            label='POD',
+            auto_pod_post=True,
+            hard_copy_collection=True,
+            shipment_status_impact='Delivered',
+            sequence_number=8,
+        )
+        shipment = SimpleNamespace(
+            pk=uuid4(),
+            pod_type=TenantShipment.PodType.HARD,
+            pod_doc_count=1,
+        )
+        with patch(
+            'mobile_api.helpers.action_navigation_metadata.build_hard_copy_confirmation_block',
+            return_value={
+                'required': True,
+                'pending': True,
+                'applicable': True,
+                'execute_action_code': 'OA-0008',
+                'pages': [{'page_id': 'p1', 'label': 'DN-1'}],
+            },
+        ):
+            event = map_action_to_pending_timeline_event(
+                action,
+                shipment=shipment,
+                tenant_schema='tenant_test',
+            )
+        self.assertEqual(event['capture_mode'], 'digital_evidence')
+        self.assertTrue(event['hard_pod'])
+        self.assertTrue(event['includes_hard_copy'])
+        self.assertEqual(
+            event['pod_capture_steps'],
+            ['digital_evidence', 'hard_copy_confirmation'],
+        )
+
     def test_pending_a7_hard_shipment_includes_pod_capture_steps(self):
-        action = _action(code='A7', label='Upload POD')
+        action = _action(code='A7', label='Upload POD', auto_pod_post=True)
         shipment = SimpleNamespace(
             pk=uuid4(),
             pod_type=TenantShipment.PodType.HARD,
             pod_doc_count=2,
         )
-        event = map_action_to_pending_timeline_event(
-            action,
-            shipment=shipment,
-            tenant_schema='tenant_test',
-        )
+        with patch(
+            'mobile_api.helpers.action_navigation_metadata.build_hard_copy_confirmation_block',
+            return_value={
+                'required': True,
+                'pending': True,
+                'applicable': True,
+                'execute_action_code': 'A7',
+            },
+        ):
+            event = map_action_to_pending_timeline_event(
+                action,
+                shipment=shipment,
+                tenant_schema='tenant_test',
+            )
         self.assertEqual(event['screen'], 'pod_capture')
         self.assertEqual(
             event['pod_capture_steps'],
@@ -321,7 +430,7 @@ class TimelineServiceTests(SimpleTestCase):
         filtered_booking = svc._filter_workflow_actions_for_context(actions, context=ctx_booking)
         self.assertEqual(
             [a.action_code for a in filtered_booking],
-            ['A2'],
+            ['A1', 'A2'],
         )
 
     def test_booking_job_uses_full_shipment_timeline(self):
@@ -351,7 +460,7 @@ class TimelineServiceTests(SimpleTestCase):
         )
         self.assertEqual(
             [a.action_code for a in filtered],
-            ['A2', 'A3', 'A4', 'A5', 'A6', 'A7', 'A8'],
+            ['A1', 'A2', 'A3', 'A4', 'A5', 'A6', 'A7', 'A8'],
         )
 
     def test_backload_bootstrap_booking_uses_full_shipment_timeline(self):
@@ -388,7 +497,7 @@ class TimelineServiceTests(SimpleTestCase):
             )
         self.assertEqual(
             [a.action_code for a in filtered],
-            ['A2', 'A3', 'A4', 'A5', 'A6', 'A7'],
+            ['A1', 'A2', 'A3', 'A4', 'A5', 'A6', 'A7'],
         )
 
     def test_merge_keeps_booking_preshipment_logs_on_shipment_timeline(self):
@@ -438,6 +547,81 @@ class TimelineServiceTests(SimpleTestCase):
         self.assertEqual(by_code['A2']['log_no'], 'L-A2')
         self.assertEqual(by_code['A3']['log_no'], 'L-A3')
 
+    def test_pickup_loading_not_implicit_when_later_step_performed(self):
+        """Confirm Loaded without A2/A3 logs must not auto-complete pickup/loading."""
+        act_a2 = _action(code='OA-0002', label='Pickup Arrival', sequence_number=2)
+        act_a3 = _action(code='OA-0003', label='Start Loading', sequence_number=3)
+        act_a4 = _action(code='OA-0004', label='Confirm Loaded', sequence_number=4)
+        log_a4 = _log(
+            log_no='L-A4',
+            action=act_a4,
+            log_date=datetime(2026, 6, 23, 13, 0, tzinfo=timezone.utc),
+        )
+        events = merge_actions_with_timeline_logs(
+            [act_a2, act_a3, act_a4],
+            [log_a4],
+        )
+        by_code = {event['action_code']: event for event in events}
+        self.assertFalse(by_code['OA-0002']['is_performed'])
+        self.assertFalse(by_code['OA-0003']['is_performed'])
+        self.assertTrue(by_code['OA-0004']['is_performed'])
+
+    def test_unloading_true_pod_false_after_delivery_arrival(self):
+        """After delivery arrival: unloading green, POD still pending."""
+        act_a6 = _action(
+            code='OA-0006',
+            label='Delivery Arrival',
+            sequence_number=6,
+            shipment_status_impact='At_Delivery',
+        )
+        act_a7 = _action(code='OA-0007', label='Start Unloading', sequence_number=7)
+        act_a8 = _action(
+            code='OA-0008',
+            label='POD',
+            auto_pod_post=True,
+            hard_copy_collection=True,
+            shipment_status_impact='Delivered',
+            sequence_number=8,
+        )
+        log_a6 = _log(
+            log_no='L-A6',
+            action=act_a6,
+            log_date=datetime(2026, 6, 23, 12, 56, tzinfo=timezone.utc),
+        )
+        events = merge_actions_with_timeline_logs(
+            [act_a6, act_a7, act_a8],
+            [log_a6],
+        )
+        by_code = {event['action_code']: event for event in events}
+        self.assertFalse(by_code['OA-0007']['is_performed'])
+        self.assertFalse(by_code['OA-0007'].get('implicit_performed'))
+        self.assertFalse(by_code['OA-0008']['is_performed'])
+
+    def test_unloading_stays_pending_when_only_pod_performed(self):
+        act_a7 = _action(code='OA-0007', label='Start Unloading', sequence_number=7)
+        act_a8 = _action(
+            code='OA-0008',
+            label='POD',
+            auto_pod_post=True,
+            shipment_status_impact='Delivered',
+            sequence_number=8,
+        )
+
+        log_a8 = _log(
+            log_no='L-POD',
+            action=act_a8,
+            log_date=datetime(2026, 6, 23, 12, 57, tzinfo=timezone.utc),
+        )
+
+        events = merge_actions_with_timeline_logs(
+            [act_a7, act_a8],
+            [log_a8],
+        )
+        by_code = {event['action_code']: event for event in events}
+        self.assertTrue(by_code['OA-0008']['is_performed'])
+        self.assertFalse(by_code['OA-0007']['is_performed'])
+        self.assertFalse(by_code['OA-0007'].get('implicit_performed'))
+
     def test_filter_always_hides_hard_pod_from_timeline(self):
         act_a7 = _action(code='A7', label='Upload POD')
         act_a7h = _action(code='A7H', label='Hard POD Collection')
@@ -457,6 +641,93 @@ class TimelineServiceTests(SimpleTestCase):
             context=ctx,
         )
         self.assertEqual([a.action_code for a in filtered], ['A7'])
+
+    def test_filter_keeps_combined_pod_with_hard_copy_on_timeline(self):
+        act_pod = _action(
+            code='OA-0008',
+            label='POD',
+            auto_pod_post=True,
+            hard_copy_collection=True,
+        )
+        act_a7h = _action(code='A7H', label='Hard POD Collection')
+        act_a7h.hard_copy_collection = True
+        shipment = MagicMock()
+        shipment.order_type = 'COD'
+        ctx = JobDetailContext(
+            driver=_driver(),
+            tenant_schema='t',
+            user_id='u',
+            job_type='shipment',
+            job_id=str(uuid4()),
+            shipment=shipment,
+        )
+        filtered = JobDetailTimelineService()._filter_workflow_actions_for_context(
+            [act_pod, act_a7h],
+            context=ctx,
+        )
+        self.assertEqual([a.action_code for a in filtered], ['OA-0008'])
+
+    def test_cod_close_timeline_order_collect_payment_pod_verify_job_closed(self):
+        act_cod = _action(
+            code='OA-0009',
+            label='Collect Payment',
+            sequence_number=9,
+        )
+        act_close = _action(
+            code='OA-0010',
+            label='Job Closed',
+            sequence_number=10,
+            shipment_status_impact='Closed',
+        )
+        act_verify = _action(
+            code='A_POD_VERIFY',
+            label='POD Verified',
+            sequence_number=75,
+            shipment_status_impact='Delivered',
+        )
+        shipment_id = uuid4()
+        log_cod = _log(
+            log_no='L-9',
+            action=act_cod,
+            log_date=datetime(2026, 6, 24, 12, 19, 0, tzinfo=timezone.utc),
+        )
+        log_close = _log(
+            log_no='L-10',
+            action=act_close,
+            log_date=datetime(2026, 6, 24, 12, 20, 0, tzinfo=timezone.utc),
+        )
+        log_verify = _log(
+            log_no='L-PV',
+            action=act_verify,
+            log_date=datetime(2026, 6, 24, 12, 19, 30, tzinfo=timezone.utc),
+        )
+        log_verify.source_channel = 'auto_cod_verify'
+        log_verify.source = 'System'
+        for row in (log_cod, log_close, log_verify):
+            row.shipment_id = shipment_id
+
+        shipment = MagicMock()
+        shipment.pk = shipment_id
+        shipment.order_type = 'COD'
+        ctx = JobDetailContext(
+            driver=_driver(),
+            tenant_schema='tenant_a',
+            user_id='u1',
+            job_type='shipment',
+            job_id=str(shipment_id),
+            shipment=shipment,
+        )
+        svc = JobDetailTimelineService()
+        with patch.object(svc, '_workflow_actions', return_value=[act_cod, act_close]):
+            events = svc._workflow_events_for_context(
+                ctx,
+                logs=[log_cod, log_close, log_verify],
+                request=None,
+            )
+        self.assertEqual(
+            [row['action_code'] for row in events],
+            ['OA-0009', 'OA-0010'],
+        )
 
 
 class TimelineProjectionTests(TestCase):

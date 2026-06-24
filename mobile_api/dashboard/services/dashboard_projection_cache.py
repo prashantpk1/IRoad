@@ -15,6 +15,9 @@ from mobile_api.dashboard.dto.driver_dashboard_context import (
 from mobile_api.dashboard.selectors import booking_selection_policy as booking_policy
 from mobile_api.dashboard.polling_constants import DASHBOARD_ACTION_LOG_SCAN_LIMIT
 
+from iroad_tenants.operation_runtime.booking_preshipment_cycle import (
+    scoped_preshipment_action_logs,
+)
 from iroad_tenants.operation_runtime.latest_action_aggregator import (
     scoped_movement_action_logs,
     scoped_shipment_action_logs,
@@ -27,18 +30,26 @@ class DashboardProjectionCache:
 
     shipment_logs: list[Any] = field(default_factory=list)
     movement_logs: list[Any] = field(default_factory=list)
+    booking_logs: list[Any] = field(default_factory=list)
     latest_action_log_id: str = ''
     log_scan_limit: int = DASHBOARD_ACTION_LOG_SCAN_LIMIT
     queries_executed: int = 0
 
     def timeline_logs(self, *, scope: str) -> list[Any]:
         """Head slice for dashboard timeline (no extra ORM round-trip)."""
-        source = self.shipment_logs if scope == 'shipment' else self.movement_logs
+        if scope == 'shipment':
+            source = self.shipment_logs
+        elif scope == 'booking':
+            source = self.booking_logs
+        else:
+            source = self.movement_logs
         return list(source[:5])
 
     def primary_logs(self) -> list[Any]:
         if self.shipment_logs:
             return self.shipment_logs
+        if self.booking_logs:
+            return self.booking_logs
         return self.movement_logs
 
 
@@ -89,6 +100,27 @@ def load_projection_cache(context: DriverDashboardContext) -> DashboardProjectio
         cache.queries_executed += 1
         if cache.movement_logs:
             head = cache.movement_logs[0]
+            cache.latest_action_log_id = str(
+                getattr(head, 'log_id', None) or getattr(head, 'pk', '') or ''
+            )
+    elif context.active_booking is not None:
+        from mobile_api.job_detail.helpers.booking_job_context import (
+            resolve_booking_preshipment_item_type,
+        )
+
+        qs = scoped_preshipment_action_logs(
+            context.active_booking,
+            booking_item_type=resolve_booking_preshipment_item_type(
+                context.active_booking,
+                driver=context.driver,
+            ),
+            driver_id=driver_pk,
+            scan_limit=limit,
+        )
+        cache.booking_logs = list(qs)
+        cache.queries_executed += 1
+        if cache.booking_logs:
+            head = cache.booking_logs[0]
             cache.latest_action_log_id = str(
                 getattr(head, 'log_id', None) or getattr(head, 'pk', '') or ''
             )

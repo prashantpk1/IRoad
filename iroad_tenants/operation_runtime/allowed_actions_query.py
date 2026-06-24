@@ -100,10 +100,61 @@ _SHIPMENT_IMPACT_DB_TOKENS = {
 _COD_ACTION_CODE_HINTS = ('a9', 'action 9')
 _COD_LABEL_HINT = 'collect payment'
 
+_UNLOADING_CODE_HINTS = ('a8', 'oa-0007', 'action 8')
+_UNLOADING_LABEL_HINT = 'unloading'
+
 _PICKUP_CODE_HINTS = ('a2', 'action 2')
 _LOADING_CODE_HINTS = ('a3', 'action 3')
 
 _REVERSAL_CODE_PREFIXES = ('r1', 'r2', 'r3', 'r4')
+
+_HARD_POD_RETRY_ACTION_Q = (
+    Q(auto_pod_post=True, hard_copy_collection=True)
+    | Q(action_code__iexact='OA-0008')
+    | Q(action_code__iexact='A7')
+    | Q(hard_copy_collection=True)
+)
+
+
+def _hard_pod_custody_outstanding(shipment) -> bool:
+    if shipment is None:
+        return False
+    try:
+        from mobile_api.dashboard.selectors.pod_cod_policy import derive_hard_pod_pending
+
+        return derive_hard_pod_pending(shipment)
+    except Exception:
+        pod_type = (getattr(shipment, 'pod_type', None) or '').strip()
+        return pod_type == TenantShipment.PodType.HARD
+
+
+def _reinclude_combined_pod_retries(
+    qs: QuerySet,
+    *,
+    shipment,
+    executed_ids: set,
+    exclude_log_id=None,
+) -> QuerySet:
+    """Executed combined POD rows may run again for hard-copy custody confirmation."""
+    if not executed_ids or shipment is None:
+        return qs
+    from iroad_tenants.operation_execution import _combined_pod_allows_hard_copy_retry
+
+    retry_actions = TenantOperationAction.objects.filter(
+        action_id__in=executed_ids,
+    ).filter(_HARD_POD_RETRY_ACTION_Q)
+    retry_ids = [
+        action.action_id
+        for action in retry_actions
+        if _combined_pod_allows_hard_copy_retry(
+            action,
+            shipment,
+            exclude_log_id=exclude_log_id,
+        )
+    ]
+    if not retry_ids:
+        return qs
+    return qs | TenantOperationAction.objects.filter(action_id__in=retry_ids)
 
 
 def _forward_impact_tokens_for_status(current_status: str) -> list[str]:
@@ -194,6 +245,8 @@ def _prefilter_shipment_candidates(
                 (TenantShipment.ShipmentStatus.CLOSED,),
             )
             candidate_q |= Q(shipment_status_impact__in=closed_tokens)
+            if _hard_pod_custody_outstanding(shipment):
+                candidate_q |= _HARD_POD_RETRY_ACTION_Q
         return qs.filter(candidate_q).exclude(
             Q(booking_status_impact__gt='') & Q(shipment_status_impact=''),
         )
@@ -242,6 +295,17 @@ def _prefilter_shipment_candidates(
         cod_q |= Q(english_label__icontains=_COD_LABEL_HINT)
         clauses |= cod_q
 
+    if current == TenantShipment.ShipmentStatus.AT_DELIVERY or stage in {
+        STAGE_DELIVERY,
+        STAGE_POD,
+        STAGE_COD,
+    }:
+        unload_q = Q()
+        for hint in _UNLOADING_CODE_HINTS:
+            unload_q |= Q(action_code__icontains=hint)
+        unload_q |= Q(english_label__icontains=_UNLOADING_LABEL_HINT)
+        clauses |= unload_q
+
     if current in {
         TenantShipment.ShipmentStatus.LOADED,
         TenantShipment.ShipmentStatus.CREATED,
@@ -253,6 +317,7 @@ def _prefilter_shipment_candidates(
     if current in {
         TenantShipment.ShipmentStatus.AT_DELIVERY,
         TenantShipment.ShipmentStatus.POD_SUBMITTED,
+        TenantShipment.ShipmentStatus.DELIVERED,
     } or stage in {STAGE_DELIVERY, STAGE_POD}:
         clauses |= Q(hard_copy_collection=True) | Q(action_code__iexact='A7H')
 
@@ -382,9 +447,15 @@ def prefilter_allowed_action_candidates(
     qs = _exclude_executed(qs, executed)
 
     if shipment is not None:
-        return _prefilter_shipment_candidates(
+        qs = _prefilter_shipment_candidates(
             qs,
             shipment=shipment,
+            exclude_log_id=exclude_log_id,
+        )
+        return _reinclude_combined_pod_retries(
+            qs,
+            shipment=shipment,
+            executed_ids=executed,
             exclude_log_id=exclude_log_id,
         )
 

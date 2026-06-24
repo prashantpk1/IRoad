@@ -169,6 +169,10 @@ class JobDetailContextService:
     ) -> JobDetailApiPayload:
         """Map orchestration context to outward API contract."""
         _ = request
+        schema = (getattr(context, 'tenant_schema', None) or '').strip()
+        if schema:
+            with schema_context(schema):
+                return self._response_builder.build(context)
         return self._response_builder.build(context)
 
     def _normalize_job_type(self, job_type: JobType | str) -> JobType:

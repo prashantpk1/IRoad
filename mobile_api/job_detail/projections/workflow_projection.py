@@ -148,10 +148,17 @@ def _build_booking_workflow(
     booking = context.booking
     booking_id = getattr(booking, 'booking_id', None) or getattr(booking, 'pk', None)
     exec_ctx = resolve_booking_job_execution_context(context)
-    booking_item_type = str(exec_ctx.get('booking_item_type') or '').strip()
+    from iroad_tenants.operation_runtime.booking_preshipment_cycle import (
+        resolve_preshipment_booking_item_type,
+    )
+
+    booking_item_type = resolve_preshipment_booking_item_type(
+        booking,
+        str(exec_ctx.get('booking_item_type') or '').strip(),
+    )
     stage_block = {
         'entity_type': 'booking',
-        'operational_stage': '',
+        'operational_stage': str(exec_ctx.get('booking_execution_stage') or '').strip(),
         'execution_sub_stage': '',
         'status_for_workflow': str(getattr(booking, 'booking_status', '') or ''),
     }
@@ -292,6 +299,8 @@ def _is_hard_copy_collection_action_row(row: Any) -> bool:
     if code.upper() == 'A7H':
         return True
     requirements = row.get('execution_requirements') or {}
+    if requirements.get('auto_pod_post'):
+        return False
     return bool(requirements.get('hard_copy_collection'))
 
 

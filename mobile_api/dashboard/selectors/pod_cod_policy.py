@@ -51,22 +51,71 @@ _HARD_POD_ACTIONABLE_STATUSES = frozenset(
 )
 
 
+def shipment_requires_hard_copy(shipment: Any | None) -> bool:
+    """Booking- or shipment-level Hard Copy POD (not digital-only)."""
+    if shipment is None:
+        return False
+    from iroad_tenants.operation_field_catalog import (
+        normalize_operation_pod_type,
+        operation_shipment_uses_hard_copy_pod,
+    )
+
+    if not operation_shipment_uses_hard_copy_pod(shipment):
+        return False
+    try:
+        from iroad_tenants.operation_execution import _pending_hard_pod_custody_exists
+
+        if _pending_hard_pod_custody_exists(shipment):
+            return True
+    except Exception:
+        pass
+    booking = getattr(shipment, 'booking', None)
+    if booking is not None:
+        booking_pod = normalize_operation_pod_type(
+            getattr(booking, 'pod_type', None),
+            default='',
+        )
+        if booking_pod == TenantShipment.PodType.HARD:
+            return True
+    pod_type = normalize_operation_pod_type(
+        getattr(shipment, 'pod_type', None),
+        default='',
+    )
+    return pod_type == TenantShipment.PodType.HARD
+
+
 def hard_pod_stage_reached(
     shipment: Any | None,
     *,
     log_evidence: dict[str, bool] | None = None,
 ) -> bool:
     """
-    Hard POD warnings/checklists only apply during delivery/POD — not pickup or in transit.
+    Hard POD warnings/checklists apply during delivery/POD — and when a shipment was
+    wrongly advanced to Delivered before hard-copy custody finished.
     """
     if shipment is None:
         return False
     status = (getattr(shipment, 'shipment_status', None) or '').strip()
+    evidence = log_evidence or {}
+    if status == TenantShipment.ShipmentStatus.DELIVERED:
+        if evidence.get('hard_pod_log'):
+            return False
+        if evidence.get('pod_uploaded'):
+            return True
+        if pod_status_is_complete(getattr(shipment, 'pod_status', None)):
+            return True
+        try:
+            from iroad_tenants.operation_execution import _pending_hard_pod_custody_exists
+
+            if _pending_hard_pod_custody_exists(shipment):
+                return True
+        except Exception:
+            pass
+        return False
     if status in _TERMINAL_SHIPMENT_STATUSES:
         return False
     if status in _HARD_POD_ACTIONABLE_STATUSES:
         return True
-    evidence = log_evidence or {}
     return bool(evidence.get('pod_uploaded'))
 
 
@@ -96,6 +145,120 @@ def derive_pod_compliant(shipment: Any | None) -> bool:
     return pod_status_is_complete(getattr(shipment, 'pod_status', None))
 
 
+def _resolve_tenant_schema(
+    shipment: Any | None,
+    *,
+    tenant_schema: str = '',
+) -> str:
+    schema = (tenant_schema or getattr(shipment, 'tenant_schema', '') or '').strip()
+    if schema:
+        return schema
+    try:
+        from django.db import connection
+
+        return (getattr(connection, 'schema_name', None) or '').strip()
+    except Exception:
+        return ''
+
+
+def _shipment_driver_id(
+    shipment: Any | None,
+    *,
+    driver: Any | None = None,
+) -> str:
+    if driver is not None:
+        resolved = str(getattr(driver, 'pk', None) or getattr(driver, 'driver_id', '') or '').strip()
+        if resolved:
+            return resolved
+    if shipment is None:
+        return ''
+    ship_driver = getattr(shipment, 'driver', None)
+    return str(
+        getattr(ship_driver, 'pk', None)
+        or getattr(shipment, 'driver_id', '')
+        or ''
+    ).strip()
+
+
+def is_hard_pod_custody_complete(
+    shipment: Any | None,
+    *,
+    log_evidence: dict[str, bool] | None = None,
+    tenant_schema: str = '',
+    driver: Any | None = None,
+) -> bool:
+    """
+    Hard-copy custody is satisfied — Action Log ``hard_pod_log`` or promoted /
+    linked custody submission (single source for workflow + hint + gates).
+    """
+    if shipment is None or not shipment_requires_hard_copy(shipment):
+        return True
+    evidence = dict(log_evidence or {})
+    if evidence.get('hard_pod_log'):
+        return True
+    schema = _resolve_tenant_schema(shipment, tenant_schema=tenant_schema)
+    shipment_id = str(
+        getattr(shipment, 'pk', None) or getattr(shipment, 'shipment_id', '') or ''
+    ).strip()
+    driver_id = _shipment_driver_id(shipment, driver=driver)
+    if not shipment_id:
+        return False
+    try:
+        authority = HardPodCustodyAuthorityService().resolve_authority(
+            tenant_schema=schema,
+            shipment_id=shipment_id,
+            driver_id=driver_id,
+        )
+    except Exception:
+        return False
+    return authority.get('custody_authority') in {
+        'execute_action_log',
+        'promoted_custody_submission',
+    }
+
+
+def enrich_log_evidence_hard_pod(
+    evidence: dict[str, bool] | None,
+    shipment: Any | None,
+    *,
+    tenant_schema: str = '',
+    driver: Any | None = None,
+    logs: list[Any] | None = None,
+) -> dict[str, bool]:
+    """Align ``hard_pod_log`` evidence with custody authority and hard-copy logs."""
+    out = dict(evidence or {})
+    if out.get('hard_pod_log') or shipment is None:
+        return out
+    if is_hard_pod_custody_complete(
+        shipment,
+        log_evidence=out,
+        tenant_schema=tenant_schema,
+        driver=driver,
+    ):
+        out['hard_pod_log'] = True
+        return out
+    from mobile_api.pod_capture.policy.canonical_pod_action_registry import (
+        PodActionRole,
+        classify_pod_action_role,
+    )
+
+    for log in logs or []:
+        action = getattr(log, 'operation_action', None)
+        if action is None:
+            continue
+        if classify_pod_action_role(action) == PodActionRole.HARD_POD:
+            out['hard_pod_log'] = True
+            break
+        code = (getattr(action, 'action_code', '') or '').strip().upper()
+        if getattr(action, 'hard_copy_collection', False) and code not in {
+            'OA-0008',
+            'A7',
+        }:
+            out['hard_pod_log'] = True
+            break
+    return out
+
+
 def derive_hard_pod_pending(
     shipment: Any | None,
     *,
@@ -110,45 +273,41 @@ def derive_hard_pod_pending(
     """
     if shipment is None:
         return False
-    pod_type = (getattr(shipment, 'pod_type', None) or '').strip().casefold()
-    if pod_type != TenantShipment.PodType.HARD.casefold():
-        return False
+
+    pod_type_hard = shipment_requires_hard_copy(shipment)
+    if not pod_type_hard:
+        try:
+            from iroad_tenants.operation_execution import _pending_hard_pod_custody_exists
+
+            if not _pending_hard_pod_custody_exists(shipment):
+                return False
+        except Exception:
+            return False
 
     evidence = log_evidence or {}
     if not hard_pod_stage_reached(shipment, log_evidence=evidence):
         return False
 
+    if is_hard_pod_custody_complete(
+        shipment,
+        log_evidence=evidence,
+        tenant_schema=tenant_schema,
+    ):
+        return False
+
     if evidence.get('hard_pod_log'):
         return False
-
-    shipment_id = str(getattr(shipment, 'pk', None) or getattr(shipment, 'shipment_id', '') or '').strip()
-    driver = getattr(shipment, 'driver', None)
-    driver_id = str(getattr(driver, 'pk', None) or getattr(shipment, 'driver_id', '') or '').strip()
-    schema = (tenant_schema or getattr(shipment, 'tenant_schema', '') or '').strip()
-    if not shipment_id:
+    if evidence.get('pod_uploaded'):
         return True
+    try:
+        from iroad_tenants.operation_execution import _pending_hard_pod_custody_exists
 
-    authority = HardPodCustodyAuthorityService().resolve_authority(
-        tenant_schema=schema,
-        shipment_id=shipment_id,
-        driver_id=driver_id,
-    )
-    if authority.get('custody_authority') in {
-        'execute_action_log',
-        'promoted_custody_submission',
-    }:
-        return False
-
-    promoted_qs = HardPODCustodySubmission.objects.filter(
-        shipment_id=shipment_id,
-        promoted_at__isnull=False,
-    ).exclude(promotion_action_log_id='')
-    if schema:
-        promoted_qs = promoted_qs.filter(tenant_schema=schema)
-    if driver_id:
-        promoted_qs = promoted_qs.filter(driver_id=driver_id)
-    if promoted_qs.first() is not None:
-        return False
+        if _pending_hard_pod_custody_exists(shipment):
+            return True
+    except Exception:
+        pass
+    if derive_pod_compliant(shipment):
+        return True
     return True
 
 
@@ -233,13 +392,14 @@ def derive_pod_cod_flags(
     log_evidence: dict[str, bool] | None = None,
     tenant_schema: str = '',
 ) -> dict[str, bool]:
-    """All dashboard POD/COD booleans for one shipment."""
-    return {
+    """All dashboard POD/COD booleans for one shipment (columns + log evidence)."""
+    evidence = dict(log_evidence or {})
+    flags = {
         'pod_pending': derive_pod_pending(shipment),
         'pod_compliant': derive_pod_compliant(shipment),
         'hard_pod_pending': derive_hard_pod_pending(
             shipment,
-            log_evidence=log_evidence,
+            log_evidence=evidence,
             tenant_schema=tenant_schema,
         ),
         'cod_pending': derive_cod_pending(shipment),
@@ -247,3 +407,41 @@ def derive_pod_cod_flags(
         'treasury_pending': derive_treasury_pending(shipment, driver=driver),
         'delivery_blocked': derive_delivery_blocked(shipment),
     }
+
+    if evidence.get('pod_uploaded'):
+        flags['pod_pending'] = False
+        if shipment_requires_hard_copy(shipment):
+            custody_complete = is_hard_pod_custody_complete(
+                shipment,
+                log_evidence=evidence,
+                tenant_schema=tenant_schema,
+                driver=driver,
+            )
+            flags['hard_pod_pending'] = not custody_complete
+            flags['pod_compliant'] = custody_complete and bool(
+                evidence.get('pod_uploaded')
+            )
+        else:
+            flags['pod_compliant'] = True
+            flags['hard_pod_pending'] = False
+
+    if shipment_requires_hard_copy(shipment) and is_hard_pod_custody_complete(
+        shipment,
+        log_evidence=evidence,
+        tenant_schema=tenant_schema,
+        driver=driver,
+    ):
+        flags['hard_pod_pending'] = False
+        flags['pod_pending'] = False
+        flags['pod_compliant'] = True
+
+    if evidence.get('cod_collected_log') and is_cod_shipment(shipment):
+        flags['cod_pending'] = False
+        flags['cod_collected'] = True
+
+    if flags.get('pod_compliant') and (
+        not is_cod_shipment(shipment) or flags.get('cod_collected')
+    ):
+        flags['delivery_blocked'] = False
+
+    return flags

@@ -13,6 +13,7 @@ from django.db.models import Q
 from iroad_tenants.operation_runtime.booking_preshipment_cycle import (
     booking_preshipment_logs_queryset,
     is_backload_preshipment_cycle,
+    resolve_preshipment_booking_item_type,
 )
 from iroad_tenants.operation_runtime.shipment_execution_stage import (
     STAGE_COD,
@@ -24,7 +25,10 @@ from iroad_tenants.operation_runtime.shipment_execution_stage import (
     is_loading_action,
     is_pickup_action,
     is_pickup_or_loading_action,
+    is_unloading_action,
     shipment_allows_pickup_loading_action,
+    shipment_allows_unloading_action,
+    shipment_unloading_done,
     _shipment_pickup_loading_done,
 )
 from tenant_workspace.models import (
@@ -131,9 +135,35 @@ def _booking_has_active_shipment(booking, booking_item_type=''):
         ),
     )
     line = (booking_item_type or '').strip()
-    if line:
-        qs = qs.filter(booking_item_type=line)
-    return qs.exists()
+    if not line:
+        return qs.exists()
+    norm = line.casefold()
+    if norm in {'backload', 'inbound'}:
+        return qs.filter(
+            Q(booking_item_type__iexact='Backload')
+            | Q(booking_item_type__iexact='Inbound')
+        ).exists()
+    if norm == 'outbound':
+        return qs.filter(booking_item_type__iexact='Outbound').exists()
+    return qs.filter(booking_item_type__iexact=line).exists()
+
+
+def _booking_has_born_shipment_line(booking, booking_item_type=''):
+    """Non-cancelled shipment row already exists for this preshipment leg."""
+    if booking is None:
+        return False
+    from iroad_tenants.operation_runtime.auto_shipment_line import (
+        booking_line_has_non_cancelled_shipment,
+    )
+
+    line = (booking_item_type or '').strip()
+    if not line:
+        return (
+            TenantShipment.objects.filter(booking_id=booking.booking_id)
+            .exclude(shipment_status=TenantShipment.ShipmentStatus.CANCELLED)
+            .exists()
+        )
+    return booking_line_has_non_cancelled_shipment(booking, line)
 
 
 def _shipment_has_active_movement(shipment):
@@ -272,6 +302,20 @@ def _is_hard_copy_collection_action(action) -> bool:
     )
 
 
+def _is_standalone_hard_copy_collection_action(action) -> bool:
+    """
+    Hard-copy-only driver step (e.g. A7H), not combined digital POD upload.
+
+    When ``auto_pod_post`` and ``hard_copy_collection`` share one action (OA-0008
+    POD), treat it as POD upload — not a separate hard-copy timeline/execute row.
+    """
+    if action is None:
+        return False
+    if getattr(action, 'auto_pod_post', False):
+        return False
+    return _is_hard_copy_collection_action(action)
+
+
 def _pending_hard_pod_custody_exists(shipment) -> bool:
     """Unpromoted custody from POST /hard-pod/submit/ (mobile step 15)."""
     shipment_id = str(
@@ -290,7 +334,27 @@ def _pending_hard_pod_custody_exists(shipment) -> bool:
 
 
 def _is_job_close_action(action) -> bool:
-    return (getattr(action, 'action_code', '') or '').strip().upper() == 'A10'
+    code = (getattr(action, 'action_code', '') or '').strip().upper()
+    if code in {'A10', 'OA-0010'}:
+        return True
+    from iroad_tenants.operation_runtime.impacts import resolve_shipment_status_impact
+
+    impact = resolve_shipment_status_impact(
+        (getattr(action, 'shipment_status_impact', '') or '').strip(),
+    )
+    return impact == TenantShipment.ShipmentStatus.CLOSED
+
+
+def _is_collect_payment_action(action) -> bool:
+    if getattr(action, 'auto_treasury_post', False):
+        return True
+    return action_matches(
+        action,
+        'collect payment',
+        'a9',
+        'action 9',
+        'oa-0009',
+    )
 
 
 def _shipment_job_close_gates_satisfied(shipment, *, exclude_log_id=None) -> bool:
@@ -317,20 +381,53 @@ def _shipment_job_close_gates_satisfied(shipment, *, exclude_log_id=None) -> boo
             != TenantShipment.CollectionStatus.COLLECTED
         ):
             return False
+    booking = getattr(shipment, 'booking', None)
+    if booking is None and getattr(shipment, 'booking_id', None):
+        from tenant_workspace.models import TenantBooking
+
+        booking = TenantBooking.objects.filter(pk=shipment.booking_id).first()
+    if booking is not None:
+        from mobile_api.dashboard.selectors.booking_selection_policy import (
+            round_trip_defers_job_close,
+        )
+
+        if round_trip_defers_job_close(booking, shipment):
+            return False
     return True
 
 
-def _hard_pod_blocks_forward_action(shipment, action_code: str) -> bool:
+def _hard_pod_blocks_forward_action(shipment, action_code: str, *, action=None) -> bool:
     """
-    Hard POD: digital A7 alone is not enough — block A8/A9/A10 until A7H custody.
+    Hard POD: digital POD alone is not enough — block post-POD forward steps until
+    hard-copy custody is confirmed.
     """
-    code = (action_code or '').strip().upper()
-    if code not in {'A8', 'A9', 'A10'}:
-        return False
     if shipment is None:
         return False
-    pod_type = (getattr(shipment, 'pod_type', None) or '').strip()
-    if pod_type != TenantShipment.PodType.HARD:
+    from iroad_tenants.operation_runtime.pod_action import _shipment_requires_hard_pod_mode
+
+    if not _shipment_requires_hard_pod_mode(shipment):
+        return False
+    blocked = False
+    if action is not None:
+        blocked = (
+            _is_collect_payment_action(action)
+            or _is_job_close_action(action)
+            or action_matches(
+                action,
+                'unloading completed',
+                'unloading',
+                'a8',
+                'action 8',
+                'oa-0007',
+            )
+        )
+    if not blocked:
+        code = (action_code or '').strip().upper()
+        blocked = code in {
+            'A8', 'A9', 'A10',
+            'OA-0007', 'OA-0009', 'OA-0010',
+        }
+    if not blocked:
         return False
     try:
         from mobile_api.dashboard.selectors import pod_cod_policy as policy
@@ -340,6 +437,134 @@ def _hard_pod_blocks_forward_action(shipment, action_code: str) -> bool:
         return not policy.derive_pod_pending(shipment)
     except Exception:
         return False
+
+
+def _hard_pod_custody_promoted(shipment) -> bool:
+    shipment_id = str(
+        getattr(shipment, 'pk', None) or getattr(shipment, 'shipment_id', '') or ''
+    ).strip()
+    if not shipment_id:
+        return False
+    try:
+        from django.db import connection
+        from mobile_api.hard_pod.models import HardPODCustodySubmission
+
+        tenant_schema = (getattr(connection, 'schema_name', None) or '').strip()
+        if not tenant_schema:
+            return False
+        return (
+            HardPODCustodySubmission.objects.filter(
+                tenant_schema=tenant_schema,
+                shipment_id=shipment_id,
+                promoted_at__isnull=False,
+            )
+            .exclude(promotion_action_log_id='')
+            .exists()
+        )
+    except Exception:
+        return False
+
+
+def _is_combined_upload_pod_action(action) -> bool:
+    if action is None:
+        return False
+    if not getattr(action, 'hard_copy_collection', False):
+        return False
+    if getattr(action, 'auto_pod_post', False):
+        return True
+    code = (getattr(action, 'action_code', '') or '').strip().upper()
+    return code in {'OA-0008', 'A7'}
+
+
+def _digital_pod_step_complete(
+    shipment,
+    *,
+    action=None,
+    exclude_log_id=None,
+) -> bool:
+    from iroad_tenants.operation_runtime.side_effects import (
+        _mobile_log_evidence_for_shipment,
+    )
+
+    evidence = _mobile_log_evidence_for_shipment(shipment)
+    if evidence.get('pod_uploaded') or evidence.get('hard_pod_log'):
+        return True
+    if action is None:
+        return False
+    executed_ids = (
+        _executed_action_ids(shipment=shipment, exclude_log_id=exclude_log_id)
+        if exclude_log_id is not None
+        else _executed_action_ids(shipment=shipment)
+    )
+    return action.action_id in executed_ids
+
+
+def _hard_pod_custody_outstanding(shipment) -> bool:
+    if shipment is None:
+        return False
+    try:
+        from mobile_api.dashboard.selectors.pod_cod_policy import derive_hard_pod_pending
+
+        return derive_hard_pod_pending(shipment)
+    except Exception:
+        pod_type = (getattr(shipment, 'pod_type', None) or '').strip()
+        return pod_type == TenantShipment.PodType.HARD
+
+
+def _combined_pod_allows_hard_copy_retry(action, shipment, *, exclude_log_id=None) -> bool:
+    """
+    Combined POD actions (auto_pod_post + hard_copy_collection) may execute twice:
+    digital evidence first, then hard custody with ``custody_submission_id``.
+    """
+    if shipment is None or action is None:
+        return False
+    if not _is_combined_upload_pod_action(action):
+        return False
+    if not _hard_pod_custody_outstanding(shipment):
+        return False
+    return _digital_pod_step_complete(
+        shipment,
+        action=action,
+        exclude_log_id=exclude_log_id,
+    )
+
+
+def _combined_pod_allows_digital_recovery(
+    action,
+    shipment,
+    *,
+    exclude_log_id=None,
+) -> bool:
+    """
+    Combined POD digital step when shipment status drifted to Delivered/POD Submitted
+    before digital evidence was captured (misconfigured Delivered impact on OA-0008).
+    """
+    if shipment is None or action is None:
+        return False
+    if not _is_combined_upload_pod_action(action):
+        return False
+    if (getattr(shipment, 'pod_type', None) or '').strip() != TenantShipment.PodType.HARD:
+        return False
+    if _hard_pod_custody_promoted(shipment):
+        return False
+    current = (shipment.shipment_status or '').strip()
+    if current not in {
+        TenantShipment.ShipmentStatus.POD_SUBMITTED,
+        TenantShipment.ShipmentStatus.DELIVERED,
+    }:
+        return False
+    from iroad_tenants.operation_runtime.side_effects import (
+        _mobile_log_evidence_for_shipment,
+    )
+
+    evidence = _mobile_log_evidence_for_shipment(shipment)
+    if evidence.get('pod_uploaded') or evidence.get('hard_pod_log'):
+        return False
+    executed_ids = _executed_action_ids(
+        shipment=shipment,
+        exclude_log_id=exclude_log_id,
+    )
+    return action.action_id not in executed_ids
 
 
 def _hard_copy_collection_shipment_allowed(
@@ -355,13 +580,15 @@ def _hard_copy_collection_shipment_allowed(
     """
     if shipment is None:
         return False
-    pod_type = (getattr(shipment, 'pod_type', None) or '').strip()
-    if pod_type != TenantShipment.PodType.HARD:
+    from iroad_tenants.operation_field_catalog import operation_shipment_uses_hard_copy_pod
+
+    if not operation_shipment_uses_hard_copy_pod(shipment):
         return False
     current = (shipment.shipment_status or '').strip()
     if current not in {
         TenantShipment.ShipmentStatus.AT_DELIVERY,
         TenantShipment.ShipmentStatus.POD_SUBMITTED,
+        TenantShipment.ShipmentStatus.DELIVERED,
     }:
         return False
     executed_codes = _executed_action_codes(
@@ -451,9 +678,26 @@ def _action_is_allowed(
         )
     )
     if action.action_id in executed_ids:
+        if shipment is not None and _combined_pod_allows_hard_copy_retry(
+            action,
+            shipment,
+            exclude_log_id=exclude_log_id,
+        ):
+            return True
         return False
 
     impact = resolve_shipment_status_impact(action.shipment_status_impact)
+    if shipment is not None and impact:
+        from iroad_tenants.operation_runtime.latest_state import (
+            resolve_effective_shipment_status_for_action,
+        )
+
+        effective = resolve_effective_shipment_status_for_action(
+            action=action,
+            shipment=shipment,
+        )
+        if effective:
+            impact = effective
 
     # --- Shipment linked: forward / side-effect actions ---
     if shipment is not None:
@@ -506,8 +750,22 @@ def _action_is_allowed(
         if requires_existing_movement and not has_active_movement:
             return False
 
-        if _hard_pod_blocks_forward_action(shipment, action_code):
+        if _hard_pod_blocks_forward_action(shipment, action_code, action=action):
             return False
+
+        if _combined_pod_allows_hard_copy_retry(
+            action,
+            shipment,
+            exclude_log_id=exclude_log_id,
+        ):
+            return True
+
+        if _combined_pod_allows_digital_recovery(
+            action,
+            shipment,
+            exclude_log_id=exclude_log_id,
+        ):
+            return True
 
         if _is_job_close_action(action):
             return _shipment_job_close_gates_satisfied(
@@ -515,17 +773,20 @@ def _action_is_allowed(
                 exclude_log_id=exclude_log_id,
             )
 
-        if action_matches(action, 'collect payment', 'a9', 'action 9'):
+        if _is_collect_payment_action(action):
             if (shipment.order_type or '').upper() != 'COD':
                 return False
+            if not shipment_unloading_done(
+                shipment,
+                exclude_log_id=exclude_log_id,
+            ):
+                return False
             return current in {
-                TenantShipment.ShipmentStatus.IN_TRANSIT,
-                TenantShipment.ShipmentStatus.AT_DELIVERY,
                 TenantShipment.ShipmentStatus.POD_SUBMITTED,
                 TenantShipment.ShipmentStatus.DELIVERED,
             }
 
-        if _is_hard_copy_collection_action(action):
+        if _is_standalone_hard_copy_collection_action(action):
             return _hard_copy_collection_shipment_allowed(
                 shipment,
                 exclude_log_id=exclude_log_id,
@@ -533,6 +794,20 @@ def _action_is_allowed(
 
         if action_matches(action, 'start job', 'action 1') or action_code == 'A1':
             return False
+
+        if is_unloading_action(action):
+            return shipment_allows_unloading_action(
+                action,
+                shipment,
+                exclude_log_id=exclude_log_id,
+            )
+
+        if action.auto_pod_post and current == TenantShipment.ShipmentStatus.AT_DELIVERY:
+            if not shipment_unloading_done(
+                shipment,
+                exclude_log_id=exclude_log_id,
+            ):
+                return False
 
         if impact:
             if (
@@ -626,7 +901,20 @@ def _action_is_allowed(
                 exclude_log_id=exclude_log_id,
             ):
                 return False
-            return not _booking_has_active_shipment(booking, booking_item_type)
+            birth_leg = resolve_preshipment_booking_item_type(booking, booking_item_type)
+            from iroad_tenants.operation_runtime.auto_shipment_line import (
+                resolve_auto_shipment_target_line,
+            )
+
+            if resolve_auto_shipment_target_line(
+                booking,
+                booking_item_type_hint=birth_leg,
+            ) is None:
+                return False
+            return (
+                not _booking_has_active_shipment(booking, booking_item_type)
+                and not _booking_has_born_shipment_line(booking, booking_item_type)
+            )
 
         if action_matches(action, 'start job', 'a1', 'action 1'):
             if booking.booking_status not in {
@@ -840,6 +1128,13 @@ def validate_operation_action_allowed(
     if operation_action is None:
         return 'Invalid operation action selected.'
 
+    if shipment is not None:
+        from iroad_tenants.operation_runtime.latest_state import (
+            repair_delivered_before_hard_pod_custody,
+        )
+
+        repair_delivered_before_hard_pod_custody(shipment)
+
     include_id = None
     if previous_action_id and operation_action.pk == previous_action_id:
         include_id = previous_action_id
@@ -853,6 +1148,13 @@ def validate_operation_action_allowed(
         include_action_id=include_id,
     )
     if allowed.filter(pk=operation_action.pk).exists():
+        return None
+
+    if shipment is not None and _combined_pod_allows_hard_copy_retry(
+        operation_action,
+        shipment,
+        exclude_log_id=exclude_log_id,
+    ):
         return None
 
     action_code = str(getattr(operation_action, 'action_code', '') or '').strip().upper()

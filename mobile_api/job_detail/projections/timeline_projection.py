@@ -10,6 +10,7 @@ from __future__ import annotations
 from typing import Any
 
 from mobile_api.job_detail.dto.job_detail_context import JobDetailContext
+from mobile_api.job_detail.timeline.timeline_event_mapper import sort_timeline_display_order
 from mobile_api.job_detail.timeline.timeline_service import JobDetailTimelineService
 
 _EMPTY_TIMELINE: dict[str, Any] = {
@@ -49,6 +50,9 @@ def build_timeline_section(
         preview_limit=preview_limit,
     )
     bundle['scope'] = context.job_type
+    bundle['timeline_preview'] = sort_timeline_display_order(
+        list(bundle.get('timeline_preview') or []),
+    )
     # Operational issues are surfaced via alerts / operational_issues blocks only.
     # They are intentionally excluded from the action-log timeline preview.
     bundle['includes_operational_issues'] = False

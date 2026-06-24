@@ -69,6 +69,30 @@ def fetch_latest_action_log_id(
         )
         return str(log_id or '')
 
+    booking = context.active_booking
+    if booking is not None and shipment is None and movement is None:
+        from iroad_tenants.operation_runtime.booking_preshipment_cycle import (
+            scoped_preshipment_action_logs,
+        )
+        from mobile_api.job_detail.helpers.booking_job_context import (
+            resolve_booking_preshipment_item_type,
+        )
+
+        log_id = (
+            scoped_preshipment_action_logs(
+                booking,
+                booking_item_type=resolve_booking_preshipment_item_type(
+                    booking,
+                    driver=context.driver,
+                ),
+                driver_id=driver_pk,
+                scan_limit=1,
+            )
+            .values_list('log_id', flat=True)
+            .first()
+        )
+        return str(log_id or '')
+
     return ''
 
 

@@ -13,7 +13,6 @@ from mobile_api.job_detail.dto.job_detail_context import JobDetailContext
 from mobile_api.job_detail.guards.ownership import driver_pk
 
 from iroad_tenants.operation_runtime.latest_action_aggregator import (
-    scoped_booking_action_logs,
     scoped_movement_action_logs,
     scoped_shipment_action_logs,
 )
@@ -67,9 +66,20 @@ def load_projection_cache(context: JobDetailContext) -> JobDetailProjectionCache
         )
         cache.queries_executed += 1
     elif context.job_type == 'booking' and context.booking is not None:
+        from iroad_tenants.operation_runtime.booking_preshipment_cycle import (
+            scoped_preshipment_action_logs,
+        )
+        from mobile_api.job_detail.helpers.booking_job_context import (
+            resolve_booking_preshipment_item_type,
+        )
+
         cache.booking_logs = list(
-            scoped_booking_action_logs(
+            scoped_preshipment_action_logs(
                 context.booking,
+                booking_item_type=resolve_booking_preshipment_item_type(
+                    context.booking,
+                    driver=context.driver,
+                ),
                 driver_id=driver_id,
                 scan_limit=limit,
             )

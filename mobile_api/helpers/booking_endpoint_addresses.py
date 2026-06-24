@@ -20,6 +20,31 @@ def leg_is_backload_line(booking_item_type: str | None) -> bool:
     return (booking_item_type or '').strip().casefold() in {'backload', 'inbound'}
 
 
+def should_swap_leg_endpoint_addresses(
+    *,
+    booking_item_type: str = '',
+    booking_execution_stage: str = '',
+    show_backload_route: bool = False,
+    backload_bootstrap: bool = False,
+) -> bool:
+    """
+  True when pickup/drop should use the return-leg swap (round-trip leg 2).
+
+  Mirrors dashboard booking cards — route reversal alone is not enough.
+    """
+    if backload_bootstrap or show_backload_route:
+        return True
+    if leg_is_backload_line(booking_item_type):
+        return True
+    from mobile_api.dashboard.selectors import booking_selection_policy as policy
+
+    if (booking_execution_stage or '').strip() == (
+        policy.BOOKING_EXECUTION_STAGE_OUTBOUND_COMPLETED
+    ):
+        return True
+    return False
+
+
 def _serialize_route_location_points(
     booking: Any,
     *,

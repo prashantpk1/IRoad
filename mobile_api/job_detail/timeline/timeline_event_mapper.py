@@ -9,9 +9,24 @@ from __future__ import annotations
 
 from typing import Any
 
-from iroad_tenants.operation_runtime.impacts import operation_action_matches
+from iroad_tenants.operation_runtime.impacts import (
+    operation_action_matches,
+    resolve_shipment_status_impact,
+)
+from iroad_tenants.operation_runtime.shipment_execution_stage import (
+    is_pickup_or_loading_action,
+)
+from mobile_api.helpers.action_execution_metadata import _is_start_job_action
 from mobile_api.helpers.action_navigation_metadata import (
+    build_hard_copy_navigation_payload,
     enrich_timeline_event_navigation,
+)
+from mobile_api.helpers.job_action_resolver import (
+    action_code_is_job_close,
+    row_is_job_close_action,
+)
+from mobile_api.dashboard.services.dashboard_pod_cod_reconciler import (
+    _log_evidence_flags,
 )
 from mobile_api.pod_capture.policy.canonical_pod_action_registry import (
     TIMELINE_EVENT_ACTION,
@@ -22,7 +37,10 @@ from mobile_api.pod_capture.policy.canonical_pod_action_registry import (
     TIMELINE_EVENT_MOVEMENT,
     TIMELINE_EVENT_POD,
     classify_timeline_event_type,
+    is_pod_upload_action,
+    is_unloading_action,
 )
+from tenant_workspace.models import TenantShipment
 
 # Re-export taxonomy constants for existing imports.
 EVENT_ACTION = TIMELINE_EVENT_ACTION
@@ -39,23 +57,56 @@ ISSUE_TIMELINE_ESCALATED = 'issue_escalated'
 ISSUE_TIMELINE_RESOLVED = 'issue_resolved'
 ISSUE_TIMELINE_REJECTED = 'issue_rejected'
 
+SYSTEM_AUTO_TIMELINE_CODES = frozenset({'A_POD_VERIFY'})
+SYSTEM_AUTO_TIMELINE_CHANNELS = frozenset({'auto_cod_verify'})
+
+
+def timeline_event_is_pod_verified(event: dict[str, Any]) -> bool:
+    """System auto-verify milestone — hidden from driver timeline UI."""
+    code = str(event.get('action_code') or '').strip().upper()
+    if code in SYSTEM_AUTO_TIMELINE_CODES:
+        return True
+    channel = str(event.get('source_channel') or '').strip()
+    if channel in SYSTEM_AUTO_TIMELINE_CHANNELS:
+        return True
+    label = str(
+        event.get('action_label')
+        or event.get('execution_label')
+        or event.get('label')
+        or '',
+    ).casefold()
+    return 'pod verified' in label or 'pod verify' in label
+
+
+def filter_hidden_timeline_events(events: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """Remove internal milestones that must not appear in the mobile stepper."""
+    return [row for row in (events or []) if not timeline_event_is_pod_verified(row)]
+
 
 def classify_event_type(action: Any | None) -> str:
     """Delegate to canonical POD action registry (A7≠A8)."""
     return classify_timeline_event_type(action)
 
 
+def _string_field(obj: Any, *attrs: str) -> str:
+    for attr in attrs:
+        value = getattr(obj, attr, '')
+        if isinstance(value, str) and value.strip():
+            return value.strip()
+    return ''
+
+
+def _action_master_label(action: Any) -> str:
+    """Prefer Action Master ``english_label`` (tenant codes are dynamic)."""
+    return _string_field(action, 'english_label', 'label', 'action_code')
+
+
 def _action_label(log_row: Any, *, request: Any | None = None) -> str:
     action = getattr(log_row, 'operation_action', None)
     if action is None:
         return ''
-    english = (
-        getattr(action, 'label', '')
-        or getattr(action, 'english_label', '')
-        or getattr(action, 'action_code', '')
-        or ''
-    ).strip()
-    arabic = (getattr(action, 'arabic_label', '') or '').strip()
+    english = _action_master_label(action)
+    arabic = _string_field(action, 'arabic_label')
     if request is not None:
         try:
             from mobile_api.helpers.i18n import get_localized_value
@@ -72,6 +123,7 @@ def map_log_to_timeline_event(
     request: Any | None = None,
     shipment: Any | None = None,
     tenant_schema: str = '',
+    log_evidence: dict[str, bool] | None = None,
 ) -> dict[str, Any]:
     """Map one Action Log ORM row to a timeline event DTO (append-only derived)."""
     action = getattr(log_row, 'operation_action', None)
@@ -126,6 +178,7 @@ def map_log_to_timeline_event(
         action,
         shipment=shipment,
         tenant_schema=tenant_schema,
+        log_evidence=log_evidence,
     )
 
 
@@ -135,14 +188,17 @@ def map_logs_to_timeline_events(
     request: Any | None = None,
     shipment: Any | None = None,
     tenant_schema: str = '',
+    log_evidence: dict[str, bool] | None = None,
 ) -> list[dict[str, Any]]:
     """Map log rows preserving input order (caller must supply stable sort)."""
+    evidence = dict(log_evidence or _log_evidence_flags(logs))
     return [
         map_log_to_timeline_event(
             row,
             request=request,
             shipment=shipment,
             tenant_schema=tenant_schema,
+            log_evidence=evidence,
         )
         for row in logs
     ]
@@ -154,6 +210,7 @@ def map_action_to_pending_timeline_event(
     request: Any | None = None,
     shipment: Any | None = None,
     tenant_schema: str = '',
+    log_evidence: dict[str, bool] | None = None,
 ) -> dict[str, Any]:
     """Map one configured workflow action to an unperformed timeline step."""
     event_type = classify_event_type(action)
@@ -203,17 +260,12 @@ def map_action_to_pending_timeline_event(
         action,
         shipment=shipment,
         tenant_schema=tenant_schema,
+        log_evidence=log_evidence,
     )
-    if (
-        shipment is not None
-        and action_code.upper() == 'A7'
-        and (getattr(shipment, 'pod_type', None) or '').strip().casefold() == 'hard'
+    if _is_start_job_action(action) or (
+        is_unloading_action(action)
+        and not getattr(action, 'auto_pod_post', False)
     ):
-        event['screen'] = 'pod_capture'
-        event['capture_mode'] = 'digital_evidence'
-        event['pod_capture_steps'] = ['digital_evidence', 'hard_copy_confirmation']
-        event['includes_hard_copy'] = True
-    elif action_code.upper() in {'A1', 'A8'}:
         event['screen'] = 'job_detail'
         event['action'] = 'execute_action'
         event['direct_execute'] = True
@@ -226,6 +278,33 @@ def map_action_to_pending_timeline_event(
     return event
 
 
+def _timeline_row_is_collect_payment(event: dict[str, Any]) -> bool:
+    code = (event.get('action_code') or '').strip().upper()
+    if code in {'A9', 'OA-0009'}:
+        return True
+    label = (event.get('action_label') or '').casefold()
+    return 'collect payment' in label
+
+
+def reconcile_hard_pod_timeline_events(
+    events: list[dict[str, Any]],
+    *,
+    shipment: Any | None = None,
+    tenant_schema: str = '',
+    log_evidence: dict[str, bool] | None = None,
+) -> list[dict[str, Any]]:
+    """
+    Hard-copy custody is step 2 inside Upload POD — not a separate timeline row.
+
+    Keep a single performed POD milestone on the timeline. Job Detail workflow
+    overlay + ``next_action_hint`` drive the hard-copy wizard after digital POD.
+    """
+    _ = shipment
+    _ = tenant_schema
+    _ = log_evidence
+    return list(events or [])
+
+
 def merge_actions_with_timeline_logs(
     actions: list[Any],
     logs: list[Any],
@@ -233,6 +312,7 @@ def merge_actions_with_timeline_logs(
     request: Any | None = None,
     shipment: Any | None = None,
     tenant_schema: str = '',
+    log_evidence: dict[str, bool] | None = None,
 ) -> list[dict[str, Any]]:
     """
     Build a workflow progression timeline.
@@ -247,6 +327,7 @@ def merge_actions_with_timeline_logs(
         if action_id and action_id not in latest_log_by_action_id:
             latest_log_by_action_id[action_id] = log
 
+    evidence = dict(log_evidence or _log_evidence_flags(logs))
     out: list[dict[str, Any]] = []
     for action in sorted(
         actions,
@@ -264,6 +345,7 @@ def merge_actions_with_timeline_logs(
                     request=request,
                     shipment=shipment,
                     tenant_schema=tenant_schema,
+                    log_evidence=evidence,
                 ),
             )
             continue
@@ -272,24 +354,196 @@ def merge_actions_with_timeline_logs(
             request=request,
             shipment=shipment,
             tenant_schema=tenant_schema,
+            log_evidence=evidence,
         )
         event['timeline_state'] = 'performed'
         event['is_performed'] = True
         event['sequence_number'] = int(getattr(action, 'sequence_number', 0) or 0)
+        if str(getattr(log, 'source_channel', '') or '').strip() in SYSTEM_AUTO_TIMELINE_CHANNELS:
+            event['is_system_auto'] = True
+            event['sequence_number'] = max(int(event.get('sequence_number') or 0), 999)
         out.append(event)
-    return out
+    return reconcile_hard_pod_timeline_events(
+        out,
+        shipment=shipment,
+        tenant_schema=tenant_schema,
+        log_evidence=evidence,
+    )
+
+
+def _resolve_workflow_action_for_event(
+    event: dict[str, Any],
+    actions: list[Any] | None,
+) -> Any | None:
+    """Match a timeline row to its Action Master row (code + sequence)."""
+    if not actions:
+        return None
+    code = (event.get('action_code') or '').strip()
+    if not code:
+        return None
+    seq = int(event.get('sequence_number') or 0)
+    for action in actions:
+        action_code = str(getattr(action, 'action_code', '') or '').strip()
+        if action_code != code:
+            continue
+        action_seq = int(getattr(action, 'sequence_number', 0) or 0)
+        if seq and action_seq and seq != action_seq:
+            continue
+        return action
+    return None
+
+
+def _is_delivery_arrival_action(action: Any | None) -> bool:
+    if action is None:
+        return False
+    impact = resolve_shipment_status_impact(
+        (getattr(action, 'shipment_status_impact', None) or '').strip(),
+    )
+    if impact == TenantShipment.ShipmentStatus.AT_DELIVERY:
+        return True
+    return operation_action_matches(action, 'delivery arrival', 'arrival at delivery')
+
+
+def _is_delivery_arrival_event(
+    event: dict[str, Any],
+    *,
+    actions: list[Any] | None = None,
+) -> bool:
+    action = _resolve_workflow_action_for_event(event, actions)
+    if action is not None and _is_delivery_arrival_action(action):
+        return True
+    label = (event.get('action_label') or '').casefold()
+    return 'delivery' in label and 'arrival' in label
+
+
+def _is_start_unloading_event(
+    event: dict[str, Any],
+    *,
+    actions: list[Any] | None = None,
+) -> bool:
+    action = _resolve_workflow_action_for_event(event, actions)
+    if action is not None and is_unloading_action(action):
+        return True
+    label = (event.get('action_label') or '').casefold()
+    return 'start unloading' in label
+
+
+def _is_pod_upload_event(
+    event: dict[str, Any],
+    *,
+    actions: list[Any] | None = None,
+) -> bool:
+    action = _resolve_workflow_action_for_event(event, actions)
+    if action is not None and is_pod_upload_action(action):
+        return True
+    return (event.get('event_type') or '').strip().casefold() in {
+        'pod',
+        'hard_pod',
+    }
+
+
+def _apply_unloading_before_pod_cascade(
+    events: list[dict[str, Any]],
+    *,
+    actions: list[Any] | None = None,
+) -> list[dict[str, Any]]:
+    """
+    After delivery arrival, show Start Unloading complete while POD is still open.
+
+    Mobile UX: unloading green + POD pending until POD is executed.
+    """
+    delivery_done = any(
+        event.get('is_performed') and _is_delivery_arrival_event(event, actions=actions)
+        for event in events
+    )
+    if not delivery_done:
+        return events
+
+    pod_done = any(
+        event.get('is_performed') and _is_pod_upload_event(event, actions=actions)
+        for event in events
+    )
+
+    cascaded: list[dict[str, Any]] = []
+    for event in events:
+        if (
+            not event.get('is_performed')
+            and _is_start_unloading_event(event, actions=actions)
+            and not pod_done
+        ):
+            implied = dict(event)
+            implied['is_performed'] = True
+            implied['timeline_state'] = 'performed'
+            implied['implicit_performed'] = True
+            implied['authority'] = 'workflow_cascade'
+            cascaded.append(implied)
+            continue
+        cascaded.append(event)
+    return cascaded
+
+
+def _allows_implicit_forward_cascade(
+    event: dict[str, Any],
+    *,
+    actions: list[Any] | None = None,
+) -> bool:
+    """Only optional steps (e.g. Start Unloading) may be implied by a later log."""
+    action = _resolve_workflow_action_for_event(event, actions)
+    if action is not None:
+        if is_pickup_or_loading_action(action):
+            return False
+        if _is_start_job_action(action):
+            return False
+    return _is_start_unloading_event(event, actions=actions)
+
+
+def _apply_forward_step_cascade(
+    events: list[dict[str, Any]],
+    *,
+    actions: list[Any] | None = None,
+) -> list[dict[str, Any]]:
+    """
+    Mark earlier optional workflow steps performed when a later step was executed.
+
+    Pickup Arrival and Start Loading always require their own action log.
+    """
+    max_performed_seq = max(
+        (
+            int(event.get('sequence_number') or 0)
+            for event in events
+            if event.get('is_performed')
+        ),
+        default=0,
+    )
+    if max_performed_seq <= 0:
+        return events
+
+    cascaded: list[dict[str, Any]] = []
+    for event in events:
+        if event.get('is_performed'):
+            cascaded.append(event)
+            continue
+        seq = int(event.get('sequence_number') or 0)
+        if seq > 0 and seq < max_performed_seq and _allows_implicit_forward_cascade(
+            event,
+            actions=actions,
+        ):
+            implied = dict(event)
+            implied['is_performed'] = True
+            implied['timeline_state'] = 'performed'
+            implied['implicit_performed'] = True
+            implied['authority'] = 'workflow_cascade'
+            cascaded.append(implied)
+            continue
+        cascaded.append(event)
+    return cascaded
 
 
 def _action_label_from_action(action: Any, *, request: Any | None = None) -> str:
     if action is None:
         return ''
-    english = (
-        getattr(action, 'label', '')
-        or getattr(action, 'english_label', '')
-        or getattr(action, 'action_code', '')
-        or ''
-    ).strip()
-    arabic = (getattr(action, 'arabic_label', '') or '').strip()
+    english = _action_master_label(action)
+    arabic = _string_field(action, 'arabic_label')
     if request is not None:
         try:
             from mobile_api.helpers.i18n import get_localized_value
@@ -441,6 +695,78 @@ def merge_issue_events_into_timeline(
             seen_issue.add(event_id)
         out.append(row)
     return out
+
+
+def _timeline_event_is_job_close(event: dict[str, Any]) -> bool:
+    row = {
+        'action_code': event.get('action_code'),
+        'english_label': event.get('action_label'),
+        'execution_label': event.get('execution_label'),
+        'label': event.get('label'),
+        'execution_requirements': {
+            'shipment_status_impact': event.get('status_impact') or '',
+        },
+    }
+    if row_is_job_close_action(row):
+        return True
+    impact = resolve_shipment_status_impact(str(event.get('status_impact') or ''))
+    if impact == TenantShipment.ShipmentStatus.CLOSED:
+        return True
+    if action_code_is_job_close(str(event.get('action_code') or '')):
+        return True
+    for label_key in ('action_label', 'execution_label', 'label'):
+        label = str(event.get(label_key) or '').casefold()
+        if (
+            'job close' in label
+            or 'job closed' in label
+            or 'close job' in label
+        ):
+            return True
+    return False
+
+
+def _timeline_event_is_system_auto(event: dict[str, Any]) -> bool:
+    if event.get('is_system_auto'):
+        return True
+    code = str(event.get('action_code') or '').strip().upper()
+    if code in SYSTEM_AUTO_TIMELINE_CODES:
+        return True
+    if str(event.get('source_channel') or '').strip() in SYSTEM_AUTO_TIMELINE_CHANNELS:
+        return True
+    label = str(event.get('action_label') or event.get('execution_label') or '').casefold()
+    return 'pod verified' in label or 'pod verify' in label
+
+
+def sort_timeline_display_order(events: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """
+    Display order for mobile stepper:
+
+    workflow steps (1..N) → Job Closed last.
+
+    ``POD Verified`` is a system-only milestone and is filtered out before sort.
+    """
+    events = filter_hidden_timeline_events(events)
+    if not events:
+        return events
+
+    def _sort_key(row: dict[str, Any]) -> tuple[int, int, str, str]:
+        if _timeline_event_is_job_close(row):
+            tier = 2
+        elif _timeline_event_is_system_auto(row):
+            tier = 1
+        else:
+            tier = 0
+        seq = int(row.get('sequence_number') or 0)
+        log_date = str(row.get('log_date') or row.get('created_at') or '')
+        log_id = str(row.get('log_id') or row.get('event_id') or '')
+        return (tier, seq, log_date, log_id)
+
+    return sorted(events, key=_sort_key)
+
+
+def pin_job_close_timeline_last(events: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """Backward-compatible alias for timeline display ordering."""
+    return sort_timeline_display_order(events)
 
 
 def sort_logs_newest_first(logs: list[Any]) -> list[Any]:

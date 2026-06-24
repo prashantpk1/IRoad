@@ -21,17 +21,30 @@ from mobile_api.pod_capture.policy.pod_capture_policy import (
     build_pod_capture_requirements,
 )
 from mobile_api.pod_capture.services.pod_capture_action_resolver import (
-    resolve_default_pod_action,
+    CANONICAL_FALLBACK_DIGITAL_POD_ACTION_CODE,
+    CANONICAL_FALLBACK_HARD_COPY_POD_ACTION_CODE,
+    HARD_POD_ACTION_CODE,
+    POD_DIGITAL_ACTION_CODE,
+    action_code_from_action,
+    resolve_digital_pod_action,
+    resolve_hard_copy_pod_action,
 )
 from tenant_workspace.models import TenantShipment
-
-
-HARD_POD_ACTION_CODE = 'A7H'
-POD_DIGITAL_ACTION_CODE = 'A7'
 HARD_COPY_SCREEN_TITLE = 'Hard POD Collection Confirmation'
 DIGITAL_EVIDENCE_SCREEN_TITLE = 'Capturing Action Evidences'
 UI_MODE_HARD_POD_CONFIRMATION = 'hard_pod_collection_confirmation'
 UI_MODE_DIGITAL_EVIDENCE = 'digital_evidence'
+
+# Mobile wizard step ids (``pod_capture_steps``) — same tokens as ``capture_mode`` / ``active_step``.
+POD_CAPTURE_STEP_DIGITAL = 'digital_evidence'
+POD_CAPTURE_STEP_HARD_COPY = 'hard_copy_confirmation'
+
+
+def build_pod_capture_steps(*, hard_pod: bool) -> list[str]:
+    """Step order for Upload POD: digital always first; hard copy second when Hard POD."""
+    if hard_pod:
+        return [POD_CAPTURE_STEP_DIGITAL, POD_CAPTURE_STEP_HARD_COPY]
+    return [POD_CAPTURE_STEP_DIGITAL]
 
 
 def _shipment_has_delivery_note(shipment: Any | None, *, tenant_schema: str) -> bool:
@@ -115,6 +128,7 @@ def build_digital_capture_ui(
     requirements: dict[str, Any],
     *,
     has_hard_copy_step: bool = False,
+    digital_action_code: str = CANONICAL_FALLBACK_DIGITAL_POD_ACTION_CODE,
 ) -> dict[str, Any]:
     """Mobile layout contract for Layer-1 digital evidence (Capturing Action Evidences)."""
     video_max_seconds = int(
@@ -163,21 +177,28 @@ def build_digital_capture_ui(
             },
         ],
         'footer_hint': 'Upload every mandatory signed document page.',
-        'primary_button': _build_digital_primary_button(has_hard_copy_step),
+        'primary_button': _build_digital_primary_button(
+            has_hard_copy_step,
+            digital_action_code=digital_action_code,
+        ),
     }
 
 
-def _build_digital_primary_button(has_hard_copy_step: bool) -> dict[str, Any]:
+def _build_digital_primary_button(
+    has_hard_copy_step: bool,
+    *,
+    digital_action_code: str,
+) -> dict[str, Any]:
     """
     Digital screen ends with Next — not Submit POD.
 
-    Hard POD: Next → execute A7 → open hard-copy confirmation wizard step.
-    Soft / no DN: Next → execute A7 → Upload POD complete.
+    Hard POD: Next → execute tenant POD action → hard-copy wizard step.
+    Soft / no DN: Next → execute tenant POD action → Upload POD complete.
     """
     button: dict[str, Any] = {
         'label': 'Next',
         'action': 'submit_digital_evidence',
-        'execute_action_code': POD_DIGITAL_ACTION_CODE,
+        'execute_action_code': digital_action_code,
     }
     if has_hard_copy_step:
         button['wizard_next_step'] = 'hard_copy_confirmation'
@@ -246,7 +267,11 @@ def build_digital_evidence_block(
     Layer-1 digital capture contract (GPS / photo / signature / video for auto_pod_post).
     """
     schema = (tenant_schema or '').strip()
-    action = resolve_default_pod_action(schema) if schema else None
+    action = resolve_digital_pod_action(schema) if schema else None
+    digital_action_code = action_code_from_action(
+        action,
+        fallback=CANONICAL_FALLBACK_DIGITAL_POD_ACTION_CODE,
+    )
     requirements = build_pod_capture_requirements(
         action,
         pod_capture_type='digital',
@@ -270,8 +295,8 @@ def build_digital_evidence_block(
         'auto_pod_post': bool(requirements.get('auto_pod_post')),
     }
     return {
-        'action_code': POD_DIGITAL_ACTION_CODE,
-        'execute_action_code': POD_DIGITAL_ACTION_CODE,
+        'action_code': digital_action_code,
+        'execute_action_code': digital_action_code,
         'requirements': requirement_payload,
         'media_steps': _build_digital_media_steps(requirement_payload),
         'capture_mode': 'digital_evidence',
@@ -279,6 +304,7 @@ def build_digital_evidence_block(
         'capture_ui': build_digital_capture_ui(
             requirement_payload,
             has_hard_copy_step=has_hard_copy_step,
+            digital_action_code=digital_action_code,
         ),
     }
 
@@ -306,6 +332,20 @@ def _hard_copy_confirmation_actionable(
     return False
 
 
+def _shipment_hard_pod_type(shipment: Any | None) -> bool:
+    if shipment is None:
+        return False
+    pod_type = (getattr(shipment, 'pod_type', None) or '').strip().casefold()
+    if pod_type == TenantShipment.PodType.HARD.casefold():
+        return True
+    booking = getattr(shipment, 'booking', None)
+    if booking is not None:
+        booking_pod = (getattr(booking, 'pod_type', None) or '').strip().casefold()
+        if booking_pod == TenantShipment.PodType.HARD.casefold():
+            return True
+    return False
+
+
 def _shipment_hard_copy_applicable(
     shipment: Any | None,
     *,
@@ -316,8 +356,7 @@ def _shipment_hard_copy_applicable(
     """Upload POD wizard includes hard-copy step (Hard POD + shipment DN pages)."""
     if shipment is None:
         return False
-    pod_type = (getattr(shipment, 'pod_type', None) or '').strip().casefold()
-    if pod_type != TenantShipment.PodType.HARD.casefold():
+    if not _shipment_hard_pod_type(shipment):
         return False
     status = (getattr(shipment, 'shipment_status', None) or '').strip()
     if status in {
@@ -391,6 +430,11 @@ def build_hard_copy_confirmation_block(
         log_evidence=log_evidence,
     )
     shipment_pk = getattr(shipment, 'pk', '')
+    hard_copy_action = resolve_hard_copy_pod_action(schema) if schema else None
+    hard_copy_action_code = action_code_from_action(
+        hard_copy_action,
+        fallback=CANONICAL_FALLBACK_HARD_COPY_POD_ACTION_CODE,
+    )
     block: dict[str, Any] = {
         'applicable': applicable,
         'actionable': actionable,
@@ -398,7 +442,7 @@ def build_hard_copy_confirmation_block(
         'submit_allowed': actionable and hard_pod_pending,
         'pending': hard_pod_pending if applicable else False,
         'documents_source': 'shipment_document' if applicable else '',
-        'action_code': HARD_POD_ACTION_CODE if applicable else '',
+        'action_code': hard_copy_action_code if applicable else '',
         'documents': list(confirmation_context.get('documents') or []),
         'pages': pages,
         'submit_endpoint': '/api/v1/mobile/driver/hard-pod/submit/',
@@ -407,7 +451,7 @@ def build_hard_copy_confirmation_block(
             if applicable
             else ''
         ),
-        'execute_action_code': HARD_POD_ACTION_CODE,
+        'execute_action_code': hard_copy_action_code,
         'ui_mode': UI_MODE_HARD_POD_CONFIRMATION if applicable else '',
         'screen_title': HARD_COPY_SCREEN_TITLE if applicable else '',
     }
@@ -440,9 +484,7 @@ def build_pod_section_metadata(
         log_evidence=log_evidence,
     )
     hard_copy_applicable = bool(hard_copy_block.get('applicable'))
-    steps = ['digital_evidence']
-    if hard_copy_applicable:
-        steps.append('hard_copy_confirmation')
+    steps = build_pod_capture_steps(hard_pod=hard_copy_applicable)
 
     digital_block = build_digital_evidence_block(
         shipment,
@@ -464,6 +506,7 @@ def build_pod_section_metadata(
             shipment,
             hard_copy_block=hard_copy_block,
             has_hard_copy_step=hard_copy_applicable,
+            digital_block=digital_block,
         ),
     }
 
@@ -473,10 +516,19 @@ def _build_upload_pod_workflow_contract(
     *,
     hard_copy_block: dict[str, Any],
     has_hard_copy_step: bool,
+    digital_block: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     """Three-call contract for mobile Upload POD wizard."""
     shipment_pk = getattr(shipment, 'pk', '')
     base = f'/api/v1/mobile/driver/jobs/shipments/{shipment_pk}/pod/capture/'
+    digital_code = (
+        (dict(digital_block or {}).get('execute_action_code') or '').strip()
+        or CANONICAL_FALLBACK_DIGITAL_POD_ACTION_CODE
+    )
+    hard_copy_code = (
+        (hard_copy_block.get('execute_action_code') or '').strip()
+        or CANONICAL_FALLBACK_HARD_COPY_POD_ACTION_CODE
+    )
     steps: list[dict[str, Any]] = [
         {
             'step': 'digital_evidence',
@@ -484,7 +536,7 @@ def _build_upload_pod_workflow_contract(
             'ui_mode': UI_MODE_DIGITAL_EVIDENCE,
             'get_endpoint': base,
             'post_endpoint': base,
-            'execute_action_code': POD_DIGITAL_ACTION_CODE,
+            'execute_action_code': digital_code,
             'primary_button': 'Next',
             'complete_upload_after_execute': not has_hard_copy_step,
         },
@@ -499,7 +551,7 @@ def _build_upload_pod_workflow_contract(
                 'documents_endpoint': hard_copy_block.get('documents_endpoint') or '',
                 'documents_source': 'shipment_document',
                 'submit_endpoint': hard_copy_block.get('submit_endpoint') or '',
-                'execute_action_code': HARD_POD_ACTION_CODE,
+                'execute_action_code': hard_copy_code,
                 'primary_button': 'Submit POD',
                 'complete_upload_after_execute': True,
             },
@@ -531,8 +583,8 @@ def _empty_pod_section() -> dict[str, Any]:
         'hard_pod_pending': False,
         'capture_steps': ['digital_evidence'],
         'digital_evidence': {
-            'action_code': POD_DIGITAL_ACTION_CODE,
-            'execute_action_code': POD_DIGITAL_ACTION_CODE,
+            'action_code': CANONICAL_FALLBACK_DIGITAL_POD_ACTION_CODE,
+            'execute_action_code': CANONICAL_FALLBACK_DIGITAL_POD_ACTION_CODE,
             'requirements': {},
         },
         'hard_copy_confirmation': _empty_hard_copy_block(),

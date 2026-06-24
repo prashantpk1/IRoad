@@ -9,6 +9,8 @@ from uuid import uuid4
 from tenant_workspace.models import TenantShipment
 
 from iroad_tenants.operation_runtime.auto_shipment_line import (
+    booking_line_has_non_cancelled_shipment,
+    format_auto_shipment_birth_error,
     resolve_auto_shipment_target_line,
 )
 
@@ -55,8 +57,11 @@ class AutoShipmentLineResolverTests(TestCase):
             if kw.get('booking_item_type') == 'Backload'
             else None,
         ), patch(
-            'iroad_tenants.views._tenant_shipment_line_has_existing_shipment',
+            'iroad_tenants.operation_runtime.auto_shipment_line.booking_line_has_non_cancelled_shipment',
             side_effect=lambda b, line_type, **kw: line_type == 'Outbound',
+        ), patch(
+            'iroad_tenants.views._tenant_booking_line_operational_status',
+            return_value='Confirmed',
         ):
             line = resolve_auto_shipment_target_line(booking, booking_item_type_hint='')
         self.assertEqual(line['booking_item_type'], 'Backload')
@@ -73,14 +78,49 @@ class AutoShipmentLineResolverTests(TestCase):
             'iroad_tenants.views._tenant_shipment_match_booking_line',
             return_value=backload_line,
         ), patch(
-            'iroad_tenants.views._tenant_shipment_line_has_existing_shipment',
+            'iroad_tenants.operation_runtime.auto_shipment_line.booking_line_has_non_cancelled_shipment',
             return_value=False,
+        ), patch(
+            'iroad_tenants.views._tenant_booking_line_operational_status',
+            return_value='Confirmed',
         ):
             line = resolve_auto_shipment_target_line(
                 booking,
                 booking_item_type_hint='Backload',
             )
         self.assertEqual(line['pod_doc_count'], 2)
+
+    def test_cancelled_outbound_line_skipped_when_hint_outbound(self):
+        booking = SimpleNamespace(booking_id=uuid4(), trip_type='Round')
+        outbound_line = {'booking_item_type': 'Outbound', 'pod_doc_count': 1}
+        backload_line = {'booking_item_type': 'Backload', 'pod_doc_count': 2}
+        with patch(
+            'iroad_tenants.operation_runtime.auto_shipment_line.resolve_preshipment_booking_item_type',
+            return_value='Backload',
+        ), patch(
+            'iroad_tenants.views._tenant_shipment_match_booking_line',
+            side_effect=lambda b, **kw: (
+                backload_line
+                if kw.get('booking_item_type') == 'Backload'
+                else outbound_line
+            ),
+        ), patch(
+            'iroad_tenants.views._tenant_shipment_booking_line_rows',
+            return_value=[outbound_line, backload_line],
+        ), patch(
+            'iroad_tenants.operation_runtime.auto_shipment_line.booking_line_has_non_cancelled_shipment',
+            return_value=False,
+        ), patch(
+            'iroad_tenants.views._tenant_booking_line_operational_status',
+            side_effect=lambda b, line_type, **kw: (
+                'Cancelled' if line_type == 'Outbound' else 'Confirmed'
+            ),
+        ):
+            line = resolve_auto_shipment_target_line(
+                booking,
+                booking_item_type_hint='Outbound',
+            )
+        self.assertEqual(line['booking_item_type'], 'Backload')
 
     def test_outbound_line_blocked_when_closed_shipment_exists(self):
         booking = SimpleNamespace(
@@ -103,8 +143,11 @@ class AutoShipmentLineResolverTests(TestCase):
             'iroad_tenants.views._tenant_shipment_booking_line_rows',
             return_value=[outbound_line, backload_line],
         ), patch(
-            'iroad_tenants.views._tenant_shipment_line_has_existing_shipment',
+            'iroad_tenants.operation_runtime.auto_shipment_line.booking_line_has_non_cancelled_shipment',
             side_effect=lambda b, line_type, **kw: line_type == 'Outbound',
+        ), patch(
+            'iroad_tenants.views._tenant_booking_line_operational_status',
+            return_value='Confirmed',
         ):
             line = resolve_auto_shipment_target_line(booking, booking_item_type_hint='')
         self.assertEqual(line['booking_item_type'], 'Backload')
@@ -120,8 +163,11 @@ class AutoShipmentLineResolverTests(TestCase):
             'iroad_tenants.views._tenant_shipment_match_booking_line',
             return_value=outbound_line,
         ), patch(
-            'iroad_tenants.views._tenant_shipment_line_has_existing_shipment',
+            'iroad_tenants.operation_runtime.auto_shipment_line.booking_line_has_non_cancelled_shipment',
             return_value=False,
+        ), patch(
+            'iroad_tenants.views._tenant_booking_line_operational_status',
+            return_value='Confirmed',
         ):
             line = resolve_auto_shipment_target_line(
                 booking,
@@ -129,3 +175,25 @@ class AutoShipmentLineResolverTests(TestCase):
             )
         self.assertEqual(line['booking_item_type'], 'Outbound')
         self.assertEqual(line['pod_doc_count'], 1)
+
+    def test_format_error_when_backload_shipment_already_exists(self):
+        booking = SimpleNamespace(
+            booking_id=uuid4(),
+            trip_type='Round',
+        )
+        with patch(
+            'iroad_tenants.operation_runtime.auto_shipment_line.booking_line_has_non_cancelled_shipment',
+            return_value=True,
+        ), patch(
+            'iroad_tenants.views._tenant_booking_line_operational_status',
+            return_value='Confirmed',
+        ), patch(
+            'iroad_tenants.views._tenant_shipment_booking_line_rows',
+            return_value=[{'booking_item_type': 'Backload'}],
+        ), patch(
+            'iroad_tenants.operation_runtime.auto_shipment_line.resolve_preshipment_booking_item_type',
+            return_value='Backload',
+        ):
+            message = format_auto_shipment_birth_error(booking, 'Backload')
+        self.assertIn('already exists', message)
+        self.assertIn('job_type=shipment', message)

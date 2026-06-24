@@ -28,6 +28,8 @@ from mobile_api.job_detail.services.job_detail_pod_cod_reconciler import (
     reconcile_job_detail_pod_cod,
 )
 
+from tenant_workspace.models import TenantShipment
+
 from iroad_tenants.operation_runtime.workflow_state_reconciler import (
     reconcile_movement_execution_state,
     reconcile_shipment_execution_state,
@@ -156,6 +158,13 @@ def apply_reconciled_status_overlays(
 
         if context.job_type == 'shipment' and context.shipment is not None:
             s = context.shipment
+            if auth == TenantShipment.ShipmentStatus.DELIVERED:
+                from iroad_tenants.operation_runtime.latest_state import (
+                    repair_delivered_before_hard_pod_custody,
+                )
+
+                if repair_delivered_before_hard_pod_custody(s):
+                    auth = (getattr(s, 'shipment_status', None) or '').strip() or auth
             snapshots.append((s, 'shipment_status', getattr(s, 'shipment_status', None)))
             setattr(s, 'shipment_status', auth)
         elif context.job_type == 'movement' and context.movement is not None:

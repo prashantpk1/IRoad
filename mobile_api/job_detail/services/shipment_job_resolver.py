@@ -98,14 +98,24 @@ def resolve_shipment_job(
             )
 
         if not shipment_is_driver_accessible(shipment):
-            return JobResolveContext(
-                job_type='shipment',
-                entity=shipment_entity_summary(shipment),
-                workflow_source=WORKFLOW_SOURCE_ENTITY_RESOLVER,
-                ownership_validated=False,
-                error_code='job_inactive',
-                error_message=str(_('mobile.jobs.inactive')),
+            booking = getattr(shipment, 'booking', None)
+            from mobile_api.helpers.backload_booking_redirect import (
+                should_pivot_shipment_to_backload_booking,
             )
+
+            if not should_pivot_shipment_to_backload_booking(
+                driver=driver,
+                booking=booking,
+                shipment=shipment,
+            ):
+                return JobResolveContext(
+                    job_type='shipment',
+                    entity=shipment_entity_summary(shipment),
+                    workflow_source=WORKFLOW_SOURCE_ENTITY_RESOLVER,
+                    ownership_validated=False,
+                    error_code='job_inactive',
+                    error_message=str(_('mobile.jobs.inactive')),
+                )
 
         booking = getattr(shipment, 'booking', None)
         if not driver_owns_shipment_leg(driver, booking, shipment):

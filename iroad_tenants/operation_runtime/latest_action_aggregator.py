@@ -13,8 +13,6 @@ from iroad_tenants.operation_runtime.impacts import (
     resolve_movement_status_impact,
     resolve_shipment_status_impact,
 )
-from django.db.models import Q
-
 from tenant_workspace.models import TenantOperationActionLog, TenantTruckMovementLog
 
 # Align with operation_execution forward rank.
@@ -58,7 +56,28 @@ def scoped_shipment_action_logs(
     booking_id = getattr(shipment, 'booking_id', None)
     scope = Q(shipment_id=shipment.pk) | Q(truck_movement__shipment_id=shipment.pk)
     if booking_id:
-        scope |= Q(booking_id=booking_id, shipment__isnull=True)
+        from tenant_workspace.models import TenantBooking
+
+        from iroad_tenants.operation_runtime.booking_preshipment_cycle import (
+            booking_preshipment_logs_queryset,
+        )
+
+        booking = getattr(shipment, 'booking', None)
+        if booking is None:
+            booking = TenantBooking.objects.filter(pk=booking_id).first()
+        if booking is not None:
+            line = (getattr(shipment, 'booking_item_type', None) or '').strip()
+            cycle_log_ids = booking_preshipment_logs_queryset(
+                booking,
+                booking_item_type=line,
+            ).values_list('log_id', flat=True)
+            scope |= Q(
+                booking_id=booking_id,
+                shipment__isnull=True,
+                log_id__in=cycle_log_ids,
+            )
+        else:
+            scope |= Q(booking_id=booking_id, shipment__isnull=True)
     qs = (
         TenantOperationActionLog.objects.filter(scope)
         .exclude(operation_action__isnull=True)
@@ -149,6 +168,17 @@ def _impact_from_log(log_row, *, kind: str) -> str | None:
         return resolve_movement_status_impact(
             (action.movement_status_impact or '').strip(),
         )
+    from iroad_tenants.operation_runtime.latest_state import (
+        resolve_effective_shipment_status_for_action,
+    )
+
+    shipment = getattr(log_row, 'shipment', None)
+    effective = resolve_effective_shipment_status_for_action(
+        action=action,
+        shipment=shipment,
+    )
+    if effective:
+        return effective
     return resolve_shipment_status_impact(
         (action.shipment_status_impact or '').strip(),
     )

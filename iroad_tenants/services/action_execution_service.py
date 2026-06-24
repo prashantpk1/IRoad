@@ -234,6 +234,8 @@ class ActionExecutionService:
         skip_recent_duplicate_guard: bool = False,
         sync_shipment_after: bool = True,
         mobile_cod_amount=None,
+        hard_pod_custody_submission_id: str = '',
+        hard_pod_client_submission_id: str = '',
     ) -> ActionExecutionResult:
         """
         Mobile-safe action execution: validate → persist log → side effects → optional sync.
@@ -333,6 +335,10 @@ class ActionExecutionService:
             action_log._birth_booking_item_type = birth_booking_item_type.strip()
         if mobile_cod_amount is not None:
             action_log._mobile_cod_amount = mobile_cod_amount
+        if hard_pod_custody_submission_id:
+            action_log._hard_pod_custody_submission_id = hard_pod_custody_submission_id.strip()
+        if hard_pod_client_submission_id:
+            action_log._hard_pod_client_submission_id = hard_pod_client_submission_id.strip()
 
         try:
             with transaction.atomic():

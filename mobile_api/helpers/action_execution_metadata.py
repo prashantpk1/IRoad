@@ -12,6 +12,10 @@ from typing import Any
 
 from iroad_tenants.operation_execution import action_matches
 from mobile_api.helpers.i18n import get_localized_value
+from mobile_api.helpers.job_action_resolver import (
+    action_is_collect_payment,
+    action_is_job_close,
+)
 
 
 def _is_hard_copy_action(action) -> bool:
@@ -149,9 +153,7 @@ def _is_direct_execute_action(action) -> bool:
 
 
 def _is_job_closed_action(action) -> bool:
-    if action is None:
-        return False
-    return (getattr(action, 'action_code', '') or '').strip().upper() == 'A10'
+    return action_is_job_close(action)
 
 
 def _job_closed_execution_requirements(action) -> dict[str, Any]:
@@ -295,7 +297,7 @@ def project_allowed_action_row(
     Mobile allowed-action DTO for one ``TenantOperationAction`` row.
     """
     name = _localized_action_name(action, request)
-    if getattr(action, 'auto_pod_post', False) and not _is_hard_copy_action(action):
+    if getattr(action, 'auto_pod_post', False):
         from mobile_api.execution.evidence.constants import (
             POD_CAPTURE_VIDEO_MAX_DURATION_SECONDS,
         )
@@ -319,7 +321,20 @@ def project_allowed_action_row(
             requirements.get('video_max_duration_seconds')
             or POD_CAPTURE_VIDEO_MAX_DURATION_SECONDS
         )
-        requirements['capture_ui'] = build_digital_capture_ui(requirements)
+        has_hard_copy_step = bool(getattr(action, 'hard_copy_collection', False))
+        from mobile_api.pod_capture.services.pod_capture_action_resolver import (
+            digital_action_code_from_action,
+        )
+
+        digital_code = digital_action_code_from_action(
+            action,
+            tenant_schema=tenant_schema,
+        )
+        requirements['capture_ui'] = build_digital_capture_ui(
+            requirements,
+            has_hard_copy_step=has_hard_copy_step,
+            digital_action_code=digital_code,
+        )
     else:
         requirements = build_execution_requirements(action, shipment=shipment)
     row = {
@@ -337,13 +352,25 @@ def project_allowed_action_row(
         'current_stage': current_stage,
         'execution_requirements': requirements,
     }
-    if getattr(action, 'auto_pod_post', False) and not _is_hard_copy_action(action):
+    if getattr(action, 'auto_pod_post', False):
         row['screen'] = 'pod_capture'
         row['action'] = 'go_to_pod_capture'
         row['capture_mode'] = requirements.get('capture_mode') or 'digital_evidence'
         row['screen_title'] = requirements.get('screen_title') or 'Capturing Action Evidences'
         if requirements.get('capture_ui'):
             row['capture_ui'] = requirements['capture_ui']
+
+    if getattr(action, 'auto_pod_post', False):
+        from mobile_api.helpers.action_navigation_metadata import (
+            apply_pod_upload_navigation,
+        )
+
+        return apply_pod_upload_navigation(
+            row,
+            action,
+            shipment=shipment,
+            tenant_schema=tenant_schema,
+        )
 
     if _is_hard_copy_action(action):
         from mobile_api.helpers.action_navigation_metadata import (
@@ -355,6 +382,28 @@ def project_allowed_action_row(
             action,
             shipment=shipment,
             tenant_schema=tenant_schema,
+        )
+
+    if action_is_collect_payment(action):
+        from mobile_api.helpers.action_navigation_metadata import (
+            apply_collect_payment_navigation_to_action_row,
+        )
+
+        return apply_collect_payment_navigation_to_action_row(
+            row,
+            action=action,
+            shipment=shipment,
+            tenant_schema=tenant_schema,
+        )
+
+    if action_is_job_close(action):
+        from mobile_api.helpers.action_navigation_metadata import (
+            apply_job_close_navigation_to_action_row,
+        )
+
+        return apply_job_close_navigation_to_action_row(
+            row,
+            action=action,
         )
 
     if _is_direct_execute_action(action):

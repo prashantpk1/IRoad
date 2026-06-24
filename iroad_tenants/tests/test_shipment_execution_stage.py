@@ -16,9 +16,12 @@ from iroad_tenants.operation_runtime.shipment_execution_stage import (
     STAGE_PICKUP,
     STAGE_PRE_TRANSIT,
     derive_shipment_execution_stage,
-    is_pickup_action,
+    is_delivery_arrival_action,
     is_loading_action,
+    is_pickup_action,
+    is_unloading_action,
     shipment_allows_pickup_loading_action,
+    shipment_allows_unloading_action,
 )
 from tenant_workspace.models import TenantOperationAction, TenantShipment
 
@@ -206,6 +209,10 @@ class BookingOnlyRegressionTests(SimpleTestCase):
         self.assertFalse(_action_is_allowed(action, booking=booking))
 
     @patch(
+        'iroad_tenants.operation_execution._booking_has_born_shipment_line',
+        return_value=False,
+    )
+    @patch(
         'iroad_tenants.operation_execution._booking_has_active_shipment',
         return_value=False,
     )
@@ -225,12 +232,51 @@ class BookingOnlyRegressionTests(SimpleTestCase):
         'iroad_tenants.operation_execution._executed_action_ids',
         return_value=set(),
     )
-    def test_auto_shipment_a4_allowed_after_a1_a2_a3(self, _ids, _a1, _a2, _a3, _active):
+    def test_auto_shipment_a4_allowed_after_a1_a2_a3(self, _ids, _a1, _a2, _a3, _active, _born):
         booking = MagicMock()
         booking.booking_id = uuid4()
         booking.booking_status = 'Confirmed'
         action = _action('A4', 'Confirm Loaded', auto_shipment_post=True)
         self.assertTrue(_action_is_allowed(action, booking=booking))
+
+    @patch(
+        'iroad_tenants.operation_execution._booking_has_born_shipment_line',
+        return_value=True,
+    )
+    @patch(
+        'iroad_tenants.operation_execution._booking_has_active_shipment',
+        return_value=False,
+    )
+    @patch(
+        'iroad_tenants.operation_execution._booking_loading_done',
+        return_value=True,
+    )
+    @patch(
+        'iroad_tenants.operation_execution._booking_pickup_done',
+        return_value=True,
+    )
+    @patch(
+        'iroad_tenants.operation_execution._booking_start_job_done',
+        return_value=True,
+    )
+    @patch(
+        'iroad_tenants.operation_execution._executed_action_ids',
+        return_value=set(),
+    )
+    def test_auto_shipment_a4_blocked_when_outbound_row_already_born(
+        self,
+        _ids,
+        _a1,
+        _a2,
+        _a3,
+        _active,
+        _born,
+    ):
+        booking = MagicMock()
+        booking.booking_id = uuid4()
+        booking.booking_status = 'Confirmed'
+        action = _action('A4', 'Confirm Loaded', auto_shipment_post=True)
+        self.assertFalse(_action_is_allowed(action, booking=booking))
 
     @patch(
         'iroad_tenants.operation_execution._booking_has_active_shipment',
@@ -327,4 +373,86 @@ class BookingOnlyRegressionTests(SimpleTestCase):
             shipment_status_impact=TenantShipment.ShipmentStatus.LOADED,
         )
         shipment = _shipment()
+        self.assertFalse(_action_is_allowed(action, shipment=shipment))
+
+
+class UnloadingPolicyTests(SimpleTestCase):
+    def test_unloading_action_match_helpers(self):
+        self.assertTrue(is_unloading_action(_action('OA-0007', 'Start Unloading')))
+        self.assertTrue(
+            is_delivery_arrival_action(
+                _action(
+                    'OA-0006',
+                    'Delivery Arrival',
+                    shipment_status_impact=TenantShipment.ShipmentStatus.AT_DELIVERY,
+                ),
+            ),
+        )
+        self.assertFalse(
+            is_delivery_arrival_action(_action('OA-0007', 'Start Unloading')),
+        )
+
+    @patch(
+        'iroad_tenants.operation_runtime.shipment_execution_stage._shipment_delivery_milestones_done',
+        return_value=(True, False),
+    )
+    def test_unloading_allowed_after_delivery_arrival(self, _mock):
+        action = _action('OA-0007', 'Start Unloading')
+        shipment = _shipment(status=TenantShipment.ShipmentStatus.AT_DELIVERY)
+        self.assertTrue(shipment_allows_unloading_action(action, shipment))
+
+    @patch(
+        'iroad_tenants.operation_runtime.shipment_execution_stage._shipment_delivery_milestones_done',
+        return_value=(False, False),
+    )
+    def test_unloading_blocked_until_delivery_arrival(self, _mock):
+        action = _action('OA-0007', 'Start Unloading')
+        shipment = _shipment(status=TenantShipment.ShipmentStatus.AT_DELIVERY)
+        self.assertFalse(shipment_allows_unloading_action(action, shipment))
+
+    @patch(
+        'iroad_tenants.operation_execution._combined_pod_allows_hard_copy_retry',
+        return_value=False,
+    )
+    @patch(
+        'iroad_tenants.operation_execution._combined_pod_allows_digital_recovery',
+        return_value=False,
+    )
+    @patch(
+        'iroad_tenants.operation_execution._hard_pod_blocks_forward_action',
+        return_value=False,
+    )
+    @patch(
+        'iroad_tenants.operation_execution._executed_action_ids',
+        return_value=set(),
+    )
+    @patch(
+        'iroad_tenants.operation_execution._shipment_has_active_movement',
+        return_value=True,
+    )
+    @patch(
+        'iroad_tenants.operation_execution.shipment_unloading_done',
+        return_value=False,
+    )
+    @patch(
+        'iroad_tenants.operation_runtime.shipment_execution_stage._shipment_delivery_milestones_done',
+        return_value=(True, False),
+    )
+    def test_pod_blocked_at_delivery_until_unloading_logged(
+        self,
+        _milestones,
+        _unload_done,
+        _movement,
+        _ids,
+        _hard_pod,
+        _digital,
+        _retry,
+    ):
+        action = _action(
+            'OA-0008',
+            'POD',
+            auto_pod_post=True,
+            shipment_status_impact=TenantShipment.ShipmentStatus.POD_SUBMITTED,
+        )
+        shipment = _shipment(status=TenantShipment.ShipmentStatus.AT_DELIVERY)
         self.assertFalse(_action_is_allowed(action, shipment=shipment))
