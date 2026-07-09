@@ -410,7 +410,7 @@ def _issue_admin_login_otp(request, user):
         'AUTH_LOGIN_OTP',
         recipient_email=user.email,
         context_dict=ctx,
-        default_subject='Your iRoad Login Verification Code',
+        default_subject='Your IRoute Login Verification Code',
         trigger_source='TemplateName: AUTH_LOGIN_OTP',
         force_django_smtp=False,
     )
@@ -429,7 +429,7 @@ def _issue_admin_login_otp(request, user):
     # Fallback when EventMapping/template is not configured.
     send_transactional_email(
         user.email,
-        'Your iRoad OTP verification code',
+        'Your IRoute OTP verification code',
         f'Your verification code is {otp_code}. It expires in 5 minutes.',
         (
             f'<p>Your verification code is <strong>{otp_code}</strong>.</p>'
@@ -468,7 +468,7 @@ def _issue_tenant_login_otp(request, tenant, *, recipient_email=None, recipient_
         'AUTH_LOGIN_OTP',
         recipient_email=target_email,
         context_dict=ctx,
-        default_subject='Your iRoad Login Verification Code',
+        default_subject='Your IRoute Login Verification Code',
         trigger_source='TemplateName: AUTH_LOGIN_OTP',
         force_django_smtp=False,
     )
@@ -486,7 +486,7 @@ def _issue_tenant_login_otp(request, tenant, *, recipient_email=None, recipient_
 
     send_transactional_email(
         target_email,
-        'Your iRoad OTP verification code',
+        'Your IRoute OTP verification code',
         f'Your verification code is {otp_code}. It expires in 5 minutes.',
         (
             f'<p>Your verification code is <strong>{otp_code}</strong>.</p>'
@@ -896,9 +896,9 @@ class OTPVerificationView(View):
         return {
             'otp_page_title': 'Tenant OTP Verification' if is_tenant else 'OTP Verification',
             'otp_meta_description': (
-                'iRoad Tenant Portal - OTP Verification'
+                'IRoute Tenant Portal - OTP Verification'
                 if is_tenant
-                else 'iRoad Admin Dashboard - OTP Verification'
+                else 'IRoute Admin Dashboard - OTP Verification'
             ),
             'otp_portal_label': 'Tenant Portal' if is_tenant else 'Admin Portal',
         }
@@ -1450,7 +1450,7 @@ class ForgotPasswordView(View):
                                 recipient_email=tenant_user_record.email,
                                 context_dict=context_dict,
                                 language='en',
-                                default_subject='Reset Your iRoad Password',
+                                default_subject='Reset Your IRoute Password',
                                 trigger_source='TemplateName: TENANT_USER_PASSWORD_RESET',
                                 force_django_smtp=True,
                             )
@@ -1486,7 +1486,7 @@ class ForgotPasswordView(View):
                             'reset_url': reset_url,
                         },
                         language='en',
-                        default_subject='Reset Your iRoad Password',
+                        default_subject='Reset Your IRoute Password',
                         trigger_source='TemplateName: TENANT_PASSWORD_RESET',
                         force_django_smtp=True,
                     )
@@ -4359,8 +4359,8 @@ class LegalIdentityView(LoginRequiredMixin, View):
             identity_id='GLOBAL-LEGAL-IDENTITY',
             defaults={
                 'company_logo': None,
-                'company_name_en': 'IRoad',
-                'company_name_ar': 'IRoad',
+                'company_name_en': 'IRoute',
+                'company_name_ar': 'IRoute',
                 'company_country_code': None,
                 'commercial_register': 'N/A',
                 'tax_number': 'N/A',
@@ -4381,8 +4381,8 @@ class LegalIdentityView(LoginRequiredMixin, View):
             identity_id='GLOBAL-LEGAL-IDENTITY',
             defaults={
                 'company_logo': None,
-                'company_name_en': 'IRoad',
-                'company_name_ar': 'IRoad',
+                'company_name_en': 'IRoute',
+                'company_name_ar': 'IRoute',
                 'company_country_code': None,
                 'commercial_register': 'N/A',
                 'tax_number': 'N/A',
@@ -4419,7 +4419,7 @@ class LegalIdentityView(LoginRequiredMixin, View):
             'updated_by',
             'updated_at',
         ])
-        messages.success(request, 'IRoad legal identity saved successfully.')
+        messages.success(request, 'IRoute legal identity saved successfully.')
         return redirect(reverse('legal_identity'))
 
 
@@ -6889,7 +6889,7 @@ class CommGatewayTestConnectionView(LoginRequiredMixin, View):
                             server.starttls()
                             server.ehlo()
                     server.login(user, password)
-                    test_subject = 'iRoad Gateway Test Message'
+                    test_subject = 'IRoute Gateway Test Message'
                     test_context = {
                         'provider_name': (request.POST.get('provider_name') or '').strip() or 'N/A',
                         'host': host_clean,
@@ -6947,7 +6947,7 @@ class CommGatewayTestConnectionView(LoginRequiredMixin, View):
                     password_secret=password,
                     sender_id=(sender or '').strip(),
                 )
-                test_message = 'iRoad SMS gateway test: configuration validated.'
+                test_message = 'IRoute SMS gateway test: configuration validated.'
                 try:
                     send_sms_http_gateway(
                         test_gateway,
@@ -7158,7 +7158,7 @@ def get_mock_preview_context():
         'api_bridge_key': 'br_live_51P2kL9H2j8mN4v6xYzQ1w2e3r4t5y6u',
         'reset_url': 'http://127.0.0.1:8000/new-password/mock-token/',
         'invite_url': 'http://127.0.0.1:8000/set-password/mock-token/',
-        'portal_login_url': 'http://subdomain.iroad.com/login/',
+        'portal_login_url': 'http://subdomain.iroute.com/login/',
         'name': 'Sarah Smith',
         'email': 'sarah@example.com',
         'password': 'TemporaryPassword123!',
@@ -7238,7 +7238,7 @@ class NotificationTemplatePreviewView(LoginRequiredMixin, View):
             elif 'email-wrapper' not in (body_html or ''):
                 wrapped_content = _wrap_email_body(
                     inner_html=body_html or '<p>No content provided.</p>',
-                    email_title=subject or 'iRoad Logistics',
+                    email_title=subject or 'IRoute Logistics',
                     use_rtl=(lang == 'ar'),
                 )
             else:

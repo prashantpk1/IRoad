@@ -663,7 +663,15 @@ function initShipmentDocumentLines() {
     return Array.from(tbody.querySelectorAll("tr[data-sd-line]"));
   }
 
-  function updateSN() {
+  function syncDocRefsToLines() {
+    const docRefNo = getHeaderDocRefNo();
+    tbody.querySelectorAll('[data-field="docRefNo"]').forEach((field) => {
+      field.value = docRefNo;
+      field.placeholder = docRefNo ? "" : "Same as header Document Ref No";
+    });
+  }
+
+  function renumberRowsOnly() {
     getRows().forEach((tr, idx) => {
       const snEl = tr.querySelector("[data-sn]");
       if (snEl) snEl.textContent = String(idx + 1);
@@ -678,7 +686,11 @@ function initShipmentDocumentLines() {
     if (pageCountInput) {
       pageCountInput.value = String(Math.max(getRows().length, 1));
     }
-    syncDerivedFields();
+  }
+
+  function updateSN() {
+    renumberRowsOnly();
+    syncDocRefsToLines();
   }
 
   function getHeaderDocRefNo() {
@@ -686,7 +698,118 @@ function initShipmentDocumentLines() {
   }
 
   function isDeliveryNoteEnabled() {
-    return !!(isDeliveryNoteInput && isDeliveryNoteInput.checked);
+    if (isDeliveryNoteInput && !isDeliveryNoteInput.disabled) {
+      return isDeliveryNoteInput.checked;
+    }
+    if (isDeliveryNoteInput && isDeliveryNoteInput.checked) return true;
+    if (documentTypeInput) {
+      const docType = String(documentTypeInput.value || "").trim();
+      if (docType === "Delivery Note") return true;
+    }
+    return false;
+  }
+
+  function syncDocumentTypeWithDeliveryNoteFlag() {
+    if (!documentTypeInput || !isDeliveryNoteInput || isDeliveryNoteInput.disabled) return;
+    const docType = String(documentTypeInput.value || "").trim();
+    if (docType === "Delivery Note") {
+      isDeliveryNoteInput.checked = true;
+    } else if (docType && isDeliveryNoteInput.checked) {
+      isDeliveryNoteInput.checked = false;
+    }
+  }
+
+  function shouldAutoPopulateLinesFromPodCount() {
+    if (!shipmentSelect || !shipmentSelect.value) return false;
+    if (isDeliveryNoteEnabled()) return true;
+    if (!isCreateDeliveryNoteForm) return false;
+    const opt =
+      shipmentSelect.selectedIndex >= 0
+        ? shipmentSelect.options[shipmentSelect.selectedIndex]
+        : null;
+    const raw = opt ? parseInt(opt.getAttribute("data-pod-doc-count") || "0", 10) : 0;
+    return Number.isFinite(raw) && raw > 0;
+  }
+
+  function selectedShipmentPodType() {
+    const shipmentSelectEl = document.getElementById("shipmentRef");
+    if (!shipmentSelectEl || shipmentSelectEl.selectedIndex < 0) return "";
+    const opt = shipmentSelectEl.options[shipmentSelectEl.selectedIndex];
+    return opt ? String(opt.getAttribute("data-pod-type") || "").trim() : "";
+  }
+
+  function isDigitalPodShipment() {
+    const podType = selectedShipmentPodType().toLowerCase();
+    return podType === "digital" || podType === "digital evidence";
+  }
+
+  const SD_NON_DN_SINGLE_LINE_MSG =
+    "When Delivery Note is off, only one subform line can be added.";
+
+  function maxSubformRows() {
+    if (isDeliveryNoteEnabled()) {
+      const shipmentSelectEl = document.getElementById("shipmentRef");
+      const opt =
+        shipmentSelectEl && shipmentSelectEl.selectedIndex >= 0
+          ? shipmentSelectEl.options[shipmentSelectEl.selectedIndex]
+          : null;
+      const raw = opt ? parseInt(opt.getAttribute("data-pod-doc-count") || "0", 10) : 0;
+      if (Number.isFinite(raw) && raw > 1) return Math.min(raw, MAX_SD_PAGE_ROWS);
+      return MAX_SD_PAGE_ROWS;
+    }
+    return 1;
+  }
+
+  function subformRowLimitMessage() {
+    if (!isDeliveryNoteEnabled()) return SD_NON_DN_SINGLE_LINE_MSG;
+    return "Maximum subform pages reached for this document type.";
+  }
+
+  function getSdAddLineLimitErrorEl() {
+    return document.getElementById("sdAddLineLimitError");
+  }
+
+  function showSdAddLineLimitError(message) {
+    const errorEl = getSdAddLineLimitErrorEl();
+    if (!errorEl) return;
+    errorEl.textContent = message || subformRowLimitMessage();
+    errorEl.classList.remove("d-none");
+    errorEl.classList.add("d-block");
+    if (addBtn) addBtn.classList.add("btn-outline-danger");
+  }
+
+  function clearSdAddLineLimitError() {
+    const errorEl = getSdAddLineLimitErrorEl();
+    if (errorEl) {
+      errorEl.textContent = "";
+      errorEl.classList.add("d-none");
+      errorEl.classList.remove("d-block");
+    }
+    if (addBtn) addBtn.classList.remove("btn-outline-danger");
+  }
+
+  function enforceSubformRowLimit() {
+    const maxRows = maxSubformRows();
+    const rows = getRows();
+    while (rows.length > maxRows) {
+      rows[rows.length - 1].remove();
+    }
+    if (getRows().length < maxRows) {
+      clearSdAddLineLimitError();
+    }
+    if (addBtn) {
+      addBtn.title = getRows().length >= maxRows ? subformRowLimitMessage() : "";
+    }
+    renumberRowsOnly();
+  }
+
+  function syncSubformRowLimitFromRules() {
+    if (!isDeliveryNoteEnabled() && getRows().length === 0) {
+      createLineRow();
+      return;
+    }
+    enforceSubformRowLimit();
+    syncDocRefsToLines();
   }
 
   function syncToggleLabel() {
@@ -697,11 +820,9 @@ function initShipmentDocumentLines() {
   }
 
   function syncDerivedFields() {
-    const docRefNo = getHeaderDocRefNo();
+    syncDocumentTypeWithDeliveryNoteFlag();
     const deliveryNoteEnabled = isDeliveryNoteEnabled();
-    tbody.querySelectorAll('[data-field="docRefNo"]').forEach((field) => {
-      field.value = docRefNo;
-    });
+    syncDocRefsToLines();
     tbody.querySelectorAll("[data-status-cell]").forEach((cell) => {
       cell.hidden = !deliveryNoteEnabled;
     });
@@ -716,12 +837,26 @@ function initShipmentDocumentLines() {
     syncToggleLabel();
   }
 
+  function syncHeaderToSubformLines() {
+    syncDerivedFields();
+    syncSubformRowLimitFromRules();
+    const headerLoc = getHeaderPhysicalLocation();
+    if (headerLoc) {
+      syncLinePhysicalLocations(headerLoc);
+    }
+  }
+
+  window.syncShipmentDocumentDeliveryNoteUi = syncDerivedFields;
+  window.syncShipmentDocumentHeaderToLines = syncHeaderToSubformLines;
+  window.__sdSyncDocRefToLines = syncDocRefsToLines;
+
   function attachRowEvents(tr) {
     const delBtn = tr.querySelector('[data-action="delete"]');
     if (delBtn) {
       delBtn.addEventListener("click", function () {
         tr.remove();
         updateSN();
+        syncSubformRowLimitFromRules();
       });
     }
     const pageNoInput = tr.querySelector('[data-field="pageNo"]');
@@ -788,7 +923,7 @@ function initShipmentDocumentLines() {
     tr.innerHTML = `
       <td data-label="SN"><span data-sn></span></td>
       <td data-label="Doc Ref No">
-        <input type="text" class="form-control form-control-sm" name="line_doc_ref_no[]" data-field="docRefNo" placeholder="Auto from header" readonly />
+        <input type="text" class="form-control form-control-sm" name="line_doc_ref_no[]" data-field="docRefNo" placeholder="Same as header Document Ref No" readonly />
       </td>
       <td data-label="Extra Ref">
         <input type="text" class="form-control form-control-sm" name="line_extra_ref[]" data-field="extraRef" placeholder="Extra Ref..." />
@@ -852,8 +987,8 @@ function initShipmentDocumentLines() {
       }
     }
     const attachmentInput = tr.querySelector('[data-field="attachment"]');
-    if (attachmentInput && !data.attachment_label) {
-      attachmentInput.required = true;
+    if (attachmentInput) {
+      attachmentInput.required = false;
     }
     applyRowFieldErrors(tr, data._field_errors || data.field_errors || null);
     attachRowEvents(tr);
@@ -861,6 +996,11 @@ function initShipmentDocumentLines() {
   }
 
   addBtn.addEventListener("click", function () {
+    if (getRows().length >= maxSubformRows()) {
+      showSdAddLineLimitError(subformRowLimitMessage());
+      return;
+    }
+    clearSdAddLineLimitError();
     createLineRow();
   });
 
@@ -877,7 +1017,9 @@ function initShipmentDocumentLines() {
   const shipmentSelect = document.getElementById("shipmentRef");
   const formEl = document.getElementById("shipmentDocumentForm");
   const isEditForm = formEl && formEl.getAttribute("data-sd-is-edit") === "true";
-  const hasServerInitialLines = initialLines.length > 0;
+  const isCreateDeliveryNoteForm =
+    formEl && formEl.getAttribute("data-sd-create-delivery-note") === "true";
+  const hasServerInitialLines = isEditForm && initialLines.length > 0;
 
   function expectedPageCountFromShipmentOption(opt) {
     if (!opt || !opt.value) return 1;
@@ -899,11 +1041,13 @@ function initShipmentDocumentLines() {
     for (let i = 0; i < target; i += 1) {
       createLineRow();
     }
+    syncDerivedFields();
     syncLinePhysicalLocations();
   }
 
   function syncPageCountFromShipment() {
     if (pageCountSyncLock || isEditForm || hasServerInitialLines || !shipmentSelect) return;
+    if (!shouldAutoPopulateLinesFromPodCount()) return;
     const opt = shipmentSelect.options[shipmentSelect.selectedIndex];
     if (!opt || !opt.value) return;
     pageCountSyncLock = true;
@@ -927,33 +1071,58 @@ function initShipmentDocumentLines() {
   }
 
   if (docRefInput) {
-    docRefInput.addEventListener("input", syncDerivedFields);
+    ["input", "change", "keyup", "paste"].forEach(function (eventName) {
+      docRefInput.addEventListener(eventName, syncHeaderToSubformLines);
+    });
   }
 
   if (isDeliveryNoteInput) {
-    isDeliveryNoteInput.addEventListener("change", syncDerivedFields);
+    isDeliveryNoteInput.addEventListener("change", function () {
+      if (isDeliveryNoteInput.checked && documentTypeInput) {
+        documentTypeInput.value = "Delivery Note";
+      } else if (
+        !isDeliveryNoteInput.checked &&
+        documentTypeInput &&
+        documentTypeInput.value === "Delivery Note"
+      ) {
+        documentTypeInput.value = "";
+      }
+      syncDerivedFields();
+      syncSubformRowLimitFromRules();
+      if (shouldAutoPopulateLinesFromPodCount() && shipmentSelect && shipmentSelect.value) {
+        syncPageCountFromShipment();
+      }
+    });
   }
 
   if (physicalLocationSelect) {
-    physicalLocationSelect.addEventListener("change", function () {
-      syncLinePhysicalLocations();
-    });
+    physicalLocationSelect.addEventListener("change", syncHeaderToSubformLines);
   }
 
   if (documentTypeInput && isDeliveryNoteInput) {
-    if (documentTypeInput.value === "Delivery Note") {
-      isDeliveryNoteInput.checked = true;
-    }
     documentTypeInput.addEventListener("change", function () {
-      if (documentTypeInput.value === "Delivery Note") {
-        isDeliveryNoteInput.checked = true;
-      }
       syncDerivedFields();
+      syncSubformRowLimitFromRules();
+      if (shouldAutoPopulateLinesFromPodCount() && shipmentSelect && shipmentSelect.value) {
+        syncPageCountFromShipment();
+      } else if (
+        !shouldAutoPopulateLinesFromPodCount() &&
+        getRows().length === 0
+      ) {
+        createLineRow();
+      }
     });
   }
 
-  syncDerivedFields();
-  syncLinePhysicalLocations();
+  syncDocumentTypeWithDeliveryNoteFlag();
+  if (isCreateDeliveryNoteForm && documentTypeInput && !documentTypeInput.value) {
+    documentTypeInput.value = "Delivery Note";
+  }
+  if (isCreateDeliveryNoteForm && isDeliveryNoteInput && !isDeliveryNoteInput.disabled) {
+    isDeliveryNoteInput.checked = true;
+  }
+  syncHeaderToSubformLines();
+  window.syncShipmentDocumentSubformLimits = syncSubformRowLimitFromRules;
 }
 
 /* ============================================

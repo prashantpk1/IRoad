@@ -17,6 +17,7 @@ from mobile_api.job_detail.guards.ownership import (
     driver_owns_shipment_leg,
     shipment_is_driver_accessible,
 )
+from mobile_api.helpers.backload_booking_redirect import coerce_driver_active_shipment_leg
 from tenant_workspace.models import TenantShipment
 
 
@@ -96,6 +97,8 @@ class HardPodSecurityGuard:
                     http_status=403,
                     message_key='mobile.auth.forbidden',
                 )
+            shipment = coerce_driver_active_shipment_leg(driver, shipment) or shipment
+            booking = getattr(shipment, 'booking', None) or booking
             pod_type = (getattr(shipment, 'pod_type', None) or '').strip()
             if pod_type != TenantShipment.PodType.HARD:
                 raise HardPodError(

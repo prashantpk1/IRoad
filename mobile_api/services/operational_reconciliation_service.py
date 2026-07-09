@@ -143,8 +143,8 @@ class OperationalReconciliationService:
         """
         Hard-copy custody warnings belong on the POD step — not pickup/in transit.
 
-        ``reconciled=False`` is normal before A7; only warn when hard POD is
-        actually outstanding during delivery/POD stages.
+        ``reconciled=False`` is normal before digital POD; only warn when hard-copy
+        custody is actually outstanding (after digital POD at delivery).
         """
         if authority.get('reconciled'):
             return False

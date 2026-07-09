@@ -30,9 +30,12 @@ class HardPodWorkflowOverlayTests(SimpleTestCase):
             {
                 'hard_pod_pending': True,
                 'pod_pending': False,
+                'log_evidence': {'pod_uploaded': True},
                 'hard_copy_confirmation': {
                     'required': True,
                     'pending': True,
+                    'applicable': True,
+                    'actionable': True,
                     'execute_action_code': 'OA-0015',
                 },
             },
@@ -67,7 +70,13 @@ class HardPodWorkflowOverlayTests(SimpleTestCase):
             {
                 'hard_pod_pending': True,
                 'pod_pending': False,
-                'hard_copy_confirmation': {'required': True, 'pending': True},
+                'log_evidence': {'pod_uploaded': True},
+                'hard_copy_confirmation': {
+                    'required': True,
+                    'pending': True,
+                    'applicable': True,
+                    'actionable': True,
+                },
             },
         )
         self.assertEqual(workflow['primary_action']['action_code'], 'A7H')
@@ -94,7 +103,13 @@ class HardPodWorkflowOverlayTests(SimpleTestCase):
             {
                 'hard_pod_pending': True,
                 'pod_pending': False,
-                'hard_copy_confirmation': {'required': True, 'pending': True},
+                'log_evidence': {'pod_uploaded': True},
+                'hard_copy_confirmation': {
+                    'required': True,
+                    'pending': True,
+                    'applicable': True,
+                    'actionable': True,
+                },
             },
         )
         self.assertTrue(pod['payment_collection_blocked'])
@@ -114,6 +129,22 @@ class HardPodWorkflowOverlayTests(SimpleTestCase):
             },
         )
         self.assertFalse(pod['payment_collection_blocked'])
+        self.assertNotIn('confirmation_ui', pod['hard_copy_confirmation'])
+
+    def test_enrich_pod_cod_strips_hard_copy_ui_before_digital_complete(self):
+        pod = enrich_pod_cod_hard_copy_gate(
+            {
+                'hard_pod_pending': True,
+                'pod_pending': True,
+                'digital_evidence_complete': False,
+                'hard_copy_confirmation': {
+                    'required': True,
+                    'pending': True,
+                    'applicable': True,
+                    'confirmation_ui': {'ui_mode': 'hard_pod_collection_confirmation'},
+                },
+            },
+        )
         self.assertNotIn('confirmation_ui', pod['hard_copy_confirmation'])
 
     def test_finalize_pod_cod_strips_active_hard_copy_ui(self):
@@ -137,6 +168,34 @@ class HardPodWorkflowOverlayTests(SimpleTestCase):
         self.assertNotIn('confirmation_ui', block)
         self.assertEqual(block.get('ui_mode'), '')
 
+    def test_overlay_blocked_while_unloading_pending(self):
+        workflow = apply_hard_pod_workflow_overlay(
+            {
+                'primary_action': {
+                    'action_code': 'OA-0008',
+                    'execution_label': 'Upload POD',
+                },
+            },
+            {
+                'hard_pod_pending': True,
+                'pod_pending': False,
+                'log_evidence': {'pod_uploaded': True},
+                'unloading_pending': True,
+                'hard_copy_confirmation': {
+                    'required': True,
+                    'pending': True,
+                    'applicable': True,
+                    'actionable': True,
+                    'execute_action_code': 'OA-0008',
+                },
+            },
+        )
+        self.assertEqual(workflow['primary_action']['action_code'], 'OA-0008')
+        self.assertNotEqual(
+            workflow['primary_action'].get('capture_mode'),
+            'hard_copy_confirmation',
+        )
+
     def test_overlay_when_hard_pod_pending_even_if_block_pending_false(self):
         workflow = apply_hard_pod_workflow_overlay(
             {
@@ -151,9 +210,12 @@ class HardPodWorkflowOverlayTests(SimpleTestCase):
             {
                 'hard_pod_pending': True,
                 'pod_pending': False,
+                'log_evidence': {'pod_uploaded': True},
                 'hard_copy_confirmation': {
                     'required': True,
                     'pending': False,
+                    'applicable': True,
+                    'actionable': True,
                     'execute_action_code': 'OA-0008',
                 },
             },

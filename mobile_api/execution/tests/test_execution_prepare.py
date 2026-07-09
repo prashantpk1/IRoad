@@ -257,7 +257,7 @@ class ExecutionPrepareTests(SimpleTestCase):
         self.assertEqual(exc.exception.code, 'forbidden')
         self.assertEqual(exc.exception.http_status, 403)
 
-    def test_stale_workflow_content_hash_mismatch(self):
+    def test_stale_workflow_content_hash_mismatch_ignored_when_workflow_matches(self):
         ctx = self._context(
             payload={
                 'content_hash': 'hash-client',
@@ -265,9 +265,19 @@ class ExecutionPrepareTests(SimpleTestCase):
             },
         )
         ctx.sync_metadata = {'content_hash': 'hash-server', 'workflow_version': 'wf-v1'}
+        StaleExecutionGuard().assert_not_stale(ctx)
+
+    def test_stale_workflow_content_hash_mismatch_when_workflow_also_stale(self):
+        ctx = self._context(
+            payload={
+                'content_hash': 'hash-client',
+                'workflow_version': 'wf-old',
+            },
+        )
+        ctx.sync_metadata = {'content_hash': 'hash-server', 'workflow_version': 'wf-new'}
         with self.assertRaises(ExecuteActionError) as exc:
             StaleExecutionGuard().assert_not_stale(ctx)
-        self.assertEqual(exc.exception.code, 'stale_content_hash')
+        self.assertEqual(exc.exception.code, 'stale_workflow_version')
         self.assertEqual(exc.exception.http_status, 409)
 
     def test_stale_workflow_version_mismatch(self):

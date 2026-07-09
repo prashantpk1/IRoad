@@ -41,13 +41,21 @@ class HardPodExecuteIntegrationService:
 
     @staticmethod
     def _is_combined_upload_pod_action(action: Any) -> bool:
-        """OA-0008 / A7 combined digital + hard-copy row (not hard-copy-only A7H)."""
-        if not getattr(action, 'hard_copy_collection', False):
+        """Both digital POD and hard-copy custody on one Action Master row."""
+        if action is None:
             return False
-        if getattr(action, 'auto_pod_post', False):
+        return bool(getattr(action, 'hard_copy_collection', False)) and bool(
+            getattr(action, 'auto_pod_post', False)
+        )
+
+    @staticmethod
+    def _action_supports_hard_pod_custody_bind(action: Any | None) -> bool:
+        """Upload POD (by label/flags) or standalone hard-copy rows may promote custody."""
+        if action is None:
+            return False
+        if is_hard_pod_action(action):
             return True
-        code = (getattr(action, 'action_code', '') or '').strip().upper()
-        return code in {'OA-0008', 'A7'}
+        return is_pod_upload_action(action)
 
     @staticmethod
     def _custody_promoted_for_shipment(*, tenant_schema: str, shipment_id: str) -> bool:
@@ -147,7 +155,7 @@ class HardPodExecuteIntegrationService:
 
     def validate_execute_requirements(self, context: Any) -> None:
         action = getattr(context, 'operation_action', None)
-        if not is_hard_pod_action(action):
+        if not self._action_supports_hard_pod_custody_bind(action):
             return
 
         payload = dict(getattr(context, 'payload', None) or {})
@@ -177,7 +185,7 @@ class HardPodExecuteIntegrationService:
 
     def bind_action_log(self, context: Any, action_log: Any) -> HardPODCustodySubmission | None:
         action = getattr(context, 'operation_action', None)
-        if not is_hard_pod_action(action):
+        if not self._action_supports_hard_pod_custody_bind(action):
             return None
         if context.idempotent_replay or action_log is None:
             return None

@@ -12,8 +12,10 @@ class EmptyMoveError(Exception):
         code: str = 'empty_move_error',
         http_status: int = 400,
         message_key: str = 'mobile.validation.failed',
+        data: dict | None = None,
     ) -> None:
         super().__init__(message)
         self.code = code
         self.http_status = http_status
         self.message_key = message_key
+        self.data = dict(data or {})

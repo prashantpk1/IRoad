@@ -401,10 +401,24 @@ function iroutePickNextAction(data) {
   data = data || {};
   var wf = data.workflow || {};
   var allowed = wf.allowed_actions || [];
-  if (!allowed.length) return {};
-
   var hint = data.next_action_hint || {};
   var primary = wf.primary_action || wf.next_action || {};
+  if (!allowed.length) {
+  if (hint.action_code && (
+    hint.action === 'go_to_pod_capture' ||
+    hint.action === 'go_to_payment_collection' ||
+    hint.action === 'go_to_evidence_capture' ||
+    hint.action === 'execute_action'
+  )) {
+    return hint;
+  }
+  if (primary && primary.action_code) return primary;
+  var timelineEmpty = irouteGetTimeline(data);
+  var pendingEmpty = irouteFindTimelinePending(timelineEmpty, function () { return true; });
+  if (pendingEmpty && pendingEmpty.action_code) return pendingEmpty;
+  return {};
+  }
+
   if (primary && primary.action_code) {
     for (var i = 0; i < allowed.length; i++) {
       if (allowed[i].action_code === primary.action_code) return allowed[i];
@@ -440,6 +454,21 @@ function irouteHandleWorkflowStuck(data) {
   var hint = data.next_action_hint || {};
   if (allowed.length > 0) {
     irouteEnvSet('workflow_stuck', 'false');
+    return false;
+  }
+  var hintCode = String(
+    hint.execute_action_code || hint.action_code ||
+    ((hint.capture_ui || {}).primary_button || {}).execute_action_code || ''
+  ).trim();
+  if (hintCode && (
+    hint.action === 'go_to_pod_capture' ||
+    hint.action === 'go_to_payment_collection' ||
+    hint.ready_for_pod === true ||
+    hint.needs_pod_capture === true ||
+    hint.show_pod_capture_button === true
+  )) {
+    irouteEnvSet('workflow_stuck', 'false');
+    console.warn('[IRoute] allowed_actions empty — trusting next_action_hint', hint.action, hintCode);
     return false;
   }
   irouteEnvSet('workflow_stuck', 'true');
@@ -541,17 +570,31 @@ function irouteSyncJobDetail(data) {
   var hardFromPod = pod.hard_pod_pending === true;
   irouteEnvSet('hard_pod_required', (hardFromPod || hint.hard_pod === true || hardPodSteps) ? 'true' : 'false');
   var digitalFirst = hint.active_step === 'digital_evidence' || hint.capture_mode === 'digital_evidence' || steps[0] === 'digital_evidence' || steps[0] === 'digital';
-  irouteEnvSet('needs_pod_capture', 'false');
+  irouteEnvSet('needs_pod_capture', hint.needs_pod_capture === true ? 'true' : 'false');
   irouteEnvSet('needs_hard_pod_confirm', 'false');
   var podCode = irouteResolvePodActionCode(data);
   if (podCode) {
     irouteEnvSet('pod_upload_action_code', podCode);
-    if (req.auto_pod_post || hint.action === 'go_to_pod_capture' || irouteFindActionByFlag(allowed, 'auto_pod_post')) {
+    if (
+      req.auto_pod_post ||
+      hint.action === 'go_to_pod_capture' ||
+      hint.ready_for_pod === true ||
+      hint.needs_pod_capture === true ||
+      irouteFindActionByFlag(allowed, 'auto_pod_post')
+    ) {
       irouteEnvSet('ready_for_pod', 'true');
     }
-  } else if (req.auto_pod_post || hint.action === 'go_to_pod_capture') {
+  } else if (
+    req.auto_pod_post ||
+    hint.action === 'go_to_pod_capture' ||
+    hint.ready_for_pod === true ||
+    hint.needs_pod_capture === true
+  ) {
     irouteEnvSet('pod_upload_action_code', code || pm.variables.get('pod_upload_action_code') || '');
     irouteEnvSet('ready_for_pod', 'true');
+  }
+  if (hint.action === 'go_to_pod_capture' || hint.ready_for_pod === true || hint.needs_pod_capture === true) {
+    irouteEnvSet('execute_is_pod_action', 'true');
   }
   var hardCode = irouteResolveHardCopyActionCode(data);
   if (hardCode) irouteEnvSet('hard_copy_action_code', hardCode);
@@ -1820,6 +1863,10 @@ def build_environment(*, env_id: str, name: str, base_url: str = "http://127.0.0
             {"key": "content_hash", "value": "", "type": "default", "enabled": True},
             {"key": "workflow_version", "value": "", "type": "default", "enabled": True},
             {"key": "execute_action_code", "value": "", "type": "default", "enabled": True},
+            {"key": "execute_client_action_id", "value": "", "type": "default", "enabled": True},
+            {"key": "execute_use_multipart", "value": "false", "type": "default", "enabled": True},
+            {"key": "needs_pod_capture", "value": "false", "type": "default", "enabled": True},
+            {"key": "needs_hard_pod_confirm", "value": "false", "type": "default", "enabled": True},
             {"key": "pod_upload_action_code", "value": "", "type": "default", "enabled": True},
             {"key": "hard_copy_action_code", "value": "", "type": "default", "enabled": True},
             {"key": "pod_content_hash", "value": "", "type": "default", "enabled": True},

@@ -14,10 +14,7 @@ from tenant_workspace.models import TenantShipment
 from tenant_workspace.ops_display import (
     address_city_label,
     address_label,
-    build_mobile_route_block,
-    parse_route_display,
     resolve_shipment_truck,
-    shipment_route_endpoints,
     truck_display_block,
 )
 
@@ -64,32 +61,69 @@ def _address_full(address: Any | None) -> str:
     return ', '.join(part.strip() for part in parts if str(part).strip())
 
 
-def resolve_history_route(shipment: Any, booking: Any | None = None) -> dict[str, str]:
-    """From/to labels and mobile route block for History list + detail."""
+def resolve_history_route(
+    shipment: Any,
+    booking: Any | None = None,
+    *,
+    request: Any | None = None,
+) -> dict[str, str]:
+    """From/to labels and mobile route block — leg-aware (matches Job Detail)."""
     booking_obj = booking if booking is not None else getattr(shipment, 'booking', None)
-    route_block = build_mobile_route_block(shipment, booking_obj)
-    from_label, to_label = shipment_route_endpoints(shipment, booking_obj)
-    loading = getattr(shipment, 'loading_address', None)
-    delivery = getattr(shipment, 'delivery_address', None)
-    if loading is None and booking_obj is not None:
-        loading = getattr(booking_obj, 'loading_address', None)
-    if delivery is None and booking_obj is not None:
-        delivery = getattr(booking_obj, 'delivery_address', None)
+    from mobile_api.job_detail.projections.job_location_projection import (
+        build_shipment_location_block,
+    )
 
-    origin_city = _address_city(loading)
-    destination_city = _address_city(delivery)
-    parsed_from, parsed_to = parse_route_display(route_block['route_display'])
-    if parsed_from and parsed_to and parsed_from.casefold() != parsed_to.casefold():
-        origin_city = parsed_from
-        destination_city = parsed_to
-    else:
-        if not origin_city:
-            origin_city = route_block['route_display_start']
-        if not destination_city:
-            destination_city = route_block['route_display_end']
+    location_block = build_shipment_location_block(
+        shipment,
+        booking=booking_obj,
+        request=request,
+    )
+    route = dict(location_block.get('route') or {})
+    pickup = dict(location_block.get('pickup_address') or {})
+    drop = dict(location_block.get('drop_address') or {})
+
+    from_label = (
+        pickup.get('label')
+        or pickup.get('display_name')
+        or ''
+    ).strip()
+    to_label = (
+        drop.get('label')
+        or drop.get('display_name')
+        or ''
+    ).strip()
+    origin_city = (pickup.get('city') or '').strip()
+    destination_city = (drop.get('city') or '').strip()
+
+    route_display_start = (route.get('route_display_start') or '').strip()
+    route_display_end = (route.get('route_display_end') or '').strip()
+    route_display = (route.get('route_display') or '').strip()
+
+    if origin_city and destination_city:
+        route_display_start = origin_city
+        route_display_end = destination_city
+        route_display = f'{origin_city} → {destination_city}'
+    elif not route_display and route_display_start and route_display_end:
+        route_display = f'{route_display_start} → {route_display_end}'
+
+    if not from_label and route_display_start:
+        from_label = route_display_start
+    if not to_label and route_display_end:
+        to_label = route_display_end
+    if not origin_city:
+        origin_city = route_display_start
+    if not destination_city:
+        destination_city = route_display_end
 
     return {
-        **route_block,
+        'route_display': route_display,
+        'route_display_start': route_display_start,
+        'route_display_end': route_display_end,
+        'route_direction': str(route.get('route_direction') or ''),
+        'route_id': str(route.get('route_id') or ''),
+        'route_code': str(route.get('route_code') or ''),
+        'route_label': str(route.get('route_label') or route_display),
+        'route_type': str(route.get('route_type') or ''),
         'from_location': from_label,
         'to_location': to_label,
         'origin_city': origin_city,
@@ -158,9 +192,8 @@ def build_history_card(
     request: Any | None = None,
 ) -> dict[str, Any]:
     """Map one terminal shipment to a History list card."""
-    _ = request
     booking = getattr(shipment, 'booking', None)
-    route = resolve_history_route(shipment, booking)
+    route = resolve_history_route(shipment, booking, request=request)
 
     display_status, final_state = final_state_labels(shipment)
     job_date = resolve_job_date(shipment, booking)

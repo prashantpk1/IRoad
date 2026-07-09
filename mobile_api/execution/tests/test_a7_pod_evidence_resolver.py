@@ -87,9 +87,9 @@ class A7PodEvidenceResolverTests(TestCase):
         )
         self.assertEqual(primary, 'bundle-video')
 
-    def test_is_a7_shipment_execute_by_action_code(self):
+    def test_is_pod_shipment_execute_by_tenant_action_code(self):
         from mobile_api.execution.services.a7_pod_evidence_resolver import (
-            _is_a7_shipment_execute,
+            _is_pod_shipment_execute,
         )
 
         context = ExecuteActionContext(
@@ -100,7 +100,22 @@ class A7PodEvidenceResolverTests(TestCase):
             job_id='ship-1',
             action_code='A7',
         )
-        self.assertTrue(_is_a7_shipment_execute(context))
+        self.assertTrue(_is_pod_shipment_execute(context))
+
+        oa_context = ExecuteActionContext(
+            driver=SimpleNamespace(pk='drv-1'),
+            tenant_schema='tenant_a',
+            user_id='u1',
+            job_type='shipment',
+            job_id='ship-1',
+            action_code='OA-0008',
+            operation_action=SimpleNamespace(
+                action_code='OA-0008',
+                english_label='POD',
+                auto_pod_post=True,
+            ),
+        )
+        self.assertTrue(_is_pod_shipment_execute(oa_context))
 
 
 class PrepareA7FragmentedBundleTests(TestCase):

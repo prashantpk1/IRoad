@@ -320,7 +320,7 @@ EMAIL_PORT = config('EMAIL_PORT', default=587, cast=int)
 EMAIL_USE_TLS = config('EMAIL_USE_TLS', default=True, cast=bool)
 EMAIL_HOST_USER = config('EMAIL_HOST_USER')
 EMAIL_HOST_PASSWORD = config('EMAIL_HOST_PASSWORD')
-DEFAULT_FROM_EMAIL = config('DEFAULT_FROM_EMAIL', default='Iroad Admin <sohamghayal02@gmail.com>')
+DEFAULT_FROM_EMAIL = config('DEFAULT_FROM_EMAIL', default='IRoute Admin <sohamghayal02@gmail.com>')
 
 # Redis — inside Docker, never use 127.0.0.1 (that is the web container, not Redis).
 def _running_in_docker() -> bool:

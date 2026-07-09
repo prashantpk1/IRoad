@@ -243,12 +243,29 @@
       </div>
       {% endif %}
 
+      {% if not shipment_document_is_edit %}
+      <div id="autoPodDnBanner" class="alert alert-info d-none mb-3" role="alert">
+        <i class="bi bi-info-circle me-2"></i>
+        <span id="autoPodDnBannerText"></span>
+        <a id="autoPodDnBannerLink" href="#" class="alert-link ms-1">Edit delivery note</a>
+      </div>
+      {% endif %}
+
+      {% if shipment_document_is_auto_scaffold %}
+      <div class="alert alert-secondary mb-3" role="alert">
+        <i class="bi bi-info-circle me-2"></i>
+        Auto POD created this delivery-note record. Complete <strong>Document Ref No</strong>, physical location,
+        and subform lines manually; attachments are optional and can be added later.
+      </div>
+      {% endif %}
+
       <!-- Shipment Documents Form -->
       <form
         id="shipmentDocumentForm"
         method="post"
         enctype="multipart/form-data"
         data-sd-is-edit="{% if shipment_document_is_edit %}true{% else %}false{% endif %}"
+        data-sd-create-delivery-note="{% if shipment_document_is_edit %}false{% else %}true{% endif %}"
       >
         {% csrf_token %}
         <!-- Section A: Header Fields -->
@@ -388,6 +405,7 @@
                       data-booking-no="{{ shipment.booking_no }}"
                       data-booking-item="{{ shipment.booking_item }}"
                       data-pod-doc-count="{{ shipment.pod_doc_count|default:0 }}"
+                      data-pod-type="{{ shipment.pod_type|default:'' }}"
                       {% if shipment_document_form_data.shipment_id == shipment.shipment_id %}selected{% endif %}
                     >
                       {{ shipment.shipment_no }} - {{ shipment.booking_no }}
@@ -443,6 +461,8 @@
                     value="{{ shipment_document_form_data.document_ref_no|default:'' }}"
                     placeholder="e.g. DN-1020"
                     required
+                    oninput="window.__sdSyncDocRefToLines && window.__sdSyncDocRefToLines()"
+                    onchange="window.__sdSyncDocRefToLines && window.__sdSyncDocRefToLines()"
                   />
                   
                   {% if shipment_document_form_errors.document_ref_no %}<div class="invalid-feedback d-block">{{ shipment_document_form_errors.document_ref_no }}</div>{% endif %}
@@ -472,9 +492,9 @@
                       
                     </div>
                     <label class="setting-toggle">
-                      <input type="checkbox" id="isDeliveryNote" name="is_delivery_note" {% if shipment_document_form_data.is_delivery_note %}checked{% endif %} />
+                      <input type="checkbox" id="isDeliveryNote" name="is_delivery_note" {% if shipment_document_form_data.is_delivery_note or shipment_document_form_data.document_type == 'Delivery Note' %}checked{% endif %} />
                       <span class="toggle-track"></span>
-                      <span class="toggle-label">No</span>
+                      <span class="toggle-label">{% if shipment_document_form_data.is_delivery_note or shipment_document_form_data.document_type == 'Delivery Note' %}Yes{% else %}No{% endif %}</span>
                     </label>
                   </div>
                 </div>
@@ -599,18 +619,25 @@
               </table>
             </div>
 
-            <div class="mt-3 d-flex gap-2 align-items-center">
-              <button
-                type="button"
-                class="btn btn-outline-primary"
-                id="addSdLineBtn"
-              >
-                <i class="bi bi-plus-lg"></i>
-                Add Line
-              </button>
-              <span class="text-muted small"
-                >One row per page. Physical location tracks custody; soft copy required per row.</span
-              >
+            <div class="mt-3">
+              <div class="d-flex gap-2 align-items-center flex-wrap">
+                <button
+                  type="button"
+                  class="btn btn-outline-primary"
+                  id="addSdLineBtn"
+                >
+                  <i class="bi bi-plus-lg"></i>
+                  Add Line
+                </button>
+                <span class="text-muted small"
+                  >One row per page. Physical location tracks custody; attachment is optional — add when available.</span
+                >
+              </div>
+              <div
+                id="sdAddLineLimitError"
+                class="invalid-feedback d-none mt-2"
+                role="alert"
+              ></div>
             </div>
           </div>
         </div>
@@ -638,10 +665,23 @@
 
       {{ shipment_document_line_rows|json_script:"shipment-document-line-rows" }}
       {{ shipment_document_physical_location_options|json_script:"shipment-document-physical-locations" }}
+      {{ shipment_document_auto_pod_dn_index|json_script:"shipment-document-auto-pod-dn-index" }}
 {% endblock %}
 
 {% block extra_js %}
 {% load static %}
+<script>
+  window.__sdSyncDocRefToLines = function () {
+    var header = document.getElementById("documentRefNo");
+    var body = document.getElementById("sdLinesTbody");
+    if (!header || !body) return;
+    var value = String(header.value || "").trim();
+    body.querySelectorAll('[data-field="docRefNo"]').forEach(function (field) {
+      field.value = value;
+      field.placeholder = value ? "" : "Same as header Document Ref No";
+    });
+  };
+</script>
 <script src="{% static 'tenantdesign/Javascript/booking_linkage_cascade.js' %}?v=20260619-cascade"></script>
 <script>
   (function () {
@@ -654,6 +694,65 @@
     var linkageSyncLock = false;
     var suppressBookingInput = false;
     var bookingLookupTimer = null;
+    var autoPodDnIndex = {};
+    var autoPodBanner = document.getElementById("autoPodDnBanner");
+    var autoPodBannerText = document.getElementById("autoPodDnBannerText");
+    var autoPodBannerLink = document.getElementById("autoPodDnBannerLink");
+    var documentTypeSelect = document.getElementById("documentType");
+    var isDeliveryNoteCheckbox = document.getElementById("isDeliveryNote");
+
+    try {
+      var autoPodIndexEl = document.getElementById("shipment-document-auto-pod-dn-index");
+      if (autoPodIndexEl) {
+        autoPodDnIndex = JSON.parse(autoPodIndexEl.textContent || "{}");
+      }
+    } catch (parseError) {
+      autoPodDnIndex = {};
+    }
+
+    function syncAutoPodDeliveryNoteGuidance(shipmentId) {
+      var entry = shipmentId ? autoPodDnIndex[shipmentId] : null;
+      var hasAutoDn = !!(entry && entry.record_no);
+      if (autoPodBanner) {
+        if (!hasAutoDn) {
+          autoPodBanner.classList.add("d-none");
+        } else {
+          if (autoPodBannerText) {
+            autoPodBannerText.textContent =
+              "This shipment already has delivery note " +
+              entry.record_no +
+              ". Edit that record — use this form only for other document types.";
+          }
+          if (autoPodBannerLink && entry.edit_url) {
+            autoPodBannerLink.href = entry.edit_url;
+          }
+          autoPodBanner.classList.remove("d-none");
+        }
+      }
+      if (documentTypeSelect) {
+        var dnOption = documentTypeSelect.querySelector('option[value="Delivery Note"]');
+        if (dnOption) {
+          dnOption.disabled = hasAutoDn;
+        }
+        if (
+          hasAutoDn &&
+          String(documentTypeSelect.value || "").toLowerCase() === "delivery note"
+        ) {
+          documentTypeSelect.value = "";
+        }
+      }
+      if (isDeliveryNoteCheckbox) {
+        if (hasAutoDn) {
+          isDeliveryNoteCheckbox.checked = false;
+          isDeliveryNoteCheckbox.disabled = true;
+        } else {
+          isDeliveryNoteCheckbox.disabled = false;
+        }
+        if (typeof window.syncShipmentDocumentDeliveryNoteUi === "function") {
+          window.syncShipmentDocumentDeliveryNoteUi();
+        }
+      }
+    }
 
     function getBookingId() {
       return bookingIdInput ? String(bookingIdInput.value || "").trim() : "";
@@ -695,13 +794,21 @@
     }
 
     function notifyShipmentChanged(previousShipmentId) {
-      if (
+      var currentShipmentId = shipmentSelect ? String(shipmentSelect.value || "").trim() : "";
+      syncAutoPodDeliveryNoteGuidance(currentShipmentId);
+        if (
         shipmentSelect &&
         shipmentSelect.value &&
         shipmentSelect.value !== previousShipmentId &&
         typeof window.syncShipmentDocumentPageCount === "function"
       ) {
         window.syncShipmentDocumentPageCount();
+      }
+      if (typeof window.syncShipmentDocumentHeaderToLines === "function") {
+        window.syncShipmentDocumentHeaderToLines();
+      }
+      if (typeof window.syncShipmentDocumentSubformLimits === "function") {
+        window.syncShipmentDocumentSubformLimits();
       }
     }
 
@@ -863,8 +970,9 @@
 </script>
 <script>
   (function () {
-    var form = document.getElementById("shipmentDocumentForm");
-    if (!form) return;
+      var form = document.getElementById("shipmentDocumentForm");
+      if (!form) return;
+      var isCreateDn = form.getAttribute("data-sd-create-delivery-note") === "true";
     var recordDate = document.getElementById("recordDate");
     var documentDate = document.getElementById("documentDate");
     if (recordDate && !recordDate.value) {
@@ -873,7 +981,17 @@
     if (documentDate && !documentDate.value) {
       documentDate.value = new Date().toISOString().slice(0, 10);
     }
+    function isDraftStatus() {
+      var statusEl = document.getElementById("status");
+      var value = statusEl ? String(statusEl.value || "").trim() : "";
+      return !value || value === "Draft" || value === "Pending" || value === "Uploaded";
+    }
     form.addEventListener("submit", function (event) {
+      if (typeof window.__sdSyncDocRefToLines === "function") {
+        window.__sdSyncDocRefToLines();
+      } else if (typeof window.syncShipmentDocumentHeaderToLines === "function") {
+        window.syncShipmentDocumentHeaderToLines();
+      }
       var tbody = document.getElementById("sdLinesTbody");
       if (!tbody) return;
       var rows = tbody.querySelectorAll("tr[data-sd-line]");
@@ -883,29 +1001,26 @@
         return;
       }
       var isDn = document.getElementById("isDeliveryNote");
-      var deliveryNote = isDn && isDn.checked;
+      var documentTypeEl = document.getElementById("documentType");
+      var deliveryNote =
+        (isDn && isDn.checked) ||
+        (documentTypeEl && String(documentTypeEl.value || "") === "Delivery Note") ||
+        isCreateDn;
       for (var i = 0; i < rows.length; i += 1) {
         var row = rows[i];
         var pageNo = row.querySelector('[data-field="pageNo"]');
         var location = row.querySelector('[data-field="physicalLocation"]');
-        var attachment = row.querySelector('[data-field="attachment"]');
-        var existing = row.querySelector('[data-field="existingAttachment"]');
         if (!pageNo || Number(pageNo.value || "0") < 1) {
           event.preventDefault();
           alert("Line " + (i + 1) + ": Page No must be a positive number.");
           return;
         }
         if (!location || !location.value) {
-          event.preventDefault();
-          alert("Line " + (i + 1) + ": Physical location (custody) is required.");
-          return;
-        }
-        var hasFile = attachment && attachment.files && attachment.files.length;
-        var hasExisting = existing && String(existing.value || "").trim();
-        if (!hasFile && !hasExisting) {
-          event.preventDefault();
-          alert("Line " + (i + 1) + ": Attachment is required.");
-          return;
+          if (!isDraftStatus()) {
+            event.preventDefault();
+            alert("Line " + (i + 1) + ": Physical location (custody) is required.");
+            return;
+          }
         }
         if (deliveryNote) {
           var status = row.querySelector('[data-field="status"]');

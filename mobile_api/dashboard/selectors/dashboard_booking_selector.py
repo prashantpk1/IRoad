@@ -109,6 +109,8 @@ class DashboardBookingSelector:
 
         for booking in bookings:
             shipments = list(booking.shipments.all())
+            if policy.is_booking_operationally_cancelled(booking, shipments):
+                continue
             is_bootstrap_booking = allow_booking_bootstrap and not shipments
             is_backload_bootstrap = policy.is_round_trip_backload_bootstrap(
                 driver,

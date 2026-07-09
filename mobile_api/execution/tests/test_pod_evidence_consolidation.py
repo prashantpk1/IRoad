@@ -57,3 +57,18 @@ class PodEvidenceConsolidationTests(TestCase):
             sum(1 for item in consolidated if item.media_type == 'photo'),
             10,
         )
+
+    def test_optional_evidence_pod_capture_type_consolidates_videos(self):
+        rows = [
+            {'media_type': 'video', 'file_ref': 'mobile/pod_evidence/v1.mp4'},
+            {'media_type': 'video', 'file_ref': 'mobile/pod_evidence/v2.mp4'},
+            {'media_type': 'video', 'file_ref': 'mobile/pod_evidence/v3.mp4'},
+        ]
+        requirements = {
+            'capture_mode': 'optional_evidence',
+            'pod_capture_type': 'digital',
+            'video_max_count': 1,
+        }
+        consolidated = consolidate_pod_evidence_dicts(rows, requirements)
+        self.assertEqual(len(consolidated), 1)
+        self.assertEqual(consolidated[0]['file_ref'], 'mobile/pod_evidence/v3.mp4')

@@ -169,31 +169,31 @@
             >
           </div>
           <div class="overview-intel-grid">
-            <div class="plan-panel">
+            <div class="plan-panel" data-live-plan-panel>
               <div class="plan-tier-card">
                 <div class="plan-tier-label">Active Subscriber Tier</div>
-                <div class="plan-tier-name">{{ tenant_dashboard.plan_name }}</div>
+                <div class="plan-tier-name" data-live-plan-name>{{ tenant_dashboard.plan_name }}</div>
                 <div class="plan-tier-price">
-                  {{ tenant_dashboard.plan_price_line }}
-                  <span>{{ tenant_dashboard.plan_cycle_label }}</span>
+                  <span data-live-plan-price>{{ tenant_dashboard.plan_price_line }}</span>
+                  <span data-live-plan-cycle>{{ tenant_dashboard.plan_cycle_label }}</span>
                 </div>
                 <div class="plan-renewal-label">Next Renewal Date</div>
-                <div class="plan-renewal-date">{{ tenant_dashboard.plan_renewal_display }}</div>
+                <div class="plan-renewal-date" data-live-plan-renewal>{{ tenant_dashboard.plan_renewal_display }}</div>
                 <i class="bi bi-crown-fill"></i>
               </div>
 
               <div class="plan-attributes-title">Package Attributes</div>
               <div class="plan-attribute good">
                 <i class="bi bi-check2-square"></i>
-                <span>{{ tenant_dashboard.plan_driver_attr }}</span>
+                <span data-live-plan-driver>{{ tenant_dashboard.plan_driver_attr }}</span>
               </div>
               <div class="plan-attribute good">
                 <i class="bi bi-cloud-check"></i>
-                <span>{{ tenant_dashboard.plan_backup_attr }}</span>
+                <span data-live-plan-backup>{{ tenant_dashboard.plan_backup_attr }}</span>
               </div>
             </div>
 
-            <div class="resource-panel">
+            <div class="resource-panel" data-live-resource-stats>
               <div class="resource-header">
                 <div class="resource-title">
                   <i class="bi bi-grid-3x3-gap-fill"></i>
@@ -204,17 +204,19 @@
 
               <div class="resource-grid">
                 {% for r in tenant_dashboard.resource_rows %}
-                  <div class="resource-item">
+                  <div class="resource-item" data-resource-key="{{ r.key }}">
                     <div class="resource-top">
                       <span>{{ r.label }}</span>
-                      <strong>{{ r.pct_label }}</strong>
+                      <strong data-resource-pct>{{ r.pct_label }}</strong>
                     </div>
                     <div class="resource-value">
-                      {{ r.current_display }} <span>/ {{ r.total_display }}</span>
+                      <span data-resource-current>{{ r.current_display }}</span>
+                      <span> / <span data-resource-total>{{ r.total_display }}</span></span>
                     </div>
                     <div class="resource-progress">
                       <span
                         class="bar {{ r.bar_class }}"
+                        data-resource-bar
                         style="width: {{ r.bar_width }}%"
                       ></span>
                     </div>
@@ -2703,5 +2705,12 @@
   "refreshUrl": "{{ fleet_gps_refresh_url|escapejs }}"
 }
 </script>
+<script type="application/json" id="resource-stats-meta">
+{
+  "refreshUrl": "{{ resource_stats_refresh_url|escapejs }}",
+  "pollIntervalMs": 30000
+}
+</script>
 <script src="{% static 'tenantdesign/Javascript/fleet-gps-map.js' %}?v=20260622a"></script>
+<script src="{% static 'tenantdesign/Javascript/resource-stats-live.js' %}?v=20260706a"></script>
 {% endblock %}

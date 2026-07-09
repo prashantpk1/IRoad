@@ -14,6 +14,9 @@ from mobile_api.pod_capture.policy.canonical_pod_action_registry import (
     action_has_role,
     classify_pod_action_role,
 )
+from iroad_tenants.operation_runtime.action_master_catalog import (
+    is_system_auto_pod_verify_channel,
+)
 
 
 def log_evidence_flags(logs: list[Any]) -> dict[str, bool]:
@@ -27,11 +30,14 @@ def log_evidence_flags(logs: list[Any]) -> dict[str, bool]:
 
     for log in logs:
         action = getattr(log, 'operation_action', None)
+        channel = (getattr(log, 'source_channel', '') or '').strip()
+        if is_system_auto_pod_verify_channel(channel):
+            flags['delivered_log'] = True
+            continue
         if action is None:
             continue
         code = (getattr(action, 'action_code', '') or '').strip().upper()
-        channel = (getattr(log, 'source_channel', '') or '').strip()
-        if code == 'A_POD_VERIFY' or channel == 'auto_cod_verify':
+        if code == 'A_POD_VERIFY':
             flags['delivered_log'] = True
         role = classify_pod_action_role(action)
         if role == PodActionRole.POD_UPLOAD:

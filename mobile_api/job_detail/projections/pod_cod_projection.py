@@ -12,8 +12,10 @@ from typing import Any
 
 from mobile_api.dashboard.selectors import pod_cod_policy as policy
 from mobile_api.helpers.cod_amount import build_cod_payment_display
+from mobile_api.helpers.hard_copy_workflow_gate import derive_unloading_pending
 from mobile_api.pod_capture.services.pod_section_metadata import (
     build_hard_copy_confirmation_block,
+    build_pod_capture_steps,
 )
 from mobile_api.job_detail.dto.job_detail_context import JobDetailContext
 from mobile_api.job_detail.services.job_detail_pod_cod_reconciler import (
@@ -37,6 +39,7 @@ def build_pod_cod_section(
     context: JobDetailContext,
     *,
     request: Any | None = None,
+    allow_hard_pod_recovery: bool = True,
 ) -> dict[str, Any]:
     """
     Build POD/COD/treasury summary for shipment Job Detail.
@@ -49,9 +52,18 @@ def build_pod_cod_section(
     if context.shipment is None:
         return dict(_EMPTY_POD_COD)
 
-    pod_bundle = (context.reconciliation or {}).get('pod_cod')
-    if not pod_bundle:
-        pod_bundle = reconcile_job_detail_pod_cod(context)
+    if allow_hard_pod_recovery:
+        from mobile_api.hard_pod.services.hard_pod_custody_recovery import (
+            try_recover_unpromoted_hard_pod_custody,
+        )
+
+        try_recover_unpromoted_hard_pod_custody(
+            driver=context.driver,
+            shipment=context.shipment,
+            tenant_schema=(context.tenant_schema or '').strip(),
+        )
+
+    pod_bundle = reconcile_job_detail_pod_cod(context)
 
     column_flags = dict(pod_bundle.get('flags') or {})
     evidence = dict(pod_bundle.get('log_evidence') or {})
@@ -78,7 +90,21 @@ def build_pod_cod_section(
         tenant_schema=(context.tenant_schema or '').strip(),
         log_evidence=evidence,
     )
+    hard_block = dict(display_flags.get('hard_copy_confirmation') or {})
+    from mobile_api.pod_capture.services.pod_section_metadata import (
+        _hard_pod_wizard_includes_hard_copy_step,
+    )
+
+    hard_wizard = _hard_pod_wizard_includes_hard_copy_step(
+        context.shipment,
+        tenant_schema=(context.tenant_schema or '').strip(),
+        log_evidence=evidence,
+    )
+    display_flags['capture_steps'] = build_pod_capture_steps(hard_pod=hard_wizard)
     display_flags['pod_type'] = (getattr(context.shipment, 'pod_type', None) or '').strip()
+    display_flags['digital_evidence_complete'] = bool(evidence.get('pod_uploaded'))
+    display_flags['log_evidence'] = evidence
+    display_flags['unloading_pending'] = derive_unloading_pending(context.shipment)
     return display_flags
 
 
@@ -112,22 +138,45 @@ def _resolve_display_flags(
     )
 
     if log_primary or evidence.get('pod_uploaded'):
-        if evidence.get('pod_uploaded'):
+        pod_evidence_logged = bool(evidence.get('pod_uploaded'))
+        pod_evidence_valid = False
+        if pod_evidence_logged:
+            try:
+                from iroad_tenants.operation_runtime.shipment_execution_stage import (
+                    shipment_pod_upload_log_is_valid,
+                )
+
+                pod_evidence_valid = shipment_pod_upload_log_is_valid(shipment)
+            except Exception:
+                pod_evidence_valid = True
+
+        if pod_evidence_logged and not pod_evidence_valid:
+            flags['pod_pending'] = True
+            flags['pod_compliant'] = False
+            if hard_pod_shipment:
+                flags['hard_pod_pending'] = True
+        elif pod_evidence_valid:
             flags['pod_pending'] = False
             if hard_pod_shipment:
                 flags['hard_pod_pending'] = not custody_complete
                 flags['pod_compliant'] = custody_complete and (
-                    hard_pod_log or evidence.get('pod_uploaded')
+                    hard_pod_log or pod_evidence_valid
                 )
             else:
                 flags['pod_compliant'] = True
                 flags['hard_pod_pending'] = False
+        elif pod_evidence_logged:
+            flags['pod_pending'] = True
+            flags['pod_compliant'] = False
     elif hard_pod_shipment and not custody_complete:
-        flags['hard_pod_pending'] = policy.derive_hard_pod_pending(
-            shipment,
-            log_evidence=evidence,
-            tenant_schema=tenant_schema,
-        )
+        if derive_unloading_pending(shipment):
+            flags['hard_pod_pending'] = False
+        else:
+            flags['hard_pod_pending'] = policy.derive_hard_pod_pending(
+                shipment,
+                log_evidence=evidence,
+                tenant_schema=tenant_schema,
+            )
 
     if log_primary or evidence.get('cod_collected_log'):
         if evidence.get('cod_collected_log') and policy.is_cod_shipment(shipment):
@@ -143,4 +192,34 @@ def _resolve_display_flags(
         not policy.is_cod_shipment(shipment) or flags.get('cod_collected')
     ):
         flags['delivery_blocked'] = False
+    try:
+        from iroad_tenants.operation_runtime.pod_action import build_shipment_document_gate
+        from iroad_tenants.operation_runtime.shipment_execution_stage import (
+            shipment_pod_prerequisites_done,
+            shipment_pod_upload_log_is_valid,
+            shipment_ready_for_pod_capture,
+            shipment_unloading_completed_done,
+        )
+
+        if shipment_ready_for_pod_capture(shipment):
+            flags['pod_pending'] = True
+            flags['pod_compliant'] = False
+        elif not evidence.get('pod_uploaded'):
+            # Column POD pending is forward-looking — do not block delivery CTAs.
+            flags['pod_pending'] = False
+
+        doc_gate = build_shipment_document_gate(
+            shipment,
+            tenant_schema=tenant_schema,
+        )
+        flags['shipment_document_required'] = bool(doc_gate.get('required'))
+        flags['shipment_document_ready'] = bool(doc_gate.get('ready'))
+        if doc_gate.get('message'):
+            flags['shipment_document_message'] = doc_gate['message']
+            # Missing Shipment Document must not block delivery/unloading CTAs.
+            if shipment_ready_for_pod_capture(shipment):
+                flags['pod_pending'] = True
+                flags['pod_compliant'] = False
+    except Exception:
+        pass
     return flags

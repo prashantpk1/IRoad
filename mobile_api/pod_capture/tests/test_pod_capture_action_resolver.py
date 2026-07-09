@@ -8,6 +8,8 @@ from unittest.mock import patch
 from mobile_api.pod_capture.services.pod_capture_action_resolver import (
     CANONICAL_FALLBACK_DIGITAL_POD_ACTION_CODE,
     CANONICAL_FALLBACK_HARD_COPY_POD_ACTION_CODE,
+    action_code_is_digital_pod_upload,
+    action_code_is_hard_copy_custody,
     find_allowed_action_row_by_impact,
     resolve_digital_pod_action_code_from_context,
     resolve_hard_copy_action_code_from_context,
@@ -55,6 +57,80 @@ class PodCaptureActionResolverTests(TestCase):
                 },
             ),
         )
+
+    def test_row_has_digital_pod_upload_by_english_label(self):
+        self.assertTrue(
+            row_has_digital_pod_upload(
+                {
+                    'action_code': 'OA-0099',
+                    'english_label': 'POD',
+                },
+            ),
+        )
+
+    def test_row_has_digital_pod_upload_by_timeline_action_label(self):
+        self.assertTrue(
+            row_has_digital_pod_upload(
+                {
+                    'action_code': 'OA-0099',
+                    'action_label': 'POD',
+                },
+            ),
+        )
+
+    def test_action_code_is_digital_pod_upload_from_workflow_row(self):
+        workflow = {
+            'allowed_actions': [
+                {
+                    'action_code': 'OA-0008',
+                    'execution_requirements': {'auto_pod_post': True},
+                },
+            ],
+        }
+        self.assertTrue(
+            action_code_is_digital_pod_upload('OA-0008', workflow=workflow),
+        )
+
+    def test_action_code_is_hard_copy_custody_from_workflow_row(self):
+        workflow = {
+            'allowed_actions': [
+                {
+                    'action_code': 'OA-0010',
+                    'execution_requirements': {'hard_copy_collection': True},
+                },
+            ],
+        }
+        self.assertTrue(
+            action_code_is_hard_copy_custody('OA-0010', workflow=workflow),
+        )
+        self.assertFalse(
+            action_code_is_digital_pod_upload('OA-0010', workflow=workflow),
+        )
+
+    def test_find_pod_upload_row_in_timeline_pending(self):
+        from mobile_api.pod_capture.services.pod_capture_action_resolver import (
+            find_pod_upload_row_in_timeline,
+        )
+
+        row = find_pod_upload_row_in_timeline(
+            {
+                'timeline_preview': [
+                    {
+                        'action_code': 'OA-0009',
+                        'action_label': 'POD',
+                        'sequence_number': 9,
+                        'is_performed': False,
+                    },
+                    {
+                        'action_code': 'OA-0010',
+                        'action_label': 'End Job',
+                        'sequence_number': 10,
+                        'is_performed': False,
+                    },
+                ],
+            },
+        )
+        self.assertEqual(row.get('action_code'), 'OA-0009')
 
     def test_find_allowed_action_row_by_impact(self):
         row = find_allowed_action_row_by_impact(

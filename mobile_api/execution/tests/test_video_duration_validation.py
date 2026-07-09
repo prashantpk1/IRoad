@@ -1,4 +1,4 @@
-"""Video clip max duration (15s) on POD capture and A7 execute."""
+"""Video clip max duration (60s) on POD capture and A7 execute."""
 from __future__ import annotations
 
 from types import SimpleNamespace
@@ -20,7 +20,7 @@ from mobile_api.pod_capture.services.pod_capture_validation_service import (
 
 class VideoDurationValidationTests(TestCase):
     def test_message_text(self):
-        self.assertIn('15', video_duration_exceeded_message())
+        self.assertIn('60', video_duration_exceeded_message())
         self.assertIn('seconds', video_duration_exceeded_message().casefold())
 
     def test_pod_capture_rejects_long_clip(self):
@@ -28,28 +28,28 @@ class VideoDurationValidationTests(TestCase):
             PODCaptureMediaItemInput(
                 media_type='video',
                 file_ref='mobile/pod_evidence/clip.mp4',
-                duration_seconds=15.1,
+                duration_seconds=60.1,
             )
         ]
         with self.assertRaises(Exception) as exc:
             PodCaptureValidationService._validate_video_duration(
                 items,
-                {'video_max_duration_seconds': 15},
+                {'video_max_duration_seconds': 60},
             )
         self.assertEqual(exc.exception.code, 'video_duration_exceeded')
-        self.assertIn('15', str(exc.exception))
+        self.assertIn('60', str(exc.exception))
 
-    def test_pod_capture_allows_fifteen_seconds_exactly(self):
+    def test_pod_capture_allows_sixty_seconds_exactly(self):
         items = [
             PODCaptureMediaItemInput(
                 media_type='video',
                 file_ref='mobile/pod_evidence/clip.mp4',
-                duration_seconds=15.0,
+                duration_seconds=60.0,
             )
         ]
         PodCaptureValidationService._validate_video_duration(
             items,
-            {'video_max_duration_seconds': 15},
+            {'video_max_duration_seconds': 60},
         )
 
     def test_execute_a7_rejects_long_clip(self):
@@ -69,10 +69,10 @@ class VideoDurationValidationTests(TestCase):
                 file_ref='mobile/pod_evidence/clip.mp4',
                 upload=None,
                 media_id='',
-                duration_seconds=16.0,
+                duration_seconds=61.0,
             )
         ]
-        requirements = {'video': True, 'video_min_count': 1, 'video_max_duration_seconds': 15}
+        requirements = {'video': True, 'video_min_count': 1, 'video_max_duration_seconds': 60}
         with self.assertRaises(ExecuteActionError) as exc:
             service._validate_video_duration(items, requirements)
         self.assertEqual(exc.exception.code, 'video_duration_exceeded')

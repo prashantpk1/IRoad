@@ -260,8 +260,9 @@ def get_admin_session(jti):
 
 def revoke_admin_session(jti):
     """Delete specific session from Redis (logout or kill)."""
-    client = get_redis_client()
-    client.delete(f'admin:session:{jti}')
+    if not jti:
+        return False
+    return redis_safe_delete(f'admin:session:{jti}')
 
 
 def revoke_all_sessions_for_admin(admin_id):
@@ -270,23 +271,31 @@ def revoke_all_sessions_for_admin(admin_id):
     Used when admin is suspended — Kill Switch.
     Uses Redis SCAN to find all matching keys safely.
     """
-    client = get_redis_client()
-    pattern = 'admin:session:*'
-    pipeline = client.pipeline()
+    if is_redis_circuit_open():
+        return False
 
-    cursor = 0
-    while True:
-        cursor, keys = client.scan(cursor, match=pattern, count=100)
-        for key in keys:
-            data = client.get(key)
-            if data:
-                session = json.loads(data)
-                if session.get('admin_id') == str(admin_id):
-                    pipeline.delete(key)
-        if cursor == 0:
-            break
+    def _revoke():
+        client = get_redis_client()
+        pattern = 'admin:session:*'
+        pipeline = client.pipeline()
 
-    pipeline.execute()
+        cursor = 0
+        while True:
+            cursor, keys = client.scan(cursor, match=pattern, count=100)
+            for key in keys:
+                data = client.get(key)
+                if data:
+                    session = json.loads(data)
+                    if session.get('admin_id') == str(admin_id):
+                        pipeline.delete(key)
+            if cursor == 0:
+                break
+
+        pipeline.execute()
+        return True
+
+    _revoke.__name__ = 'revoke_all_sessions_for_admin'
+    return _redis_call(_revoke, fallback=False) is True
 
 
 def get_all_active_admin_sessions():
@@ -294,39 +303,53 @@ def get_all_active_admin_sessions():
     Return list of all active admin sessions.
     Used by Active Sessions Monitor (FRM-CP-11-03).
     """
-    client = get_redis_client()
-    pattern = 'admin:session:*'
-    sessions = []
+    if is_redis_circuit_open():
+        return []
 
-    cursor = 0
-    while True:
-        cursor, keys = client.scan(cursor, match=pattern, count=100)
-        for key in keys:
-            data = client.get(key)
-            if data:
-                session = json.loads(data)
-                ttl = client.ttl(key)
-                session['ttl_seconds'] = ttl
-                sessions.append(session)
-        if cursor == 0:
-            break
+    def _fetch():
+        client = get_redis_client()
+        pattern = 'admin:session:*'
+        sessions = []
 
-    sessions.sort(key=lambda x: x.get('started_at', ''), reverse=True)
-    return sessions
+        cursor = 0
+        while True:
+            cursor, keys = client.scan(cursor, match=pattern, count=100)
+            for key in keys:
+                data = client.get(key)
+                if data:
+                    session = json.loads(data)
+                    ttl = client.ttl(key)
+                    session['ttl_seconds'] = ttl
+                    sessions.append(session)
+            if cursor == 0:
+                break
+
+        sessions.sort(key=lambda x: x.get('started_at', ''), reverse=True)
+        return sessions
+
+    _fetch.__name__ = 'get_all_active_admin_sessions'
+    return _redis_call(_fetch, fallback=[])
 
 
 def count_active_admin_sessions():
     """Count active admin sessions from Redis efficiently."""
-    client = get_redis_client()
-    pattern = 'admin:session:*'
-    count = 0
-    cursor = 0
-    while True:
-        cursor, keys = client.scan(cursor, match=pattern, count=1000)
-        count += len(keys)
-        if cursor == 0:
-            break
-    return count
+    if is_redis_circuit_open():
+        return 0
+
+    def _count():
+        client = get_redis_client()
+        pattern = 'admin:session:*'
+        count = 0
+        cursor = 0
+        while True:
+            cursor, keys = client.scan(cursor, match=pattern, count=1000)
+            count += len(keys)
+            if cursor == 0:
+                break
+        return count
+
+    _count.__name__ = 'count_active_admin_sessions'
+    return _redis_call(_count, fallback=0)
 
 
 # ─────────────────────────────────────────
@@ -339,25 +362,31 @@ def revoke_all_tenant_sessions(tenant_id):
     Keys: tenant:{tenant_id}:session:{j}
     Populated by create_tenant_session() or tenant workspace on login.
     """
-    client = get_redis_client()
-    pattern = f'tenant:{tenant_id}:session:*'
-    deleted = 0
+    if is_redis_circuit_open():
+        return 0
 
-    cursor = 0
-    while True:
-        pipeline = client.pipeline()
-        batch_has_keys = False
-        cursor, keys = client.scan(cursor, match=pattern, count=100)
-        for key in keys:
-            pipeline.delete(key)
-            batch_has_keys = True
-        if batch_has_keys:
-            # Sum actual delete results (1 when key deleted, 0 otherwise).
-            deleted += sum(int(v or 0) for v in pipeline.execute())
-        if cursor == 0:
-            break
+    def _revoke():
+        client = get_redis_client()
+        pattern = f'tenant:{tenant_id}:session:*'
+        deleted = 0
 
-    return deleted
+        cursor = 0
+        while True:
+            pipeline = client.pipeline()
+            batch_has_keys = False
+            cursor, keys = client.scan(cursor, match=pattern, count=100)
+            for key in keys:
+                pipeline.delete(key)
+                batch_has_keys = True
+            if batch_has_keys:
+                # Sum actual delete results (1 when key deleted, 0 otherwise).
+                deleted += sum(int(v or 0) for v in pipeline.execute())
+            if cursor == 0:
+                break
+        return deleted
+
+    _revoke.__name__ = 'revoke_all_tenant_sessions'
+    return _redis_call(_revoke, fallback=0)
 
 
 def create_tenant_session(
@@ -439,21 +468,79 @@ def refresh_and_get_tenant_session(tenant_id, jti, timeout_minutes):
     return result
 
 
-def revoke_tenant_session_key(tenant_id, jti):
+def _tenant_revoked_jti_key(jti):
+    return f'tenant:revoked:{jti}'
+
+
+def mark_tenant_jti_revoked(jti, ttl_seconds=86400):
+    """Block JWT re-hydration after explicit session revoke (kill switch)."""
+    token = str(jti or '').strip()
+    if not token:
+        return False
+    return redis_safe_setex(_tenant_revoked_jti_key(token), max(60, int(ttl_seconds)), '1')
+
+
+def is_tenant_jti_revoked(jti):
+    """True when this JTI was explicitly revoked and must not be re-hydrated."""
+    token = str(jti or '').strip()
+    if not token:
+        return False
+    value = redis_safe_get(_tenant_revoked_jti_key(token))
+    if value is REDIS_UNAVAILABLE:
+        return False
+    return value is not None
+
+
+def rehydrate_tenant_session_from_jwt_claims(
+        tenant_id,
+        jti,
+        timeout_minutes,
+        jwt_claims,
+        *,
+        ip_address='',
+        user_agent=''):
+    """
+    Recreate a missing Redis session when the portal JWT is still valid.
+
+    Used after Redis restarts or when login cookies were issued before the
+    session key could be persisted. Skipped when the JTI is on the revoke list.
+    """
+    if not jwt_claims or is_tenant_jti_revoked(jti):
+        return (False, None)
+    reference_id = str(jwt_claims.get('tenant_user_id') or tenant_id).strip()
+    reference_name = str(
+        jwt_claims.get('display_name') or jwt_claims.get('email') or ''
+    ).strip()
+    create_tenant_session(
+        str(tenant_id),
+        'Tenant_User',
+        reference_id,
+        reference_name,
+        ip_address or '',
+        (user_agent or '')[:500],
+        timeout_minutes,
+        jti=str(jti),
+    )
+    return refresh_and_get_tenant_session(tenant_id, jti, timeout_minutes)
+
+
+def revoke_tenant_session_key(tenant_id, jti, *, revoked_ttl_seconds=86400):
     """Delete one tenant/driver session from Redis (best-effort when Redis is down)."""
     if not jti:
         return False
+    mark_tenant_jti_revoked(jti, ttl_seconds=revoked_ttl_seconds)
     key = f'tenant:{tenant_id}:session:{jti}'
     return redis_safe_delete(key)
 
 
-def revoke_tenant_session_by_jti(jti):
+def revoke_tenant_session_by_jti(jti, *, revoked_ttl_seconds=86400):
     """
     Delete a tenant/driver session by JTI without prior tenant_id.
     Returns number of deleted keys.
     """
     if not jti:
         return 0
+    mark_tenant_jti_revoked(jti, ttl_seconds=revoked_ttl_seconds)
 
     def _revoke():
         client = get_redis_client()
@@ -509,26 +596,33 @@ def get_all_active_tenant_sessions():
     Return list of all active tenant web/driver sessions from Redis.
     Keys: tenant:{tenant_id}:session:{jti}
     """
-    client = get_redis_client()
-    pattern = 'tenant:*:session:*'
-    sessions = []
+    if is_redis_circuit_open():
+        return []
 
-    cursor = 0
-    while True:
-        cursor, keys = client.scan(cursor, match=pattern, count=200)
-        for key in keys:
-            data = client.get(key)
-            if not data:
-                continue
-            session = json.loads(data)
-            ttl = client.ttl(key)
-            session['ttl_seconds'] = ttl
-            sessions.append(session)
-        if cursor == 0:
-            break
+    def _fetch():
+        client = get_redis_client()
+        pattern = 'tenant:*:session:*'
+        sessions = []
 
-    sessions.sort(key=lambda x: x.get('started_at', ''), reverse=True)
-    return sessions
+        cursor = 0
+        while True:
+            cursor, keys = client.scan(cursor, match=pattern, count=200)
+            for key in keys:
+                data = client.get(key)
+                if not data:
+                    continue
+                session = json.loads(data)
+                ttl = client.ttl(key)
+                session['ttl_seconds'] = ttl
+                sessions.append(session)
+            if cursor == 0:
+                break
+
+        sessions.sort(key=lambda x: x.get('started_at', ''), reverse=True)
+        return sessions
+
+    _fetch.__name__ = 'get_all_active_tenant_sessions'
+    return _redis_call(_fetch, fallback=[])
 
 
 def get_tenant_session(tenant_id, jti):

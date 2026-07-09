@@ -28,6 +28,9 @@ from iroad_tenants.operation_runtime.latest_state import (
     apply_shipment_status_impact,
     resolve_effective_shipment_status_for_action,
 )
+from iroad_tenants.operation_runtime.movement_action_validator import (
+    is_empty_move_catalog_action,
+)
 from iroad_tenants.operation_runtime.movement_ops import birth_movement_for_shipment
 from iroad_tenants.operation_runtime.pod_action import (
     apply_pod_posting_from_action_log,
@@ -58,11 +61,8 @@ def _is_confirm_loaded_action(action) -> bool:
 
 
 def _is_depart_in_transit_action(action) -> bool:
-    if action is not None:
-        category = (getattr(action, 'sequence_category', None) or '').strip()
-        code = (getattr(action, 'action_code', None) or '').strip().upper()
-        if category == 'empty_move' or code.startswith('EM'):
-            return False
+    if action is not None and is_empty_move_catalog_action(action):
+        return False
     return operation_action_matches(
         action,
         'depart in transit',
@@ -73,13 +73,11 @@ def _is_depart_in_transit_action(action) -> bool:
 
 
 def _is_unloading_completed_action(action) -> bool:
-    return operation_action_matches(
-        action,
-        'unloading completed',
-        'unloading',
-        'a8',
-        'action 8',
+    from iroad_tenants.operation_runtime.shipment_execution_stage import (
+        is_unloading_completed_action,
     )
+
+    return is_unloading_completed_action(action)
 
 
 def _should_auto_mark_delivered_for_credit(action, shipment) -> bool:
@@ -109,7 +107,22 @@ def _mobile_log_evidence_for_shipment(shipment) -> dict[str, bool]:
         .select_related('operation_action')
         .order_by('-log_date', '-created_at')[:100],
     )
-    return log_evidence_flags(logs)
+    evidence = log_evidence_flags(logs)
+    try:
+        from mobile_api.dashboard.selectors.pod_cod_policy import (
+            enrich_log_evidence_hard_pod,
+            shipment_requires_hard_copy,
+        )
+
+        if shipment_requires_hard_copy(shipment):
+            evidence = enrich_log_evidence_hard_pod(
+                evidence,
+                shipment,
+                logs=logs,
+            )
+    except Exception:
+        pass
+    return evidence
 
 
 def _mobile_pod_compliance_satisfied(shipment) -> bool:
@@ -172,6 +185,12 @@ def _sync_pod_status_from_mobile_logs(shipment) -> None:
             shipment.save(update_fields=['pod_status', 'updated_at'])
         return
     if evidence.get('pod_uploaded') or evidence.get('delivered_log'):
+        from iroad_tenants.operation_runtime.shipment_execution_stage import (
+            _shipment_pod_upload_substantively_complete,
+        )
+
+        if not _shipment_pod_upload_substantively_complete(shipment):
+            return
         shipment.pod_status = TenantShipment.PodStatus.COMPLETED
         shipment.save(update_fields=['pod_status', 'updated_at'])
 
@@ -249,20 +268,19 @@ def _ensure_auto_delivered_verify_log(
     notes: str = 'Auto POD verified after COD collection',
 ) -> None:
     """
-    Log-primary reconciler: append a Delivered-impact row so authoritative_status
-    advances with the column (tenant Action Master ``A_POD_VERIFY`` when present).
+    Log-primary reconciler: append a backend-only Delivered milestone row.
+
+    No Action Master row is required — ``operation_action`` stays NULL and
+    timeline consumers key off ``source_channel``.
     """
     from iroad_tenants.operation_runtime.action_master_catalog import (
-        resolve_auto_cod_verify_action,
+        AUTO_COD_VERIFY_IDEMPOTENCY_PREFIX,
+        AUTO_COD_VERIFY_LOG_NO_PREFIX,
     )
 
-    verify_action = resolve_auto_cod_verify_action()
-    if verify_action is None:
-        return
-
     shipment_pk = str(getattr(shipment, 'pk', '') or getattr(shipment, 'shipment_id', ''))
-    idempotency_key = f'auto-pod-verify-{shipment_pk}'
-    log_no = f'LOG-POD-VERIFY-{shipment_pk[:24]}'
+    idempotency_key = f'{AUTO_COD_VERIFY_IDEMPOTENCY_PREFIX}{shipment_pk}'
+    log_no = f'{AUTO_COD_VERIFY_LOG_NO_PREFIX}{shipment_pk[:24]}'
 
     log_row, _created = TenantOperationActionLog.objects.get_or_create(
         idempotency_key=idempotency_key,
@@ -270,7 +288,7 @@ def _ensure_auto_delivered_verify_log(
             'log_no': log_no,
             'log_sequence': 99,
             'log_date': timezone.now(),
-            'operation_action': verify_action,
+            'operation_action': None,
             'source': 'System',
             'source_channel': source_channel,
             'source_ref': source_channel,
@@ -283,12 +301,17 @@ def _ensure_auto_delivered_verify_log(
             'truck_movement': getattr(action_log, 'truck_movement', None),
         },
     )
-    if log_row.operation_action_id != verify_action.pk:
-        log_row.operation_action = verify_action
+    patch_fields: list[str] = []
+    if log_row.source_channel != source_channel:
         log_row.source_channel = source_channel
-        log_row.save(
-            update_fields=['operation_action', 'source_channel', 'updated_at'],
-        )
+        log_row.source_ref = source_channel
+        patch_fields.extend(['source_channel', 'source_ref'])
+    if log_row.operation_action_id is not None:
+        log_row.operation_action = None
+        patch_fields.append('operation_action')
+    if patch_fields:
+        patch_fields.append('updated_at')
+        log_row.save(update_fields=patch_fields)
 
 
 def _apply_auto_delivered_for_cod(
@@ -353,6 +376,67 @@ def maybe_advance_delivered_when_job_close_ready(
     return True
 
 
+def maybe_advance_shipment_after_hard_pod_custody(
+    shipment,
+    *,
+    action_log: TenantOperationActionLog | None = None,
+    created_by_label: str = 'system',
+) -> bool:
+    """
+    After hard-copy custody promotion: when digital + hard-copy are both complete,
+    advance ``shipment_status`` to POD Submitted and ``pod_status`` to Completed.
+    """
+    _ = action_log
+    _ = created_by_label
+    if shipment is None:
+        return False
+    current = (shipment.shipment_status or '').strip()
+    if current in {
+        TenantShipment.ShipmentStatus.CLOSED,
+        TenantShipment.ShipmentStatus.CANCELLED,
+    }:
+        return False
+    try:
+        from mobile_api.dashboard.selectors.pod_cod_policy import derive_hard_pod_pending
+
+        if derive_hard_pod_pending(shipment):
+            return False
+    except Exception:
+        return False
+
+    _sync_pod_status_from_mobile_logs(shipment)
+    if hasattr(shipment, 'refresh_from_db'):
+        shipment.refresh_from_db(
+            fields=['pod_status', 'shipment_status', 'order_type', 'updated_at'],
+        )
+
+    if not _mobile_pod_compliance_satisfied(shipment):
+        return False
+
+    pod_type = (getattr(shipment, 'pod_type', None) or '').strip()
+    if pod_type == TenantShipment.PodType.HARD:
+        if (getattr(shipment, 'pod_status', None) or '').strip() != (
+            TenantShipment.PodStatus.COMPLETED
+        ):
+            shipment.pod_status = TenantShipment.PodStatus.COMPLETED
+            shipment.save(update_fields=['pod_status', 'updated_at'])
+
+    if current != TenantShipment.ShipmentStatus.POD_SUBMITTED:
+        shipment.shipment_status = TenantShipment.ShipmentStatus.POD_SUBMITTED
+        shipment.save(update_fields=['shipment_status', 'updated_at'])
+
+    from iroad_tenants.operation_runtime.latest_state import after_shipment_status_side_effects
+
+    after_shipment_status_side_effects(shipment)
+    booking = getattr(shipment, 'booking', None)
+    if booking is None and getattr(shipment, 'booking_id', None):
+        from tenant_workspace.models import TenantBooking
+
+        booking = TenantBooking.objects.filter(pk=shipment.booking_id).first()
+    sync_booking_pod_status_from_shipments(booking)
+    return True
+
+
 def _shipment_job_close_gates_satisfied_for_advance(shipment) -> bool:
     if not _mobile_pod_compliance_satisfied(shipment):
         return False
@@ -405,6 +489,12 @@ def _ensure_auto_close_job_log(
     from iroad_tenants.operation_runtime.action_master_catalog import (
         resolve_auto_close_job_action,
     )
+    from iroad_tenants.views import (
+        _next_auto_number_for_form,
+        OPERATION_ACTION_LOG_AUTO_FORM_CODE,
+        OPERATION_ACTION_LOG_AUTO_FORM_LABEL,
+        OPERATION_ACTION_LOG_REF_PREFIX,
+    )
 
     close_action = resolve_auto_close_job_action()
     if close_action is None:
@@ -412,7 +502,25 @@ def _ensure_auto_close_job_log(
 
     shipment_pk = str(getattr(shipment, 'pk', '') or getattr(shipment, 'shipment_id', ''))
     idempotency_key = f'auto-job-close-{shipment_pk}'
-    log_no = f'LOG-JOB-CLOSE-{shipment_pk[:24]}'
+
+    existing = TenantOperationActionLog.objects.filter(idempotency_key=idempotency_key).first()
+    if existing is not None:
+        return
+
+    log_no = ''
+    log_sequence = 0
+    for _ in range(10):
+        log_no, log_sequence = _next_auto_number_for_form(
+            form_code=OPERATION_ACTION_LOG_AUTO_FORM_CODE,
+            form_label=OPERATION_ACTION_LOG_AUTO_FORM_LABEL,
+            prefix=OPERATION_ACTION_LOG_REF_PREFIX,
+        )
+        if not TenantOperationActionLog.objects.filter(log_no=log_no).exists():
+            break
+
+    if not log_no or TenantOperationActionLog.objects.filter(log_no=log_no).exists():
+        log_no = f'LOG-JOB-CLOSE-{shipment_pk[:24]}'
+        log_sequence = 100
 
     driver = None
     if action_log is not None:
@@ -424,7 +532,7 @@ def _ensure_auto_close_job_log(
         idempotency_key=idempotency_key,
         defaults={
             'log_no': log_no,
-            'log_sequence': 100,
+            'log_sequence': log_sequence,
             'log_date': timezone.now(),
             'operation_action': close_action,
             'source': 'System',
@@ -700,6 +808,10 @@ def apply_execution_side_effects(action_log, *, created_by_label='') -> None:
     if action is None:
         return
 
+    from iroad_tenants.operation_runtime.workflow_action_policy import (
+        action_is_job_close,
+    )
+
     booking = action_log.booking
     shipment = action_log.shipment
     truck_movement = action_log.truck_movement
@@ -786,8 +898,26 @@ def apply_execution_side_effects(action_log, *, created_by_label='') -> None:
             )
 
     hard_first_pod_execute = False
-    if shipment is not None and getattr(action, 'hard_copy_collection', False):
+    run_hard_copy_promotion = False
+    if shipment is not None:
         from iroad_tenants.operation_execution import _pending_hard_pod_custody_exists
+        from iroad_tenants.operation_field_catalog import operation_shipment_uses_hard_copy_pod
+        from mobile_api.pod_capture.policy.canonical_pod_action_registry import (
+            is_pod_upload_action,
+        )
+
+        custody_linked = bool(
+            str(getattr(action_log, '_hard_pod_custody_submission_id', None) or '').strip()
+            or str(getattr(action_log, '_hard_pod_client_submission_id', None) or '').strip()
+        )
+        run_hard_copy_promotion = bool(getattr(action, 'hard_copy_collection', False))
+        if not run_hard_copy_promotion and operation_shipment_uses_hard_copy_pod(shipment):
+            if is_pod_upload_action(action) and (
+                custody_linked or _pending_hard_pod_custody_exists(shipment)
+            ):
+                run_hard_copy_promotion = True
+
+    if shipment is not None and run_hard_copy_promotion:
         from iroad_tenants.operation_runtime.hard_pod_promotion import (
             promote_pending_hard_pod_custody_for_action_log,
         )
@@ -809,6 +939,13 @@ def apply_execution_side_effects(action_log, *, created_by_label='') -> None:
             shipment.refresh_from_db()
         apply_hard_copy_received_if_needed(shipment=shipment, action=action)
         shipment.refresh_from_db()
+        if promoted:
+            maybe_advance_shipment_after_hard_pod_custody(
+                shipment,
+                action_log=action_log,
+                created_by_label=created_by_label,
+            )
+            shipment.refresh_from_db()
 
     if shipment is not None and action.auto_pod_post and not hard_first_pod_execute:
         pod_document = birth_pod_from_action_log(
@@ -822,7 +959,10 @@ def apply_execution_side_effects(action_log, *, created_by_label='') -> None:
             created_by_label=created_by_label,
         )
 
-    if shipment is not None and (action.shipment_status_impact or '').strip():
+    if shipment is not None and (
+        (action.shipment_status_impact or '').strip()
+        or action_is_job_close(action)
+    ):
         from iroad_tenants.operation_runtime.latest_state import (
             resolve_effective_shipment_status_for_action,
         )

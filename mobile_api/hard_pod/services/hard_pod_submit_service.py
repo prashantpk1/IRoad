@@ -11,9 +11,10 @@ Hard POD custody submit orchestration — prepares custody state only.
 # Ops Document Handover on desktop is the final verification step
 from __future__ import annotations
 
+import hashlib
+import logging
 from typing import Any, Mapping
 
-import hashlib
 from django.db import transaction
 from django_tenants.utils import schema_context
 
@@ -26,9 +27,15 @@ from mobile_api.hard_pod.services.hard_pod_custody_service import HardPodCustody
 from mobile_api.hard_pod.services.hard_pod_idempotency_service import HardPodIdempotencyService
 from mobile_api.job_detail.guards.ownership import driver_pk
 from mobile_api.pod_capture.models import PODCaptureBundle
+from mobile_api.hard_pod.services.hard_pod_custody_promotion import (
+    promote_custody_submission,
+    resolve_hard_pod_promotion_action_code,
+)
 from mobile_api.pod_capture.services.pod_capture_action_resolver import (
     resolve_hard_copy_pod_action_code,
 )
+
+logger = logging.getLogger('mobile_api.hard_pod')
 
 
 def _driver_label(driver: Any) -> str:
@@ -147,10 +154,13 @@ class HardPodSubmitService:
                     tenant_schema=schema,
                     integrity_checksum=integrity_checksum,
                 )
-                return self._build_response(
+                return self._finalize_submission_response(
                     existing,
-                    replayed=True,
+                    driver=driver,
+                    shipment=shipment,
                     tenant_schema=schema,
+                    payload=payload,
+                    replayed=True,
                 )
 
             capture_bundle_id = self._resolve_capture_bundle_id(
@@ -182,7 +192,14 @@ class HardPodSubmitService:
                         tenant_schema=schema,
                         integrity_checksum=integrity_checksum,
                     )
-                    return self._build_response(submission, replayed=True, tenant_schema=schema)
+                    return self._finalize_submission_response(
+                        submission,
+                        driver=driver,
+                        shipment=shipment,
+                        tenant_schema=schema,
+                        payload=payload,
+                        replayed=True,
+                    )
 
                 actor_label = _driver_label(driver)
                 self._custody.record_collected(
@@ -210,7 +227,14 @@ class HardPodSubmitService:
                 if media_items:
                     self._custody.persist_media_rows(submission, media_items)
 
-            return self._build_response(submission, replayed=False, tenant_schema=schema)
+            return self._finalize_submission_response(
+                submission,
+                driver=driver,
+                shipment=shipment,
+                tenant_schema=schema,
+                payload=payload,
+                replayed=False,
+            )
 
     def _resolve_capture_bundle_id(
         self,
@@ -230,6 +254,93 @@ class HardPodSubmitService:
         )
         return str(bundle.id) if bundle else None
 
+    def _finalize_submission_response(
+        self,
+        submission: Any,
+        *,
+        driver: Any,
+        shipment: Any,
+        tenant_schema: str,
+        payload: Mapping[str, Any],
+        replayed: bool,
+    ) -> dict[str, Any]:
+        response = self._build_response(
+            submission,
+            replayed=replayed,
+            tenant_schema=tenant_schema,
+        )
+        execute_step = self._promote_custody_via_execute(
+            submission=submission,
+            driver=driver,
+            shipment=shipment,
+            tenant_schema=tenant_schema,
+            payload=payload,
+        )
+        if execute_step:
+            response['execute_step'] = execute_step
+            if execute_step.get('promoted'):
+                submission.refresh_from_db()
+                if not (
+                    submission.promoted_at
+                    and (submission.promotion_action_log_id or '').strip()
+                ):
+                    execute_step['promoted'] = False
+                    execute_step['error_code'] = 'hard_pod_custody_not_promoted'
+            if execute_step.get('promoted'):
+                cod_code = str(execute_step.get('next_collect_payment_action_code') or '').strip()
+                response['next_step'] = {
+                    'requires_execute_action': False,
+                    'execute_action_code': execute_step.get('execute_action_code') or '',
+                    'complete_upload_after_execute': True,
+                    'reason': 'hard_pod_workflow_complete',
+                    'action_log_id': execute_step.get('action_log_id') or '',
+                    'refresh_job_detail': True,
+                }
+                if cod_code:
+                    response['next_step'].update(
+                        {
+                            'action': 'go_to_payment_collection',
+                            'screen': 'collect_payment',
+                            'next_action_code': cod_code,
+                        },
+                    )
+            elif execute_step.get('error_code'):
+                response['next_step']['execute_error_code'] = execute_step['error_code']
+                response['next_step']['custody_submission_id'] = str(
+                    getattr(submission, 'pk', '') or ''
+                )
+                response['next_step']['message'] = str(
+                    execute_step.get('message') or ''
+                ).strip()
+        return response
+
+    def _promote_custody_via_execute(
+        self,
+        *,
+        submission: Any,
+        driver: Any,
+        shipment: Any,
+        tenant_schema: str,
+        payload: Mapping[str, Any],
+    ) -> dict[str, Any] | None:
+        """
+        Promote custody using tenant dynamic Action Master code (kernel path).
+
+        Avoids the mobile execute orchestrator (recursion / stale-sync issues).
+        """
+        from mobile_api.hard_pod.services.hard_pod_custody_recovery import (
+            hard_pod_promotion_guard,
+        )
+
+        with hard_pod_promotion_guard():
+            return promote_custody_submission(
+                submission=submission,
+                driver=driver,
+                shipment=shipment,
+                tenant_schema=tenant_schema,
+                payload=payload,
+            )
+
     def _build_response(
         self,
         submission: Any,
@@ -247,7 +358,11 @@ class HardPodSubmitService:
             'timeline_preview': timeline,
             'next_step': {
                 'requires_execute_action': True,
-                'execute_action_code': resolve_hard_copy_pod_action_code(tenant_schema),
+                'execute_action_code': resolve_hard_pod_promotion_action_code(
+                    tenant_schema,
+                    shipment=None,
+                    fallback=resolve_hard_copy_pod_action_code(tenant_schema),
+                ),
                 'complete_upload_after_execute': True,
                 'reason': 'hard_pod_workflow_progression',
             },

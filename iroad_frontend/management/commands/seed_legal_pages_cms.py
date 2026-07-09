@@ -19,14 +19,14 @@ from iroad_frontend.models import (
 
 def _privacy_seed_data():
     return {
-        'page_title_en': 'Privacy Policy - IRoad',
-        'page_title_ar': 'سياسة الخصوصية - آيرواد',
+        'page_title_en': 'Privacy Policy - IRoute',
+        'page_title_ar': 'سياسة الخصوصية - آيروت',
         'meta_description_en': (
-            'Read the IRoad privacy policy: how we collect, use, and protect '
+            'Read the IRoute privacy policy: how we collect, use, and protect '
             'your data when you use our transport management platform.'
         ),
         'meta_description_ar': (
-            'اطلع على سياسة خصوصية آيرواد: كيف نجمع بياناتك ونستخدمها ونحميها '
+            'اطلع على سياسة خصوصية آيروت: كيف نجمع بياناتك ونستخدمها ونحميها '
             'عند استخدامك لمنصة إدارة النقل.'
         ),
         'page_header_h1_en': 'Privacy Policy',
@@ -41,14 +41,14 @@ def _privacy_seed_data():
 
 def _terms_seed_data():
     return {
-        'page_title_en': 'Terms & Conditions - IRoad',
-        'page_title_ar': 'الشروط والأحكام - آيرواد',
+        'page_title_en': 'Terms & Conditions - IRoute',
+        'page_title_ar': 'الشروط والأحكام - آيروت',
         'meta_description_en': (
-            'IRoad terms and conditions of use for the website and SaaS '
+            'IRoute terms and conditions of use for the website and SaaS '
             'transport management services.'
         ),
         'meta_description_ar': (
-            'شروط وأحكام استخدام آيرواد للموقع ولخدمات إدارة النقل السحابية.'
+            'شروط وأحكام استخدام آيروت للموقع ولخدمات إدارة النقل السحابية.'
         ),
         'page_header_h1_en': 'Terms & Conditions',
         'page_header_h1_ar': 'الشروط والأحكام',
@@ -62,7 +62,7 @@ def _terms_seed_data():
 
 _PRIVACY_HTML_EN = """
 <h2>Introduction</h2>
-<p>IRoad (&ldquo;we&rdquo;, &ldquo;us&rdquo;, or &ldquo;our&rdquo;) operates a transport management
+<p>IRoute (&ldquo;we&rdquo;, &ldquo;us&rdquo;, or &ldquo;our&rdquo;) operates a transport management
 software platform. This Privacy Policy explains how we handle personal and
 business information when you visit our website or use our services.</p>
 
@@ -104,7 +104,7 @@ on our website.</p>
 
 _PRIVACY_HTML_AR = """
 <h2>مقدمة</h2>
-<p>تُدير شركة آيرواد (&ldquo;نحن&rdquo;) منصة برمجيات لإدارة النقل. توضح سياسة الخصوصية هذه
+<p>تُدير شركة آيروت (&ldquo;نحن&rdquo;) منصة برمجيات لإدارة النقل. توضح سياسة الخصوصية هذه
 كيفية تعاملنا مع المعلومات الشخصية وذات الصلة بالأعمال عند زيارتك لموقعنا أو
 استخدامك لخدماتنا.</p>
 
@@ -143,11 +143,11 @@ _PRIVACY_HTML_AR = """
 
 _TERMS_HTML_EN = """
 <h2>Agreement</h2>
-<p>By accessing or using IRoad websites, demos, or cloud services, you agree to
+<p>By accessing or using IRoute websites, demos, or cloud services, you agree to
 these Terms &amp; Conditions and our Privacy Policy.</p>
 
 <h2>Services</h2>
-<p>IRoad provides software and related services for transport and logistics
+<p>IRoute provides software and related services for transport and logistics
 operations. Features and availability may differ by plan or region.</p>
 
 <h2>Accounts</h2>
@@ -162,7 +162,7 @@ all activity under your account. Notify us promptly of any unauthorized use.</p>
 </ul>
 
 <h2>Intellectual property</h2>
-<p>IRoad and its licensors retain all rights in the software, branding, and
+<p>IRoute and its licensors retain all rights in the software, branding, and
 content. You receive a limited license to use the service according to your
 subscription.</p>
 
@@ -171,7 +171,7 @@ subscription.</p>
 We do not warrant uninterrupted or error-free operation.</p>
 
 <h2>Limitation of liability</h2>
-<p>To the maximum extent permitted by law, IRoad is not liable for indirect,
+<p>To the maximum extent permitted by law, IRoute is not liable for indirect,
 incidental, special, or consequential damages arising from use of the service.</p>
 
 <h2>Termination</h2>
@@ -179,7 +179,7 @@ incidental, special, or consequential damages arising from use of the service.</
 or legal reasons, subject to your contract where applicable.</p>
 
 <h2>Governing law</h2>
-<p>These terms are governed by the laws applicable to your agreement with IRoad,
+<p>These terms are governed by the laws applicable to your agreement with IRoute,
 unless otherwise specified in writing.</p>
 
 <h2>Changes</h2>
@@ -193,11 +193,11 @@ the revised terms where permitted by law.</p>
 
 _TERMS_HTML_AR = """
 <h2>الاتفاق</h2>
-<p>باستخدامك لمواقع آيرواد أو العروض التوضيحية أو الخدمات السحابية فإنك توافق على
+<p>باستخدامك لمواقع آيروت أو العروض التوضيحية أو الخدمات السحابية فإنك توافق على
 هذه الشروط والأحكام وعلى سياسة الخصوصية.</p>
 
 <h2>الخدمات</h2>
-<p>توفر آيرواد برمجيات وخدمات مرتبطة بعمليات النقل واللوجستيات، وقد تختلف
+<p>توفر آيروت برمجيات وخدمات مرتبطة بعمليات النقل واللوجستيات، وقد تختلف
 الميزات والتوفر حسب الخطة أو المنطقة.</p>
 
 <h2>الحسابات</h2>
@@ -212,7 +212,7 @@ _TERMS_HTML_AR = """
 </ul>
 
 <h2>الملكية الفكرية</h2>
-<p>تحتفظ آيرواد والمرخصون لها بجميع الحقوق في البرمجيات والعلامات والمحتوى،
+<p>تحتفظ آيروت والمرخصون لها بجميع الحقوق في البرمجيات والعلامات والمحتوى،
 ويُمنح لك ترخيص محدود لاستخدام الخدمة وفق اشتراكك.</p>
 
 <h2>إخلاء المسؤولية</h2>
@@ -220,7 +220,7 @@ _TERMS_HTML_AR = """
 دائماً أو خالياً من الأخطاء.</p>
 
 <h2>تحديد المسؤولية</h2>
-<p>في الحد الأقصى الذي يسمح به القانون، لا تتحمل آيرواد المسؤولية عن الأضرار
+<p>في الحد الأقصى الذي يسمح به القانون، لا تتحمل آيروت المسؤولية عن الأضرار
 غير المباشرة أو العرضية أو الخاصة أو التبعية الناتجة عن استخدام الخدمة.</p>
 
 <h2>إنهاء الخدمة</h2>
@@ -228,7 +228,7 @@ _TERMS_HTML_AR = """
 مع مراعاة عقدك حيث ينطبق ذلك.</p>
 
 <h2>القانون الحاكم</h2>
-<p>تخضع هذه الشروط للقوانين المعمول بها في اتفاقك مع آيرواد ما لم يُنص على
+<p>تخضع هذه الشروط للقوانين المعمول بها في اتفاقك مع آيروت ما لم يُنص على
 خلاف ذلك كتابةً.</p>
 
 <h2>التغييرات</h2>

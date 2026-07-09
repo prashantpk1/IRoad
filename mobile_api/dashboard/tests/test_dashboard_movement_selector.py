@@ -175,7 +175,7 @@ class MovementSelectionPolicyTests(SimpleTestCase):
             'complete_done': False,
         },
     )
-    def test_movement_ordering_picks_earlier_date(self, _mock_flags):
+    def test_movement_ordering_picks_most_recent_date(self, _mock_flags):
         driver = _driver()
         later = _movement(
             movement_date=date(2026, 6, 1),
@@ -191,7 +191,7 @@ class MovementSelectionPolicyTests(SimpleTestCase):
             driver,
             [later, earlier],
         )
-        self.assertEqual(picked.movement_no, 'EM-EARLY')
+        self.assertEqual(picked.movement_no, 'EM-LATE')
 
     @patch(
         'mobile_api.dashboard.selectors.movement_selection_policy.movement_log_milestone_flags',

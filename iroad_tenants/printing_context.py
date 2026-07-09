@@ -2,19 +2,18 @@
 from __future__ import annotations
 
 from django.conf import settings
+from django.templatetags.static import static
 
 from tenant_workspace.models import OrganizationProfile
 
 PRINT_NA = '—'
 
+IROUTE_LOGO_BLUE_STATIC = 'tenantdesign/image/brand/iroute-logo-blue.svg'
+IROUTE_LOGO_WHITE_STATIC = 'tenantdesign/image/brand/iroute-logo-white.svg'
+
 
 def _organization_profile():
     return OrganizationProfile.objects.order_by('-updated_at').first()
-
-
-def _org_seal_text(profile) -> str:
-    """Print templates always use the fixed IRoad seal mark (see Printing-Templates/)."""
-    return 'IR'
 
 
 def _org_logo_url(profile) -> str:
@@ -26,17 +25,36 @@ def _org_logo_url(profile) -> str:
         return ''
 
 
+def _static_asset_url(static_path: str) -> str:
+    return absolute_media_url(static(static_path))
+
+
+def build_brand_print_context() -> dict:
+    """
+    Official IRoute logo assets (see IROAD DOC/iroute_logo/).
+
+    Blue logo on light/white print backgrounds; white logo on Dynamic Blue (#3B82F6).
+    """
+    return {
+        'logo_blue_url': _static_asset_url(IROUTE_LOGO_BLUE_STATIC),
+        'logo_white_url': _static_asset_url(IROUTE_LOGO_WHITE_STATIC),
+        'logo_blue_on_light': True,
+    }
+
+
 def build_org_print_context() -> dict:
     profile = _organization_profile()
+    tenant_logo_url = absolute_media_url(_org_logo_url(profile))
+    brand = build_brand_print_context()
     return {
         'org': {
             'name_ar': (profile.name_ar if profile else '') or PRINT_NA,
             'name_en': (profile.name_en if profile else '') or PRINT_NA,
-            'seal_text': _org_seal_text(profile),
-            'logo_url': absolute_media_url(_org_logo_url(profile)),
+            'logo_url': tenant_logo_url,
             'cr_number': (profile.cr_number if profile else '') or PRINT_NA,
             'tax_number': (profile.tax_number if profile else '') or PRINT_NA,
         },
+        'brand': brand,
         'print_na': PRINT_NA,
         'currency_code': (
             (profile.base_currency_code if profile else '') or 'SAR'

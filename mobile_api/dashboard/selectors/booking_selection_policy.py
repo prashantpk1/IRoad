@@ -5,8 +5,9 @@ Pure booking/shipment selection rules for the driver dashboard.
 
 Lifecycle split (mobile execution vs portal/accounting):
 
-- **Execution complete** — ``DELIVERED`` or ``CLOSED``; drives leg sequencing,
-  next executable shipment, and active shipment for the driver.
+- **Execution complete** — ``CLOSED``, or ``DELIVERED`` / ``POD_SUBMITTED`` only
+  after POD (+ COD when applicable) gates pass; drives leg sequencing and active
+  shipment for the driver.
 - **Business complete** — ``CLOSED`` only; drives booking fully-complete skip
   and business progress percentages.
 
@@ -32,10 +33,10 @@ _LINE_TYPE_ORDER: dict[str, int] = {
     'backload': 2,
 }
 
-_EXECUTION_COMPLETE_STATUSES = frozenset(
+_POST_DELIVERY_EXECUTION_STATUSES = frozenset(
     {
+        TenantShipment.ShipmentStatus.POD_SUBMITTED,
         TenantShipment.ShipmentStatus.DELIVERED,
-        TenantShipment.ShipmentStatus.CLOSED,
     }
 )
 
@@ -68,14 +69,44 @@ def is_shipment_cancelled(shipment: TenantShipment | Any) -> bool:
     return _norm_status(shipment) == TenantShipment.ShipmentStatus.CANCELLED
 
 
+def _shipment_mobile_execution_gates_satisfied(shipment: TenantShipment | Any) -> bool:
+    """POD (+ COD when applicable) done — leg may hand off to the next booking row."""
+    if shipment is None:
+        return False
+    order_type = (getattr(shipment, 'order_type', None) or '').strip().upper()
+    if order_type == 'COD':
+        if (
+            getattr(shipment, 'collection_status', None)
+            != TenantShipment.CollectionStatus.COLLECTED
+        ):
+            return False
+    pod_status = (getattr(shipment, 'pod_status', None) or '').strip()
+    if pod_status == TenantShipment.PodStatus.COMPLETED:
+        return True
+    try:
+        from iroad_tenants.operation_runtime.side_effects import (
+            _mobile_pod_compliance_satisfied,
+        )
+
+        return _mobile_pod_compliance_satisfied(shipment)
+    except Exception:
+        return False
+
+
 def is_shipment_execution_complete(shipment: TenantShipment | Any) -> bool:
     """
     Leg finished for mobile execution sequencing.
 
-    ``DELIVERED`` or ``CLOSED`` — next leg may become executable without waiting
-    for portal ``CLOSED`` finalization on the prior leg.
+    ``CLOSED`` always completes. ``DELIVERED`` / ``POD_SUBMITTED`` complete only
+    when POD (+ COD) gates pass so round-trip leg 2 cannot start after
+    Unloading Completed (OA-0008) before POD (OA-0009).
     """
-    return _norm_status(shipment) in _EXECUTION_COMPLETE_STATUSES
+    status = _norm_status(shipment)
+    if status == TenantShipment.ShipmentStatus.CLOSED:
+        return True
+    if status not in _POST_DELIVERY_EXECUTION_STATUSES:
+        return False
+    return _shipment_mobile_execution_gates_satisfied(shipment)
 
 
 def is_shipment_business_complete(shipment: TenantShipment | Any) -> bool:
@@ -90,6 +121,42 @@ def is_shipment_completed(shipment: TenantShipment | Any) -> bool:
 
 def is_booking_cancelled(booking: TenantBooking | Any) -> bool:
     return (booking.booking_status or '').strip() == TenantBooking.Status.CANCELLED
+
+
+def is_booking_operationally_cancelled(
+    booking: TenantBooking | Any,
+    shipments: Sequence[TenantShipment | Any] | None = None,
+) -> bool:
+    """
+    Booking must not drive mobile jobs when portal shows it as Cancelled.
+
+    Covers R3 (stored Cancelled), derived header Cancelled (all legs cancelled),
+    and Confirmed headers whose only shipment rows are Cancelled.
+    """
+    if booking is None:
+        return True
+    if is_booking_cancelled(booking):
+        return True
+    try:
+        from iroad_tenants.booking_status import (
+            BOOKING_HEADER_CANCELLED,
+            derive_booking_header_status,
+        )
+
+        if derive_booking_header_status(booking) == BOOKING_HEADER_CANCELLED:
+            return True
+    except Exception:
+        pass
+    if shipments is not None:
+        rows = list(shipments)
+        if rows and not countable_shipments(rows):
+            # Backload row existed but is cancelled — booking is fully dead.
+            if any(_is_secondary_line_type(s) for s in rows):
+                return True
+            if is_backload_leg_pending(booking, rows):
+                return False
+            return True
+    return False
 
 
 def is_booking_active(booking: TenantBooking | Any) -> bool:
@@ -141,10 +208,11 @@ def round_trip_defers_job_close(
     shipments: Sequence[TenantShipment | Any] | None = None,
 ) -> bool:
     """
-    Round-trip bookings use one Job Close on the final leg only.
+    Round-trip bookings defer Job Close on outbound only until POD/COD are done.
 
-    After outbound POD/COD the driver continues the return leg — Job Close must
-    not appear on the first leg (avoids tapping Job Closed twice).
+    After outbound POD (+ COD) the driver must tap **End Job** on the timeline to
+    finish round 1 explicitly, then continue the return leg — avoids mixing round 1
+    and round 2 state on one screen.
     """
     if booking is None:
         return False
@@ -160,13 +228,17 @@ def round_trip_defers_job_close(
         except Exception:
             rows = []
 
-    if is_backload_leg_pending(booking, rows):
-        return True
     if is_booking_fully_complete(rows, booking=booking):
         return False
     if shipment is None:
         return True
     if _is_outbound_line_type(shipment):
+        from iroad_tenants.operation_execution import (
+            _shipment_leg_pod_cod_complete_for_job_close,
+        )
+
+        if _shipment_leg_pod_cod_complete_for_job_close(shipment):
+            return False
         return True
     if _is_secondary_line_type(shipment):
         nxt = get_next_executable_shipment(booking, rows)
@@ -209,7 +281,7 @@ def _progress_tuple(
 def booking_execution_progress(
     shipments: Sequence[TenantShipment | Any],
 ) -> tuple[int, int, int]:
-    """Progress by execution-complete legs (``DELIVERED`` / ``CLOSED``)."""
+    """Progress by execution-complete legs (POD/COD gates + ``CLOSED``)."""
     return _progress_tuple(
         shipments,
         complete_fn=is_shipment_execution_complete,
@@ -299,7 +371,7 @@ def is_backload_leg_pending(
     if not primary:
         return _outbound_primary_resolved(booking, shipments)
     return all(
-        is_shipment_execution_complete(s) or is_shipment_cancelled(s)
+        is_shipment_business_complete(s) or is_shipment_cancelled(s)
         for s in primary
     )
 
@@ -434,19 +506,38 @@ def is_booking_execution_fully_complete(
     return all(is_shipment_execution_complete(s) for s in active)
 
 
+def _leg_has_blocking_driver_work(shipment: TenantShipment | Any) -> bool:
+    """Leg still needs driver steps (movement, POD/COD, or End Job)."""
+    if is_shipment_cancelled(shipment):
+        return False
+    if not is_shipment_execution_complete(shipment):
+        return True
+    return not is_shipment_business_complete(shipment)
+
+
 def get_next_executable_shipment(
     booking: TenantBooking | Any,
     shipments: Sequence[TenantShipment | Any],
 ) -> Any | None:
     """
-    First execution-incomplete leg in deterministic order (cancelled skipped).
+    First leg that still needs driver work, in deterministic order.
 
-    Round-trip: a backload/inbound leg is never next until every leg before it
-    in sort order is execution-complete (blocking by ordering, not ad-hoc status).
+    Round-trip: a backload/inbound leg is never next until every prior leg is
+    business-closed (End Job). Outbound may stay ``Delivered`` after POD/COD
+    until the driver closes round 1 explicitly.
     """
-    _ = booking
-    for shipment in _countable_sorted(shipments):
-        if not is_shipment_execution_complete(shipment):
+    ordered = _countable_sorted(shipments)
+    is_round = normalized_trip_type(booking).casefold() == 'round'
+    for index, shipment in enumerate(ordered):
+        if is_round and index > 0:
+            priors = ordered[:index]
+            if any(
+                not is_shipment_business_complete(prior)
+                and not is_shipment_cancelled(prior)
+                for prior in priors
+            ):
+                continue
+        if _leg_has_blocking_driver_work(shipment):
             return shipment
     return None
 
@@ -585,6 +676,8 @@ def booking_is_visible_to_driver(
 ) -> bool:
     """Driver may see this booking if assigned on header or any shipment leg."""
     if not is_booking_active(booking) or is_booking_cancelled(booking):
+        return False
+    if is_booking_operationally_cancelled(booking, shipments):
         return False
     if driver_has_booking_assignment(driver, booking):
         return True

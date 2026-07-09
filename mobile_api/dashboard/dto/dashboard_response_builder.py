@@ -30,6 +30,8 @@ class DashboardApiPayload(TypedDict, total=False):
     active_job: dict[str, Any]
     current_empty_move: dict[str, Any]
     workflow: dict[str, Any]
+    next_action_hint: dict[str, Any]
+    on_call: dict[str, Any]
     pod_cod_summary: dict[str, Any]
     timeline_summary: dict[str, Any]
     alerts: dict[str, Any]
@@ -47,11 +49,14 @@ class DashboardResponseBuilder:
         request: Any | None = None,
     ) -> DashboardApiPayload:
         summary = context.summary or {}
+        workflow = self._build_workflow(context)
         return DashboardApiPayload(
             current_job=self._build_current_job(context),
             active_job=self._build_active_job(context, request=request),
             current_empty_move=self._build_current_empty_move(context),
-            workflow=self._build_workflow(context),
+            workflow=workflow,
+            next_action_hint=self._build_next_action_hint(context, workflow=workflow, request=request),
+            on_call=self._build_on_call(context),
             pod_cod_summary=self._build_pod_cod_summary(context),
             timeline_summary=summary.get('timeline_summary')
             or self._build_timeline_summary(context),
@@ -88,9 +93,19 @@ class DashboardResponseBuilder:
 
     def _build_workflow(self, context: DriverDashboardContext) -> dict[str, Any]:
         workflow = context.workflow_projection
-        if workflow:
-            return dict(workflow)
-        return dict(_EMPTY_WORKFLOW)
+        if not workflow:
+            return dict(_EMPTY_WORKFLOW)
+        out = dict(workflow)
+        from mobile_api.helpers.action_navigation_metadata import (
+            enrich_workflow_pod_navigation,
+        )
+
+        return enrich_workflow_pod_navigation(
+            out,
+            shipment=None,
+            tenant_schema=(getattr(context, 'tenant_schema', None) or ''),
+            log_evidence={},
+        )
 
     def _build_pod_cod_summary(self, context: DriverDashboardContext) -> dict[str, Any]:
         pod = context.pod_cod_projection
@@ -129,3 +144,27 @@ class DashboardResponseBuilder:
 
     def _build_sync_metadata(self, context: DriverDashboardContext) -> dict[str, Any]:
         return dict(context.sync_metadata or {})
+
+    def _build_on_call(self, context: DriverDashboardContext) -> dict[str, Any]:
+        from mobile_api.dashboard.services.dashboard_navigation_service import (
+            build_dashboard_on_call_state,
+        )
+
+        return build_dashboard_on_call_state(context)
+
+    def _build_next_action_hint(
+        self,
+        context: DriverDashboardContext,
+        *,
+        workflow: dict[str, Any],
+        request: Any | None = None,
+    ) -> dict[str, Any]:
+        from mobile_api.dashboard.services.dashboard_navigation_service import (
+            build_dashboard_next_action_hint,
+        )
+
+        return build_dashboard_next_action_hint(
+            context,
+            workflow=workflow,
+            request=request,
+        )

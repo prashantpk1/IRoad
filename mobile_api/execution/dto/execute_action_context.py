@@ -43,6 +43,7 @@ class ExecuteActionContext:
     timeline: dict[str, Any] = field(default_factory=dict)
     alerts: dict[str, Any] = field(default_factory=dict)
     sync_metadata: dict[str, Any] = field(default_factory=dict)
+    job: dict[str, Any] = field(default_factory=dict)
 
     # Kernel result (``ActionExecutionResult``) — set after execute step
     action_log: Any | None = None

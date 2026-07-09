@@ -33,7 +33,7 @@ class PodCaptureMediaItemSerializer(serializers.Serializer):
         required=False,
         allow_null=True,
         min_value=0,
-        help_text='Video clip length in seconds (max 15 for POD capture).',
+        help_text='Video clip length in seconds (max 60 for POD capture).',
     )
 
     def validate(self, attrs: dict) -> dict:

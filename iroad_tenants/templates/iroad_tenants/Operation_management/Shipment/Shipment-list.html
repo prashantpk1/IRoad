@@ -310,12 +310,14 @@
                         <li><hr class="dropdown-divider" /></li>
                         {% if shipment.shipment_status != 'Cancelled' %}
                         <li>
-                          <form method="post" action="{% url 'iroad_tenants:tenant_operation_shipment_cancel' shipment.shipment_id %}" onsubmit="return confirm('Cancel shipment {{ shipment.shipment_no|escapejs }}? An R1 action log entry will be recorded.');">
-                            {% csrf_token %}
-                            <button type="submit" class="dropdown-item text-warning">
-                              <i class="bi bi-x-circle me-2"></i>Cancel
-                            </button>
-                          </form>
+                          <button
+                            type="button"
+                            class="dropdown-item text-warning shipment-cancel-trigger"
+                            data-shipment-no="{{ shipment.shipment_no|escape }}"
+                            data-cancel-url="{% url 'iroad_tenants:tenant_operation_shipment_cancel' shipment.shipment_id %}"
+                          >
+                            <i class="bi bi-x-circle me-2"></i>Cancel
+                          </button>
                         </li>
                         {% endif %}
                       </ul>
@@ -591,6 +593,36 @@
     <!-- ========== END SHIPMENT DETAIL SLIDE PANEL ========== -->
 
     <!-- Bootstrap 5 JS -->
+
+<div class="modal fade" id="shipmentCancelModal" tabindex="-1" aria-labelledby="shipmentCancelModalLabel" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content">
+      <form method="post" id="shipmentCancelForm" action="">
+        {% csrf_token %}
+        <div class="modal-header">
+          <h2 class="modal-title h5" id="shipmentCancelModalLabel">Cancel shipment</h2>
+          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+        </div>
+        <div class="modal-body">
+          <p class="mb-0">
+            Cancel <strong id="shipmentCancelNo">—</strong>?
+            This will set the shipment status to <strong>Cancelled</strong>
+            {% if shipment_cancel_action %}
+            and record an action log entry using
+            <strong>{{ shipment_cancel_action.action_code }} — {{ shipment_cancel_action.english_label }}</strong>.
+            {% else %}
+            and record an action log entry using the configured <strong>Cancel Shipment</strong> operation action.
+            {% endif %}
+          </p>
+        </div>
+        <div class="modal-footer gap-2">
+          <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Keep shipment</button>
+          <button type="submit" class="btn btn-danger">Confirm cancel</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
 {% endblock %}
 
 {% block extra_js %}
@@ -805,6 +837,28 @@
               openPanel();
             });
           });
+      })();
+
+      (function () {
+        var modalEl = document.getElementById("shipmentCancelModal");
+        var formEl = document.getElementById("shipmentCancelForm");
+        var noEl = document.getElementById("shipmentCancelNo");
+        var modal =
+          modalEl && typeof bootstrap !== "undefined"
+            ? bootstrap.Modal.getOrCreateInstance(modalEl)
+            : null;
+        if (!modal || !formEl) return;
+
+        document.querySelectorAll(".shipment-cancel-trigger").forEach(function (btn) {
+          btn.addEventListener("click", function (e) {
+            e.preventDefault();
+            formEl.action = btn.getAttribute("data-cancel-url") || "";
+            if (noEl) {
+              noEl.textContent = btn.getAttribute("data-shipment-no") || "—";
+            }
+            modal.show();
+          });
+        });
       })();
     </script>
 {% endblock %}

@@ -39,6 +39,17 @@ from iroad_tenants.operation_runtime.shipment_execution_stage import (
 )
 
 
+def _column_behind_authoritative(column: str | None, authoritative: str | None) -> bool:
+    """True when the DB column lags workflow milestone / impact evidence."""
+    auth = (authoritative or '').strip()
+    if not auth:
+        return False
+    col = (column or '').strip()
+    if not col:
+        return True
+    return shipment_status_rank(auth) > shipment_status_rank(col)
+
+
 def _auto_repair_status_drift_enabled() -> bool:
     try:
         from django.conf import settings
@@ -145,10 +156,13 @@ def reconcile_shipment_execution_state(
     )
 
     hybrid_derived = derive_latest_action_status(shipment) if shipment else None
-    if (
-        drift.get('has_status_drift')
-        and shipment is not None
-        and _auto_repair_status_drift_enabled()
+    repair_target = authoritative or hybrid_derived
+    if shipment is not None and (
+        _column_behind_authoritative(column, repair_target)
+        or (
+            _auto_repair_status_drift_enabled()
+            and drift.get('has_status_drift')
+        )
     ):
         from iroad_tenants.operation_runtime.latest_state import (
             sync_shipment_status_from_action_log,

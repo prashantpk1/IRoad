@@ -281,8 +281,12 @@ class ExecuteActionOrchestrator:
         else:
             self._media_service.persist_execution_media(context)
 
-        # 11.5 A7 — promote evidence onto POD / delivery-note lines after media exists
-        if (context.action_code or '').strip().upper() == 'A7' and context.action_log is not None:
+        # 11.5 Upload POD — promote evidence onto POD / delivery-note lines after media exists
+        from mobile_api.execution.services.a7_pod_evidence_resolver import (
+            _is_pod_shipment_execute,
+        )
+
+        if _is_pod_shipment_execute(context) and context.action_log is not None:
             from iroad_tenants.operation_runtime.pod_action import (
                 sync_a7_pod_evidence_attachments,
             )
@@ -623,6 +627,7 @@ class ExecuteActionOrchestrator:
                         latitude=str(payload.get('latitude') or ''),
                         longitude=str(payload.get('longitude') or ''),
                         map_link=str(payload.get('map_link') or ''),
+                        location_address=str(payload.get('location_address') or ''),
                         birth_booking_item_type=birth_booking_item_type,
                         skip_recent_duplicate_guard=True,
                         sync_shipment_after=True,
@@ -693,6 +698,21 @@ class ExecuteActionOrchestrator:
             context.shipment = shipment
             context.booking = getattr(shipment, 'booking', None) or context.booking
         if movement is not None:
+            if hasattr(movement, 'refresh_from_db'):
+                movement.refresh_from_db(
+                    fields=[
+                        'from_latitude',
+                        'from_longitude',
+                        'from_location_address',
+                        'from_location_map_link',
+                        'to_latitude',
+                        'to_longitude',
+                        'to_location_address',
+                        'to_location_map_link',
+                        'status',
+                        'updated_at',
+                    ],
+                )
             context.movement = movement
 
     @staticmethod

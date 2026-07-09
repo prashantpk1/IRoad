@@ -15,11 +15,17 @@ class PrintCssVariableExpansionTests(SimpleTestCase):
         self.assertIn('color: #FFFFFF', expanded)
         self.assertNotIn('var(--', expanded)
 
-    def test_injects_base_tag_when_site_url_configured(self):
-        with self.settings(SITE_URL='http://127.0.0.1:8000'):
-            html = '<html><head><meta charset="utf-8"></head><body></body></html>'
-            prepared = prepare_print_html_for_wkhtmltopdf(html)
-        self.assertIn('<base href="http://127.0.0.1:8000/">', prepared)
+    def test_strips_google_fonts_and_base_tag_for_offline_pdf(self):
+        html = (
+            '<html><head>'
+            '<link rel="preconnect" href="https://fonts.googleapis.com">'
+            '<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans" rel="stylesheet">'
+            '<base href="http://127.0.0.1:8000/">'
+            '</head><body></body></html>'
+        )
+        prepared = prepare_print_html_for_wkhtmltopdf(html)
+        self.assertNotIn('fonts.googleapis.com', prepared)
+        self.assertNotIn('<base ', prepared.lower())
 
     def test_injects_wkhtmltopdf_compat_styles_once(self):
         html = '<html><head></head><body></body></html>'

@@ -151,7 +151,7 @@
         <div class="setting-row">
           <div class="setting-row-info">
             <label class="form-label" for="autoMovementPost">Auto Movement Post <span class="required">*</span></label>
-            <span class="field-hint">Exactly one action system-wide must have this enabled.</span>
+            <span class="field-hint">Exactly one action per Sequence Category must have this enabled.</span>
             {% if operation_action_form_errors.auto_movement_post %}<div class="invalid-feedback d-block">{{ operation_action_form_errors.auto_movement_post }}</div>{% endif %}
           </div>
           <label class="setting-toggle">
@@ -172,28 +172,19 @@
             <span class="toggle-label">{% if operation_action_form_data.auto_shipment_post %}Enabled{% else %}Disabled{% endif %}</span>
           </label>
         </div>
+        {% comment %}Auto POD Post / Hard Copy Collection toggles hidden from portal UI{% endcomment %}
+        {% if operation_action_form_data.auto_pod_post %}<input type="hidden" name="auto_pod_post" value="on" />{% endif %}
+        {% if operation_action_form_data.hard_copy_collection %}<input type="hidden" name="hard_copy_collection" value="on" />{% endif %}
         <div class="setting-row">
           <div class="setting-row-info">
-            <label class="form-label" for="autoPodPost">Auto POD Post</label>
-            <span class="field-hint">Optional. Maximum one action system-wide can have this enabled.</span>
-            {% if operation_action_form_errors.auto_pod_post %}<div class="invalid-feedback d-block">{{ operation_action_form_errors.auto_pod_post }}</div>{% endif %}
+            <label class="form-label" for="confirmPayment">Confirm Payment</label>
+            <span class="field-hint">Optional. Maximum one action system-wide can have this enabled. Logs COD collection payment on execute.</span>
+            {% if operation_action_form_errors.auto_treasury_post %}<div class="invalid-feedback d-block">{{ operation_action_form_errors.auto_treasury_post }}</div>{% endif %}
           </div>
           <label class="setting-toggle">
-            <input type="checkbox" id="autoPodPost" name="auto_pod_post" {% if operation_action_form_data.auto_pod_post %}checked{% endif %}{% if operation_action_is_view %} disabled{% endif %} />
+            <input type="checkbox" id="confirmPayment" name="auto_treasury_post" {% if operation_action_form_data.auto_treasury_post %}checked{% endif %}{% if operation_action_is_view %} disabled{% endif %} />
             <span class="toggle-track"></span>
-            <span class="toggle-label">{% if operation_action_form_data.auto_pod_post %}Enabled{% else %}Disabled{% endif %}</span>
-          </label>
-        </div>
-        <div class="setting-row">
-          <div class="setting-row-info">
-            <label class="form-label" for="hardCopyCollection">Hard Copy Collection</label>
-            <span class="field-hint">Optional. Maximum one action system-wide can have this enabled.</span>
-            {% if operation_action_form_errors.hard_copy_collection %}<div class="invalid-feedback d-block">{{ operation_action_form_errors.hard_copy_collection }}</div>{% endif %}
-          </div>
-          <label class="setting-toggle">
-            <input type="checkbox" id="hardCopyCollection" name="hard_copy_collection" {% if operation_action_form_data.hard_copy_collection %}checked{% endif %}{% if operation_action_is_view %} disabled{% endif %} />
-            <span class="toggle-track"></span>
-            <span class="toggle-label">{% if operation_action_form_data.hard_copy_collection %}Enabled{% else %}Disabled{% endif %}</span>
+            <span class="toggle-label">{% if operation_action_form_data.auto_treasury_post %}Enabled{% else %}Disabled{% endif %}</span>
           </label>
         </div>
       </div>
@@ -518,13 +509,12 @@
       if (actionCode) actionCode.value = createDefaults.action_code_preview || "";
       var statusSelect = document.getElementById("status");
       if (statusSelect) statusSelect.value = createDefaults.status || "";
-      ["autoMovementPost", "autoShipmentPost", "autoPodPost", "hardCopyCollection"].forEach(function (fieldId) {
+      ["autoMovementPost", "autoShipmentPost", "confirmPayment"].forEach(function (fieldId) {
         var input = document.getElementById(fieldId);
         if (!input) return;
         if (fieldId === "autoMovementPost") input.checked = !!createDefaults.auto_movement_post;
         if (fieldId === "autoShipmentPost") input.checked = !!createDefaults.auto_shipment_post;
-        if (fieldId === "autoPodPost") input.checked = !!createDefaults.auto_pod_post;
-        if (fieldId === "hardCopyCollection") input.checked = !!createDefaults.hard_copy_collection;
+        if (fieldId === "confirmPayment") input.checked = !!createDefaults.auto_treasury_post;
         var label = input.closest(".setting-toggle");
         if (label) {
           var toggleLabel = label.querySelector(".toggle-label");

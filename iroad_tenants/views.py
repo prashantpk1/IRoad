@@ -45,6 +45,7 @@ from iroad_tenants.list_table_utils import (
     apply_eal_column_filters,
     apply_eal_column_sort,
     build_eal_list_queryset,
+    build_eal_pagination_page_links,
     copy_eal_list_params,
     eal_column_filter_values,
     eal_list_query_href,
@@ -90,6 +91,7 @@ from superadmin.redis_helpers import (
     get_tenant_session,
     refresh_and_get_tenant_session,
     refresh_tenant_session,
+    rehydrate_tenant_session_from_jwt_claims,
     revoke_tenant_session_key,
     stash_tenant_session_on_request,
 )
@@ -179,7 +181,10 @@ from iroad_tenants.subscription_limits import (
     counts_toward_internal_truck_limit,
     subscription_limit_status,
 )
-from iroad_tenants.tenant_dashboard_overview import build_tenant_dashboard_overview
+from iroad_tenants.tenant_dashboard_overview import (
+    build_tenant_dashboard_overview,
+    build_tenant_resource_stats_payload,
+)
 from iroad_tenants.tenant_permission_matrix import (
     TENANT_PERMISSION_FLAGS,
     TENANT_PERMISSION_MATRIX,
@@ -244,6 +249,7 @@ from iroad_tenants.operation_action_form import (
     apply_confirmed_sequence_swap,
     allocate_operation_action_code,
     default_auto_movement_post_enabled,
+    default_mobile_visible_for_action_scope,
     find_sequence_peer,
     operation_action_sequence_registry,
     operation_action_booking_status_choices,
@@ -1141,6 +1147,24 @@ def _tenant_context_from_session(request, *, _debug_label=''):
             str(tenant_jti),
             session_data,
         )
+    if redis_ok is False and jwt_claims:
+        # Redis key missing but portal JWT still valid — e.g. Redis restart or
+        # login succeeded while Redis was temporarily unavailable.
+        redis_ok, session_data = rehydrate_tenant_session_from_jwt_claims(
+            str(tenant.tenant_id),
+            str(tenant_jti),
+            timeout_minutes,
+            jwt_claims,
+            ip_address=request.META.get('REMOTE_ADDR', ''),
+            user_agent=request.META.get('HTTP_USER_AGENT', ''),
+        )
+        if redis_ok is True:
+            stash_tenant_session_on_request(
+                request,
+                str(tenant.tenant_id),
+                str(tenant_jti),
+                session_data,
+            )
     if redis_ok is False:
         print(
             f'{_dbg} FAIL: refresh_tenant_session returned False '
@@ -1392,7 +1416,22 @@ class TenantDashboardView(View):
         context['fleet_gps_refresh_url'] = reverse(
             'iroad_tenants:tenant_dashboard_fleet_gps',
         )
+        context['resource_stats_refresh_url'] = reverse(
+            'iroad_tenants:tenant_dashboard_resource_stats',
+        )
         return render(request, 'iroad_tenants/index.html', context)
+
+
+class TenantDashboardResourceStatsView(View):
+    """JSON feed for live Plan & Resources Intelligence refresh."""
+
+    def get(self, request):
+        context = _tenant_context_from_session(request)
+        if context is None:
+            return JsonResponse({'error': 'Unauthorized'}, status=401)
+        return JsonResponse(
+            build_tenant_resource_stats_payload(context['tenant']),
+        )
 
 
 class TenantDashboardFleetGpsView(View):
@@ -7901,7 +7940,7 @@ class TenantOperationBookingCreateView(View):
                     'booking_line_status_values': {'Outbound': 'Draft', 'Backload': 'Draft'},
                     'booking_line_type_options': ('Outbound', 'Backload'),
                     'booking_trip_type_options': ('One-Way', 'Round'),
-                    'booking_form_data': {},
+                    'booking_form_data': _tenant_booking_empty_form_data(),
                     'booking_is_edit': False,
                     'tenant_schema_name': tenant_registry.schema_name,
                     **operation_field_options_context(booking=None),
@@ -8043,8 +8082,9 @@ class TenantOperationBookingListView(View):
                     | Q(route__destination_point__display_label__icontains=search_q)
                 )
 
-            booking_page_obj = Paginator(qs.order_by('-created_at'), 10).get_page(
-                request.GET.get('page') or 1
+            booking_page_obj, booking_pagination = paginate_tenant_list(
+                request,
+                qs.order_by('-created_at'),
             )
             start_index = booking_page_obj.start_index() if booking_page_obj.paginator.count else 0
             booking_rows = _tenant_booking_build_list_rows(
@@ -8060,6 +8100,7 @@ class TenantOperationBookingListView(View):
                     'booking_search_query': search_q,
                     'booking_stats': _tenant_booking_stats(),
                     'tenant_schema_name': tenant_registry.schema_name,
+                    **booking_pagination,
                 }
             )
             return render(request, self.template_name, context)
@@ -8132,6 +8173,8 @@ class TenantOperationShipmentListView(View):
             shipment_page = paginator.get_page(request.GET.get('page') or 1)
             shipment_records = list(shipment_page.object_list)
             for shipment in shipment_records:
+                _tenant_shipment_sync_status_from_action_log(shipment)
+                shipment.refresh_from_db()
                 shipment.booking_action_id = (
                     shipment.booking_id
                     if shipment.booking_id
@@ -8364,7 +8407,7 @@ class TenantOperationShipmentCreateView(View):
                             prefix=SHIPMENT_REF_PREFIX,
                         ),
                         'shipment_form_data': shipment_form_data,
-                        'form_errors': form_errors,
+                        'form_errors': _tenant_shipment_prepare_form_errors_for_ui(form_errors),
                     }
                 )
                 context.update(_tenant_shipment_form_options_context(tenant_registry))
@@ -8453,7 +8496,7 @@ class TenantOperationShipmentCreateView(View):
                             prefix=SHIPMENT_REF_PREFIX,
                         ),
                         'shipment_form_data': shipment_form_data,
-                        'form_errors': form_errors,
+                        'form_errors': _tenant_shipment_prepare_form_errors_for_ui(form_errors),
                     }
                 )
                 context.update(_tenant_shipment_form_options_context(tenant_registry))
@@ -8571,7 +8614,7 @@ class TenantOperationShipmentDocumentsCreateView(View):
         TenantShipmentDocument.Status.REJECTED,
     }
 
-    def _validate_shipment_document_submission(self, request, form_data):
+    def _validate_shipment_document_submission(self, request, form_data, *, editing_document_id=None):
         form_errors = {}
         for field_name, message in {
             'booking_id': 'Booking is required.',
@@ -8630,6 +8673,15 @@ class TenantOperationShipmentDocumentsCreateView(View):
             form_errors['notes'] = 'Add notes explaining the rejection before setting status to Rejected.'
 
         booking, shipment = _tenant_shipment_document_resolve_linkage(form_data, form_errors)
+        line_rows, pipeline_errors = _tenant_shipment_document_proof_pipeline_validate(
+            shipment=shipment,
+            is_delivery_note=is_delivery_note,
+            line_rows=line_rows,
+            document_type=(form_data.get('document_type') or '').strip(),
+            editing_document_id=editing_document_id,
+        )
+        form_errors.update(pipeline_errors)
+        form_data['page_count'] = str(max(len(line_rows), 1))
         _tenant_shipment_document_enrich_form_data(form_data)
         return form_errors, line_errors, line_rows, record_date, document_date, booking, shipment
 
@@ -8695,20 +8747,24 @@ class TenantOperationShipmentDocumentsCreateView(View):
                 prefix=SHIPMENT_DOCUMENTS_REF_PREFIX,
             ),
             'shipment_document_form_data': form_data
-            or {
-                'record_date': timezone.localdate().isoformat(),
-                'document_date': timezone.localdate().isoformat(),
-                'page_count': '1',
-                'status': TenantShipmentDocument.Status.DRAFT,
-            },
+            or _tenant_shipment_document_default_form_data(),
             'shipment_document_form_errors': form_errors or {},
             'shipment_document_booking_options': booking_options,
             'shipment_document_booking_item_options': booking_item_options,
             'shipment_document_shipments': shipments,
             'shipment_document_is_edit': document is not None,
+            'shipment_document_is_auto_scaffold': bool(
+                document
+                and document.is_delivery_note
+                and (
+                    'auto-created' in (document.notes or '').casefold()
+                    or (document.document_ref_no or '').strip().upper() == 'PENDING'
+                )
+            ),
             'shipment_document_record': document,
             'shipment_document_line_rows': line_rows,
             'shipment_document_physical_location_options': OPERATION_PHYSICAL_LOCATION_OPTIONS,
+            'shipment_document_auto_pod_dn_index': _tenant_shipment_document_auto_pod_delivery_note_index(),
             'tenant_schema_name': tenant_registry.schema_name,
         }
 
@@ -8723,6 +8779,9 @@ class TenantOperationShipmentDocumentsCreateView(View):
     def _form_data_from_document(self, document):
         shipment = document.shipment
         booking = document.booking or (shipment.booking if shipment and shipment.booking_id else None)
+        document_ref_no = document.document_ref_no or ''
+        if str(document_ref_no).strip().upper() == 'PENDING':
+            document_ref_no = ''
         return {
             'record_date': document.record_date.isoformat() if document.record_date else '',
             'booking_id': str(document.booking_id) if document.booking_id else '',
@@ -8731,7 +8790,7 @@ class TenantOperationShipmentDocumentsCreateView(View):
             'shipment_id': str(document.shipment_id) if document.shipment_id else '',
             'shipment_ref': shipment.shipment_no if shipment else '',
             'document_type': document.document_type,
-            'document_ref_no': document.document_ref_no,
+            'document_ref_no': document_ref_no,
             'document_date': document.document_date.isoformat() if document.document_date else '',
             'is_delivery_note': document.is_delivery_note,
             'physical_location': normalize_operation_physical_location(document.physical_location or ''),
@@ -8755,7 +8814,46 @@ class TenantOperationShipmentDocumentsCreateView(View):
             clear_tenant_portal_cookie(response, request=request)
             return response
         try:
-            context.update(self._form_context(tenant_registry))
+            from iroad_tenants.operation_runtime.proof_pipeline import (
+                shipment_auto_pod_document_flow,
+                shipment_existing_delivery_note,
+            )
+
+            shipment_id = (request.GET.get('shipment_id') or '').strip()
+            prefill_shipment = None
+            if shipment_id:
+                prefill_shipment = (
+                    TenantShipment.objects.filter(pk=shipment_id)
+                    .select_related('booking')
+                    .first()
+                )
+                if prefill_shipment is not None:
+                    existing_dn = shipment_existing_delivery_note(prefill_shipment)
+                    if existing_dn is not None and shipment_auto_pod_document_flow(prefill_shipment):
+                        messages.info(
+                            request,
+                            (
+                                f'This shipment already has delivery note {existing_dn.record_no} '
+                                f'({prefill_shipment.shipment_no}). Edit it here — use + Add Document only for '
+                                f'other document types (invoice, waybill, etc.).'
+                            ),
+                            extra_tags='tenant',
+                        )
+                        return _tenant_redirect(
+                            request,
+                            'iroad_tenants:tenant_operation_shipment_documents_edit',
+                            document_id=existing_dn.pk,
+                        )
+            context.update(
+                self._form_context(
+                    tenant_registry,
+                    form_data=_tenant_shipment_document_default_form_data(
+                        request=request,
+                        shipment=prefill_shipment,
+                    ),
+                    line_rows=_tenant_shipment_document_default_line_rows(prefill_shipment),
+                ),
+            )
             return render(request, self.template_name, context)
         finally:
             restore_public_schema(request)
@@ -8905,13 +9003,6 @@ class TenantOperationShipmentPodListView(View):
             total = paginator.count
             start_index = pod_page.start_index() if total else 0
             end_index = pod_page.end_index() if total else 0
-            stats_qs = TenantShipmentDocument.objects.filter(record_no__startswith=pod_prefix)
-            stats_shipment_ids = list(
-                stats_qs.exclude(shipment_id__isnull=True)
-                .values_list('shipment_id', flat=True)
-                .distinct()
-            )
-            stats_shipment_qs = TenantShipment.objects.filter(pk__in=stats_shipment_ids)
             context.update(
                 {
                     'pod_rows': pod_rows,
@@ -8920,18 +9011,7 @@ class TenantOperationShipmentPodListView(View):
                     'pagination_start': start_index,
                     'pagination_end': end_index,
                     'pagination_total': total,
-                    'pod_stats': {
-                        'total': stats_qs.count(),
-                        'hard_copy': stats_shipment_qs.filter(pod_type=TenantShipment.PodType.HARD).count(),
-                        'soft_copy': stats_shipment_qs.filter(pod_type=TenantShipment.PodType.SOFT).count(),
-                        'digital_evidence': stats_shipment_qs.filter(pod_type=TenantShipment.PodType.DIGITAL).count(),
-                        'completed': stats_shipment_qs.filter(
-                            pod_status=TenantShipment.PodStatus.COMPLETED,
-                        ).count(),
-                        'pending': stats_shipment_qs.filter(
-                            pod_status=TenantShipment.PodStatus.NOT_COMPLETED,
-                        ).count(),
-                    },
+                    'pod_stats': _shipment_pod_list_stats_context(pod_prefix),
                     'tenant_schema_name': tenant_registry.schema_name,
                 }
             )
@@ -8977,7 +9057,8 @@ class TenantOperationShipmentPodCreateView(View):
                 'pod_type': '',
                 'physical_location': '',
                 'receiver_user_id': default_receiver_user_id,
-                'status': 'Draft',
+                'pod_status': TenantShipment.PodStatus.NOT_COMPLETED,
+                'status': 'Posted',
             }
         linked_shipment = shipment or (document.shipment if document.shipment_id else None)
         booking = document.booking
@@ -8998,7 +9079,7 @@ class TenantOperationShipmentPodCreateView(View):
             'document_type': document.document_type,
             'source_document_id': str(document.source_document_id) if document.source_document_id else '',
             'doc_no': str(document.source_document_id) if document.source_document_id else '',
-            'document_ref_no': document.document_ref_no,
+            'document_ref_no': document.document_ref_no or '',
             'page_count': str(document.page_count or 1),
             'booking_id': str(document.booking_id) if document.booking_id else '',
             'booking_no': booking.booking_no if booking else '',
@@ -9008,6 +9089,10 @@ class TenantOperationShipmentPodCreateView(View):
             'pod_type': pod_type,
             'physical_location': document.physical_location,
             'receiver_user_id': receiver_user_id,
+            'pod_status': normalize_operation_pod_status(
+                getattr(linked_shipment, 'pod_status', None) if linked_shipment else None,
+                default=TenantShipment.PodStatus.NOT_COMPLETED,
+            ),
             'status': _tenant_shipment_pod_status_to_form(document.status),
         }
 
@@ -9067,14 +9152,24 @@ class TenantOperationShipmentPodCreateView(View):
             ).first()
             if source_document is not None and source_document.shipment_id and linked_shipment is None:
                 linked_shipment = source_document.shipment
+        include_shipment_id = None
+        if form_data and (form_data.get('shipment_id') or '').strip():
+            include_shipment_id = (form_data.get('shipment_id') or '').strip()
+        elif document is not None and document.shipment_id:
+            include_shipment_id = str(document.shipment_id)
+        pod_shipment_options = _tenant_shipment_pod_linkage_options(
+            include_shipment_id=include_shipment_id,
+        )
         return {
             'preview_pod_record_no': preview_pod_record_no,
             'pod_form_data': pod_form_data,
             'form_errors': form_errors or {},
             'doc_no_options': doc_no_options,
             'delivery_note_options': delivery_note_options,
+            'pod_shipment_options': pod_shipment_options,
             'doc_ref_options_map': _tenant_shipment_pod_doc_ref_options_map(),
             'operation_pod_type_options': operation_pod_type_options(),
+            'operation_pod_status_options': operation_pod_status_options(),
             'delivery_note_pages_json': json.dumps(_tenant_shipment_pod_delivery_note_pages_map()),
             'pod_line_page_options': _tenant_shipment_pod_line_page_options(source_document),
             'pod_action_log_options': _tenant_shipment_pod_action_log_option_rows(
@@ -9157,11 +9252,15 @@ class TenantOperationShipmentPodCreateView(View):
                 'pod_type': (request.POST.get('pod_type') or '').strip(),
                 'physical_location': '',
                 'receiver_user_id': (request.POST.get('receiver_user_id') or '').strip(),
-                'status': (request.POST.get('status') or 'Draft').strip(),
+                'pod_status': normalize_operation_pod_status(
+                    request.POST.get('pod_status'),
+                    default=TenantShipment.PodStatus.NOT_COMPLETED,
+                ),
+                'status': (request.POST.get('status') or 'Posted').strip(),
             }
             form_errors = {}
             if form_data['status'] not in POD_TRANSACTION_FORM_STATUSES:
-                form_errors['status'] = 'Select a valid status (Draft or Posted).'
+                form_errors['status'] = 'Invalid document status.'
             document_status = _tenant_shipment_pod_status_from_form(form_data['status'])
             is_posted = form_data['status'] == 'Posted'
             record_date = parse_date(form_data['record_date']) if form_data['record_date'] else timezone.localdate()
@@ -9199,6 +9298,15 @@ class TenantOperationShipmentPodCreateView(View):
                 form_errors,
                 shipment=shipment,
             )
+            if (
+                source_document is not None
+                and shipment is not None
+                and source_document.shipment_id
+                and source_document.shipment_id != shipment.pk
+            ):
+                form_errors['shipment_id'] = (
+                    'Selected shipment must match the delivery note linked to Doc No.'
+                )
             receiver_user = _tenant_shipment_pod_resolve_receiver_user(form_data, form_errors)
             if source_document is not None:
                 page_count = max(page_count, int(source_document.page_count or 1))
@@ -9235,7 +9343,9 @@ class TenantOperationShipmentPodCreateView(View):
             except json.JSONDecodeError:
                 pod_pages = []
             if not pod_pages:
-                pod_pages = _tenant_shipment_pod_build_line_rows_from_source(source_document)
+                form_errors['pod_pages'] = (
+                    'Add at least one POD page line manually (Doc Page, source, action log or map).'
+                )
             line_payload = []
             for idx, row in enumerate(pod_pages, start=1):
                 if not isinstance(row, dict):
@@ -9300,6 +9410,21 @@ class TenantOperationShipmentPodCreateView(View):
                 if not values['doc_page']:
                     continue
                 line_payload.append((idx, values))
+            from iroad_tenants.operation_runtime.proof_pipeline import (
+                validate_manual_pod_page_lines,
+                validate_pod_page_line_count,
+            )
+
+            page_count_error = validate_pod_page_line_count(
+                source_document=source_document,
+                shipment=shipment,
+                line_count=len(line_payload),
+            )
+            if page_count_error:
+                form_errors['pod_pages'] = page_count_error
+            form_errors.update(
+                validate_manual_pod_page_lines(line_payload, is_posted=is_posted)
+            )
             if not line_payload:
                 form_errors['pod_pages'] = 'At least one POD page line is required.'
             if form_errors:
@@ -9394,6 +9519,11 @@ class TenantOperationShipmentPodCreateView(View):
             TenantShipmentPodPage.objects.filter(document=document).delete()
             for idx, values in line_payload:
                 TenantShipmentPodPage.objects.create(document=document, line_no=idx, **values)
+
+            saved_page_count = len(line_payload)
+            document.page_count = saved_page_count
+            document.save(update_fields=['page_count', 'updated_at'])
+            _tenant_shipment_apply_pod_doc_count(shipment, saved_page_count)
 
             if is_posted:
                 _tenant_shipment_pod_apply_posting_effects(
@@ -9500,6 +9630,11 @@ class TenantOperationDocumentHandoverListView(View):
             clear_tenant_portal_cookie(response, request=request)
             return response
         try:
+            from iroad_tenants.operation_runtime.hard_pod_document_handover import (
+                upgrade_stale_mobile_draft_handovers,
+            )
+
+            upgrade_stale_mobile_draft_handovers()
             search_q = (request.GET.get('q') or '').strip()
             handover_qs = TenantDocumentHandover.objects.select_related(
                 'booking',
@@ -9677,6 +9812,14 @@ class TenantOperationDocumentHandoverCreateView(View):
                 elif shipment.pk not in pending_ids:
                     form_errors['shipment_id'] = 'Shipment must have pending POD work.'
                 else:
+                    from iroad_tenants.operation_runtime.proof_pipeline import (
+                        document_handover_allowed,
+                    )
+
+                    if not document_handover_allowed(shipment):
+                        form_errors['shipment_id'] = (
+                            'Document Handover applies to Hard Copy POD shipments only.'
+                        )
                     booking = _tenant_document_handover_sync_linkage_from_shipment(
                         form_data,
                         shipment,
@@ -9760,6 +9903,18 @@ class TenantOperationDocumentHandoverCreateView(View):
 
             if not line_payload:
                 form_errors['handover_lines'] = 'At least one page verification line is required.'
+            else:
+                from iroad_tenants.operation_runtime.proof_pipeline import (
+                    validate_handover_page_line_count,
+                )
+
+                handover_count_error = validate_handover_page_line_count(
+                    source_document=source_document,
+                    shipment=shipment,
+                    line_count=len(line_payload),
+                )
+                if handover_count_error:
+                    form_errors['handover_lines'] = handover_count_error
 
             if is_posted:
                 if not line_payload:
@@ -10522,11 +10677,15 @@ def _tenant_operation_action_form_context(
     operation_action_form_data.setdefault('status', TenantOperationAction.Status.ACTIVE)
     operation_action_form_data.setdefault(
         'auto_movement_post',
-        default_auto_movement_post_enabled(exclude_action_id=exclude_action_id),
+        default_auto_movement_post_enabled(
+            exclude_action_id=exclude_action_id,
+            sequence_category=category or 'job',
+        ),
     )
     operation_action_form_data.setdefault('auto_shipment_post', False)
     operation_action_form_data.setdefault('auto_pod_post', False)
     operation_action_form_data.setdefault('hard_copy_collection', False)
+    operation_action_form_data.setdefault('auto_treasury_post', False)
     scope_choices = list(ACTION_SCOPE_CHOICES)
     sequence_category_choices = list(SEQUENCE_CATEGORY_CHOICES)
     booking_status_choices = list(operation_action_booking_status_choices())
@@ -10604,10 +10763,12 @@ def _tenant_operation_action_form_context(
                 'status': TenantOperationAction.Status.ACTIVE,
                 'auto_movement_post': default_auto_movement_post_enabled(
                     exclude_action_id=exclude_action_id,
+                    sequence_category='job',
                 ),
                 'auto_shipment_post': False,
                 'auto_pod_post': False,
                 'hard_copy_collection': False,
+                'auto_treasury_post': False,
             }
             if mode == 'create'
             else None
@@ -10675,6 +10836,7 @@ def _tenant_operation_action_form_data_from_object(action):
         'auto_shipment_post': _tenant_operation_action_bool(action.auto_shipment_post),
         'auto_pod_post': _tenant_operation_action_bool(action.auto_pod_post),
         'hard_copy_collection': _tenant_operation_action_bool(action.hard_copy_collection),
+        'auto_treasury_post': _tenant_operation_action_bool(action.auto_treasury_post),
     }
 
 
@@ -10694,6 +10856,7 @@ def _tenant_operation_action_form_data_from_request(request, *, action_code_prev
         'auto_shipment_post': request.POST.get('auto_shipment_post') == 'on',
         'auto_pod_post': request.POST.get('auto_pod_post') == 'on',
         'hard_copy_collection': request.POST.get('hard_copy_collection') == 'on',
+        'auto_treasury_post': request.POST.get('auto_treasury_post') == 'on',
         'confirm_sequence_swap': request.POST.get('confirm_sequence_swap') == '1',
     }
 
@@ -10745,10 +10908,14 @@ def _tenant_operation_action_assign_form_fields(action, form_data, *, sequence_n
     action.action_scope = form_data['action_scope']
     action.sequence_category = form_data['sequence_category']
     action.sequence_number = sequence_number
+    action.mobile_visible = default_mobile_visible_for_action_scope(
+        form_data['action_scope'],
+    )
     action.auto_movement_post = form_data['auto_movement_post']
     action.auto_shipment_post = form_data['auto_shipment_post']
     action.auto_pod_post = form_data['auto_pod_post']
     action.hard_copy_collection = form_data['hard_copy_collection']
+    action.auto_treasury_post = form_data['auto_treasury_post']
     action.booking_status_impact = form_data['booking_status_impact']
     action.shipment_status_impact = form_data['shipment_status_impact']
     action.movement_status_impact = form_data['movement_status_impact']
@@ -10951,10 +11118,14 @@ class TenantOperationActionsCreateView(View):
                         action_scope=form_data['action_scope'],
                         sequence_category=form_data['sequence_category'],
                         sequence_number=sequence_number,
+                        mobile_visible=default_mobile_visible_for_action_scope(
+                            form_data['action_scope'],
+                        ),
                         auto_movement_post=form_data['auto_movement_post'],
                         auto_shipment_post=form_data['auto_shipment_post'],
                         auto_pod_post=form_data['auto_pod_post'],
                         hard_copy_collection=form_data['hard_copy_collection'],
+                        auto_treasury_post=form_data['auto_treasury_post'],
                         booking_status_impact=form_data['booking_status_impact'],
                         shipment_status_impact=form_data['shipment_status_impact'],
                         movement_status_impact=form_data['movement_status_impact'],
@@ -11546,6 +11717,7 @@ def _tenant_operation_action_log_lookup_context(
         booking_item_type=booking_item_type,
         exclude_log_id=action_log.log_id if action_log is not None else None,
         include_action_id=include_action_id,
+        for_admin_log=True,
     )
 
     booking_options, shipments = _tenant_truck_movement_linkage_options()
@@ -11592,13 +11764,11 @@ def _tenant_operation_action_log_lookup_context(
         getattr(linkage_movement, 'truck_id', None) if linkage_movement else None,
         getattr(shipment, 'truck_id', None) if shipment else None,
         (form_data or {}).get('truck_id'),
-        (form_data or {}).get('truck'),
     ]
     include_driver_ids = [
         getattr(linkage_movement, 'driver_id', None) if linkage_movement else None,
         getattr(shipment, 'driver_id', None) if shipment else None,
         (form_data or {}).get('driver_id'),
-        (form_data or {}).get('driver'),
     ]
     if action_log is not None:
         include_truck_ids.append(getattr(action_log, 'truck_id', None))
@@ -11616,11 +11786,14 @@ def _tenant_operation_action_log_lookup_context(
             include_driver_ids=include_driver_ids,
         ),
         'action_options': action_options_payload(list(action_dropdown_options)),
-        'action_allowed_context_label': action_dropdown_context_label(
-            booking=booking,
-            shipment=shipment,
-            movement=movement,
-            booking_item_type=booking_item_type,
+        'action_allowed_context_label': (
+            action_dropdown_context_label(
+                booking=booking,
+                shipment=shipment,
+                movement=movement,
+                booking_item_type=booking_item_type,
+            )
+            + ' Without-scope actions (Cancel Shipment, Incident Report, etc.) are always available.'
         ),
         'user_options': [
             {
@@ -12137,15 +12310,19 @@ class TenantOperationActionLogAllowedActionsView(View):
                 movement=linkage['movement'],
                 booking_item_type=linkage['booking_item_type'],
                 include_action_id=include_action_id,
+                for_admin_log=True,
             )
             return JsonResponse(
                 {
                     'actions': action_options_payload(dropdown_options),
-                    'context_label': action_dropdown_context_label(
-                        booking=linkage['booking'],
-                        shipment=linkage['shipment'],
-                        movement=linkage['movement'],
-                        booking_item_type=linkage['booking_item_type'],
+                    'context_label': (
+                        action_dropdown_context_label(
+                            booking=linkage['booking'],
+                            shipment=linkage['shipment'],
+                            movement=linkage['movement'],
+                            booking_item_type=linkage['booking_item_type'],
+                        )
+                        + ' Without-scope actions (Cancel Shipment, Incident Report, etc.) are always available.'
                     ),
                 }
             )
@@ -12267,6 +12444,7 @@ class TenantOperationActionLogCreateView(View):
                 shipment=linkage['shipment'],
                 movement=linkage['truck_movement'],
                 booking_item_type=booking_item_type,
+                for_admin_log=True,
             )
             if policy_error:
                 form_errors['operation_action_id'] = policy_error
@@ -12491,14 +12669,20 @@ class TenantOperationActionLogListView(View):
             clear_tenant_portal_cookie(response, request=request)
             return response
         try:
+            from iroad_tenants.operation_runtime.action_master_catalog import (
+                exclude_admin_hidden_system_logs,
+            )
+
             search_q = (request.GET.get('q') or '').strip()
-            log_qs = TenantOperationActionLog.objects.select_related(
-                'operation_action',
-                'booking',
-                'shipment',
-                'truck',
-                'driver',
-                'truck_movement',
+            log_qs = exclude_admin_hidden_system_logs(
+                TenantOperationActionLog.objects.select_related(
+                    'operation_action',
+                    'booking',
+                    'shipment',
+                    'truck',
+                    'driver',
+                    'truck_movement',
+                )
             ).order_by('-log_date', '-created_at')
             if search_q:
                 log_qs = log_qs.filter(
@@ -12939,6 +13123,7 @@ class TenantOperationActionLogEditView(View):
                 booking_item_type=booking_item_type,
                 exclude_log_id=action_log.log_id,
                 previous_action_id=action_log.operation_action_id,
+                for_admin_log=True,
             )
             if policy_error:
                 form_errors['operation_action_id'] = policy_error
@@ -13251,6 +13436,14 @@ class TenantOperationSurchargeSalesCreateView(View):
             return _tenant_redirect(request, 'iroad_tenants:tenant_operation_surcharge_sales_list')
         finally:
             restore_public_schema(request)
+
+
+def _tenant_booking_empty_form_data():
+    """Default booking_form_data for create GET and empty option context."""
+    return {
+        'booking_status': TenantBooking.Status.DRAFT,
+        'pod_status': TenantShipment.PodStatus.NOT_COMPLETED,
+    }
 
 
 def _tenant_booking_form_data_from_post(request):
@@ -13664,7 +13857,7 @@ def _tenant_booking_form_options_context(tenant_registry, booking=None, form_dat
             'is_scheduled': bool(getattr(booking, 'is_scheduled', False)),
         }
     elif form_data is None:
-        form_data = {}
+        form_data = _tenant_booking_empty_form_data()
 
     return {
         'booking_client_accounts': client_accounts,
@@ -13719,7 +13912,10 @@ def _tenant_booking_line_status_from_shipment(shipment):
     """Map shipment state to booking-item display label (PCS §3.4.2)."""
     if shipment.shipment_status == TenantShipment.ShipmentStatus.CANCELLED:
         return BOOKING_ITEM_CANCELLED
-    if shipment.shipment_status == TenantShipment.ShipmentStatus.CLOSED:
+    if shipment.shipment_status in {
+        TenantShipment.ShipmentStatus.CLOSED,
+        TenantShipment.ShipmentStatus.DELIVERED,
+    }:
         return BOOKING_ITEM_COMPLETED
     if shipment.shipment_status in {
         TenantShipment.ShipmentStatus.LOADED,
@@ -13727,7 +13923,6 @@ def _tenant_booking_line_status_from_shipment(shipment):
         TenantShipment.ShipmentStatus.IN_TRANSIT,
         TenantShipment.ShipmentStatus.AT_DELIVERY,
         TenantShipment.ShipmentStatus.POD_SUBMITTED,
-        TenantShipment.ShipmentStatus.DELIVERED,
     }:
         return BOOKING_ITEM_IN_PROGRESS
     return shipment.shipment_status or BOOKING_ITEM_CONFIRMED
@@ -14403,6 +14598,7 @@ def _tenant_get_or_create_manual_override_action(shipment_status):
         'auto_shipment_post': False,
         'auto_pod_post': False,
         'hard_copy_collection': False,
+        'auto_treasury_post': False,
         'shipment_status_impact': shipment_status,
         'movement_status_impact': '',
         'booking_status_impact': '',
@@ -14419,39 +14615,6 @@ def _tenant_get_or_create_manual_override_action(shipment_status):
         action.shipment_status_impact = shipment_status
         action.save(update_fields=['shipment_status_impact', 'updated_at'])
     return action
-
-
-def _tenant_shipment_derive_latest_action_status(shipment):
-    if shipment is None:
-        return None
-    latest_logs = (
-        TenantOperationActionLog.objects.filter(shipment_id=shipment.pk)
-        .select_related('operation_action')
-        .exclude(operation_action__isnull=True)
-        .order_by('-log_date', '-created_at')[:50]
-    )
-    for log in latest_logs:
-        derived = _tenant_resolve_shipment_status_impact(
-            getattr(log.operation_action, 'shipment_status_impact', '')
-        )
-        if derived:
-            return derived
-    return None
-
-
-def _tenant_shipment_sync_status_from_action_log(shipment):
-    """
-    Gap 4 (hybrid): keep shipment_status column as cache, derive from latest action log.
-    """
-    if shipment is None:
-        return shipment
-    derived_status = _tenant_shipment_derive_latest_action_status(shipment)
-    if not derived_status or shipment.shipment_status == derived_status:
-        return shipment
-    shipment.shipment_status = derived_status
-    shipment.save(update_fields=['shipment_status', 'updated_at'])
-    _tenant_shipment_after_status_side_effects(shipment)
-    return shipment
 
 
 def _tenant_shipment_create_manual_override_action_log(
@@ -15028,18 +15191,6 @@ def _tenant_shipment_birth_from_booking_line(booking, matched_line, *, shipment_
     shipment.full_clean()
     shipment.save()
     _tenant_booking_sync_pod_doc_counts_to_shipments(booking)
-    from iroad_tenants.operation_runtime.pod_action import (
-        _birth_delivery_note_scaffold,
-        _shipment_target_pod_doc_count,
-    )
-
-    if _shipment_target_pod_doc_count(shipment) > 0:
-        _birth_delivery_note_scaffold(
-            shipment,
-            created_by_label=created_by_label,
-            status=TenantShipmentDocument.Status.DRAFT,
-            notes='Auto-created from booking POD doc count on shipment birth.',
-        )
     return shipment
 
 
@@ -16090,7 +16241,7 @@ class TenantOperationBookingCreateView(View):
                     'booking_line_status_values': {'Outbound': 'Draft', 'Backload': 'Draft'},
                     'booking_line_type_options': ('Outbound', 'Backload'),
                     'booking_trip_type_options': ('One-Way', 'Round'),
-                    'booking_form_data': {},
+                    'booking_form_data': _tenant_booking_empty_form_data(),
                     'booking_is_edit': False,
                     'tenant_schema_name': tenant_registry.schema_name,
                     **operation_field_options_context(booking=None),
@@ -16365,8 +16516,9 @@ class TenantOperationBookingListView(View):
                     | Q(route__destination_point__display_label__icontains=search_q)
                 )
 
-            booking_page_obj = Paginator(qs.order_by('-created_at'), 10).get_page(
-                request.GET.get('page') or 1
+            booking_page_obj, booking_pagination = paginate_tenant_list(
+                request,
+                qs.order_by('-created_at'),
             )
             start_index = booking_page_obj.start_index() if booking_page_obj.paginator.count else 0
             booking_rows = _tenant_booking_build_list_rows(
@@ -16382,6 +16534,7 @@ class TenantOperationBookingListView(View):
                     'booking_search_query': search_q,
                     'booking_stats': _tenant_booking_stats(),
                     'tenant_schema_name': tenant_registry.schema_name,
+                    **booking_pagination,
                 }
             )
             return render(request, self.template_name, context)
@@ -16735,6 +16888,8 @@ class TenantOperationShipmentListView(View):
             shipment_page = paginator.get_page(request.GET.get('page') or 1)
             shipment_records = list(shipment_page.object_list)
             for shipment in shipment_records:
+                _tenant_shipment_sync_status_from_action_log(shipment)
+                shipment.refresh_from_db()
                 shipment.booking_action_id = (
                     shipment.booking_id
                     if shipment.booking_id
@@ -16748,6 +16903,9 @@ class TenantOperationShipmentListView(View):
                 shipment.route_chip = _tenant_shipment_route_chip(shipment, shipment.booking)
                 shipment.cod_payment_status = _tenant_shipment_cod_payment_status(shipment)
             stats_qs = TenantShipment.objects.all()
+            from iroad_tenants.operation_runtime.action_master_catalog import (
+                resolve_cancel_shipment_action,
+            )
             context.update(
                 {
                     'shipment_records': shipment_records,
@@ -16756,6 +16914,7 @@ class TenantOperationShipmentListView(View):
                     'pagination_total': paginator.count,
                     'pagination_start': shipment_page.start_index() if paginator.count else 0,
                     'pagination_end': shipment_page.end_index() if paginator.count else 0,
+                    'shipment_cancel_action': resolve_cancel_shipment_action(),
                     'shipment_stats': {
                         'active': stats_qs.filter(
                             shipment_status__in=_tenant_shipment_active_statuses(),
@@ -17656,7 +17815,7 @@ class TenantOperationShipmentCreateView(View):
                             prefix=SHIPMENT_REF_PREFIX,
                         ),
                         'shipment_form_data': shipment_form_data,
-                        'form_errors': form_errors,
+                        'form_errors': _tenant_shipment_prepare_form_errors_for_ui(form_errors),
                     }
                 )
                 context.update(_tenant_shipment_form_options_context(tenant_registry))
@@ -17745,7 +17904,7 @@ class TenantOperationShipmentCreateView(View):
                             prefix=SHIPMENT_REF_PREFIX,
                         ),
                         'shipment_form_data': shipment_form_data,
-                        'form_errors': form_errors,
+                        'form_errors': _tenant_shipment_prepare_form_errors_for_ui(form_errors),
                     }
                 )
                 context.update(_tenant_shipment_form_options_context(tenant_registry))
@@ -17822,6 +17981,9 @@ class TenantOperationShipmentDetailView(View):
             )
             shipment_pk = shipment.shipment_id
             shipment.cod_payment_status = _tenant_shipment_cod_payment_status(shipment)
+            from iroad_tenants.operation_runtime.action_master_catalog import (
+                resolve_cancel_shipment_action,
+            )
             context.update(
                 {
                     'shipment': shipment,
@@ -17830,6 +17992,7 @@ class TenantOperationShipmentDetailView(View):
                     'cod_payment_status': _tenant_shipment_cod_payment_status(shipment),
                     'additional_charges': shipment.total_additional_charges,
                     'tenant_schema_name': tenant_registry.schema_name,
+                    'shipment_cancel_action': resolve_cancel_shipment_action(),
                     'back_to_list_url': reverse('iroad_tenants:tenant_operation_shipment_list'),
                     'edit_shipment_url': reverse(
                         'iroad_tenants:tenant_operation_shipment_edit',
@@ -18096,7 +18259,7 @@ class TenantOperationShipmentEditView(View):
                         'preview_shipment_no': shipment.shipment_no,
                         'shipment_creation_date': shipment.shipment_date,
                         'shipment_form_data': shipment_form_data,
-                        'form_errors': form_errors,
+                        'form_errors': _tenant_shipment_prepare_form_errors_for_ui(form_errors),
                         'shipment_field_locks': _tenant_shipment_ui_lock_flags(shipment),
                         'shipment_status_display': shipment.shipment_status,
                         'shipment_status_choices': TenantShipment.ShipmentStatus.choices,
@@ -18170,7 +18333,7 @@ class TenantOperationShipmentEditView(View):
                         'preview_shipment_no': shipment.shipment_no,
                         'shipment_creation_date': shipment.shipment_date,
                         'shipment_form_data': shipment_form_data,
-                        'form_errors': form_errors,
+                        'form_errors': _tenant_shipment_prepare_form_errors_for_ui(form_errors),
                         'shipment_field_locks': _tenant_shipment_ui_lock_flags(shipment),
                         'shipment_status_display': shipment.shipment_status,
                         'shipment_status_choices': TenantShipment.ShipmentStatus.choices,
@@ -18186,17 +18349,34 @@ class TenantOperationShipmentEditView(View):
 
 
 class TenantOperationShipmentCancelView(View):
-    """PCS §4.2 — cancel shipment (R1 action log); shipments are never deleted."""
+    """PCS §4.2 — cancel shipment via Operation Action log; shipments are never deleted."""
 
-    def post(self, request, shipment_id):
-        context = _tenant_context_from_session(request)
+    def _cancel_access_denied(self, request, context):
         if context is None:
             response = redirect('login')
             clear_tenant_portal_cookie(response, request=request)
             return response
         if not context.get('is_tenant_admin') and not context.get('can_view_shipment'):
-            messages.error(request, 'You do not have permission to cancel Shipment.', extra_tags='tenant')
+            messages.error(
+                request,
+                'You do not have permission to cancel Shipment.',
+                extra_tags='tenant',
+            )
             return _tenant_redirect(request, 'iroad_tenants:tenant_dashboard')
+        return None
+
+    def get(self, request, shipment_id):
+        """Cancel is POST-only from the confirmation modal."""
+        return redirect(
+            'iroad_tenants:tenant_operation_shipment_detail',
+            shipment_id=shipment_id,
+        )
+
+    def post(self, request, shipment_id):
+        context = _tenant_context_from_session(request)
+        denied = self._cancel_access_denied(request, context)
+        if denied:
+            return denied
         tenant_registry = _activate_tenant_workspace_schema(request)
         if tenant_registry is None:
             response = redirect('login')
@@ -18251,6 +18431,98 @@ class TenantOperationShipmentDeleteView(View):
         return redirect('iroad_tenants:tenant_operation_shipment_list')
 
 
+def _tenant_shipment_document_default_form_data(
+    *,
+    request=None,
+    shipment=None,
+) -> dict[str, str]:
+    """Create-form defaults — delivery note POD entry (all sections editable together)."""
+    data = {
+        'record_date': timezone.localdate().isoformat(),
+        'document_date': timezone.localdate().isoformat(),
+        'page_count': '1',
+        'status': TenantShipmentDocument.Status.DRAFT,
+        'document_type': 'Delivery Note',
+        'physical_location': 'With Driver',
+    }
+    if shipment is None and request is not None:
+        shipment_id = (request.GET.get('shipment_id') or '').strip()
+        if shipment_id:
+            shipment = (
+                TenantShipment.objects.filter(pk=shipment_id)
+                .select_related('booking')
+                .first()
+            )
+    if shipment is not None:
+        booking = shipment.booking if shipment.booking_id else None
+        data['shipment_id'] = str(shipment.pk)
+        data['shipment_ref'] = shipment.shipment_no or ''
+        data['booking_item'] = (shipment.booking_item_ref or '').strip()
+        if booking is not None:
+            data['booking_id'] = str(booking.pk)
+            data['booking_no'] = booking.booking_no or ''
+        from iroad_tenants.operation_runtime.pod_action import _shipment_target_pod_doc_count
+
+        data['page_count'] = str(max(_shipment_target_pod_doc_count(shipment), 1))
+    return data
+
+
+def _tenant_shipment_document_default_line_rows(shipment=None) -> list[dict[str, str]]:
+    """Pre-build subform rows so header + lines are ready on first paint."""
+    physical_location = 'With Driver'
+    if shipment is None:
+        return [
+            {
+                'page_no': '1',
+                'status': 'Not Completed',
+                'physical_location': physical_location,
+            },
+        ]
+    from iroad_tenants.operation_runtime.pod_action import _shipment_target_pod_doc_count
+
+    count = max(_shipment_target_pod_doc_count(shipment), 1)
+    return [
+        {
+            'page_no': str(index + 1),
+            'status': 'Not Completed',
+            'physical_location': physical_location,
+        }
+        for index in range(count)
+    ]
+
+
+def _tenant_shipment_document_proof_pipeline_validate(
+    *,
+    shipment,
+    is_delivery_note: bool,
+    line_rows: list,
+    document_type: str = '',
+    editing_document_id=None,
+) -> tuple[list, dict[str, str]]:
+    from iroad_tenants.operation_runtime.proof_pipeline import (
+        apply_shipment_document_line_rules,
+        validate_manual_shipment_document_create,
+    )
+
+    errors: dict[str, str] = {}
+    duplicate_error = validate_manual_shipment_document_create(
+        shipment=shipment,
+        is_delivery_note=is_delivery_note,
+        document_type=document_type,
+        editing_document_id=editing_document_id,
+    )
+    if duplicate_error:
+        errors['document_type'] = duplicate_error
+
+    rows, line_errors = apply_shipment_document_line_rules(
+        shipment=shipment,
+        is_delivery_note=is_delivery_note,
+        line_rows=line_rows,
+    )
+    errors.update(line_errors)
+    return rows, errors
+
+
 def _tenant_shipment_document_linkage_options():
     """Build FK-backed option rows for Shipment Document linkage UI (PCS §8.1)."""
     shipment_rows = []
@@ -18259,6 +18531,10 @@ def _tenant_shipment_document_linkage_options():
         booking_id = str(shipment.booking_id) if shipment.booking_id else ''
         booking_no = booking.booking_no if booking else ''
         booking_item = (shipment.booking_item_ref or '').strip()
+        pod_type = normalize_operation_pod_type(
+            shipment.pod_type or getattr(booking, 'pod_type', ''),
+            default=TenantShipment.PodType.DIGITAL,
+        )
         shipment_rows.append(
             {
                 'shipment_id': str(shipment.pk),
@@ -18267,6 +18543,7 @@ def _tenant_shipment_document_linkage_options():
                 'booking_no': booking_no,
                 'booking_item': booking_item,
                 'pod_doc_count': int(shipment.pod_doc_count or 0),
+                'pod_type': pod_type,
             }
         )
     booking_options = build_booking_options_from_shipment_rows(shipment_rows)
@@ -18274,8 +18551,38 @@ def _tenant_shipment_document_linkage_options():
     return booking_options, shipment_rows, booking_item_options
 
 
+def _tenant_shipment_document_auto_pod_delivery_note_index() -> dict[str, dict[str, str]]:
+    """Map shipment_id → auto/scaffold delivery note for create-form UX."""
+    from django.urls import reverse
+
+    from tenant_workspace.models import TenantShipmentDocument
+
+    index: dict[str, dict[str, str]] = {}
+    for row in (
+        TenantShipmentDocument.objects.filter(is_delivery_note=True, shipment_id__isnull=False)
+        .select_related('shipment')
+        .order_by('-created_at')[:500]
+    ):
+        shipment_id = str(row.shipment_id)
+        if shipment_id in index:
+            continue
+        index[shipment_id] = {
+            'document_id': str(row.pk),
+            'record_no': row.record_no or '',
+            'status': row.status or '',
+            'auto_created': 'auto-created' in (row.notes or '').casefold(),
+            'edit_url': reverse(
+                'iroad_tenants:tenant_operation_shipment_documents_edit',
+                kwargs={'document_id': row.pk},
+            ),
+        }
+    return index
+
+
 def _tenant_document_handover_linkage_options(*, include_shipment_id=None):
-    """Shipments with delivery-note documents — Document Handover cascade (PCS §8.1)."""
+    """Shipments with delivery-note documents — Document Handover (Hard POD only)."""
+    from iroad_tenants.operation_runtime.proof_pipeline import document_handover_allowed
+
     delivery_note_filter = Q(documents__is_delivery_note=True)
     qs = TenantShipment.objects.select_related('booking').filter(delivery_note_filter).distinct()
     if include_shipment_id:
@@ -18285,6 +18592,9 @@ def _tenant_document_handover_linkage_options(*, include_shipment_id=None):
     shipment_rows = []
     seen_shipment_ids = set()
     for shipment in qs.order_by('-created_at')[:500]:
+        if not document_handover_allowed(shipment):
+            if not include_shipment_id or str(shipment.pk) != str(include_shipment_id):
+                continue
         shipment_id = str(shipment.pk)
         if shipment_id in seen_shipment_ids:
             continue
@@ -18329,6 +18639,9 @@ def _tenant_shipment_document_enrich_form_data(form_data):
     """Preserve linkage display fields after a failed create/edit POST."""
     if not isinstance(form_data, dict):
         return form_data
+    doc_type = (form_data.get('document_type') or '').strip()
+    if doc_type == 'Delivery Note':
+        form_data['is_delivery_note'] = True
     shipment_id = (form_data.get('shipment_id') or '').strip()
     shipment = None
     if shipment_id:
@@ -18358,6 +18671,7 @@ def _tenant_shipment_document_parse_line_rows_from_request(
     line_completion_statuses,
     line_signer_locations,
 ):
+    line_doc_refs = request.POST.getlist('line_doc_ref_no[]')
     line_extra_refs = request.POST.getlist('line_extra_ref[]')
     line_page_nos = request.POST.getlist('line_page_no[]')
     line_statuses = request.POST.getlist('line_status[]')
@@ -18365,7 +18679,7 @@ def _tenant_shipment_document_parse_line_rows_from_request(
     line_attachments = request.FILES.getlist('line_attachment[]')
     line_existing_attachment_labels = request.POST.getlist('line_existing_attachment_label[]')
     max_lines = max(
-        len(request.POST.getlist('line_doc_ref_no[]')),
+        len(line_doc_refs),
         len(line_extra_refs),
         len(line_page_nos),
         len(line_statuses),
@@ -18374,6 +18688,12 @@ def _tenant_shipment_document_parse_line_rows_from_request(
         len(line_existing_attachment_labels),
         1,
     )
+    header_status = (form_data.get('status') or TenantShipmentDocument.Status.DRAFT).strip()
+    relax_line_fields = header_status in {
+        TenantShipmentDocument.Status.DRAFT,
+        TenantShipmentDocument.Status.PENDING,
+        TenantShipmentDocument.Status.UPLOADED,
+    }
     is_delivery_note = bool(form_data.get('is_delivery_note'))
     rows = []
     errors = []
@@ -18415,12 +18735,13 @@ def _tenant_shipment_document_parse_line_rows_from_request(
             continue
         if not page_no:
             page_no = str(len(rows) + 1)
+        line_doc_ref = line_doc_refs[idx].strip() if idx < len(line_doc_refs) else ''
         if is_delivery_note:
             line_status = line_status or 'Not Completed'
         else:
             line_status = ''
         row = {
-            'doc_ref_no': form_data.get('document_ref_no', ''),
+            'doc_ref_no': line_doc_ref or form_data.get('document_ref_no', ''),
             'extra_ref': extra_ref,
             'page_no': page_no,
             'status': line_status,
@@ -18436,10 +18757,10 @@ def _tenant_shipment_document_parse_line_rows_from_request(
             field_errors['page_no'] = 'Page No must be a positive number.'
         if is_delivery_note and line_status not in line_completion_statuses:
             field_errors['status'] = 'Status must be Completed or Not Completed.'
-        if line_location not in line_signer_locations:
+        if line_location and line_location not in line_signer_locations:
+            field_errors['physical_location'] = 'Select a valid physical location.'
+        elif not relax_line_fields and line_location not in line_signer_locations:
             field_errors['physical_location'] = 'Physical location is required.'
-        if not attachment_file and not attachment_storage_path:
-            field_errors['attachment'] = 'Attachment is required.'
         if field_errors:
             errors.append(
                 f'Line {row_no}: '
@@ -18454,7 +18775,7 @@ def _tenant_shipment_document_parse_line_rows_from_request(
             'status': 'Not Completed' if is_delivery_note else '',
             'physical_location': '',
             'attachment_label': '',
-            '_field_errors': {'attachment': 'Attachment is required.'},
+            '_field_errors': {},
         })
         errors.append('At least one document page line is required.')
     return rows, errors
@@ -18579,6 +18900,10 @@ def _tenant_shipment_pod_linkage_options(*, include_shipment_id=None):
                 'booking_no': booking.booking_no if booking else '',
                 'booking_item': (shipment.booking_item_ref or '').strip(),
                 'pod_type': shipment_pod_type,
+                'pod_status': normalize_operation_pod_status(
+                    shipment.pod_status,
+                    default=TenantShipment.PodStatus.NOT_COMPLETED,
+                ),
                 'pod_doc_count': int(shipment.pod_doc_count or 0),
             }
         )
@@ -19154,13 +19479,91 @@ def _tenant_shipment_pod_detail_page_rows(document):
     ]
 
 
+def _tenant_shipment_count_pod_pages(shipment) -> int:
+    """Count POD page lines saved on shipment POD child documents."""
+    if shipment is None:
+        return 0
+    pod_doc_ids = list(
+        TenantShipmentDocument.objects.filter(
+            shipment=shipment,
+            document_type='pod',
+        ).values_list('pk', flat=True)
+    )
+    if not pod_doc_ids:
+        pod_prefix = f'{SHIPMENT_POD_REF_PREFIX}-'
+        pod_doc_ids = list(
+            TenantShipmentDocument.objects.filter(
+                shipment=shipment,
+                record_no__startswith=pod_prefix,
+            ).values_list('pk', flat=True)
+        )
+    if not pod_doc_ids:
+        return 0
+    return TenantShipmentPodPage.objects.filter(document_id__in=pod_doc_ids).count()
+
+
+def _tenant_shipment_apply_pod_doc_count(shipment, count: int) -> None:
+    """Persist POD doc count on shipment and mirror to booking line."""
+    if shipment is None:
+        return
+    count = max(int(count or 0), 0)
+    shipment.pod_doc_count = count
+    shipment.save(update_fields=['pod_doc_count', 'updated_at'])
+    _tenant_booking_sync_pod_doc_count_from_shipment(shipment)
+
+
+def _tenant_shipment_op_doc_page_count(shipment) -> int:
+    """Sum OP-DOC header page_count (delivery notes, or any top-level shipment document)."""
+    if shipment is None:
+        return 0
+    base_qs = TenantShipmentDocument.objects.filter(
+        shipment=shipment,
+        source_document__isnull=True,
+    ).exclude(document_type__iexact='pod')
+    dn_qs = base_qs.filter(is_delivery_note=True)
+    if dn_qs.exists():
+        return int(dn_qs.aggregate(total=Sum('page_count')).get('total') or 0)
+    return int(base_qs.aggregate(total=Sum('page_count')).get('total') or 0)
+
+
+def _tenant_shipment_document_resolve_page_count(document) -> int:
+    """Resolved page count from saved subform lines (falls back to header)."""
+    if document is None:
+        return 0
+    doc_pages = TenantShipmentDocumentPage.objects.filter(document=document).count()
+    pod_pages = TenantShipmentPodPage.objects.filter(document=document).count()
+    header_count = int(document.page_count or 0)
+    candidates = [value for value in (doc_pages, pod_pages, header_count) if value > 0]
+    return max(candidates) if candidates else 0
+
+
+def _tenant_shipment_document_sync_page_count_after_save(document, shipment=None):
+    """Mirror shipment document page lines to header, shipment.pod_doc_count, and booking."""
+    if document is None:
+        return
+    saved_count = _tenant_shipment_document_resolve_page_count(document)
+    if saved_count <= 0:
+        return
+    if int(document.page_count or 0) != saved_count:
+        document.page_count = saved_count
+        document.save(update_fields=['page_count', 'updated_at'])
+    if shipment is None and document.shipment_id:
+        shipment = document.shipment
+    if shipment is None and document.shipment_id:
+        shipment = TenantShipment.objects.filter(pk=document.shipment_id).first()
+    if shipment is not None:
+        _tenant_shipment_document_refresh_shipment_pod(shipment)
+
+
 def _tenant_shipment_document_refresh_shipment_pod(shipment):
-    """OP-DOC §5.2/5.4: pod_doc_count from DN pages; pod_status Pending until all DN verified."""
+    """OP-DOC §5.2/5.4: pod_doc_count from DN pages and saved POD lines; pod_status Pending until all DN verified."""
     if not shipment:
         return
+    pod_pages_count = _tenant_shipment_count_pod_pages(shipment)
+    op_doc_count = _tenant_shipment_op_doc_page_count(shipment)
     dn_qs = TenantShipmentDocument.objects.filter(shipment=shipment, is_delivery_note=True)
-    if dn_qs.exists():
-        shipment.pod_doc_count = int(dn_qs.aggregate(total=Sum('page_count')).get('total') or 0)
+    if op_doc_count > 0 or pod_pages_count > 0:
+        shipment.pod_doc_count = max(op_doc_count, pod_pages_count)
     elif int(shipment.pod_doc_count or 0) <= 0 and shipment.booking_id:
         booking = shipment.booking
         if booking is None:
@@ -19217,6 +19620,7 @@ def _tenant_shipment_document_save_document_pages(document, form_data, line_rows
             attachment_label=label,
         )
     document.sync_pod_pages_from_document_pages()
+    _tenant_shipment_document_sync_page_count_after_save(document)
 
 
 def _tenant_shipment_document_save_pod_lines(document, form_data, line_rows):
@@ -19428,7 +19832,7 @@ class TenantOperationShipmentDocumentsCreateView(View):
         TenantShipmentDocument.Status.REJECTED,
     }
 
-    def _validate_shipment_document_submission(self, request, form_data):
+    def _validate_shipment_document_submission(self, request, form_data, *, editing_document_id=None):
         form_errors = {}
         for field_name, message in {
             'booking_id': 'Booking is required.',
@@ -19487,6 +19891,15 @@ class TenantOperationShipmentDocumentsCreateView(View):
             form_errors['notes'] = 'Add notes explaining the rejection before setting status to Rejected.'
 
         booking, shipment = _tenant_shipment_document_resolve_linkage(form_data, form_errors)
+        line_rows, pipeline_errors = _tenant_shipment_document_proof_pipeline_validate(
+            shipment=shipment,
+            is_delivery_note=is_delivery_note,
+            line_rows=line_rows,
+            document_type=(form_data.get('document_type') or '').strip(),
+            editing_document_id=editing_document_id,
+        )
+        form_errors.update(pipeline_errors)
+        form_data['page_count'] = str(max(len(line_rows), 1))
         _tenant_shipment_document_enrich_form_data(form_data)
         return form_errors, line_errors, line_rows, record_date, document_date, booking, shipment
 
@@ -19552,20 +19965,24 @@ class TenantOperationShipmentDocumentsCreateView(View):
                 prefix=SHIPMENT_DOCUMENTS_REF_PREFIX,
             ),
             'shipment_document_form_data': form_data
-            or {
-                'record_date': timezone.localdate().isoformat(),
-                'document_date': timezone.localdate().isoformat(),
-                'page_count': '1',
-                'status': TenantShipmentDocument.Status.DRAFT,
-            },
+            or _tenant_shipment_document_default_form_data(),
             'shipment_document_form_errors': form_errors or {},
             'shipment_document_booking_options': booking_options,
             'shipment_document_booking_item_options': booking_item_options,
             'shipment_document_shipments': shipments,
             'shipment_document_is_edit': document is not None,
+            'shipment_document_is_auto_scaffold': bool(
+                document
+                and document.is_delivery_note
+                and (
+                    'auto-created' in (document.notes or '').casefold()
+                    or (document.document_ref_no or '').strip().upper() == 'PENDING'
+                )
+            ),
             'shipment_document_record': document,
             'shipment_document_line_rows': line_rows,
             'shipment_document_physical_location_options': OPERATION_PHYSICAL_LOCATION_OPTIONS,
+            'shipment_document_auto_pod_dn_index': _tenant_shipment_document_auto_pod_delivery_note_index(),
             'tenant_schema_name': tenant_registry.schema_name,
         }
 
@@ -19580,6 +19997,9 @@ class TenantOperationShipmentDocumentsCreateView(View):
     def _form_data_from_document(self, document):
         shipment = document.shipment
         booking = document.booking or (shipment.booking if shipment and shipment.booking_id else None)
+        document_ref_no = document.document_ref_no or ''
+        if str(document_ref_no).strip().upper() == 'PENDING':
+            document_ref_no = ''
         return {
             'record_date': document.record_date.isoformat() if document.record_date else '',
             'booking_id': str(document.booking_id) if document.booking_id else '',
@@ -19588,7 +20008,7 @@ class TenantOperationShipmentDocumentsCreateView(View):
             'shipment_id': str(document.shipment_id) if document.shipment_id else '',
             'shipment_ref': shipment.shipment_no if shipment else '',
             'document_type': document.document_type,
-            'document_ref_no': document.document_ref_no,
+            'document_ref_no': document_ref_no,
             'document_date': document.document_date.isoformat() if document.document_date else '',
             'is_delivery_note': document.is_delivery_note,
             'physical_location': normalize_operation_physical_location(document.physical_location or ''),
@@ -19612,7 +20032,46 @@ class TenantOperationShipmentDocumentsCreateView(View):
             clear_tenant_portal_cookie(response, request=request)
             return response
         try:
-            context.update(self._form_context(tenant_registry))
+            from iroad_tenants.operation_runtime.proof_pipeline import (
+                shipment_auto_pod_document_flow,
+                shipment_existing_delivery_note,
+            )
+
+            shipment_id = (request.GET.get('shipment_id') or '').strip()
+            prefill_shipment = None
+            if shipment_id:
+                prefill_shipment = (
+                    TenantShipment.objects.filter(pk=shipment_id)
+                    .select_related('booking')
+                    .first()
+                )
+                if prefill_shipment is not None:
+                    existing_dn = shipment_existing_delivery_note(prefill_shipment)
+                    if existing_dn is not None and shipment_auto_pod_document_flow(prefill_shipment):
+                        messages.info(
+                            request,
+                            (
+                                f'This shipment already has delivery note {existing_dn.record_no} '
+                                f'({prefill_shipment.shipment_no}). Edit it here — use + Add Document only for '
+                                f'other document types (invoice, waybill, etc.).'
+                            ),
+                            extra_tags='tenant',
+                        )
+                        return _tenant_redirect(
+                            request,
+                            'iroad_tenants:tenant_operation_shipment_documents_edit',
+                            document_id=existing_dn.pk,
+                        )
+            context.update(
+                self._form_context(
+                    tenant_registry,
+                    form_data=_tenant_shipment_document_default_form_data(
+                        request=request,
+                        shipment=prefill_shipment,
+                    ),
+                    line_rows=_tenant_shipment_document_default_line_rows(prefill_shipment),
+                ),
+            )
             return render(request, self.template_name, context)
         finally:
             restore_public_schema(request)
@@ -19789,7 +20248,11 @@ class TenantOperationShipmentDocumentsEditView(TenantOperationShipmentDocumentsC
                 document_date,
                 booking,
                 shipment,
-            ) = self._validate_shipment_document_submission(request, form_data)
+            ) = self._validate_shipment_document_submission(
+                request,
+                form_data,
+                editing_document_id=document.pk,
+            )
             form_errors.update(guard_errors)
             page_count = max(len(line_rows), 1)
 
@@ -19979,9 +20442,16 @@ def _shipment_pod_display_data(document, shipment=None):
     if shipment is None and document.shipment_id:
         shipment = document.shipment
     user_label = _tenant_shipment_pod_user_label(document)
-    pod_type = getattr(shipment, 'pod_type', '') or document.document_type or ''
-    pod_status = getattr(shipment, 'pod_status', '') or (
-        'Compliant' if document.status == TenantShipmentDocument.Status.VERIFIED else 'Pending'
+    from iroad_tenants.operation_runtime.proof_pipeline import (
+        resolve_shipment_pod_evidence_display,
+        shipment_pod_type,
+    )
+
+    evidence_display = resolve_shipment_pod_evidence_display(document)
+    shipment_pod_class = shipment_pod_type(shipment) if shipment else ''
+    pod_status = normalize_operation_pod_status(
+        getattr(shipment, 'pod_status', None) if shipment else None,
+        default=TenantShipment.PodStatus.NOT_COMPLETED,
     )
     pod_pages = list(document.pod_pages.all())
     activity_log = [
@@ -20025,7 +20495,7 @@ def _shipment_pod_display_data(document, shipment=None):
                 'title': 'Updated',
                 'timestamp': document.updated_at,
                 'actor': user_label if user_label != '—' else 'System',
-                'color': '#28a745' if pod_status == 'Compliant' else 'var(--primary-color)',
+                'color': '#28a745' if pod_status == TenantShipment.PodStatus.COMPLETED else 'var(--primary-color)',
             },
         )
     source_doc = document.source_document if document.source_document_id else None
@@ -20042,7 +20512,10 @@ def _shipment_pod_display_data(document, shipment=None):
         ),
         'booking_item': shipment.booking_item_ref if shipment else '',
         'shipment_ref': shipment.shipment_no if shipment else '',
-        'pod_type': pod_type,
+        'pod_type': evidence_display['evidence_type'],
+        'evidence_type': evidence_display['evidence_type'],
+        'evidence_badge': evidence_display['evidence_badge'],
+        'shipment_pod_class': shipment_pod_class,
         'pod_status': pod_status,
         'physical_location': document.physical_location,
         'user_label': user_label,
@@ -20056,6 +20529,22 @@ def _shipment_pod_display_data(document, shipment=None):
         ],
         'activity_log': activity_log,
     }
+
+
+def _shipment_pod_list_stats_context(pod_prefix: str) -> dict[str, int]:
+    from iroad_tenants.operation_runtime.proof_pipeline import shipment_pod_list_stats
+
+    stats_qs = TenantShipmentDocument.objects.filter(record_no__startswith=pod_prefix)
+    stats_shipment_ids = list(
+        stats_qs.exclude(shipment_id__isnull=True)
+        .values_list('shipment_id', flat=True)
+        .distinct()
+    )
+    stats_shipment_qs = TenantShipment.objects.filter(pk__in=stats_shipment_ids)
+    return shipment_pod_list_stats(
+        stats_qs=stats_qs,
+        stats_shipment_qs=stats_shipment_qs,
+    )
 
 
 class TenantOperationShipmentPodListView(View):
@@ -20100,13 +20589,6 @@ class TenantOperationShipmentPodListView(View):
             total = paginator.count
             start_index = pod_page.start_index() if total else 0
             end_index = pod_page.end_index() if total else 0
-            stats_qs = TenantShipmentDocument.objects.filter(record_no__startswith=pod_prefix)
-            stats_shipment_ids = list(
-                stats_qs.exclude(shipment_id__isnull=True)
-                .values_list('shipment_id', flat=True)
-                .distinct()
-            )
-            stats_shipment_qs = TenantShipment.objects.filter(pk__in=stats_shipment_ids)
             context.update(
                 {
                     'pod_rows': pod_rows,
@@ -20115,18 +20597,7 @@ class TenantOperationShipmentPodListView(View):
                     'pagination_start': start_index,
                     'pagination_end': end_index,
                     'pagination_total': total,
-                    'pod_stats': {
-                        'total': stats_qs.count(),
-                        'hard_copy': stats_shipment_qs.filter(pod_type=TenantShipment.PodType.HARD).count(),
-                        'soft_copy': stats_shipment_qs.filter(pod_type=TenantShipment.PodType.SOFT).count(),
-                        'digital_evidence': stats_shipment_qs.filter(pod_type=TenantShipment.PodType.DIGITAL).count(),
-                        'completed': stats_shipment_qs.filter(
-                            pod_status=TenantShipment.PodStatus.COMPLETED,
-                        ).count(),
-                        'pending': stats_shipment_qs.filter(
-                            pod_status=TenantShipment.PodStatus.NOT_COMPLETED,
-                        ).count(),
-                    },
+                    'pod_stats': _shipment_pod_list_stats_context(pod_prefix),
                     'tenant_schema_name': tenant_registry.schema_name,
                 }
             )
@@ -20172,7 +20643,8 @@ class TenantOperationShipmentPodCreateView(View):
                 'pod_type': '',
                 'physical_location': '',
                 'receiver_user_id': default_receiver_user_id,
-                'status': 'Draft',
+                'pod_status': TenantShipment.PodStatus.NOT_COMPLETED,
+                'status': 'Posted',
             }
         linked_shipment = shipment or (document.shipment if document.shipment_id else None)
         booking = document.booking
@@ -20193,7 +20665,7 @@ class TenantOperationShipmentPodCreateView(View):
             'document_type': document.document_type,
             'source_document_id': str(document.source_document_id) if document.source_document_id else '',
             'doc_no': str(document.source_document_id) if document.source_document_id else '',
-            'document_ref_no': document.document_ref_no,
+            'document_ref_no': document.document_ref_no or '',
             'page_count': str(document.page_count or 1),
             'booking_id': str(document.booking_id) if document.booking_id else '',
             'booking_no': booking.booking_no if booking else '',
@@ -20203,6 +20675,10 @@ class TenantOperationShipmentPodCreateView(View):
             'pod_type': pod_type,
             'physical_location': document.physical_location,
             'receiver_user_id': receiver_user_id,
+            'pod_status': normalize_operation_pod_status(
+                getattr(linked_shipment, 'pod_status', None) if linked_shipment else None,
+                default=TenantShipment.PodStatus.NOT_COMPLETED,
+            ),
             'status': _tenant_shipment_pod_status_to_form(document.status),
         }
 
@@ -20262,14 +20738,24 @@ class TenantOperationShipmentPodCreateView(View):
             ).first()
             if source_document is not None and source_document.shipment_id and linked_shipment is None:
                 linked_shipment = source_document.shipment
+        include_shipment_id = None
+        if form_data and (form_data.get('shipment_id') or '').strip():
+            include_shipment_id = (form_data.get('shipment_id') or '').strip()
+        elif document is not None and document.shipment_id:
+            include_shipment_id = str(document.shipment_id)
+        pod_shipment_options = _tenant_shipment_pod_linkage_options(
+            include_shipment_id=include_shipment_id,
+        )
         return {
             'preview_pod_record_no': preview_pod_record_no,
             'pod_form_data': pod_form_data,
             'form_errors': form_errors or {},
             'doc_no_options': doc_no_options,
             'delivery_note_options': delivery_note_options,
+            'pod_shipment_options': pod_shipment_options,
             'doc_ref_options_map': _tenant_shipment_pod_doc_ref_options_map(),
             'operation_pod_type_options': operation_pod_type_options(),
+            'operation_pod_status_options': operation_pod_status_options(),
             'delivery_note_pages_json': json.dumps(_tenant_shipment_pod_delivery_note_pages_map()),
             'pod_line_page_options': _tenant_shipment_pod_line_page_options(source_document),
             'pod_action_log_options': _tenant_shipment_pod_action_log_option_rows(
@@ -20352,11 +20838,15 @@ class TenantOperationShipmentPodCreateView(View):
                 'pod_type': (request.POST.get('pod_type') or '').strip(),
                 'physical_location': '',
                 'receiver_user_id': (request.POST.get('receiver_user_id') or '').strip(),
-                'status': (request.POST.get('status') or 'Draft').strip(),
+                'pod_status': normalize_operation_pod_status(
+                    request.POST.get('pod_status'),
+                    default=TenantShipment.PodStatus.NOT_COMPLETED,
+                ),
+                'status': (request.POST.get('status') or 'Posted').strip(),
             }
             form_errors = {}
             if form_data['status'] not in POD_TRANSACTION_FORM_STATUSES:
-                form_errors['status'] = 'Select a valid status (Draft or Posted).'
+                form_errors['status'] = 'Invalid document status.'
             document_status = _tenant_shipment_pod_status_from_form(form_data['status'])
             is_posted = form_data['status'] == 'Posted'
             record_date = parse_date(form_data['record_date']) if form_data['record_date'] else timezone.localdate()
@@ -20394,6 +20884,15 @@ class TenantOperationShipmentPodCreateView(View):
                 form_errors,
                 shipment=shipment,
             )
+            if (
+                source_document is not None
+                and shipment is not None
+                and source_document.shipment_id
+                and source_document.shipment_id != shipment.pk
+            ):
+                form_errors['shipment_id'] = (
+                    'Selected shipment must match the delivery note linked to Doc No.'
+                )
             receiver_user = _tenant_shipment_pod_resolve_receiver_user(form_data, form_errors)
             if source_document is not None:
                 page_count = max(page_count, int(source_document.page_count or 1))
@@ -20430,7 +20929,9 @@ class TenantOperationShipmentPodCreateView(View):
             except json.JSONDecodeError:
                 pod_pages = []
             if not pod_pages:
-                pod_pages = _tenant_shipment_pod_build_line_rows_from_source(source_document)
+                form_errors['pod_pages'] = (
+                    'Add at least one POD page line manually (Doc Page, source, action log or map).'
+                )
             line_payload = []
             for idx, row in enumerate(pod_pages, start=1):
                 if not isinstance(row, dict):
@@ -20495,6 +20996,21 @@ class TenantOperationShipmentPodCreateView(View):
                 if not values['doc_page']:
                     continue
                 line_payload.append((idx, values))
+            from iroad_tenants.operation_runtime.proof_pipeline import (
+                validate_manual_pod_page_lines,
+                validate_pod_page_line_count,
+            )
+
+            page_count_error = validate_pod_page_line_count(
+                source_document=source_document,
+                shipment=shipment,
+                line_count=len(line_payload),
+            )
+            if page_count_error:
+                form_errors['pod_pages'] = page_count_error
+            form_errors.update(
+                validate_manual_pod_page_lines(line_payload, is_posted=is_posted)
+            )
             if not line_payload:
                 form_errors['pod_pages'] = 'At least one POD page line is required.'
             if form_errors:
@@ -20589,6 +21105,11 @@ class TenantOperationShipmentPodCreateView(View):
             TenantShipmentPodPage.objects.filter(document=document).delete()
             for idx, values in line_payload:
                 TenantShipmentPodPage.objects.create(document=document, line_no=idx, **values)
+
+            saved_page_count = len(line_payload)
+            document.page_count = saved_page_count
+            document.save(update_fields=['page_count', 'updated_at'])
+            _tenant_shipment_apply_pod_doc_count(shipment, saved_page_count)
 
             if is_posted:
                 _tenant_shipment_pod_apply_posting_effects(
@@ -20695,6 +21216,11 @@ class TenantOperationDocumentHandoverListView(View):
             clear_tenant_portal_cookie(response, request=request)
             return response
         try:
+            from iroad_tenants.operation_runtime.hard_pod_document_handover import (
+                upgrade_stale_mobile_draft_handovers,
+            )
+
+            upgrade_stale_mobile_draft_handovers()
             search_q = (request.GET.get('q') or '').strip()
             handover_qs = TenantDocumentHandover.objects.select_related(
                 'booking',
@@ -20872,6 +21398,14 @@ class TenantOperationDocumentHandoverCreateView(View):
                 elif shipment.pk not in pending_ids:
                     form_errors['shipment_id'] = 'Shipment must have pending POD work.'
                 else:
+                    from iroad_tenants.operation_runtime.proof_pipeline import (
+                        document_handover_allowed,
+                    )
+
+                    if not document_handover_allowed(shipment):
+                        form_errors['shipment_id'] = (
+                            'Document Handover applies to Hard Copy POD shipments only.'
+                        )
                     booking = _tenant_document_handover_sync_linkage_from_shipment(
                         form_data,
                         shipment,
@@ -20955,6 +21489,18 @@ class TenantOperationDocumentHandoverCreateView(View):
 
             if not line_payload:
                 form_errors['handover_lines'] = 'At least one page verification line is required.'
+            else:
+                from iroad_tenants.operation_runtime.proof_pipeline import (
+                    validate_handover_page_line_count,
+                )
+
+                handover_count_error = validate_handover_page_line_count(
+                    source_document=source_document,
+                    shipment=shipment,
+                    line_count=len(line_payload),
+                )
+                if handover_count_error:
+                    form_errors['handover_lines'] = handover_count_error
 
             if is_posted:
                 if not line_payload:
@@ -22346,6 +22892,19 @@ def _merge_validation_error_into_form_errors(exc, form_errors):
     elif getattr(exc, 'messages', None):
         joined = '; '.join(str(m) for m in exc.messages)
         form_errors.setdefault('__all__', joined)
+
+
+def _tenant_shipment_prepare_form_errors_for_ui(form_errors):
+    """Map non-field shipment errors onto visible controls for portal highlighting."""
+    if not form_errors:
+        return {}
+    prepared = dict(form_errors)
+    all_msg = (prepared.get('__all__') or '').strip()
+    if all_msg and not prepared.get('shipment_status'):
+        prepared['shipment_status'] = all_msg
+    if all_msg and prepared.get('shipment_status') == all_msg:
+        prepared.pop('__all__', None)
+    return prepared
 
 
 TENANT_CLIENT_ACCOUNT_COLUMN_FILTERS = {
@@ -29820,9 +30379,10 @@ class DriverTreasuryListView(View):
                 q.pop('page', None)
                 return '?' + q.urlencode()
 
-            pagination_page_links = [
-                (n, _page_url(n)) for n in treasuries_page.paginator.page_range
-            ]
+            pagination_page_links = build_eal_pagination_page_links(
+                treasuries_page,
+                _page_url,
+            )
             prev_url = (
                 _page_url(treasuries_page.previous_page_number())
                 if treasuries_page.has_previous()
@@ -30258,9 +30818,10 @@ class DriverTreasuryTransactionListView(View):
                 q.pop('page', None)
                 return '?' + q.urlencode()
 
-            pagination_page_links = [
-                (n, _page_url(n)) for n in transactions_page.paginator.page_range
-            ]
+            pagination_page_links = build_eal_pagination_page_links(
+                transactions_page,
+                _page_url,
+            )
             prev_url = (
                 _page_url(transactions_page.previous_page_number())
                 if transactions_page.has_previous()
@@ -30805,7 +31366,7 @@ class DriverAttachmentAllListView(View):
 
             sort_urls = {f: _sort_url(f) for f in allowed_sort}
 
-            pagination_page_links = [(n, _page_url(n)) for n in page.paginator.page_range]
+            pagination_page_links = build_eal_pagination_page_links(page, _page_url)
             prev_url = _page_url(page.previous_page_number()) if page.has_previous() else None
             next_url = _page_url(page.next_page_number()) if page.has_next() else None
 
@@ -32338,7 +32899,7 @@ class TruckAttachmentAllListView(View):
 
             sort_urls = {f: _sort_url(f) for f in allowed_sort}
 
-            pagination_page_links = [(n, _page_url(n)) for n in page.paginator.page_range]
+            pagination_page_links = build_eal_pagination_page_links(page, _page_url)
             prev_url = _page_url(page.previous_page_number()) if page.has_previous() else None
             next_url = _page_url(page.next_page_number()) if page.has_next() else None
 

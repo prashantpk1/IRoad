@@ -1,0 +1,16 @@
+{% comment %}
+  pagination_page_links — required list of (num, href) tuples; href is None for ellipsis
+  page_obj — optional; when set, marks the active page number
+  active_page — optional explicit page number when page_obj is not passed
+{% endcomment %}
+{% for num, href in pagination_page_links %}
+  {% if href == None %}
+  <span class="eal-page-btn eal-page-ellipsis" aria-hidden="true">&hellip;</span>
+  {% elif page_obj and num == page_obj.number %}
+  <span class="eal-page-btn active" aria-current="page">{{ num }}</span>
+  {% elif active_page and num == active_page %}
+  <span class="eal-page-btn active" aria-current="page">{{ num }}</span>
+  {% else %}
+  <a class="eal-page-btn" href="{{ href }}">{{ num }}</a>
+  {% endif %}
+{% endfor %}

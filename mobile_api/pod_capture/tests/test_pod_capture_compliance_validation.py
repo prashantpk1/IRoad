@@ -119,17 +119,17 @@ class PodCapturePolicyTests(SimpleTestCase):
 
         self.assertEqual(derive_pod_type_overlay('invalid_type'), {})
 
-    def test_digital_pod_requires_photo_signature_and_video(self) -> None:
+    def test_digital_pod_optional_video_with_duration_cap(self) -> None:
         action = _action(code='A7', label='Upload POD', auto_pod=True)
         req = build_pod_capture_requirements(
             action,
             pod_capture_type='digital',
         )
-        self.assertTrue(req.get('photo'))
-        self.assertTrue(req.get('signature'))
-        self.assertTrue(req.get('video'))
-        self.assertEqual(int(req.get('video_min_count') or 0), 1)
-        self.assertFalse(req.get('video_optional'))
+        self.assertFalse(req.get('video'))
+        self.assertEqual(int(req.get('video_min_count') or 0), 0)
+        self.assertTrue(req.get('video_optional'))
+        self.assertFalse(req.get('requires_video'))
+        self.assertEqual(req.get('video_max_duration_seconds'), 60)
 
 
 class PodCaptureValidationServiceTests(SimpleTestCase):

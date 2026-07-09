@@ -48,26 +48,66 @@ def resolve_client_name(
     return _localized_client_label(client, request=request)
 
 
-def resolve_execution_date(
-    *,
-    shipment: Any | None = None,
-    booking: Any | None = None,
-) -> str:
-    """
-    Booking execution date as ``YYYY-MM-DD``.
-
-    Falls back to ``booking_date`` when ``execution_date`` is unset.
-    """
-    resolved_booking = booking
-    if resolved_booking is None and shipment is not None:
-        resolved_booking = getattr(shipment, 'booking', None)
-    if resolved_booking is None:
-        return ''
-    execution = getattr(resolved_booking, 'execution_date', None)
-    fallback = getattr(resolved_booking, 'booking_date', None)
-    value = execution or fallback
+def _format_date_value(value: Any) -> str:
     if value is None:
         return ''
     if hasattr(value, 'isoformat'):
         return value.isoformat()
     return str(value).strip()
+
+
+def resolve_execution_date(
+    *,
+    shipment: Any | None = None,
+    booking: Any | None = None,
+    movement: Any | None = None,
+) -> str:
+    """
+    Execution date as ``YYYY-MM-DD``.
+
+    Bookings: ``execution_date`` with fallback to ``booking_date``.
+    Movements: ``start_time`` date when the job has started, else ``movement_date``.
+    """
+    resolved_booking = booking
+    if resolved_booking is None and shipment is not None:
+        resolved_booking = getattr(shipment, 'booking', None)
+    if resolved_booking is not None:
+        execution = getattr(resolved_booking, 'execution_date', None)
+        fallback = getattr(resolved_booking, 'booking_date', None)
+        return _format_date_value(execution or fallback)
+
+    if movement is not None:
+        start_time = getattr(movement, 'start_time', None)
+        if start_time is not None:
+            if hasattr(start_time, 'date'):
+                return start_time.date().isoformat()
+            return _format_date_value(start_time)
+        return _format_date_value(getattr(movement, 'movement_date', None))
+
+    return ''
+
+
+def resolve_execution_time(*, movement: Any | None = None) -> str:
+    """
+    Local execution clock time for movements after Start Job.
+
+    Returns ``HH:MM:SS`` when ``movement.start_time`` is set; otherwise empty.
+    """
+    if movement is None:
+        return ''
+    start_time = getattr(movement, 'start_time', None)
+    if start_time is None:
+        return ''
+    try:
+        from django.utils import timezone
+
+        localized = (
+            timezone.localtime(start_time)
+            if timezone.is_aware(start_time)
+            else start_time
+        )
+        return localized.strftime('%H:%M:%S')
+    except Exception:
+        if hasattr(start_time, 'strftime'):
+            return start_time.strftime('%H:%M:%S')
+        return ''

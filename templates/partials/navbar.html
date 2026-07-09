@@ -60,7 +60,7 @@
       <div class="header-user-info">
         <span class="header-user-name">
           {% if request.user.is_authenticated %}
-            {% if request.user.email == 'iroadadmin@yopmail.com' or request.user.first_name == 'Root' %}
+            {% if request.user.email == 'irouteadmin@yopmail.com' or request.user.first_name == 'Root' %}
               {% translate "Root Admin" %}
             {% else %}
               {{ request.user.first_name }} {{ request.user.last_name }}

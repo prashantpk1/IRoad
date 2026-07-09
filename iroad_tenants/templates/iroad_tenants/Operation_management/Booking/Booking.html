@@ -157,19 +157,15 @@
                   >
                 </div>
                 <div class="field">
-                  <label for="bookingStatus" class="form-label">Booking Status</label>
-                  {% if booking_is_edit %}
-                  <select class="form-select" id="bookingStatus" name="booking_status">
-                    <option value="Draft" {% if booking_form_data.booking_status == 'Draft' %}selected{% endif %}>Draft</option>
-                    <option value="Confirmed" {% if booking_form_data.booking_status == 'Confirmed' %}selected{% endif %}>Active</option>
-                    <option value="Cancelled" {% if booking_form_data.booking_status == 'Cancelled' %}selected{% endif %}>Cancelled</option>
+                  <label for="bookingStatusDisplay" class="form-label">Booking Status</label>
+                  {% firstof booking_derived_status booking_form_data.booking_status "Draft" as booking_status_selected %}
+                  <select class="form-select" id="bookingStatusDisplay">
+                    {% for status in operation_booking_status_options %}
+                    <option value="{{ status }}" {% if booking_status_selected == status %}selected{% endif %}>{{ status }}</option>
+                    {% endfor %}
                   </select>
-                  {% if booking_derived_status %}
-                  <span class="field-hint d-block mt-1">Operational status (derived): <strong>{{ booking_derived_status }}</strong>{% if booking_derived_status == 'Executed' %} — set automatically when all lines are executed{% endif %}</span>
-                  {% endif %}
-                  {% else %}
-                  <input type="hidden" id="bookingStatus" name="booking_status" value="Draft" />
-                  <p class="form-control-plaintext mb-0" id="bookingStatusDisplay">Draft</p>
+                  <input type="hidden" id="bookingStatus" name="booking_status" value="{% firstof booking_form_data.booking_status 'Draft' %}" />
+                  {% if not booking_is_edit %}
                   <span class="field-hint">Use Save as Draft or Confirm Booking below.</span>
                   {% endif %}
                 </div>
@@ -898,6 +894,25 @@
         var sourcing = document.getElementById("sourcingMode");
         var bookingStatus = document.getElementById("bookingStatus");
         var bookingStatusDisplay = document.getElementById("bookingStatusDisplay");
+
+        function storableBookingStatus(displayValue) {
+          var allowed = { Draft: "Draft", Confirmed: "Confirmed", Cancelled: "Cancelled" };
+          return allowed[displayValue] || null;
+        }
+
+        function syncBookingStatusHidden() {
+          if (!bookingStatus || !bookingStatusDisplay) return;
+          if (bookingStatus.tagName !== "SELECT" && bookingStatusDisplay.tagName === "SELECT") {
+            var stored = storableBookingStatus(bookingStatusDisplay.value);
+            if (stored) {
+              bookingStatus.value = stored;
+            }
+          }
+        }
+        if (bookingStatusDisplay && bookingStatusDisplay.tagName === "SELECT") {
+          bookingStatusDisplay.addEventListener("change", syncBookingStatusHidden);
+          syncBookingStatusHidden();
+        }
         var orderTypeSelect = document.getElementById("orderType");
         var isScheduled = document.getElementById("isScheduled");
         var executionDateEl = document.getElementById("executionDate");
@@ -2337,18 +2352,20 @@
             var action = event.submitter ? (event.submitter.value || "") : "";
             var isConfirm = action === "confirm";
             if (bookingStatus) {
-              var isStatusSelect = bookingStatus.tagName === "SELECT";
-              if (isStatusSelect && bookingStatus.value === "Cancelled") {
-                /* keep Cancelled when chosen on edit */
-              } else if (isConfirm) {
+              if (isConfirm) {
                 bookingStatus.value = "Confirmed";
               } else if (action === "draft") {
                 bookingStatus.value = "Draft";
               }
             }
-            if (bookingStatusDisplay) {
-              bookingStatusDisplay.textContent = isConfirm ? "Confirmed" : "Draft";
+            if (bookingStatusDisplay && bookingStatusDisplay.tagName === "SELECT") {
+              if (isConfirm) {
+                bookingStatusDisplay.value = "Confirmed";
+              } else if (action === "draft") {
+                bookingStatusDisplay.value = "Draft";
+              }
             }
+            syncBookingStatusHidden();
             if (!validateBookingBeforeSubmit(isConfirm)) {
               event.preventDefault();
             }

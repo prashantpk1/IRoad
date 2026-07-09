@@ -80,7 +80,7 @@ def seed_root_admin():
 
     try:
         admin, created = AdminUser.objects.get_or_create(
-            email="iroadadmin@yopmail.com",
+            email="irouteadmin@yopmail.com",
             defaults={
                 "first_name": "Root",
                 "last_name": "Admin",
@@ -463,7 +463,7 @@ def seed_tenant_security_settings():
 
 def main():
     print("=" * 50)
-    print("  IRoad Super Admin — Master Seed Script")
+    print("  IRoute Super Admin — Master Seed Script")
     print("=" * 50)
 
     try:

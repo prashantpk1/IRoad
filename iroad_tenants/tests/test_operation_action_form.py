@@ -3,6 +3,7 @@ from unittest.mock import MagicMock, patch
 
 from iroad_tenants.operation_action_form import (
     apply_confirmed_sequence_swap,
+    default_mobile_visible_for_action_scope,
     format_job_operation_action_code,
     normalize_operation_action_sequencing,
     recommended_operation_action_code,
@@ -45,6 +46,11 @@ class OperationActionFormTests(unittest.TestCase):
     def test_sequencing_active_for_job_scope_and_category(self):
         self.assertTrue(sequencing_is_active('job', 'job'))
         self.assertTrue(sequencing_is_active('on_call', 'empty_move'))
+
+    def test_default_mobile_visible_for_driver_scopes(self):
+        self.assertTrue(default_mobile_visible_for_action_scope('job'))
+        self.assertTrue(default_mobile_visible_for_action_scope('on_call'))
+        self.assertFalse(default_mobile_visible_for_action_scope('without'))
 
     def test_consecutive_sequence_numbers_valid(self):
         self.assertIsNone(validate_consecutive_sequence_numbers([1, 2, 3]))
@@ -142,27 +148,67 @@ class OperationActionFormTests(unittest.TestCase):
 
     def test_toggle_requires_exactly_one_auto_movement_post(self):
         errors = validate_configuration_toggles(
-            {'auto_movement_post': False},
+            {
+                'auto_movement_post': False,
+                'sequence_category': 'job',
+            },
             enabled_counts={
                 'auto_movement_post': 0,
                 'auto_shipment_post': 0,
                 'auto_pod_post': 0,
                 'hard_copy_collection': 0,
+                'auto_treasury_post': 0,
             },
         )
         self.assertIn('auto_movement_post', errors)
 
-    def test_toggle_rejects_second_auto_movement_post(self):
+    def test_toggle_rejects_second_auto_movement_post_in_same_category(self):
         errors = validate_configuration_toggles(
-            {'auto_movement_post': True},
+            {
+                'auto_movement_post': True,
+                'sequence_category': 'job',
+            },
             enabled_counts={
                 'auto_movement_post': 1,
                 'auto_shipment_post': 0,
                 'auto_pod_post': 0,
                 'hard_copy_collection': 0,
+                'auto_treasury_post': 0,
             },
         )
         self.assertIn('auto_movement_post', errors)
+
+    def test_toggle_allows_auto_movement_post_when_other_category_owns_it(self):
+        errors = validate_configuration_toggles(
+            {
+                'auto_movement_post': True,
+                'sequence_category': 'empty_move',
+            },
+            enabled_counts={
+                'auto_movement_post': 0,
+                'auto_shipment_post': 0,
+                'auto_pod_post': 0,
+                'hard_copy_collection': 0,
+                'auto_treasury_post': 0,
+            },
+        )
+        self.assertNotIn('auto_movement_post', errors)
+
+    def test_toggle_skips_auto_movement_post_requirement_for_without_category(self):
+        errors = validate_configuration_toggles(
+            {
+                'auto_movement_post': False,
+                'sequence_category': 'without',
+            },
+            enabled_counts={
+                'auto_movement_post': 0,
+                'auto_shipment_post': 0,
+                'auto_pod_post': 0,
+                'hard_copy_collection': 0,
+                'auto_treasury_post': 0,
+            },
+        )
+        self.assertNotIn('auto_movement_post', errors)
 
     def test_toggle_rejects_second_auto_shipment_post(self):
         errors = validate_configuration_toggles(
@@ -172,9 +218,23 @@ class OperationActionFormTests(unittest.TestCase):
                 'auto_shipment_post': 1,
                 'auto_pod_post': 0,
                 'hard_copy_collection': 0,
+                'auto_treasury_post': 0,
             },
         )
         self.assertIn('auto_shipment_post', errors)
+
+    def test_toggle_rejects_second_confirm_payment(self):
+        errors = validate_configuration_toggles(
+            {'auto_treasury_post': True},
+            enabled_counts={
+                'auto_movement_post': 1,
+                'auto_shipment_post': 0,
+                'auto_pod_post': 0,
+                'hard_copy_collection': 0,
+                'auto_treasury_post': 1,
+            },
+        )
+        self.assertIn('auto_treasury_post', errors)
 
     @patch('iroad_tenants.operation_action_form.find_sequence_peer')
     @patch('iroad_tenants.operation_action_form.existing_sequenced_numbers')
@@ -258,13 +318,18 @@ class OperationActionFormTests(unittest.TestCase):
         peer.auto_shipment_post = True
         peer.auto_pod_post = False
         peer.hard_copy_collection = False
+        peer.auto_treasury_post = False
 
         other_owner = MagicMock()
         other_owner.pk = 'other-id'
         other_owner.auto_movement_post = True
 
+        others_qs = MagicMock()
+        others_qs.__iter__ = lambda self: iter([other_owner])
+        others_qs.filter.return_value = others_qs
+
         mock_action_model = MagicMock()
-        mock_action_model.objects.filter.return_value.exclude.return_value = [other_owner]
+        mock_action_model.objects.filter.return_value.exclude.return_value = others_qs
 
         form_data = {
             'sequence_category': 'job',

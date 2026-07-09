@@ -81,13 +81,25 @@ def driver_owns_booking(driver: Any, booking: TenantBooking | Any | None) -> boo
 
 
 def booking_is_driver_accessible(booking: TenantBooking | Any | None) -> bool:
-    """Confirmed, non-cancelled booking eligible for mobile execution."""
+    """Confirmed, operationally open booking eligible for mobile execution."""
     if booking is None:
         return False
     status = str(getattr(booking, 'booking_status', '') or '').strip()
     if status == TenantBooking.Status.CANCELLED:
         return False
-    return status == TenantBooking.Status.CONFIRMED
+    if status != TenantBooking.Status.CONFIRMED:
+        return False
+    try:
+        from iroad_tenants.booking_status import (
+            BOOKING_HEADER_CANCELLED,
+            derive_booking_header_status,
+        )
+
+        if derive_booking_header_status(booking) == BOOKING_HEADER_CANCELLED:
+            return False
+    except Exception:
+        pass
+    return True
 
 
 def driver_owns_movement(driver: Any, movement: Any) -> bool:

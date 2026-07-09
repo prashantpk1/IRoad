@@ -181,8 +181,14 @@ def select_active_empty_move_from_list(
     *,
     exclude_booking_id: Any | None = None,
 ) -> Any | None:
-    """Pick the current empty move from an in-memory sequence (tests / prefetch)."""
-    for movement in sorted_movements(movements):
+    """
+    Pick the driver's current empty move from an in-memory sequence.
+
+    When multiple active rows exist (data anomaly), prefer the **most recent**
+    movement by date / sequence so mobile resumes the latest job — not the oldest.
+    """
+    ordered = sorted_movements(movements)
+    for movement in reversed(ordered):
         if not is_active_empty_move(movement):
             continue
         if not driver_assigned_to_movement(driver, movement):

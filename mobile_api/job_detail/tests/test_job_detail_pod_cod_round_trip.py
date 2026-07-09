@@ -90,7 +90,16 @@ class PodCodProjectionTests(TestCase):
             pod_status=TenantShipment.PodStatus.NOT_COMPLETED,
             status=TenantShipment.ShipmentStatus.AT_DELIVERY,
         )
-        self.assertTrue(pod_cod_policy.derive_hard_pod_pending(shipment))
+        with patch(
+            'iroad_tenants.operation_runtime.shipment_execution_stage.shipment_unloading_completed_done',
+            return_value=True,
+        ):
+            self.assertTrue(
+                pod_cod_policy.derive_hard_pod_pending(
+                    shipment,
+                    log_evidence={'pod_uploaded': True},
+                )
+            )
 
     @patch('mobile_api.job_detail.services.job_detail_pod_cod_reconciler.get_projection_cache')
     def test_reconcile_log_evidence_pod_uploaded(self, mock_cache):

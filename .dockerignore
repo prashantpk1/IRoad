@@ -1,0 +1,83 @@
+# .dockerignore — exclude from Docker BUILD CONTEXT (production image slimming)
+#
+# NOT the same as .gitignore:
+#   .gitignore  → what Git must not commit
+#   .dockerignore → what must not be COPY'd into the image
+#
+# Docker reads the filesystem, not git. Paths below marked [local] are also in
+# .gitignore but must be listed here if those folders still exist on disk.
+
+# ── Docker-only (usually tracked in git, not needed in runtime image) ──
+.git
+.github
+.gitattributes
+.dockerignore
+README.md
+**/tests/
+htmlcov/
+.coverage
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.hypothesis/
+.tox/
+.nox/
+
+# ── [local] Local-only folders (see .gitignore) ──
+postman/
+postman_back/
+backup_postman/
+pm_back/
+mobile_api/postman/
+mobile_api/execution/postman/
+scratch/
+tmp/
+temp/
+local/
+designerDesign/
+IROAD DOC/
+
+# ── [local] Secrets & env (see .gitignore) ──
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.p12
+secrets/
+credentials.json
+
+# ── [local] Dev scripts & junk (see .gitignore) ──
+verify_phase*.py
+verify_comm_*.py
+test_comm_integration.py
+scripts/verify_*
+twilio_test.py
+real_twilio_test.py
+*twilio*test*.py
+*.postman_environment.json
+*.postman_collection.json
+*.lnk
+*.bak
+*.bak_merge
+Untitled
+Untitled*
+
+# ── Runtime data (generated on server, not baked into image) ──
+media/
+staticfiles/
+db.sqlite3
+*.sql
+*.sql.gz
+*.dump
+dump.rdb
+
+# ── Tooling caches (safe on any machine) ──
+__pycache__/
+*.py[cod]
+.vscode/
+.idea/
+.cursor/
+node_modules/
+.DS_Store
+Thumbs.db

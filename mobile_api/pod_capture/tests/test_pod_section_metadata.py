@@ -171,18 +171,20 @@ class PodSectionMetadataTests(TestCase):
         digital = section['digital_evidence']
         self.assertEqual(digital['action_code'], 'A7')
         reqs = digital['requirements']
-        self.assertTrue(reqs['photo'])
-        self.assertTrue(reqs['signature'])
-        self.assertTrue(reqs['video'])
-        self.assertFalse(reqs['video_optional'])
-        self.assertEqual(reqs['video_min_count'], 1)
+        self.assertTrue(reqs['photo_enabled'])
+        self.assertFalse(reqs['photo'])
+        self.assertFalse(reqs['signature'])
+        self.assertTrue(reqs['video_enabled'])
+        self.assertFalse(reqs['video'])
+        self.assertTrue(reqs['video_optional'])
+        self.assertEqual(reqs['video_min_count'], 0)
         self.assertEqual(reqs['video_max_count'], 1)
-        self.assertEqual(reqs['video_max_duration_seconds'], 15)
+        self.assertEqual(reqs['video_max_duration_seconds'], 60)
         media_types = [row['media_type'] for row in digital['media_steps']]
-        self.assertEqual(media_types, ['photo', 'signature', 'video'])
+        self.assertEqual(media_types, ['photo', 'video'])
         video_step = digital['media_steps'][-1]
-        self.assertTrue(video_step['required'])
-        self.assertEqual(video_step['max_duration_seconds'], 15)
+        self.assertFalse(video_step['required'])
+        self.assertEqual(video_step['max_duration_seconds'], 60)
         self.assertEqual(section['screen_title'], 'Capturing Action Evidences')
         capture_ui = section['capture_ui']
         self.assertEqual(capture_ui['screen_title'], 'Capturing Action Evidences')
@@ -258,3 +260,55 @@ class PodSectionMetadataTests(TestCase):
         )
         self.assertEqual(section['capture_steps'], ['digital_evidence'])
         self.assertFalse(section['hard_copy_confirmation']['required'])
+
+    @patch(
+        'mobile_api.pod_capture.services.pod_section_metadata.resolve_digital_pod_action',
+        return_value=_mock_a7_action(),
+    )
+    @patch(
+        'mobile_api.pod_capture.services.pod_section_metadata.resolve_hard_copy_pod_action',
+        return_value=SimpleNamespace(action_code='A7H', hard_copy_collection=True),
+    )
+    @patch(
+        'mobile_api.pod_capture.services.pod_section_metadata._shipment_has_delivery_note',
+        return_value=False,
+    )
+    @patch(
+        'iroad_tenants.operation_field_catalog.operation_shipment_uses_hard_copy_pod',
+        return_value=True,
+    )
+    @patch(
+        'iroad_tenants.operation_runtime.pod_action.portal_shipment_document_exists',
+        return_value=False,
+    )
+    def test_hard_shipment_without_portal_document_blocks_digital_next(
+        self,
+        _mock_portal,
+        _mock_hard_pod,
+        _mock_dn,
+        _mock_hard,
+        _mock_a7,
+    ):
+        shipment = SimpleNamespace(
+            pk=uuid.uuid4(),
+            pod_type=TenantShipment.PodType.HARD,
+            pod_doc_count=0,
+            pod_status=TenantShipment.PodStatus.NOT_COMPLETED,
+            shipment_status=TenantShipment.ShipmentStatus.AT_DELIVERY,
+            driver_id=uuid.uuid4(),
+            driver=None,
+        )
+        section = build_pod_section_metadata(
+            shipment,
+            tenant_schema='tenant_test',
+        )
+        hard = section['hard_copy_confirmation']
+        self.assertFalse(hard['applicable'])
+        self.assertFalse(hard['actionable'])
+        digital_ui = section['digital_evidence']['capture_ui']
+        self.assertNotIn('wizard_next_step', digital_ui['primary_button'])
+        self.assertTrue(digital_ui['primary_button']['complete_upload_after_execute'])
+        self.assertTrue(digital_ui['primary_button'].get('hard_copy_blocked'))
+        section_ui = section['capture_ui']
+        self.assertTrue(section_ui.get('submit_blocked'))
+        self.assertIn('Shipment Document', section_ui.get('submit_blocked_reason', ''))

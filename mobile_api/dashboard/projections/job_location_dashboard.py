@@ -14,6 +14,7 @@ from mobile_api.helpers.booking_endpoint_addresses import (
 from mobile_api.helpers.job_booking_meta import (
     resolve_client_name,
     resolve_execution_date,
+    resolve_execution_time,
 )
 from mobile_api.helpers.order_type import resolve_order_type_text
 from mobile_api.helpers.route_backload_proxy import backload_route_booking_proxy
@@ -109,7 +110,9 @@ def build_dashboard_active_job(
             'execution_date': resolve_execution_date(
                 shipment=movement_shipment,
                 booking=movement_booking,
+                movement=movement,
             ),
+            'execution_time': resolve_execution_time(movement=movement),
         }
         block.update(build_movement_location_block(movement, request=request))
         return block

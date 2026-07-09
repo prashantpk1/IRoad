@@ -57,6 +57,11 @@ def _action(*, code='A1', label='Start', **flags):
     a.movement_status_impact = flags.get('movement_status_impact', '')
     a.auto_pod_post = flags.get('auto_pod_post', False)
     a.hard_copy_collection = flags.get('hard_copy_collection', False)
+    a.auto_treasury_post = flags.get('auto_treasury_post', False)
+    a.auto_movement_post = flags.get('auto_movement_post', False)
+    a.auto_shipment_post = flags.get('auto_shipment_post', False)
+    a.condition_code = flags.get('condition_code', '')
+    a.sequence_category = flags.get('sequence_category', 'job')
     return a
 
 
@@ -171,6 +176,16 @@ class TimelineEventMapperTests(SimpleTestCase):
         event = map_log_to_timeline_event(_log(action=_action()))
         self.assertEqual(event['authority'], 'action_log')
         self.assertTrue(event['append_only'])
+
+    def test_map_log_system_auto_pod_verify_without_operation_action(self):
+        log = _log(action=None)
+        log.source_channel = 'auto_cod_verify'
+        log.source = 'System'
+        event = map_log_to_timeline_event(log)
+        self.assertEqual(event['action_code'], 'A_POD_VERIFY')
+        self.assertEqual(event['action_label'], 'POD Verified')
+        self.assertTrue(event['is_system_auto'])
+        self.assertEqual(event['status_impact'], TenantShipment.ShipmentStatus.DELIVERED)
 
     def test_classify_hard_pod_event_type(self):
         self.assertEqual(
@@ -367,6 +382,47 @@ class TimelineServiceTests(SimpleTestCase):
         self.assertIs(mock_fetch.call_args.kwargs['movement'], movement)
         self.assertIsNone(mock_fetch.call_args.kwargs['shipment'])
 
+    def test_credit_shipment_timeline_hides_payment_collection_label(self):
+        act_payment = _action(code='OA-0009', label='Payment Collection', sequence_number=9)
+        act_payment.auto_treasury_post = True
+        act_close = _action(code='OA-0010', label='End Job', sequence_number=10)
+        shipment = MagicMock()
+        shipment.order_type = 'Credit'
+        ctx = JobDetailContext(
+            driver=_driver(),
+            tenant_schema='t',
+            user_id='u',
+            job_type='shipment',
+            job_id=str(uuid4()),
+            shipment=shipment,
+        )
+        filtered = JobDetailTimelineService()._filter_shipment_workflow_actions(
+            [act_payment, act_close],
+            context=ctx,
+        )
+        self.assertEqual([a.action_code for a in filtered], ['OA-0010'])
+
+    def test_credit_shipment_timeline_keeps_pod_hides_payment(self):
+        act_pod = _action(code='OA-0008', label='POD', sequence_number=9)
+        act_payment = _action(code='OA-0009', label='Payment Collection', sequence_number=10)
+        act_payment.auto_treasury_post = True
+        act_close = _action(code='OA-0011', label='End Job', sequence_number=11)
+        shipment = MagicMock()
+        shipment.order_type = 'Credit'
+        ctx = JobDetailContext(
+            driver=_driver(),
+            tenant_schema='t',
+            user_id='u',
+            job_type='shipment',
+            job_id=str(uuid4()),
+            shipment=shipment,
+        )
+        filtered = JobDetailTimelineService()._filter_shipment_workflow_actions(
+            [act_pod, act_payment, act_close],
+            context=ctx,
+        )
+        self.assertEqual([a.action_code for a in filtered], ['OA-0008', 'OA-0011'])
+
     def test_filter_workflow_actions_for_movement_and_shipment_contexts(self):
         act_a1 = _action(code='A1', label='Start Job')
         act_a1.sequence_category = 'job'
@@ -467,7 +523,7 @@ class TimelineServiceTests(SimpleTestCase):
         act_a1 = _action(code='A1', label='Start Job')
         act_a2 = _action(code='A2', label='Pickup Arrival')
         act_a3 = _action(code='A3', label='Start Loading')
-        act_a4 = _action(code='A4', label='Confirm Loaded')
+        act_a4 = _action(code='A4', label='Confirm Loaded', auto_shipment_post=True)
         act_a5 = _action(code='A5', label='Depart In Transit')
         act_a6 = _action(code='A6', label='Delivery Arrival')
         act_a7 = _action(code='A7', label='Upload POD')
@@ -566,8 +622,69 @@ class TimelineServiceTests(SimpleTestCase):
         self.assertFalse(by_code['OA-0003']['is_performed'])
         self.assertTrue(by_code['OA-0004']['is_performed'])
 
+    def test_departure_performed_on_semantic_log_without_code_match(self):
+        """Departure turns green from its own log even when action_id/code differ."""
+        timeline_departure = _action(
+            code='OA-0005',
+            label='Departure',
+            sequence_number=5,
+            shipment_status_impact='In_Transit',
+            action_id=uuid4(),
+        )
+        logged_departure = _action(
+            code='OA-0099',
+            label='Depart In Transit',
+            sequence_number=99,
+            shipment_status_impact='In_Transit',
+            action_id=uuid4(),
+        )
+        act_a6 = _action(
+            code='OA-0006',
+            label='Delivery Arrival',
+            sequence_number=6,
+            shipment_status_impact='At_Delivery',
+        )
+        log_departure = _log(
+            log_no='L-DEP',
+            action=logged_departure,
+            log_date=datetime(2026, 6, 30, 18, 5, tzinfo=timezone.utc),
+        )
+        events = merge_actions_with_timeline_logs(
+            [timeline_departure, act_a6],
+            [log_departure],
+        )
+        by_code = {event['action_code']: event for event in events}
+        self.assertTrue(by_code['OA-0005']['is_performed'])
+        self.assertFalse(by_code['OA-0006']['is_performed'])
+
+    def test_departure_not_performed_when_only_delivery_arrival_logged(self):
+        timeline_departure = _action(
+            code='OA-0005',
+            label='Departure',
+            sequence_number=5,
+            shipment_status_impact='In_Transit',
+        )
+        act_a6 = _action(
+            code='OA-0006',
+            label='Delivery Arrival',
+            sequence_number=6,
+            shipment_status_impact='At_Delivery',
+        )
+        log_a6 = _log(
+            log_no='L-A6',
+            action=act_a6,
+            log_date=datetime(2026, 6, 30, 18, 10, tzinfo=timezone.utc),
+        )
+        events = merge_actions_with_timeline_logs(
+            [timeline_departure, act_a6],
+            [log_a6],
+        )
+        by_code = {event['action_code']: event for event in events}
+        self.assertFalse(by_code['OA-0005']['is_performed'])
+        self.assertTrue(by_code['OA-0006']['is_performed'])
+
     def test_unloading_true_pod_false_after_delivery_arrival(self):
-        """After delivery arrival: unloading green, POD still pending."""
+        """After delivery arrival: unloading still pending until OA-0007 is executed."""
         act_a6 = _action(
             code='OA-0006',
             label='Delivery Arrival',
@@ -618,9 +735,10 @@ class TimelineServiceTests(SimpleTestCase):
             [log_a8],
         )
         by_code = {event['action_code']: event for event in events}
-        self.assertTrue(by_code['OA-0008']['is_performed'])
+        self.assertFalse(by_code['OA-0008']['is_performed'])
         self.assertFalse(by_code['OA-0007']['is_performed'])
         self.assertFalse(by_code['OA-0007'].get('implicit_performed'))
+        self.assertTrue(by_code['OA-0008'].get('prerequisite_violation'))
 
     def test_filter_always_hides_hard_pod_from_timeline(self):
         act_a7 = _action(code='A7', label='Upload POD')
@@ -679,12 +797,6 @@ class TimelineServiceTests(SimpleTestCase):
             sequence_number=10,
             shipment_status_impact='Closed',
         )
-        act_verify = _action(
-            code='A_POD_VERIFY',
-            label='POD Verified',
-            sequence_number=75,
-            shipment_status_impact='Delivered',
-        )
         shipment_id = uuid4()
         log_cod = _log(
             log_no='L-9',
@@ -698,7 +810,7 @@ class TimelineServiceTests(SimpleTestCase):
         )
         log_verify = _log(
             log_no='L-PV',
-            action=act_verify,
+            action=None,
             log_date=datetime(2026, 6, 24, 12, 19, 30, tzinfo=timezone.utc),
         )
         log_verify.source_channel = 'auto_cod_verify'

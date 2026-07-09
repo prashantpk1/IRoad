@@ -7,6 +7,7 @@ FROM python:${PYTHON_VERSION}-slim-bookworm
 
 ENV PYTHONDONTWRITEBYTECODE=1
 ENV PYTHONUNBUFFERED=1
+ENV RUNNING_IN_DOCKER=1
 
 WORKDIR /app
 
@@ -20,4 +21,4 @@ RUN python -m pip install --no-cache-dir --upgrade pip \
 
 COPY . /app
 
-EXPOSE 8000
+EXPOSE 8001

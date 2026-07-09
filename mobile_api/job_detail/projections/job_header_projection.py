@@ -11,6 +11,7 @@ from mobile_api.helpers.cod_amount import build_cod_payment_display
 from mobile_api.helpers.job_booking_meta import (
     resolve_client_name,
     resolve_execution_date,
+    resolve_execution_time,
 )
 from mobile_api.helpers.order_type import resolve_order_type_text
 from mobile_api.job_detail.dto.job_detail_context import JobDetailContext
@@ -26,6 +27,10 @@ from mobile_api.job_detail.projections.job_location_projection import (
     build_shipment_location_block,
     serialize_route,
 )
+from mobile_api.job_detail.services.job_detail_projection_cache import (
+    get_projection_cache,
+)
+from iroad_tenants.operation_runtime.movement_action_validator import is_empty_movement
 from iroad_tenants.operation_runtime.movement_stage_derivation import (
     derive_movement_operational_stage,
 )
@@ -53,9 +58,11 @@ def build_job_header(
         'order_type': '',
         'client_name': '',
         'execution_date': '',
+        'execution_time': '',
         'route': {},
         'pickup_address': {},
         'drop_address': {},
+        'delivery_address': {},
     }
 
     if context.job_type == 'shipment' and context.shipment is not None:
@@ -108,9 +115,20 @@ def build_job_header(
         base['execution_date'] = resolve_execution_date(
             shipment=movement_shipment,
             booking=movement_booking,
+            movement=context.movement,
         )
+        base['execution_time'] = resolve_execution_time(movement=context.movement)
+        movement_logs = None
+        if is_empty_movement(context.movement):
+            cache = get_projection_cache(context)
+            if cache is not None:
+                movement_logs = list(cache.movement_logs or [])
         base.update(
-            build_movement_location_block(context.movement, request=request),
+            build_movement_location_block(
+                context.movement,
+                request=request,
+                movement_logs=movement_logs,
+            ),
         )
         recon = entity_reconciliation_block(context)
         auth_status = (recon.get('authoritative_status') or '').strip()
@@ -164,8 +182,20 @@ def build_job_header(
             base['booking_item_type'] = exec_ctx['booking_item_type']
         if exec_ctx.get('backload_bootstrap'):
             base['backload_bootstrap_pending'] = True
+            base['status_label'] = 'Return Trip'
+            base['leg_label'] = 'Backload'
+        elif exec_ctx.get('booking_execution_stage'):
+            stage = str(exec_ctx.get('booking_execution_stage') or '').strip()
+            if stage == 'OUTBOUND_COMPLETED':
+                base['status_label'] = 'Return Trip'
         if (context.resolver_meta or {}).get('backload_booking_redirect'):
             base['backload_booking_redirect'] = True
+            meta = context.resolver_meta or {}
+            redirected_from = str(meta.get('redirected_from_shipment_id') or '').strip()
+            if redirected_from:
+                base['redirected_from_shipment_id'] = redirected_from
+        if (context.resolver_meta or {}).get('closed_shipment_active_leg_redirect'):
+            base['closed_shipment_active_leg_redirect'] = True
         return base
 
     return base

@@ -66,6 +66,9 @@ def _shipment(
     sequence=1,
     driver_id=None,
     shipment_no='SH-1',
+    pod_status=TenantShipment.PodStatus.NOT_COMPLETED,
+    order_type='Credit',
+    collection_status=None,
 ):
     s = MagicMock()
     s.pk = uuid4()
@@ -76,6 +79,10 @@ def _shipment(
     s.shipment_sequence = sequence
     s.driver_id = driver_id
     s.trip_type = ''
+    s.pod_status = pod_status
+    s.pod_type = TenantShipment.PodType.DIGITAL
+    s.order_type = order_type
+    s.collection_status = collection_status
     return s
 
 
@@ -109,9 +116,17 @@ def _mock_booking_queryset(bookings):
 
 class BookingSelectionPolicyTests(SimpleTestCase):
     def test_execution_complete_delivered_and_closed(self):
-        self.assertTrue(
+        self.assertFalse(
             policy.is_shipment_execution_complete(
                 _shipment(status=TenantShipment.ShipmentStatus.DELIVERED)
+            )
+        )
+        self.assertTrue(
+            policy.is_shipment_execution_complete(
+                _shipment(
+                    status=TenantShipment.ShipmentStatus.DELIVERED,
+                    pod_status=TenantShipment.PodStatus.COMPLETED,
+                )
             )
         )
         self.assertTrue(
@@ -171,6 +186,47 @@ class BookingSelectionPolicyTests(SimpleTestCase):
         self.assertEqual(biz_completed, 1)
         self.assertEqual(exec_pct, 100)
         self.assertEqual(biz_pct, 100)
+
+    def test_operationally_cancelled_when_all_shipments_cancelled(self):
+        booking = _booking(trip_type='Round')
+        shipments = [
+            _shipment(
+                booking_item_type='Outbound',
+                status=TenantShipment.ShipmentStatus.CANCELLED,
+            ),
+            _shipment(
+                booking_item_type='Backload',
+                status=TenantShipment.ShipmentStatus.CANCELLED,
+                sequence=2,
+            ),
+        ]
+        self.assertTrue(
+            policy.is_booking_operationally_cancelled(booking, shipments),
+        )
+        self.assertFalse(
+            policy.booking_is_visible_to_driver(_driver(), booking, shipments),
+        )
+
+    def test_not_operationally_cancelled_when_outbound_only_cancelled(self):
+        """Partial cancel (backload still open) must remain visible for bootstrap."""
+        driver = _driver()
+        booking = _booking(
+            trip_type='Round',
+            assigned_driver_id=driver.pk,
+            backload_driver_id=driver.pk,
+        )
+        shipments = [
+            _shipment(
+                booking_item_type='Outbound',
+                status=TenantShipment.ShipmentStatus.CANCELLED,
+            ),
+        ]
+        self.assertFalse(
+            policy.is_booking_operationally_cancelled(booking, shipments),
+        )
+        self.assertTrue(
+            policy.booking_is_visible_to_driver(driver, booking, shipments),
+        )
 
     def test_booking_fully_complete_requires_all_legs_closed(self):
         booking = _booking(trip_type='Round')
@@ -239,7 +295,7 @@ class BookingSelectionPolicyTests(SimpleTestCase):
         nxt = policy.get_next_executable_shipment(booking, shipments)
         self.assertEqual(nxt.booking_item_type, 'Outbound')
 
-    def test_round_trip_delivered_outbound_activates_backload_same_driver(self):
+    def test_round_trip_delivered_outbound_without_pod_stays_on_outbound(self):
         driver = _driver()
         booking = _booking(
             trip_type='Round',
@@ -260,7 +316,38 @@ class BookingSelectionPolicyTests(SimpleTestCase):
             ),
         ]
         active = policy.get_active_shipment_for_driver(driver, booking, shipments)
-        self.assertEqual(active.booking_item_type, 'Backload')
+        self.assertEqual(active.booking_item_type, 'Outbound')
+
+        exec_total, exec_completed, exec_pct = policy.booking_execution_progress(
+            shipments
+        )
+        self.assertEqual(exec_total, 2)
+        self.assertEqual(exec_completed, 0)
+        self.assertEqual(exec_pct, 0)
+
+    def test_round_trip_pod_complete_outbound_stays_active_until_job_close(self):
+        driver = _driver()
+        booking = _booking(
+            trip_type='Round',
+            assigned_driver_id=driver.pk,
+            backload_driver_id=driver.pk,
+        )
+        shipments = [
+            _shipment(
+                booking_item_type='Outbound',
+                status=TenantShipment.ShipmentStatus.DELIVERED,
+                sequence=1,
+                pod_status=TenantShipment.PodStatus.COMPLETED,
+            ),
+            _shipment(
+                booking_item_type='Backload',
+                status=TenantShipment.ShipmentStatus.LOADED,
+                sequence=2,
+                shipment_no='SH-2',
+            ),
+        ]
+        active = policy.get_active_shipment_for_driver(driver, booking, shipments)
+        self.assertEqual(active.booking_item_type, 'Outbound')
 
         exec_total, exec_completed, exec_pct = policy.booking_execution_progress(
             shipments
@@ -319,6 +406,7 @@ class BookingSelectionPolicyTests(SimpleTestCase):
                 status=TenantShipment.ShipmentStatus.DELIVERED,
                 sequence=1,
                 driver_id=outbound_driver.pk,
+                pod_status=TenantShipment.PodStatus.COMPLETED,
             ),
             _shipment(
                 booking_item_type='Backload',
@@ -328,6 +416,16 @@ class BookingSelectionPolicyTests(SimpleTestCase):
                 driver_id=backload_driver.pk,
             ),
         ]
+        active_backload = policy.get_active_shipment_for_driver(
+            backload_driver, booking, shipments
+        )
+        active_outbound = policy.get_active_shipment_for_driver(
+            outbound_driver, booking, shipments
+        )
+        self.assertIsNone(active_backload)
+        self.assertEqual(active_outbound.booking_item_type, 'Outbound')
+
+        shipments[0].shipment_status = TenantShipment.ShipmentStatus.CLOSED
         active_backload = policy.get_active_shipment_for_driver(
             backload_driver, booking, shipments
         )
@@ -499,6 +597,7 @@ class BookingProjectionTests(SimpleTestCase):
                 booking_item_type='Outbound',
                 status=TenantShipment.ShipmentStatus.DELIVERED,
                 sequence=1,
+                pod_status=TenantShipment.PodStatus.COMPLETED,
             ),
             _shipment(
                 booking_item_type='Backload',
@@ -512,10 +611,10 @@ class BookingProjectionTests(SimpleTestCase):
 
         self.assertEqual(card['execution_progress_percentage'], 50)
         self.assertEqual(card['business_progress_percentage'], 0)
-        self.assertEqual(card['active_shipment']['shipment_no'], 'SH-2')
+        self.assertEqual(card['active_shipment']['shipment_no'], 'SH-1')
         self.assertEqual(
             card['booking_execution_stage'],
-            policy.BOOKING_EXECUTION_STAGE_OUTBOUND_COMPLETED,
+            policy.BOOKING_EXECUTION_STAGE_PARTIAL,
         )
 
 
@@ -581,6 +680,7 @@ class DashboardBookingSelectorTests(SimpleTestCase):
                 booking_item_type='Outbound',
                 status=TenantShipment.ShipmentStatus.DELIVERED,
                 sequence=1,
+                pod_status=TenantShipment.PodStatus.COMPLETED,
             ),
             _shipment(
                 booking_item_type='Backload',
@@ -596,12 +696,12 @@ class DashboardBookingSelectorTests(SimpleTestCase):
 
         result = DashboardBookingSelector().select_current_driver_booking(driver)
         self.assertIsNotNone(result)
-        self.assertEqual(result.active_shipment.booking_item_type, 'Backload')
+        self.assertEqual(result.active_shipment.booking_item_type, 'Outbound')
         self.assertEqual(result.execution_progress_percentage, 50)
         self.assertEqual(result.business_progress_percentage, 0)
         self.assertEqual(
             result.booking_execution_stage,
-            policy.BOOKING_EXECUTION_STAGE_OUTBOUND_COMPLETED,
+            policy.BOOKING_EXECUTION_STAGE_PARTIAL,
         )
 
     @patch(
@@ -711,11 +811,16 @@ class BookingExecutionStageTests(SimpleTestCase):
     def test_execution_completed_all_delivered_not_all_closed(self):
         booking = _booking(trip_type='One-Way')
         legs = [
-            _shipment(status=TenantShipment.ShipmentStatus.DELIVERED, sequence=1),
+            _shipment(
+                status=TenantShipment.ShipmentStatus.DELIVERED,
+                sequence=1,
+                pod_status=TenantShipment.PodStatus.COMPLETED,
+            ),
             _shipment(
                 status=TenantShipment.ShipmentStatus.DELIVERED,
                 sequence=2,
                 shipment_no='SH-2',
+                pod_status=TenantShipment.PodStatus.COMPLETED,
             ),
         ]
         self.assertEqual(
@@ -728,8 +833,9 @@ class BookingExecutionStageTests(SimpleTestCase):
         legs = [
             _shipment(
                 booking_item_type='Outbound',
-                status=TenantShipment.ShipmentStatus.DELIVERED,
+                status=TenantShipment.ShipmentStatus.CLOSED,
                 sequence=1,
+                pod_status=TenantShipment.PodStatus.COMPLETED,
             ),
             _shipment(
                 booking_item_type='Backload',
@@ -748,8 +854,9 @@ class BookingExecutionStageTests(SimpleTestCase):
         legs = [
             _shipment(
                 booking_item_type='Outbound',
-                status=TenantShipment.ShipmentStatus.DELIVERED,
+                status=TenantShipment.ShipmentStatus.CLOSED,
                 sequence=1,
+                pod_status=TenantShipment.PodStatus.COMPLETED,
             ),
             _shipment(
                 booking_item_type='Backload',
@@ -1046,3 +1153,41 @@ class RoundTripBackloadBootstrapSelectorTests(SimpleTestCase):
             result.booking_execution_stage,
             policy.BOOKING_EXECUTION_STAGE_OUTBOUND_COMPLETED,
         )
+
+    @patch.object(DashboardBookingSelector, '_auto_shipment_bootstrap_enabled')
+    @patch('mobile_api.dashboard.selectors.dashboard_booking_selector.TenantBooking')
+    def test_selector_skips_booking_when_all_shipments_cancelled(
+        self,
+        mock_booking_model,
+        mock_bootstrap,
+    ):
+        """Round trip with both legs cancelled must not appear on mobile dashboard."""
+        mock_bootstrap.return_value = False
+        driver = _driver()
+        booking = _booking(
+            trip_type='Round',
+            assigned_driver_id=driver.pk,
+            backload_driver_id=driver.pk,
+        )
+        booking.shipments.all.return_value = [
+            _shipment(
+                booking_item_type='Outbound',
+                status=TenantShipment.ShipmentStatus.CANCELLED,
+                driver_id=driver.pk,
+            ),
+            _shipment(
+                booking_item_type='Backload',
+                status=TenantShipment.ShipmentStatus.CANCELLED,
+                driver_id=driver.pk,
+            ),
+        ]
+        mock_booking_model.objects.filter.return_value = _mock_booking_queryset(
+            [booking],
+        )
+
+        result = DashboardBookingSelector().select_current_driver_booking(
+            driver,
+            tenant_schema='tenant_test',
+        )
+
+        self.assertIsNone(result)

@@ -91,6 +91,21 @@ class HardPodSubmitAPIView(MobileAPIView):
                 http_code=exc.http_status,
             )
 
+        execute_step = data.get('execute_step') or {}
+        if execute_step.get('error_code') and not execute_step.get('promoted'):
+            return self.error(
+                message=str(
+                    execute_step.get('message')
+                    or _('mobile.hard_pod.execute_failed'),
+                ),
+                code=str(execute_step.get('error_code') or 'hard_pod_execute_failed'),
+                message_key=str(
+                    execute_step.get('message_key') or 'mobile.hard_pod.execute_failed',
+                ),
+                http_code=400,
+                data=data,
+            )
+
         logger.info(
             'hard_pod_submit tenant=%s driver=%s submission=%s replayed=%s',
             tenant_schema,

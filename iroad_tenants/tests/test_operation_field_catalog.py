@@ -3,9 +3,11 @@ from __future__ import annotations
 
 from django.test import SimpleTestCase
 
+from iroad_tenants.booking_status import OPERATION_ACTION_BOOKING_STATUS_CHOICES
 from iroad_tenants.operation_field_catalog import (
     normalize_operation_pod_status,
     normalize_operation_pod_type,
+    operation_booking_status_options,
     operation_pod_status_options,
     operation_pod_type_options,
 )
@@ -23,6 +25,23 @@ class OperationPodFieldCatalogTests(SimpleTestCase):
         self.assertEqual(
             operation_pod_status_options(),
             ('Completed', 'Not Completed'),
+        )
+
+    def test_booking_status_options_match_spec(self):
+        self.assertEqual(
+            operation_booking_status_options(),
+            tuple(value for value, _ in OPERATION_ACTION_BOOKING_STATUS_CHOICES),
+        )
+        self.assertEqual(
+            operation_booking_status_options(),
+            (
+                'Draft',
+                'Confirmed',
+                'In Progress',
+                'Partially Completed',
+                'Completed',
+                'Cancelled',
+            ),
         )
 
     def test_normalize_legacy_pod_type_values(self):

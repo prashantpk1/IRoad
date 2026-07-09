@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import uuid
 from types import SimpleNamespace
+from unittest.mock import patch
 from mobile_api.tests.transaction_test_case import TransactionTestCase
 
 from mobile_api.issues.exceptions import IssueReportingError
@@ -17,7 +18,10 @@ from mobile_api.issues.models.operational_issue import (
 from mobile_api.issues.services.issue_reconciliation_service import (
     IssueReconciliationService,
 )
-from mobile_api.issues.services.issue_reporting_service import IssueReportingService
+from mobile_api.issues.services.issue_reporting_service import (
+    IssueReportingService,
+    _IssueJobScope,
+)
 
 
 def _driver(driver_pk: str):
@@ -56,10 +60,21 @@ class IssueReportingFoundationTests(TransactionTestCase):
     def _service(self, *, shipment_id: str, owned: bool = True) -> IssueReportingService:
         svc = IssueReportingService()
         resolver = _DummyShipmentResolver(shipment_id=shipment_id, owned=owned)
-        svc._resolve_shipment = lambda *, driver, shipment_id: resolver.resolve(  # noqa: SLF001
-            driver,
-            shipment_id,
-        )
+
+        def _resolve_job_scope(**kwargs):
+            shipment_ref = (kwargs.get('shipment_ref') or '').strip()
+            movement_ref = (kwargs.get('movement_ref') or '').strip()
+            ref = movement_ref or shipment_ref
+            shipment = resolver.resolve(kwargs['driver'], ref)
+            scope_id = str(getattr(shipment, 'pk', '') or getattr(shipment, 'shipment_id', ''))
+            return _IssueJobScope(
+                job_type='shipment',
+                scope_id=scope_id,
+                shipment=shipment,
+                movement=None,
+            )
+
+        svc._resolve_job_scope = _resolve_job_scope  # noqa: SLF001
         return svc
 
     def _payload(self, *, client_issue_id: str, shipment_id: str, issue_type: str = 'delay'):
@@ -89,6 +104,50 @@ class IssueReportingFoundationTests(TransactionTestCase):
             },
         )
 
+    def test_movement_issue_via_shipment_id_fallback(self):
+        movement_id = str(uuid.uuid4())
+        client_issue_id = f'issue-mov-{uuid.uuid4()}'
+        tenant, driver_id, payload = self._payload(
+            client_issue_id=client_issue_id,
+            shipment_id=movement_id,
+            issue_type='delay',
+        )
+        movement = SimpleNamespace(
+            pk=movement_id,
+            movement_id=movement_id,
+            truck=SimpleNamespace(pk='truck-1'),
+        )
+
+        svc = IssueReportingService()
+
+        def _resolve_job_scope(**kwargs):
+            return _IssueJobScope(
+                job_type='movement',
+                scope_id=movement_id,
+                shipment=None,
+                movement=movement,
+            )
+
+        svc._resolve_job_scope = _resolve_job_scope  # noqa: SLF001
+
+        with patch(
+            'mobile_api.issues.services.issue_reporting_service.append_incident_report_action_log',
+        ) as mock_append_log:
+            result = svc.report_issue(
+                driver=_driver(driver_id),
+                tenant_schema=tenant,
+                payload=payload,
+            )
+            mock_append_log.assert_called_once()
+            self.assertIsNone(mock_append_log.call_args.kwargs.get('shipment'))
+            self.assertEqual(
+                mock_append_log.call_args.kwargs.get('movement'),
+                movement,
+            )
+
+        self.assertEqual(result['issue']['job_type'], 'movement')
+        self.assertEqual(result['issue']['movement_id'], movement_id)
+
     def test_issue_creation_and_escalation_flow(self):
         shipment_id = str(uuid.uuid4())
         client_issue_id = f'issue-{uuid.uuid4()}'
@@ -98,11 +157,15 @@ class IssueReportingFoundationTests(TransactionTestCase):
             issue_type='accident',
         )
 
-        result = self._service(shipment_id=shipment_id).report_issue(
-            driver=_driver(driver_id),
-            tenant_schema=tenant,
-            payload=payload,
-        )
+        with patch(
+            'mobile_api.issues.services.issue_reporting_service.append_incident_report_action_log',
+        ) as mock_append_log:
+            result = self._service(shipment_id=shipment_id).report_issue(
+                driver=_driver(driver_id),
+                tenant_schema=tenant,
+                payload=payload,
+            )
+            mock_append_log.assert_called_once()
 
         self.assertIn('issue', result)
         self.assertIn('escalation', result)

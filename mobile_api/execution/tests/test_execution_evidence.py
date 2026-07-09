@@ -73,40 +73,48 @@ class EvidenceValidationTests(SimpleTestCase):
     def test_missing_gps_raises(self):
         ctx = _context(
             operation_action=_action(
-                action_code='A2',
+                action_code='OA-0002',
                 english_label='Pickup Arrival',
-                movement_status_impact='',
+                action_scope='job',
+                movement_status_impact='At Pickup',
             ),
-            action_code='A2',
+            action_code='OA-0002',
             payload={'latitude': '', 'longitude': ''},
         )
         with self.assertRaises(ExecuteActionError) as exc:
             EvidenceValidationService().validate_required_evidence(ctx)
         self.assertEqual(exc.exception.code, 'gps_required')
 
-    def test_start_job_does_not_require_gps(self):
+    def test_start_job_requires_gps_on_evidence_screen(self):
         ctx = _context(
             operation_action=_action(
-                action_code='A1',
+                action_code='OA-0001',
                 english_label='Start Job',
+                action_scope='job',
                 movement_status_impact='',
                 booking_status_impact='In_Execution',
             ),
+            action_code='OA-0001',
             payload={'latitude': '', 'longitude': ''},
         )
-        EvidenceValidationService().validate_required_evidence(ctx)
+        with self.assertRaises(ExecuteActionError) as exc:
+            EvidenceValidationService().validate_required_evidence(ctx)
+        self.assertEqual(exc.exception.code, 'gps_required')
 
-    def test_a8_unloading_does_not_require_gps(self):
+    def test_unloading_requires_gps_on_evidence_screen(self):
         ctx = _context(
             operation_action=_action(
-                action_code='A8',
-                english_label='Unloading Completed',
+                action_code='OA-0007',
+                english_label='Start Unloading',
+                action_scope='job',
                 movement_status_impact='Completed',
             ),
-            action_code='A8',
+            action_code='OA-0007',
             payload={'latitude': '', 'longitude': ''},
         )
-        EvidenceValidationService().validate_required_evidence(ctx)
+        with self.assertRaises(ExecuteActionError) as exc:
+            EvidenceValidationService().validate_required_evidence(ctx)
+        self.assertEqual(exc.exception.code, 'gps_required')
 
     def test_gps_passes_when_provided(self):
         ctx = _context(
@@ -114,14 +122,28 @@ class EvidenceValidationTests(SimpleTestCase):
         )
         EvidenceValidationService().validate_required_evidence(ctx)
 
-    def test_a9_notes_optional_when_blank(self):
+    def test_optional_photo_video_allows_empty_media(self):
         ctx = _context(
             operation_action=_action(
-                action_code='A9',
+                action_code='OA-0006',
+                english_label='Delivery Arrival',
+                action_scope='job',
+            ),
+            action_code='OA-0006',
+            payload={'latitude': '25.0', 'longitude': '55.0', 'media': []},
+        )
+        EvidenceValidationService().validate_required_evidence(ctx)
+
+    def test_collect_payment_notes_optional_when_blank(self):
+        ctx = _context(
+            operation_action=_action(
+                action_code='OA-0009',
                 english_label='Collect Payment',
+                auto_treasury_post=True,
                 movement_status_impact='',
             ),
-            payload={'notes': ''},
+            action_code='OA-0009',
+            payload={'notes': '', 'latitude': '25.0', 'longitude': '55.0'},
         )
         EvidenceValidationService().validate_required_evidence(ctx)
 
@@ -211,7 +233,7 @@ class EvidenceValidationTests(SimpleTestCase):
                 EvidenceValidationService().validate_required_evidence(ctx)
         self.assertEqual(exc.exception.code, 'media_limit_exceeded')
 
-    def test_photo_required_count(self):
+    def test_photo_not_required_for_driver_evidence(self):
         ctx = _context(
             payload={
                 'media': [
@@ -234,9 +256,7 @@ class EvidenceValidationTests(SimpleTestCase):
                 'signature': False,
             },
         ):
-            with self.assertRaises(ExecuteActionError) as exc:
-                EvidenceValidationService().validate_required_evidence(ctx)
-        self.assertEqual(exc.exception.code, 'photo_required')
+            EvidenceValidationService().validate_required_evidence(ctx)
 
     def test_signature_required(self):
         ctx = _context(

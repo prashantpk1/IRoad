@@ -5,8 +5,8 @@ Driver-scoped Driver Treasury Transaction queries (read-only).
 
 IRoute Ch.13:
   - Driver sees only their active wallet rows.
-  - Client Collection · Debit = COD cash received (A9).
-  - Custody Collection · Credit = cash handed over (transfer out).
+  - Client Collection · Credit = COD cash received (A9).
+  - Custody Collection · Debit = cash handed over (transfer out).
 """
 from __future__ import annotations
 

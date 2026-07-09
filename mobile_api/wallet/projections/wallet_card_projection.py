@@ -28,20 +28,20 @@ def transaction_type_label(txn: Any) -> str:
     """
     UI label for the transaction header.
 
-    Ch.13: Client Collection (Debit) = cash received; Custody Collection (Credit) = handover.
+    Ch.13: Client Collection (Credit) = cash received; Custody Collection (Debit) = handover.
     """
     category = str(getattr(txn, 'transaction_category', '') or '').strip()
     txn_type = str(getattr(txn, 'transaction_type', '') or '').strip()
 
     if category == DriverTreasuryTransaction.TransactionCategory.CLIENT_COLLECTION:
-        if txn_type == DriverTreasuryTransaction.TransactionType.DEBIT:
+        if txn_type == DriverTreasuryTransaction.TransactionType.CREDIT:
             return 'Received Amount'
         return 'Client Collection'
 
     if category == DriverTreasuryTransaction.TransactionCategory.CUSTODY_COLLECTION:
         return 'Transferred Out'
 
-    if txn_type == DriverTreasuryTransaction.TransactionType.DEBIT:
+    if txn_type == DriverTreasuryTransaction.TransactionType.CREDIT:
         return 'Received Amount'
     return 'Transferred Out'
 
@@ -49,7 +49,7 @@ def transaction_type_label(txn: Any) -> str:
 def cash_flow_direction(txn: Any) -> str:
     """``in`` increases driver wallet balance; ``out`` decreases it."""
     txn_type = str(getattr(txn, 'transaction_type', '') or '').strip()
-    if txn_type == DriverTreasuryTransaction.TransactionType.DEBIT:
+    if txn_type == DriverTreasuryTransaction.TransactionType.CREDIT:
         return 'in'
     return 'out'
 

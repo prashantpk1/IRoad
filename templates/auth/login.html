@@ -4,8 +4,8 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <meta name="description" content="iRoad Admin Dashboard - Sign In" />
-    <title>Sign In | iRoad Admin</title>
+    <meta name="description" content="IRoute Admin Dashboard - Sign In" />
+    <title>Sign In | IRoute Admin</title>
 
     <!-- Google Fonts -->
     <link rel="preconnect" href="https://fonts.googleapis.com" />
@@ -147,7 +147,7 @@
         <div class="auth-form-container">
           <div class="auth-form-header">
             <div class="auth-brand">
-              <span class="auth-logo">i<span>Road</span></span>
+              <img src="{% static 'landing/images/logo.svg' %}?v=2" alt="IRoute Logo" style="height: 48px; width: auto;" />
             </div>
             <h1 class="auth-title">Sign In</h1>
             <p class="auth-subtitle">Please enter your details to sign in</p>
@@ -289,7 +289,7 @@
           </form>
 
           <div class="auth-footer">
-            <p>&copy; 2026 iRoad. All rights reserved.</p>
+            <p>&copy; 2026 IRoute. All rights reserved.</p>
           </div>
         </div>
       </div>
@@ -439,10 +439,10 @@
 
         /* Other tab logged in -> CSRF was rotated; reload to get a fresh token or redirect. */
         window.addEventListener("storage", function (ev) {
-          if (ev.key === "iroad_auth_bump" && ev.newValue) {
+          if (ev.key === "iroute_auth_bump" && ev.newValue) {
             window.location.reload();
           }
-          if (ev.key === "iroad_logout_bump" && ev.newValue) {
+          if (ev.key === "iroute_logout_bump" && ev.newValue) {
             window.location.reload();
           }
         });

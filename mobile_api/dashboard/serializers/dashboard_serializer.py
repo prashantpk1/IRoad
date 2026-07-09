@@ -57,6 +57,8 @@ class DashboardResponseSerializer(serializers.Serializer):
     active_job = serializers.DictField(required=False, default=dict)
     current_empty_move = serializers.DictField(required=False, default=dict)
     workflow = serializers.DictField(required=False, default=dict)
+    next_action_hint = serializers.DictField(required=False, default=dict)
+    on_call = serializers.DictField(required=False, default=dict)
     pod_cod_summary = serializers.DictField(required=False, default=dict)
     timeline_summary = serializers.DictField(required=False, default=dict)
     alerts = serializers.DictField(required=False, default=dict)

@@ -7,6 +7,7 @@ Timeline is derived from append-only Action Log rows (Engine Principle P1).
 """
 from __future__ import annotations
 
+from datetime import datetime
 from typing import Any
 
 from django.conf import settings
@@ -26,21 +27,21 @@ from mobile_api.job_detail.projections.job_location_projection import (
     build_shipment_location_block,
 )
 from mobile_api.history.selectors.order_type_resolver import resolve_order_type
+from mobile_api.history.projections.history_milestone_resolver import (
+    _tenant_schema_from_request,
+    milestone_completed_for_history,
+    pick_log_for_history_milestone,
+    resolve_history_milestone_specs,
+)
+from mobile_api.history.projections.history_timeline_projection import (
+    _find_log_for_event,
+    _pick_timeline_event_for_step,
+    build_history_timeline_events,
+    index_timeline_events_by_step_key,
+)
 from mobile_api.job_detail.timeline.timeline_event_mapper import map_log_to_timeline_event
 from tenant_workspace.models import TenantOperationActionMedia
 from tenant_workspace.ops_display import resolve_shipment_truck, truck_display_block
-
-# Canonical forward-action milestones for the History Detail UI.
-_MILESTONE_SPECS: tuple[tuple[str, str, tuple[str, ...]], ...] = (
-    ('pickup', 'Pickup', ('A2',)),
-    ('loading', 'Loading', ('A3', 'A4')),
-    ('in_transit', 'In Transit', ('A5',)),
-    ('delivery', 'Delivery', ('A6',)),
-    ('pod', 'POD', ('A7',)),
-    ('unloading', 'Unloading Completed', ('A8',)),
-    ('payment', 'Collect Payment', ('A9',)),
-    ('job_closed', 'Shipment Completed', ('A10',)),
-)
 
 
 def _media_url(media_row: TenantOperationActionMedia) -> str:
@@ -106,7 +107,15 @@ def timezone_local(dt):
 def _pick_latest_log_for_codes(
     logs: list[Any],
     action_codes: tuple[str, ...],
+    *,
+    step_key: str = '',
 ) -> Any | None:
+    if step_key:
+        return pick_log_for_history_milestone(
+            logs,
+            step_key=step_key,
+            action_codes=action_codes,
+        )
     codes = {c.strip().casefold() for c in action_codes if c}
     matched = []
     for log in logs:
@@ -134,7 +143,8 @@ def build_workflow_status(
     """
     Ordered workflow steps for History Detail (read-only).
 
-    Each step is completed when a matching forward Action Log exists.
+    Uses Action Master merge (same as Job Detail) so renamed OA-* codes and
+    booking-line COD still produce POD / unloading / payment / close rows.
     """
     booking = getattr(shipment, 'booking', None)
     cargo = getattr(shipment, 'cargo', None)
@@ -147,29 +157,71 @@ def build_workflow_status(
             or ''
         ).strip()
 
-    loading_address = getattr(shipment, 'loading_address', None)
-    delivery_address = getattr(shipment, 'delivery_address', None)
-    if loading_address is None and booking is not None:
-        loading_address = getattr(booking, 'loading_address', None)
-    if delivery_address is None and booking is not None:
-        delivery_address = getattr(booking, 'delivery_address', None)
-    route = resolve_history_route(shipment, booking)
+    order_type = resolve_order_type(shipment, booking)
+    tenant_schema = _tenant_schema_from_request(request)
+    milestone_specs = resolve_history_milestone_specs(
+        order_type=order_type,
+        tenant_schema=tenant_schema,
+    )
+    route = resolve_history_route(shipment, booking, request=request)
     payment_tag = payment_method_tag(shipment, booking)
+    location_block = build_shipment_location_block(
+        shipment,
+        booking=booking,
+        request=request,
+    )
+    pickup_address = dict(location_block.get('pickup_address') or {})
+    drop_address = dict(location_block.get('drop_address') or {})
+
+    timeline_events, workflow_actions = build_history_timeline_events(
+        shipment,
+        logs,
+        booking=booking,
+        request=request,
+    )
+    events_by_step = index_timeline_events_by_step_key(timeline_events, workflow_actions)
 
     steps: list[dict[str, Any]] = []
-    for step_key, label, codes in _MILESTONE_SPECS:
-        log_row = _pick_latest_log_for_codes(logs, codes)
-        completed = log_row is not None
+    for step_key, label, codes in milestone_specs:
+        timeline_event = _pick_timeline_event_for_step(
+            events_by_step.get(step_key, []),
+            step_key=step_key,
+        )
+        log_row = _find_log_for_event(timeline_event, logs)
+        if log_row is None:
+            log_row = pick_log_for_history_milestone(
+                logs,
+                step_key=step_key,
+                action_codes=codes,
+            )
+        completed = milestone_completed_for_history(
+            shipment,
+            step_key,
+            log_row,
+            order_type=order_type,
+        )
         event = (
             map_log_to_timeline_event(log_row, request=request) if log_row is not None else {}
         )
+        if timeline_event and not event:
+            event = dict(timeline_event)
 
         step: dict[str, Any] = {
             'step_key': step_key,
             'label': label,
             'completed': completed,
-            'timestamp': _format_timestamp(log_row) if log_row else '',
-            'display_timestamp': _display_timestamp(log_row) if log_row else '',
+            'timestamp': (
+                _format_timestamp(log_row)
+                if log_row
+                else str(timeline_event.get('log_date') or timeline_event.get('created_at') or '')
+                if timeline_event
+                else ''
+            ),
+            'display_timestamp': (
+                _display_timestamp(log_row)
+                if log_row
+                else _display_timestamp_from_event(timeline_event)
+            ),
             'action_code': event.get('action_code', ''),
             'action_label': event.get('action_label', label),
             'latitude': event.get('latitude', ''),
@@ -178,19 +230,41 @@ def build_workflow_status(
         }
 
         if step_key == 'pickup':
-            step['location'] = _address_full(loading_address) or route['from_location']
+            step['location'] = (
+                pickup_address.get('label')
+                or pickup_address.get('display_name')
+                or route['from_location']
+            )
             step['shipment_no'] = str(getattr(shipment, 'shipment_no', '') or '')
         elif step_key == 'loading':
             step['cargo_description'] = cargo_name
             step['payment_type'] = payment_tag
         elif step_key == 'delivery':
-            step['location'] = _address_full(delivery_address) or route['to_location']
+            step['location'] = (
+                drop_address.get('label')
+                or drop_address.get('display_name')
+                or route['to_location']
+            )
         elif step_key == 'pod' and step['media']:
             step['pod_preview_url'] = step['media'][0].get('file_url', '')
 
-        steps.append(step)
+        if completed:
+            steps.append(step)
 
     return steps
+
+
+def _display_timestamp_from_event(event: dict[str, Any] | None) -> str:
+    if not event:
+        return ''
+    raw = str(event.get('log_date') or event.get('created_at') or '').strip()
+    if not raw:
+        return ''
+    try:
+        parsed = datetime.fromisoformat(raw.replace('Z', '+00:00'))
+        return timezone_local(parsed).strftime('%d %b %Y | %I:%M %p')
+    except Exception:
+        return raw
 
 
 def build_history_detail(
@@ -201,13 +275,14 @@ def build_history_detail(
 ) -> dict[str, Any]:
     """Full History Detail payload (summary + workflow + timeline audit)."""
     booking = getattr(shipment, 'booking', None)
-    loading = getattr(shipment, 'loading_address', None)
-    delivery = getattr(shipment, 'delivery_address', None)
-    if loading is None and booking is not None:
-        loading = getattr(booking, 'loading_address', None)
-    if delivery is None and booking is not None:
-        delivery = getattr(booking, 'delivery_address', None)
-    route = resolve_history_route(shipment, booking)
+    location_block = build_shipment_location_block(
+        shipment,
+        booking=booking,
+        request=request,
+    )
+    pickup_address = dict(location_block.get('pickup_address') or {})
+    drop_address = dict(location_block.get('drop_address') or {})
+    route = resolve_history_route(shipment, booking, request=request)
     display_status, final_state = final_state_labels(shipment)
     job_date = resolve_job_date(shipment, booking)
     order_type = resolve_order_type(shipment, booking)
@@ -241,12 +316,20 @@ def build_history_detail(
         },
         'truck': truck_display_block(truck),
         'origin': {
-            'city': route['origin_city'] or _address_city(loading),
-            'address': _address_full(loading) or route['from_location'],
+            'city': route['origin_city'] or pickup_address.get('city', ''),
+            'address': (
+                pickup_address.get('label')
+                or pickup_address.get('display_name')
+                or route['from_location']
+            ),
         },
         'destination': {
-            'city': route['destination_city'] or _address_city(delivery),
-            'address': _address_full(delivery) or route['to_location'],
+            'city': route['destination_city'] or drop_address.get('city', ''),
+            'address': (
+                drop_address.get('label')
+                or drop_address.get('display_name')
+                or route['to_location']
+            ),
         },
         'client_name': _client_name(shipment, booking),
         'job_date': job_date.isoformat() if job_date else '',
@@ -268,17 +351,21 @@ def build_history_detail(
         )
     ]
 
+    workflow_timeline, _workflow_actions = build_history_timeline_events(
+        shipment,
+        logs,
+        booking=booking,
+        request=request,
+    )
+    timeline_preview = [
+        row for row in workflow_timeline if row.get('is_performed')
+    ]
+
     actions_fired_count = sum(
         1
         for row in logs
         if getattr(row, 'operation_action', None) is not None
         and not getattr(getattr(row, 'operation_action', None), 'admin_only', False)
-    )
-
-    location_block = build_shipment_location_block(
-        shipment,
-        booking=booking,
-        request=request,
     )
 
     return {
@@ -287,14 +374,16 @@ def build_history_detail(
         'drop_address': location_block.get('drop_address') or {},
         'summary': summary,
         'workflow_status': build_workflow_status(shipment, logs, request=request),
+        'timeline_preview': timeline_preview,
         'timeline': {
             'scope': 'shipment',
             'events': timeline_events,
+            'timeline_preview': timeline_preview,
             'append_only': True,
             'authority': 'action_log',
         },
         'actions_fired_count': actions_fired_count,
         'history_projection_version': str(
-            getattr(settings, 'MOBILE_HISTORY_PROJECTION_VERSION', '1')
+            getattr(settings, 'MOBILE_HISTORY_PROJECTION_VERSION', '4')
         ),
     }

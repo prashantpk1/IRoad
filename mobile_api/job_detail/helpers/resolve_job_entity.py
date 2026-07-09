@@ -7,6 +7,7 @@ from typing import Any
 
 from mobile_api.helpers.backload_booking_redirect import (
     pivot_booking_to_active_shipment,
+    pivot_closed_shipment_to_active_leg,
     pivot_context_to_backload_booking,
 )
 from mobile_api.job_detail.dto.job_detail_context import JobDetailContext
@@ -49,12 +50,19 @@ def resolve_job_detail_entity(
         if result.resolve_context is not None:
             context.resolver_meta = result.resolve_context.to_resolver_meta()
         if context.booking is not None and context.shipment is not None:
-            pivot_context_to_backload_booking(
+            pivoted = pivot_context_to_backload_booking(
                 driver=context.driver,
                 booking=context.booking,
                 shipment=context.shipment,
                 context=context,
             )
+            if not pivoted:
+                pivot_closed_shipment_to_active_leg(
+                    driver=context.driver,
+                    booking=context.booking,
+                    shipment=context.shipment,
+                    context=context,
+                )
         return
 
     if context.job_type == 'booking':

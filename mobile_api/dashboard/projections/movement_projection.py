@@ -11,6 +11,10 @@ from mobile_api.dashboard.dto.driver_empty_move_selection import (
     DriverEmptyMoveSelectionResult,
 )
 from mobile_api.dashboard.selectors import movement_selection_policy as policy
+from mobile_api.helpers.job_booking_meta import (
+    resolve_execution_date,
+    resolve_execution_time,
+)
 from mobile_api.job_detail.projections.job_location_projection import (
     build_movement_location_block,
 )
@@ -86,6 +90,8 @@ def build_empty_move_card(
         card['job_id'] = card['movement_id']
 
     card.update(_empty_move_location_fields(movement, request=request))
+    card['execution_date'] = resolve_execution_date(movement=movement)
+    card['execution_time'] = resolve_execution_time(movement=movement)
     return card
 
 

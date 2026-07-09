@@ -67,6 +67,7 @@ class PodCaptureValidationService:
 
         self._validate_capture_metadata(context)
         self.resolve_target_action(context)
+        self.validate_shipment_document_ready(context)
         self.validate_workflow_action_allowed(context)
         self.validate_pod_compliance(context)
 
@@ -98,6 +99,27 @@ class PodCaptureValidationService:
 
         context.operation_action = action
         self._assert_pod_capture_action(action)
+
+    def validate_shipment_document_ready(self, context: PodCaptureContext) -> None:
+        from django.core.exceptions import ValidationError as DjangoValidationError
+
+        from iroad_tenants.operation_runtime.pod_action import (
+            validate_shipment_document_for_pod_execute,
+        )
+
+        if context.shipment is None or context.operation_action is None:
+            return
+        try:
+            validate_shipment_document_for_pod_execute(
+                context.shipment,
+                context.operation_action,
+            )
+        except DjangoValidationError as exc:
+            message = '; '.join(getattr(exc, 'messages', []) or [str(exc)])
+            raise self._validation_error(
+                'shipment_document_required',
+                message,
+            ) from exc
 
     def validate_workflow_action_allowed(self, context: PodCaptureContext) -> None:
         """

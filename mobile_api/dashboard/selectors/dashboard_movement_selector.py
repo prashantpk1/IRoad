@@ -39,6 +39,8 @@ class DashboardMovementSelector:
 
         cutoff = timezone.now().date() - timedelta(days=DASHBOARD_MOVEMENT_LOOKBACK_DAYS)
 
+        # Newest-first so the candidate window includes the latest open empty move
+        # (ascending slice previously dropped recent rows when history > limit).
         movements_qs = (
             TenantTruckMovementLog.objects.filter(
                 driver_id=driver_pk,
@@ -46,7 +48,7 @@ class DashboardMovementSelector:
                 movement_date__gte=cutoff,
             )
             .exclude(movement_source__iexact='loaded')
-            .order_by('movement_date', 'movement_sequence', 'created_at')[
+            .order_by('-movement_date', '-movement_sequence', '-created_at')[
                 :DASHBOARD_MOVEMENT_CANDIDATE_LIMIT
             ]
         )
@@ -85,7 +87,6 @@ class DashboardMovementSelector:
         _ = (shipment, tenant_schema, driver)
         return None
 
-    @staticmethod
     @staticmethod
     def _result_from_movement(movement: Any) -> DriverEmptyMoveSelectionResult:
         stage = policy.movement_execution_stage(movement)

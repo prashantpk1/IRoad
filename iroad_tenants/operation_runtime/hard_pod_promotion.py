@@ -83,19 +83,28 @@ def promote_pending_hard_pod_custody_for_action_log(
     """
     Promote unpromoted Hard POD custody before shipment moves to Delivered.
 
-  Hard-first mobile flow submits custody via ``/hard-pod/submit/`` then executes
-    a combined POD action (e.g. OA-0008) without digital evidence yet.
+    Applies to standalone hard-copy rows **or** tenant Upload POD (english_label)
+    reused for step 2 (e.g. OA-0009) on Hard POD shipments.
     """
     if action_log is None or shipment is None or action is None:
         return False
-    if not getattr(action, 'hard_copy_collection', False):
-        return False
     from iroad_tenants.operation_field_catalog import operation_shipment_uses_hard_copy_pod
+    from mobile_api.pod_capture.policy.canonical_pod_action_registry import (
+        is_pod_upload_action,
+    )
 
     if not operation_shipment_uses_hard_copy_pod(shipment):
         return False
-    if not _pending_hard_pod_custody_exists(shipment):
-        return False
+
+    custody_linked = bool(
+        str(getattr(action_log, '_hard_pod_custody_submission_id', None) or '').strip()
+        or str(getattr(action_log, '_hard_pod_client_submission_id', None) or '').strip()
+    )
+    hard_copy_action = bool(getattr(action, 'hard_copy_collection', False))
+    pod_promotion_action = bool(is_pod_upload_action(action) and custody_linked)
+    if not hard_copy_action and not pod_promotion_action:
+        if not (_pending_hard_pod_custody_exists(shipment) and is_pod_upload_action(action)):
+            return False
 
     submission = _resolve_submission_for_action_log(action_log)
     if submission is None:
@@ -108,6 +117,17 @@ def promote_pending_hard_pod_custody_for_action_log(
         return False
 
     if submission.promotion_action_log_id == action_log_id:
+        from iroad_tenants.operation_runtime.hard_pod_document_handover import (
+            ensure_document_handover_from_hard_pod_promotion,
+        )
+
+        ensure_document_handover_from_hard_pod_promotion(
+            shipment=shipment,
+            action_log=action_log,
+            confirmed_pages=_confirmed_pages_payload(submission),
+            custody_submission=submission,
+            created_by_label=created_by_label,
+        )
         return True
 
     if submission.promoted_at and submission.promotion_action_log_id != action_log_id:
@@ -132,5 +152,17 @@ def promote_pending_hard_pod_custody_for_action_log(
         submission.promoted_at = submission.promoted_at or getattr(action_log, 'log_date', None)
         submission.promotion_action_log_id = action_log_id
         submission.save(update_fields=['promoted_at', 'promotion_action_log_id'])
+
+    from iroad_tenants.operation_runtime.hard_pod_document_handover import (
+        ensure_document_handover_from_hard_pod_promotion,
+    )
+
+    ensure_document_handover_from_hard_pod_promotion(
+        shipment=shipment,
+        action_log=action_log,
+        confirmed_pages=confirmed_pages,
+        custody_submission=submission,
+        created_by_label=created_by_label,
+    )
 
     return True

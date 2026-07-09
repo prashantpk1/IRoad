@@ -1,3 +1,5 @@
+name: iroad-client-test
+
 services:
   redis:
     image: redis:7-alpine
@@ -5,6 +7,12 @@ services:
     restart: unless-stopped
     ports:
       - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+      start_period: 5s
 
   web:
     build:
@@ -15,14 +23,17 @@ services:
     env_file:
       - .env
     environment:
+      RUNNING_IN_DOCKER: "1"
       DB_HOST: host.docker.internal
+      DB_NAME: iroad_client
       REDIS_URL: redis://redis:6379/0
       CELERY_BROKER_URL: redis://redis:6379/1
       CELERY_RESULT_BACKEND: redis://redis:6379/2
     command: >
       sh -c "python manage.py migrate &&
-             python manage.py runserver 0.0.0.0:8000"
+             python manage.py runserver 0.0.0.0:8001"
     depends_on:
-      - redis
+      redis:
+        condition: service_healthy
     ports:
-      - "8000:8000"
+      - "8001:8001"

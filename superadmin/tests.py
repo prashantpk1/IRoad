@@ -222,3 +222,71 @@ class CrossDomainEmailValidationTests(TestCase):
             tenant_activation_email_blocked(self.tenant),
             'This email is already used by an active super admin.',
         )
+
+
+from unittest.mock import patch
+import redis
+from superadmin.redis_helpers import (
+    reset_redis_client,
+    count_active_admin_sessions,
+    get_all_active_admin_sessions,
+    get_all_active_tenant_sessions,
+    revoke_all_sessions_for_admin,
+    revoke_all_tenant_sessions,
+    revoke_admin_session,
+)
+
+class RedisHelperTimeoutTests(TestCase):
+    def setUp(self):
+        reset_redis_client()
+
+    def tearDown(self):
+        reset_redis_client()
+
+    @patch('superadmin.redis_helpers.get_redis_client')
+    def test_count_active_admin_sessions_timeout(self, mock_get_client):
+        mock_client = mock_get_client.return_value
+        mock_client.scan.side_effect = redis.exceptions.TimeoutError("Timeout connecting to server")
+        
+        result = count_active_admin_sessions()
+        self.assertEqual(result, 0)
+
+    @patch('superadmin.redis_helpers.get_redis_client')
+    def test_get_all_active_admin_sessions_timeout(self, mock_get_client):
+        mock_client = mock_get_client.return_value
+        mock_client.scan.side_effect = redis.exceptions.TimeoutError("Timeout connecting to server")
+        
+        result = get_all_active_admin_sessions()
+        self.assertEqual(result, [])
+
+    @patch('superadmin.redis_helpers.get_redis_client')
+    def test_get_all_active_tenant_sessions_timeout(self, mock_get_client):
+        mock_client = mock_get_client.return_value
+        mock_client.scan.side_effect = redis.exceptions.TimeoutError("Timeout connecting to server")
+        
+        result = get_all_active_tenant_sessions()
+        self.assertEqual(result, [])
+
+    @patch('superadmin.redis_helpers.get_redis_client')
+    def test_revoke_all_sessions_for_admin_timeout(self, mock_get_client):
+        mock_client = mock_get_client.return_value
+        mock_client.scan.side_effect = redis.exceptions.TimeoutError("Timeout connecting to server")
+        
+        result = revoke_all_sessions_for_admin("123")
+        self.assertFalse(result)
+
+    @patch('superadmin.redis_helpers.get_redis_client')
+    def test_revoke_all_tenant_sessions_timeout(self, mock_get_client):
+        mock_client = mock_get_client.return_value
+        mock_client.scan.side_effect = redis.exceptions.TimeoutError("Timeout connecting to server")
+        
+        result = revoke_all_tenant_sessions("tenant-uuid")
+        self.assertEqual(result, 0)
+
+    @patch('superadmin.redis_helpers.get_redis_client')
+    def test_revoke_admin_session_timeout(self, mock_get_client):
+        mock_client = mock_get_client.return_value
+        mock_client.delete.side_effect = redis.exceptions.TimeoutError("Timeout connecting to server")
+        
+        result = revoke_admin_session("jti-uuid")
+        self.assertFalse(result)

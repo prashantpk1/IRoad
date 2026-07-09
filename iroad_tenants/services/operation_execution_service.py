@@ -50,6 +50,8 @@ class OperationExecutionService:
         booking_item_type: str = '',
         exclude_log_id=None,
         previous_action_id=None,
+        allow_standalone_execution: bool = False,
+        hard_pod_custody_submission_id: str = '',
     ) -> str | None:
         return validate_operation_action_allowed(
             operation_action,
@@ -59,6 +61,33 @@ class OperationExecutionService:
             booking_item_type=booking_item_type,
             exclude_log_id=exclude_log_id,
             previous_action_id=previous_action_id,
+            allow_standalone_execution=allow_standalone_execution,
+            hard_pod_custody_submission_id=hard_pod_custody_submission_id,
+        )
+
+    @staticmethod
+    def validate_driver_action_execution(
+        operation_action,
+        *,
+        booking=None,
+        shipment=None,
+        movement=None,
+        booking_item_type: str = '',
+        exclude_log_id=None,
+        previous_action_id=None,
+        allow_standalone_execution: bool = False,
+        hard_pod_custody_submission_id: str = '',
+    ) -> str | None:
+        return OperationExecutionService.validate_operation_action_allowed(
+            operation_action,
+            booking=booking,
+            shipment=shipment,
+            movement=movement,
+            booking_item_type=booking_item_type,
+            exclude_log_id=exclude_log_id,
+            previous_action_id=previous_action_id,
+            allow_standalone_execution=allow_standalone_execution,
+            hard_pod_custody_submission_id=hard_pod_custody_submission_id,
         )
 
     @staticmethod
@@ -127,5 +156,3 @@ class OperationExecutionService:
             job_no=job_no,
             shipment=shipment,
         )
-
-    validate_driver_action_execution = validate_operation_action_allowed

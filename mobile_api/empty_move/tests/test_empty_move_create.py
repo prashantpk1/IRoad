@@ -64,15 +64,27 @@ class EmptyMoveCreateServiceTests(SimpleTestCase):
     @patch(
         'mobile_api.empty_move.services.empty_move_create_service.DashboardBookingSelector'
     )
+    @patch(
+        'mobile_api.empty_move.services.empty_move_create_service.is_active_empty_move',
+        return_value=True,
+    )
     def test_blocks_when_empty_move_already_active(
         self,
+        _mock_active,
         mock_booking_cls,
         mock_movement_cls,
         _schema,
     ):
         mock_booking_cls.return_value.select_current_driver_booking.return_value = None
+        movement = SimpleNamespace(
+            pk=uuid4(),
+            movement_id=uuid4(),
+            movement_no='EM-EXISTING',
+            status='Scheduled',
+            empty_move_reason='maintenance',
+        )
         mock_movement_cls.return_value.select_current_empty_move.return_value = (
-            SimpleNamespace(movement=SimpleNamespace())
+            SimpleNamespace(movement=movement, movement_stage='created')
         )
 
         service = EmptyMoveCreateService()
@@ -88,6 +100,67 @@ class EmptyMoveCreateServiceTests(SimpleTestCase):
                 },
             )
         self.assertEqual(ctx.exception.code, 'empty_move_already_active')
+        self.assertTrue(ctx.exception.data.get('resume_existing'))
+        self.assertEqual(
+            (ctx.exception.data.get('resume_job') or {}).get('job_no'),
+            'EM-EXISTING',
+        )
+
+    @patch('mobile_api.empty_move.services.empty_move_create_service.schema_context')
+    @patch(
+        'mobile_api.empty_move.services.empty_move_create_service.DashboardMovementSelector'
+    )
+    @patch(
+        'mobile_api.empty_move.services.empty_move_create_service.DashboardBookingSelector'
+    )
+    @patch(
+        'mobile_api.empty_move.services.empty_move_create_service.is_active_empty_move',
+        return_value=False,
+    )
+    def test_allows_create_when_only_closed_empty_move_in_selector(
+        self,
+        _mock_active,
+        mock_booking_cls,
+        mock_movement_cls,
+        mock_schema,
+    ):
+        """After End Job, selector may still return a row but it must not block create."""
+        mock_booking_cls.return_value.select_current_driver_booking.return_value = None
+        closed = SimpleNamespace(
+            pk=uuid4(),
+            movement_id=uuid4(),
+            movement_no='EM-CLOSED',
+            status='Completed',
+            empty_move_reason='maintenance',
+        )
+        mock_movement_cls.return_value.select_current_empty_move.return_value = (
+            SimpleNamespace(movement=closed, movement_stage='completed')
+        )
+        mock_schema.return_value.__enter__ = lambda s: None
+        mock_schema.return_value.__exit__ = lambda s, *a: None
+
+        service = EmptyMoveCreateService()
+        with patch.object(
+            service,
+            'create_empty_move',
+            wraps=service.create_empty_move,
+        ):
+            with patch(
+                'mobile_api.empty_move.services.empty_move_create_service._resolve_driver_truck',
+                return_value=None,
+            ):
+                with self.assertRaises(EmptyMoveError) as ctx:
+                    service.create_empty_move(
+                        driver=_driver(),
+                        tenant_user=SimpleNamespace(pk=uuid4()),
+                        tenant_schema='tenant_test',
+                        payload={
+                            'empty_move_reason': 'maintenance',
+                            'from_location_id': uuid4(),
+                            'to_location_id': uuid4(),
+                        },
+                    )
+        self.assertEqual(ctx.exception.code, 'truck_required')
 
     @patch('mobile_api.empty_move.services.empty_move_create_service.transaction')
     @patch(
@@ -180,7 +253,7 @@ class EmptyMoveCreateServiceTests(SimpleTestCase):
     @patch(
         'mobile_api.empty_move.services.empty_move_create_service.DashboardBookingSelector'
     )
-    def test_create_applies_route_gps(
+    def test_create_applies_departure_gps_only(
         self,
         mock_booking_cls,
         mock_movement_cls,
@@ -222,20 +295,21 @@ class EmptyMoveCreateServiceTests(SimpleTestCase):
                 tenant_schema='tenant_test',
                 payload={
                     'empty_move_reason': 'reposition',
-                    'from_location_id': uuid4(),
-                    'to_location_id': uuid4(),
-                    'from_latitude': 24.7136,
-                    'from_longitude': 46.6753,
-                    'to_latitude': 21.4858,
-                    'to_longitude': 39.1925,
+                    'latitude': 24.7136,
+                    'longitude': 46.6753,
+                    'from_address': 'Depot A',
                 },
             )
 
         mock_apply_links.assert_called_once()
         link_kwargs = mock_apply_links.call_args.kwargs
         self.assertEqual(link_kwargs['from_latitude'], '24.7136')
-        self.assertEqual(link_kwargs['to_longitude'], '39.1925')
+        self.assertEqual(link_kwargs['from_longitude'], '46.6753')
+        self.assertEqual(link_kwargs['from_address'], 'Depot A')
+        self.assertEqual(link_kwargs['to_latitude'], '')
+        self.assertEqual(link_kwargs['to_longitude'], '')
         self.assertFalse(result['empty_move']['workflow_started'])
+        self.assertFalse(result['workflow_contract']['manual_location_picker'])
 
     @patch('mobile_api.empty_move.services.empty_move_create_service.transaction')
     @patch(
@@ -254,7 +328,7 @@ class EmptyMoveCreateServiceTests(SimpleTestCase):
     @patch(
         'mobile_api.empty_move.services.empty_move_create_service.DashboardBookingSelector'
     )
-    def test_create_with_places_only_skips_location_master(
+    def test_create_with_gps_only_skips_location_master(
         self,
         mock_booking_cls,
         mock_movement_cls,
@@ -278,13 +352,13 @@ class EmptyMoveCreateServiceTests(SimpleTestCase):
             from_location_point=None,
             to_location_point=None,
             from_location_map_link='https://maps.google.com/?q=21.5433,39.1728',
-            to_location_map_link='https://maps.google.com/?q=21.4225,39.8262',
+            to_location_map_link='',
             from_location_address='King Abdulaziz Rd, Jeddah',
-            to_location_address='Industrial Area, Makkah',
+            to_location_address='',
             from_latitude='21.5433',
             from_longitude='39.1728',
-            to_latitude='21.4225',
-            to_longitude='39.8262',
+            to_latitude='',
+            to_longitude='',
             refresh_from_db=MagicMock(),
         )
         mock_birth.return_value = movement
@@ -301,12 +375,9 @@ class EmptyMoveCreateServiceTests(SimpleTestCase):
                     tenant_schema='tenant_test',
                     payload={
                         'empty_move_reason': 'reposition',
+                        'latitude': 21.5433,
+                        'longitude': 39.1728,
                         'from_address': 'King Abdulaziz Rd, Jeddah',
-                        'from_latitude': 21.5433,
-                        'from_longitude': 39.1728,
-                        'to_address': 'Industrial Area, Makkah',
-                        'to_latitude': 21.4225,
-                        'to_longitude': 39.8262,
                     },
                 )
 
@@ -316,9 +387,20 @@ class EmptyMoveCreateServiceTests(SimpleTestCase):
         self.assertIsNone(birth_kwargs['to_location'])
         link_kwargs = mock_apply_links.call_args.kwargs
         self.assertEqual(link_kwargs['from_address'], 'King Abdulaziz Rd, Jeddah')
-        self.assertEqual(link_kwargs['to_longitude'], '39.8262')
+        self.assertEqual(link_kwargs['to_latitude'], '')
+        self.assertEqual(link_kwargs['to_longitude'], '')
         self.assertEqual(
             result['empty_move']['from_location']['display_name'],
             'King Abdulaziz Rd, Jeddah',
         )
-        self.assertEqual(result['empty_move']['to_location']['latitude'], '21.4225')
+        self.assertEqual(
+            result['empty_move']['from_location']['from_address'],
+            'King Abdulaziz Rd, Jeddah',
+        )
+        self.assertEqual(result['empty_move']['from_location']['latitude'], '21.5433')
+        self.assertEqual(result['empty_move']['from_location']['longitude'], '39.1728')
+        to_location = result['empty_move']['to_location']
+        self.assertEqual(to_location['latitude'], '')
+        self.assertEqual(to_location['longitude'], '')
+        self.assertEqual(to_location['location_capture_mode'], 'gps')
+        self.assertTrue(to_location['gps_capture_required'])

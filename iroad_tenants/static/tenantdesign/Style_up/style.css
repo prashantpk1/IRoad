@@ -4674,26 +4674,33 @@ a.eal-row-btn {
 }
 .eal-pagination-controls {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
-  gap: 4px;
+  justify-content: flex-end;
+  gap: 6px;
+}
+a.eal-page-btn {
+  text-decoration: none;
 }
 .eal-page-btn {
   min-width: 34px;
   height: 34px;
+  padding: 0 6px;
   border-radius: 8px;
   border: 1.5px solid #e2e4ed;
   background: #fff;
   color: #4b4e5e;
   font-size: 13px;
   font-weight: 600;
-  display: flex;
+  display: inline-flex;
   align-items: center;
   justify-content: center;
   cursor: pointer;
   transition: all 0.18s;
   font-family: "Segoe UI", sans-serif;
+  box-sizing: border-box;
 }
-.eal-page-btn:hover {
+.eal-page-btn:hover:not(:disabled):not(.active):not(.eal-page-ellipsis) {
   border-color: #3b82f6;
   color: #3b82f6;
 }
@@ -4701,6 +4708,23 @@ a.eal-row-btn {
   background: #3b82f6;
   color: #fff;
   border-color: #3b82f6;
+  cursor: default;
+}
+.eal-page-btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+.eal-page-btn:disabled:hover {
+  border-color: #e2e4ed;
+  color: #4b4e5e;
+  background: #fff;
+}
+.eal-page-btn.eal-page-ellipsis {
+  min-width: 28px;
+  border-color: transparent;
+  background: transparent;
+  cursor: default;
+  pointer-events: none;
 }
 
 /* ============================================

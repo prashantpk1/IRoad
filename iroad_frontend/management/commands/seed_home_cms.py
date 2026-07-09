@@ -34,19 +34,19 @@ TESTIMONIAL_QUOTE_AR = (
 def _home_text_defaults():
     """Char/Text fields only; images use static fallbacks until uploaded in CMS."""
     return {
-        'page_title_en': 'IRoad - Transport Management System',
-        'page_title_ar': 'آيرواد - نظام إدارة النقل',
+        'page_title_en': 'IRoute - Transport Management System',
+        'page_title_ar': 'آيروت - نظام إدارة النقل',
         'meta_description_en': (
-            'IRoad is an all-in-one transport management system for modern '
+            'IRoute is an all-in-one transport management system for modern '
             'logistics companies — manage operations, fleet, and finances in one '
             'powerful SaaS platform.'
         ),
         'meta_description_ar': (
-            'آيرواد منصة شاملة لإدارة النقل لشركات اللوجستيات الحديثة — أدِر العمليات '
+            'آيروت منصة شاملة لإدارة النقل لشركات اللوجستيات الحديثة — أدِر العمليات '
             'والأسطول والمالية في منصة SaaS واحدة قوية.'
         ),
         'logo_alt_en': 'Logo',
-        'logo_alt_ar': 'آيرواد',
+        'logo_alt_ar': 'آيروت',
         'nav_home_en': 'Home',
         'nav_home_ar': 'الرئيسية',
         'nav_about_en': 'About',
@@ -63,8 +63,8 @@ def _home_text_defaults():
         'header_sign_in_en': 'Sign In',
         'header_sign_in_ar': 'تسجيل الدخول',
         'header_sign_in_url': '/login/',
-        'hero_kicker_en': 'Welcome to IRoad',
-        'hero_kicker_ar': 'مرحباً بك في آيرواد',
+        'hero_kicker_en': 'Welcome to IRoute',
+        'hero_kicker_ar': 'مرحباً بك في آيروت',
         'hero_heading_en': (
             'All-in-One Transport Management System for Modern Logistics Companies'
         ),
@@ -86,16 +86,16 @@ def _home_text_defaults():
         'hero_bullet_2_ar': 'رؤية لحظية للعمليات',
         'hero_bullet_3_en': 'Integrated Finance & Reporting',
         'hero_bullet_3_ar': 'مالية وتقارير متكاملة',
-        'about_kicker_en': 'About IRoad',
-        'about_kicker_ar': 'عن آيرواد',
+        'about_kicker_en': 'About IRoute',
+        'about_kicker_ar': 'عن آيروت',
         'about_heading_en': 'A Complete Transport Management System Built for Efficiency',
         'about_heading_ar': 'نظام إدارة نقل متكامل مبني من أجل الكفاءة',
         'about_body_en': (
-            'IRoad is a powerful SaaS platform designed to help transport companies '
+            'IRoute is a powerful SaaS platform designed to help transport companies '
             'manage operations, fleet, finance, and delivery workflows from a single system.'
         ),
         'about_body_ar': (
-            'آيرواد منصة SaaS قوية تساعد شركات النقل على إدارة العمليات والأسطول '
+            'آيروت منصة SaaS قوية تساعد شركات النقل على إدارة العمليات والأسطول '
             'والمالية وسير عمل التسليم من نظام واحد.'
         ),
         'about_point_1_title_en': 'Centralized Operations Control',
@@ -135,8 +135,8 @@ def _home_text_defaults():
         'services_footer_link_label_en': 'Start Free Trial',
         'services_footer_link_label_ar': 'ابدأ مجاناً',
         'services_footer_link_url': '/contact/',
-        'why_kicker_en': 'Why Choose IRoad',
-        'why_kicker_ar': 'لماذا آيرواد',
+        'why_kicker_en': 'Why Choose IRoute',
+        'why_kicker_ar': 'لماذا آيروت',
         'why_heading_en': 'Full control, automation, and real-time visibility',
         'why_heading_ar': 'تحكم كامل وأتمتة ورؤية لحظية',
         'why_point_1_title_en': 'Full Operational Control',
@@ -163,8 +163,8 @@ def _home_text_defaults():
         'features_kicker_ar': 'قدرات متقدمة',
         'features_heading_en': 'Advanced tools built for control and visibility',
         'features_heading_ar': 'أدوات متقدمة للتحكم والرؤية',
-        'features_footer_text_en': 'Transform how your team operates with IRoad SaaS.',
-        'features_footer_text_ar': 'حوّل طريقة عمل فريقك مع آيرواد SaaS.',
+        'features_footer_text_en': 'Transform how your team operates with IRoute SaaS.',
+        'features_footer_text_ar': 'حوّل طريقة عمل فريقك مع آيروت SaaS.',
         'features_footer_link_label_en': 'Start Free Trial',
         'features_footer_link_label_ar': 'ابدأ مجاناً',
         'features_footer_link_url': '/contact/',
@@ -238,23 +238,23 @@ def _home_text_defaults():
         'business_bullet_2_ar': 'قابلية التوسع',
         'testimonials_kicker_en': 'Our Testimonials',
         'testimonials_kicker_ar': 'آراء عملائنا',
-        'testimonials_heading_en': 'What transport teams say about IRoad',
-        'testimonials_heading_ar': 'ماذا يقول فرق النقل عن آيرواد',
+        'testimonials_heading_en': 'What transport teams say about IRoute',
+        'testimonials_heading_ar': 'ماذا يقول فرق النقل عن آيروت',
         'testimonials_happy_count': '10k',
         'testimonials_happy_label_en': 'Trusted by World Customer',
         'testimonials_happy_label_ar': 'موثوق به من عملاء حول العالم',
         'footer_cta_left_en': "Let's Connect",
         'footer_cta_left_ar': 'لنتواصل',
-        'footer_brand_text_en': 'IRoad',
-        'footer_brand_text_ar': 'آيرواد',
+        'footer_brand_text_en': 'IRoute',
+        'footer_brand_text_ar': 'آيروت',
         'footer_cta_right_en': 'Book a Demo',
         'footer_cta_right_ar': 'احجز عرضاً',
         'footer_about_blurb_en': (
-            'IRoad is a modern SaaS platform for transport companies to manage '
+            'IRoute is a modern SaaS platform for transport companies to manage '
             'operations, fleet, and finance efficiently.'
         ),
         'footer_about_blurb_ar': (
-            'آيرواد منصة SaaS حديثة لشركات النقل لإدارة العمليات والأسطول '
+            'آيروت منصة SaaS حديثة لشركات النقل لإدارة العمليات والأسطول '
             'والمالية بكفاءة.'
         ),
         'footer_social_pinterest_url': '#',
@@ -275,10 +275,10 @@ def _home_text_defaults():
         'footer_newsletter_title_en': 'Get Product Updates',
         'footer_newsletter_title_ar': 'احصل على تحديثات المنتج',
         'footer_newsletter_desc_en': (
-            'Get IRoad product news, releases, and feature updates.'
+            'Get IRoute product news, releases, and feature updates.'
         ),
         'footer_newsletter_desc_ar': (
-            'أخبار منتج آيرواد والإصدارات وتحديثات الميزات.'
+            'أخبار منتج آيروت والإصدارات وتحديثات الميزات.'
         ),
         'footer_newsletter_placeholder_en': 'Enter your email',
         'footer_newsletter_placeholder_ar': 'أدخل بريدك الإلكتروني',

@@ -49,8 +49,8 @@
             <i class="bi bi-file-earmark-ruled"></i>
           </div>
           <div>
-            <div class="eal-stat-value">{{ pod_stats.hard_copy|default:0 }}</div>
-            <div class="eal-stat-label">Hard Copy</div>
+            <div class="eal-stat-value">{{ pod_stats.hard_pod_shipments|default:0 }}</div>
+            <div class="eal-stat-label">Hard POD (Handover)</div>
           </div>
         </div>
         <div class="eal-stat-card">
@@ -147,7 +147,7 @@
                 <th>Doc Date</th>
                 <th>Pages</th>
                 <th>User</th>
-                <th>POD Type</th>
+                <th>Evidence Type</th>
                 <th>POD Status</th>
                 <th>ACTIONS</th>
               </tr>
@@ -171,7 +171,11 @@
                 <td>{{ row.document_date|date:"d M Y" }}</td>
                 <td>{{ row.page_count }}</td>
                 <td>{{ row.user_label }}</td>
-                <td><span class="status-badge in-transit">{{ row.pod_type }}</span></td>
+                <td>
+                  <span class="status-badge {% if row.evidence_badge == 'digital' %}in-transit{% elif row.evidence_badge == 'soft' %}active{% elif row.evidence_badge == 'mixed' %}in-transit{% else %}pending{% endif %}">
+                    {{ row.evidence_type|default:row.pod_type }}
+                  </span>
+                </td>
                 <td><span class="status-badge {% if row.pod_status == 'Completed' %}active{% else %}pending{% endif %}">{{ row.pod_status }}</span></td>
                 <td>
                   <div class="dropdown eal-actions-cell">

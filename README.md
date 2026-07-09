@@ -78,12 +78,12 @@ iroad/
 
 7. **Run the development server**:
    ```bash
-   python manage.py runserver
+   python manage.py runserver 8001
    ```
 
 ## 📜 Usage
 
-Access the dashboard at `http://127.0.0.1:8000/`. Default administrative access can be configured through the `superadmin` module.
+Access the dashboard at `http://127.0.0.1:8001/`. Default administrative access can be configured through the `superadmin` module.
 
 ## 🔒 Security Notes
 

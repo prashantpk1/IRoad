@@ -16,6 +16,8 @@ class IssueResponseBuilder:
         timeline_preview: dict[str, Any],
         workflow_impact: dict[str, Any],
         replayed: bool,
+        job_type: str = 'shipment',
+        movement_id: str = '',
     ) -> dict[str, Any]:
         media = [
             {
@@ -30,7 +32,17 @@ class IssueResponseBuilder:
         issue_payload = {
             'issue_id': str(getattr(issue, 'pk', '') or getattr(issue, 'id', '')),
             'client_issue_id': (getattr(issue, 'client_issue_id', None) or '').strip(),
-            'shipment_id': (getattr(issue, 'shipment_id', None) or '').strip(),
+            'job_type': (job_type or 'shipment').strip(),
+            'shipment_id': (
+                (getattr(issue, 'shipment_id', None) or '').strip()
+                if (job_type or 'shipment') == 'shipment'
+                else ''
+            ),
+            'movement_id': (
+                (movement_id or getattr(issue, 'shipment_id', None) or '').strip()
+                if (job_type or 'shipment') == 'movement'
+                else (movement_id or '').strip()
+            ),
             'driver_id': (getattr(issue, 'driver_id', None) or '').strip(),
             'issue_type': (getattr(issue, 'issue_type', None) or '').strip(),
             'severity': (getattr(issue, 'severity', None) or '').strip(),

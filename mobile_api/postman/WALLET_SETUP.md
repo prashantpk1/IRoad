@@ -21,7 +21,7 @@
 ## Prerequisites
 
 - Driver has an **active** `DriverTreasury` wallet
-- At least one **COD** shipment with **A9 Collect Payment** fired (creates Client Collection · Debit row)
+- At least one **COD** shipment with **A9 Collect Payment** fired (creates Client Collection · Credit row)
 - Capability `mobile.driver.wallet`
 
 ## Endpoints

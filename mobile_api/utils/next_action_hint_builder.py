@@ -5,26 +5,45 @@ Driver-facing next-step hints for Job Detail and Execute Action responses.
 """
 from __future__ import annotations
 
+from types import SimpleNamespace
 from typing import Any
 
 from mobile_api.dashboard.selectors import booking_selection_policy as booking_policy
 from mobile_api.helpers.cod_amount import build_cod_payment_display
+from mobile_api.helpers.hard_copy_workflow_gate import (
+    digital_evidence_complete_for_pod_cod,
+    hard_copy_step_due,
+    hard_copy_workflow_gate_open,
+    unloading_pending_for_pod_workflow,
+)
 from mobile_api.helpers.job_action_resolver import (
     action_code_is_collect_payment,
     action_code_is_job_close,
     resolve_collect_payment_action_code_from_context,
+    resolve_delivery_arrival_action_code_from_context,
     resolve_job_close_action_code_from_context,
     resolve_unloading_action_code_from_context,
+    resolve_unloading_completed_action_code_from_context,
     row_action_reason_label,
     row_is_collect_payment_action,
     row_is_confirm_loaded_action,
+    row_is_delivery_arrival_action,
     row_is_job_close_action,
     row_is_start_job_action,
     row_is_unloading_action,
+    row_is_unloading_completed_action,
 )
+from mobile_api.helpers.empty_move_action_resolver import (
+    resolve_empty_move_complete_action_code,
+    row_is_empty_move_action,
+)
+from iroad_tenants.operation_runtime.movement_state_machine import (
+    is_movement_complete_action,
+)
+from tenant_workspace.models import TenantShipment, TenantTruckMovementLog
 from mobile_api.pod_capture.services.pod_capture_action_resolver import (
-    CANONICAL_FALLBACK_DIGITAL_POD_ACTION_CODE,
-    CANONICAL_FALLBACK_HARD_COPY_POD_ACTION_CODE,
+    action_code_is_digital_pod_upload,
+    action_code_is_hard_copy_custody,
     resolve_digital_pod_action_code_from_context,
     resolve_hard_copy_action_code_from_context,
     row_has_digital_pod_upload,
@@ -32,9 +51,124 @@ from mobile_api.pod_capture.services.pod_capture_action_resolver import (
 )
 from mobile_api.pod_capture.services.pod_section_metadata import build_pod_capture_steps
 from iroad_tenants.operation_runtime.shipment_execution_stage import (
+    shipment_at_or_past_in_transit,
+    shipment_delivery_arrival_done,
+    shipment_pod_prerequisites_done,
+    shipment_pod_upload_log_is_valid,
+    shipment_unloading_completed_done,
     shipment_unloading_done,
 )
-from tenant_workspace.models import TenantShipment
+
+
+def _movement_workflow_context(
+    workflow: dict[str, Any],
+    *,
+    movement: Any | None = None,
+) -> bool:
+    if movement is not None:
+        return True
+    metadata = dict(workflow.get('workflow_metadata') or {})
+    entity_type = str(metadata.get('entity_type') or '').strip().casefold()
+    job_type = str(
+        metadata.get('job_type') or workflow.get('job_type') or ''
+    ).strip().casefold()
+    return entity_type == 'movement' or job_type == 'movement'
+
+
+def _neutral_pod_cod_for_movement() -> dict[str, Any]:
+    """Empty-move jobs have no POD/COD gates — avoid shipment defaults in hints."""
+    return {
+        'pod_pending': False,
+        'pod_compliant': False,
+        'hard_pod_pending': False,
+        'cod_pending': False,
+        'cod_collected': False,
+        'treasury_pending': False,
+        'delivery_blocked': False,
+        'digital_evidence_complete': True,
+    }
+
+
+def _build_empty_move_execute_hint(
+    workflow: dict[str, Any],
+    *,
+    action_code: str = '',
+) -> dict[str, Any]:
+    code = (action_code or '').strip()
+    if not code:
+        next_action = workflow.get('next_action') or {}
+        code = str(next_action.get('action_code') or '').strip()
+    row = _resolve_action_row(workflow, code)
+    return _build_evidence_capture_hint(
+        action_code=code,
+        reason=(
+            row_action_reason_label(row, code)
+            or 'Capture movement evidence before continuing.'
+        ),
+        workflow=workflow,
+        ui_mode='empty_move',
+    )
+
+
+def _movement_dashboard_hint() -> dict[str, Any]:
+    return {
+        'action': 'go_to_dashboard',
+        'screen': 'dashboard',
+        'reason': 'Movement complete.',
+        'job_closed': True,
+        'show_completion_screen': True,
+    }
+
+
+def _empty_move_complete_action_code(
+    action_code: str | None,
+    *,
+    tenant_schema: str,
+    workflow: dict[str, Any],
+) -> bool:
+    token = (action_code or '').strip().upper()
+    if not token:
+        return False
+    complete_code = resolve_empty_move_complete_action_code(tenant_schema).strip().upper()
+    if complete_code and token == complete_code:
+        return True
+    row = _resolve_action_row(workflow, token)
+    if not row:
+        return False
+    action = row if not isinstance(row, dict) else SimpleNamespace(
+        action_code=row.get('action_code'),
+        english_label=row.get('english_label') or row.get('execution_label') or row.get('label'),
+        arabic_label=row.get('arabic_label'),
+        movement_status_impact=(row.get('execution_requirements') or {}).get(
+            'movement_status_impact',
+        )
+        or row.get('movement_status_impact'),
+        shipment_status_impact='',
+    )
+    return is_movement_complete_action(action)
+
+
+def _movement_terminal_for_hint(
+    movement: Any | None,
+    *,
+    action_code: str | None,
+    tenant_schema: str,
+    workflow: dict[str, Any],
+) -> bool:
+    if movement is not None:
+        status = (getattr(movement, 'status', '') or '').strip()
+        if status == TenantTruckMovementLog.Status.COMPLETED:
+            return True
+    if _empty_move_complete_action_code(
+        action_code,
+        tenant_schema=tenant_schema,
+        workflow=workflow,
+    ):
+        return True
+    steps = list(workflow.get('workflow_status') or [])
+    if steps and all(bool(step.get('completed')) for step in steps):
+        return True
+    return False
 
 
 def _normalize_allowed_actions(actions: Any) -> list[dict[str, Any]]:
@@ -108,6 +242,7 @@ def _build_digital_pod_capture_hint(
     pod_cod: dict[str, Any],
     *,
     tenant_schema: str = '',
+    shipment: Any | None = None,
 ) -> dict[str, Any]:
     """Step 1 — digital evidence wizard (step 2 when Hard POD)."""
     hard_copy_applicable = _hard_copy_applicable(pod_cod)
@@ -132,12 +267,33 @@ def _build_digital_pod_capture_hint(
         'hard_pod': hard_copy_applicable,
         'job_closed': False,
         'show_completion_screen': False,
+        'show_pod_capture_button': True,
     }
+    from mobile_api.pod_capture.services.pod_section_metadata import (
+        build_digital_evidence_block,
+    )
+
+    block = build_digital_evidence_block(
+        shipment,
+        tenant_schema=tenant_schema,
+        has_hard_copy_step=hard_copy_applicable,
+        allow_hard_copy_wizard_next=bool(
+            dict(pod_cod.get('hard_copy_confirmation') or {}).get('applicable'),
+        ),
+    )
+    if block.get('capture_ui'):
+        hint['capture_ui'] = block['capture_ui']
+    if block.get('action_code') and not hint.get('action_code'):
+        hint['action_code'] = block['action_code']
     if hard_copy_applicable:
         block = dict(pod_cod.get('hard_copy_confirmation') or {})
         hint['documents_endpoint'] = block.get('documents_endpoint') or ''
         hint['custody_submit_endpoint'] = block.get('submit_endpoint') or ''
-    return hint
+    from mobile_api.job_detail.services.job_detail_navigation_reconciler import (
+        apply_pod_mobile_cta_contract,
+    )
+
+    return apply_pod_mobile_cta_contract(hint)
 
 
 def align_next_action_hint_with_workflow(
@@ -158,7 +314,35 @@ def align_next_action_hint_with_workflow(
     """
     workflow = dict(workflow or {})
     pod_cod = dict(pod_cod or {})
+    is_cod = (getattr(shipment, 'order_type', None) or '').strip().upper() == 'COD'
     primary = dict(workflow.get('primary_action') or {})
+    shipment_status = _column_shipment_status(workflow, shipment)
+    if shipment is not None:
+        shipment_status = (
+            (getattr(shipment, 'shipment_status', None) or '').strip()
+            or shipment_status
+        )
+    if _unloading_completed_step_due(
+        shipment,
+        workflow,
+        shipment_status,
+        tenant_schema=tenant_schema,
+    ):
+        return _finalize_hint(
+            _build_unloading_completed_execute_hint(
+                workflow,
+                tenant_schema=tenant_schema,
+            ),
+            workflow,
+        )
+    if _unloading_step_due(shipment, workflow):
+        return _finalize_hint(
+            _build_unloading_execute_hint(
+                workflow,
+                tenant_schema=tenant_schema,
+            ),
+            workflow,
+        )
     code = str(
         hint.get('action_code')
         or primary.get('action_code')
@@ -167,17 +351,37 @@ def align_next_action_hint_with_workflow(
     ).strip()
     row = _resolve_action_row(workflow, code) or primary
 
-    if (
+    if _hard_copy_step_required(pod_cod) and digital_evidence_complete_for_pod_cod(pod_cod):
+        payment_hint = (
+            str(hint.get('action') or '') == 'go_to_payment_collection'
+            or str(hint.get('screen') or '') == 'collect_payment'
+            or row_is_collect_payment_action(primary)
+            or row_is_collect_payment_action(row)
+            or row_is_collect_payment_action(hint)
+        )
+        if payment_hint:
+            return _finalize_hint(
+                _hard_copy_hint(workflow, pod_cod, tenant_schema=tenant_schema),
+                workflow,
+            )
+
+    if is_cod and (
         row_is_collect_payment_action(primary)
         or row_is_collect_payment_action(row)
         or row_is_collect_payment_action(hint)
     ):
-        if pod_cod.get('pod_pending'):
+        if pod_cod.get('pod_pending') and _pod_upload_step_due(
+            shipment,
+            pod_cod,
+            workflow,
+            tenant_schema=tenant_schema,
+        ):
             return _finalize_hint(
                 _build_digital_pod_capture_hint(
                     workflow,
                     pod_cod,
                     tenant_schema=tenant_schema,
+                    shipment=shipment,
                 ),
                 workflow,
             )
@@ -189,8 +393,14 @@ def align_next_action_hint_with_workflow(
                 ),
                 workflow,
             )
+        if _hard_copy_step_required(pod_cod):
+            return _finalize_hint(
+                _hard_copy_hint(workflow, pod_cod, tenant_schema=tenant_schema),
+                workflow,
+            )
         if (
-            not pod_cod.get('cod_collected')
+            is_cod
+            and not pod_cod.get('cod_collected')
             and (
                 str(hint.get('action') or '') == 'go_to_payment_collection'
                 or str(hint.get('screen') or '') == 'collect_payment'
@@ -209,11 +419,19 @@ def align_next_action_hint_with_workflow(
                 workflow,
             )
 
-    if _hard_copy_step_required(pod_cod) and (
+    if is_cod and _hard_copy_step_required(pod_cod) and (
         row_is_collect_payment_action(primary)
         or row_is_collect_payment_action(row)
         or row_is_collect_payment_action(hint)
     ):
+        if _unloading_step_due(shipment, workflow):
+            return _finalize_hint(
+                _build_unloading_execute_hint(
+                    workflow,
+                    tenant_schema=tenant_schema,
+                ),
+                workflow,
+            )
         return _finalize_hint(
             _hard_copy_hint(workflow, pod_cod, tenant_schema=tenant_schema),
             workflow,
@@ -222,7 +440,10 @@ def align_next_action_hint_with_workflow(
     if not _hard_copy_step_required(pod_cod):
         allowed = workflow.get('allowed_actions') or []
         if row_is_job_close_action(primary) or _job_close_in_allowed_actions(allowed):
-            if str(hint.get('action') or '') == 'go_to_pod_capture':
+            if (
+                str(hint.get('action') or '') == 'go_to_pod_capture'
+                and not pod_cod.get('pod_pending')
+            ):
                 resolved_booking = booking or getattr(shipment, 'booking', None)
                 return _finalize_close_or_round_trip_continue_hint(
                     workflow=workflow,
@@ -257,39 +478,63 @@ def align_next_action_hint_with_workflow(
                     workflow,
                 )
 
-    if pod_cod.get('pod_pending') and row_has_digital_pod_upload(row):
+    if (
+        pod_cod.get('pod_pending')
+        and row_has_digital_pod_upload(row)
+        and _pod_upload_step_due(
+            shipment,
+            pod_cod,
+            workflow,
+            tenant_schema=tenant_schema,
+        )
+    ):
         if str(hint.get('action') or '') != 'go_to_pod_capture':
             return _finalize_hint(
                 _build_digital_pod_capture_hint(
                     workflow,
                     pod_cod,
                     tenant_schema=tenant_schema,
+                    shipment=shipment,
                 ),
                 workflow,
             )
         return _merge_pod_navigation_from_workflow_row(
             _finalize_hint(dict(hint), workflow),
             workflow,
+            pod_cod=pod_cod,
         )
 
-    if _hard_copy_step_required(pod_cod) and str(hint.get('action') or '') != 'go_to_pod_capture':
-        return _finalize_hint(
-            _hard_copy_hint(workflow, pod_cod, tenant_schema=tenant_schema),
-            workflow,
-        )
+    if _hard_copy_step_required(pod_cod) and digital_evidence_complete_for_pod_cod(pod_cod):
+        if str(hint.get('action') or '') != 'go_to_pod_capture':
+            return _finalize_hint(
+                _hard_copy_hint(workflow, pod_cod, tenant_schema=tenant_schema),
+                workflow,
+            )
 
-    return _merge_pod_navigation_from_workflow_row(_finalize_hint(dict(hint), workflow), workflow)
+    return _merge_pod_navigation_from_workflow_row(
+        _finalize_hint(dict(hint), workflow),
+        workflow,
+        pod_cod=pod_cod,
+    )
 
 
 def _merge_pod_navigation_from_workflow_row(
     hint: dict[str, Any],
     workflow: dict[str, Any],
+    *,
+    pod_cod: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     """Copy POD wizard contract from primary/next action when already projected."""
     code = str(hint.get('action_code') or '').strip()
+    primary = dict(workflow.get('primary_action') or {})
     if not code:
-        return hint
-    row = _resolve_action_row(workflow, code) or dict(workflow.get('primary_action') or {})
+        if str(hint.get('action') or '') != 'go_to_pod_capture':
+            return hint
+        row = primary
+        if not row or str(row.get('action') or '') != 'go_to_pod_capture':
+            return hint
+    else:
+        row = _resolve_action_row(workflow, code) or primary
     if not row_has_digital_pod_upload(row) and not row_has_hard_copy_collection(row):
         return hint
     if str(row.get('action') or '') != 'go_to_pod_capture':
@@ -313,44 +558,140 @@ def _merge_pod_navigation_from_workflow_row(
             out[key] = row[key]
     if out.get('action') == 'go_to_pod_capture':
         out['requires_multipart'] = False
+    from mobile_api.helpers.hard_copy_workflow_gate import (
+        coerce_digital_pod_capture_row,
+        hard_copy_step_due,
+    )
+
+    if not hard_copy_step_due(pod_cod):
+        return coerce_digital_pod_capture_row(out, pod_cod=pod_cod)
     return out
 
 
-def _is_digital_pod_next(workflow: dict[str, Any], next_code: str) -> bool:
+def _is_digital_pod_next(
+    workflow: dict[str, Any],
+    next_code: str,
+    *,
+    tenant_schema: str = '',
+) -> bool:
     if not (next_code or '').strip():
         return False
     row = _resolve_action_row(workflow, next_code)
     if row_has_digital_pod_upload(row):
         return True
-    code = (next_code or '').strip().upper()
-    return code == CANONICAL_FALLBACK_DIGITAL_POD_ACTION_CODE
+    resolved = resolve_digital_pod_action_code_from_context(
+        workflow=workflow,
+        tenant_schema=tenant_schema,
+    )
+    if resolved and (next_code or '').strip().casefold() == resolved.casefold():
+        return True
+    return action_code_is_digital_pod_upload(
+        next_code,
+        workflow=workflow,
+        tenant_schema=tenant_schema,
+    )
 
 
-def _is_hard_copy_pod_next(workflow: dict[str, Any], next_code: str) -> bool:
+def _is_hard_copy_pod_next(
+    workflow: dict[str, Any],
+    next_code: str,
+    *,
+    tenant_schema: str = '',
+) -> bool:
     row = _resolve_action_row(workflow, next_code)
-    return row_has_hard_copy_collection(row)
+    if row_has_hard_copy_collection(row):
+        return True
+    return action_code_is_hard_copy_custody(
+        next_code,
+        workflow=workflow,
+        tenant_schema=tenant_schema,
+    )
+
+
+def _unloading_completed_execute_just_completed(
+    action_code: str | None,
+    workflow: dict[str, Any],
+    *,
+    tenant_schema: str = '',
+) -> bool:
+    code = (action_code or '').strip()
+    if not code:
+        return False
+    row = _resolve_action_row(workflow, code)
+    if row_is_unloading_completed_action(row):
+        return True
+    resolved = resolve_unloading_completed_action_code_from_context(
+        workflow=workflow,
+        tenant_schema=tenant_schema,
+    )
+    return bool(resolved) and code.casefold() == resolved.casefold()
 
 
 def _executed_digital_pod_upload(
     workflow: dict[str, Any],
     action_code: str | None,
+    *,
+    tenant_schema: str = '',
 ) -> bool:
     row = _resolve_action_row(workflow, action_code or '')
-    if row_has_digital_pod_upload(row):
+    if row_is_unloading_completed_action(row):
+        return False
+    if row_has_digital_pod_upload(row) and not row_has_hard_copy_collection(row):
         return True
-    code = (action_code or '').strip().upper()
-    return code in {'OA-0008', 'A7', CANONICAL_FALLBACK_DIGITAL_POD_ACTION_CODE}
+    return action_code_is_digital_pod_upload(
+        action_code,
+        workflow=workflow,
+        tenant_schema=tenant_schema,
+    )
+
+
+def _hard_copy_custody_execute_just_completed(
+    workflow: dict[str, Any],
+    pod_cod: dict[str, Any],
+    action_code: str | None,
+    *,
+    tenant_schema: str = '',
+) -> bool:
+    """True on execute response immediately after hard-copy custody promotion."""
+    if not (action_code or '').strip():
+        return False
+    if pod_cod.get('hard_pod_pending'):
+        return False
+    if not digital_evidence_complete_for_pod_cod(pod_cod):
+        return False
+    promoted = action_code_is_hard_copy_custody(
+        action_code,
+        workflow=workflow,
+        tenant_schema=tenant_schema,
+    )
+    if not promoted:
+        promoted = action_code_is_digital_pod_upload(
+            action_code,
+            workflow=workflow,
+            tenant_schema=tenant_schema,
+        )
+    if not promoted:
+        return False
+    return bool(pod_cod.get('pod_compliant'))
 
 
 def _pod_execute_just_completed(
     workflow: dict[str, Any],
     pod_cod: dict[str, Any],
     action_code: str | None,
+    *,
+    tenant_schema: str = '',
 ) -> bool:
     """True only on the execute-action response immediately after digital POD."""
     if not (action_code or '').strip():
         return False
-    if not _executed_digital_pod_upload(workflow, action_code):
+    if not _executed_digital_pod_upload(
+        workflow,
+        action_code,
+        tenant_schema=tenant_schema,
+    ):
+        return False
+    if _hard_copy_step_required(pod_cod):
         return False
     return bool(pod_cod.get('pod_compliant')) and not pod_cod.get('pod_pending')
 
@@ -393,11 +734,44 @@ def _hard_copy_applicable(pod_cod: dict[str, Any]) -> bool:
 
 
 def _hard_copy_step_required(pod_cod: dict[str, Any]) -> bool:
-    if pod_cod.get('pod_pending'):
+    return hard_copy_step_due(pod_cod)
+
+
+def _pod_upload_step_due(
+    shipment: Any | None,
+    pod_cod: dict[str, Any],
+    workflow: dict[str, Any],
+    *,
+    tenant_schema: str = '',
+) -> bool:
+    """Digital POD capture after unloading milestones when no valid POD log exists."""
+    if unloading_pending_for_pod_workflow(pod_cod):
         return False
-    if not pod_cod.get('hard_pod_pending'):
+    if digital_evidence_complete_for_pod_cod(pod_cod) and not pod_cod.get(
+        'hard_pod_pending',
+        False,
+    ) and not pod_cod.get('pod_pending', False):
         return False
-    return _hard_copy_applicable(pod_cod)
+    if shipment is None:
+        return bool(pod_cod.get('pod_pending') or pod_cod.get('hard_pod_pending'))
+    if not shipment_pod_prerequisites_done(shipment):
+        return False
+    if not shipment_unloading_completed_done(shipment):
+        return False
+    if shipment_pod_upload_log_is_valid(shipment):
+        return False
+    allowed = workflow.get('allowed_actions') or []
+    has_pod_step = any(
+        isinstance(row, dict) and row_has_digital_pod_upload(row)
+        for row in allowed
+    )
+    if not has_pod_step and not resolve_digital_pod_action_code_from_context(
+        pod_cod=pod_cod,
+        workflow=workflow,
+        tenant_schema=tenant_schema,
+    ):
+        return False
+    return True
 
 
 def _resolve_round_trip_return_open_job(
@@ -431,6 +805,66 @@ def _resolve_round_trip_return_open_job(
     }
 
 
+def resolve_round_trip_continuation_open_job(
+    booking: Any | None,
+    *,
+    driver: Any | None = None,
+) -> dict[str, Any] | None:
+    """
+    Canonical job pointer after outbound completes (booking bootstrap or active leg).
+    """
+    open_job = _resolve_round_trip_return_open_job(booking, driver=driver)
+    if open_job:
+        return open_job
+    if booking is None:
+        return None
+    from mobile_api.job_detail.helpers.booking_job_context import load_booking_shipments
+
+    shipments = load_booking_shipments(booking)
+    active = booking_policy.get_active_shipment_for_driver(driver, booking, shipments)
+    if active is None:
+        return None
+    if driver is not None and not booking_policy.driver_owns_shipment_leg(
+        driver,
+        booking,
+        active,
+    ):
+        return None
+    line = str(getattr(active, 'booking_item_type', '') or '').strip()
+    if line.casefold() not in {'backload', 'inbound'}:
+        return None
+    ship_id = getattr(active, 'shipment_id', None) or getattr(active, 'pk', None)
+    return {
+        'job_type': 'shipment',
+        'job_id': str(ship_id) if ship_id is not None else '',
+        'job_no': str(getattr(active, 'shipment_no', '') or ''),
+        'booking_item_type': line or 'Backload',
+    }
+
+
+def _leg_complete_navigation_hint(
+    open_job: dict[str, Any] | None,
+    *,
+    reason: str,
+) -> dict[str, Any]:
+    """Navigate to return leg — replaces stale outbound shipment on back press."""
+    hint: dict[str, Any] = {
+        'action': 'navigate_open_job',
+        'screen': 'job_detail',
+        'job_closed': False,
+        'show_completion_screen': True,
+        'leg_completed': True,
+        'booking_continues': True,
+        'reason': reason,
+        'replace_navigation_stack': True,
+    }
+    if open_job:
+        hint['open_job'] = open_job
+        hint['job_type'] = open_job.get('job_type', '')
+        hint['job_id'] = open_job.get('job_id', '')
+    return hint
+
+
 def _round_trip_leg_complete_continue_hint(
     booking: Any | None,
     *,
@@ -438,26 +872,23 @@ def _round_trip_leg_complete_continue_hint(
     workflow: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     """Outbound leg finished — continue return trip instead of Job Close."""
-    open_job = _resolve_round_trip_return_open_job(booking, driver=driver)
-    hint: dict[str, Any] = {
+    open_job = resolve_round_trip_continuation_open_job(booking, driver=driver)
+    if open_job:
+        return _leg_complete_navigation_hint(
+            open_job,
+            reason=(
+                'Outbound trip complete. Continue the return trip from this job.'
+            ),
+        )
+    return {
         'action': 'go_to_dashboard',
         'screen': 'dashboard',
         'job_closed': False,
         'show_completion_screen': True,
         'leg_completed': True,
         'booking_continues': True,
+        'reason': 'Outbound leg complete. Continue the return trip from My Jobs.',
     }
-    if open_job:
-        hint['open_job'] = open_job
-        hint['reason'] = (
-            'Outbound trip complete. Tap Open Job on My Jobs to '
-            'start the return trip.'
-        )
-    else:
-        hint['reason'] = (
-            'Outbound leg complete. Continue the return trip from My Jobs.'
-        )
-    return hint
 
 
 def _finalize_job_close_timeline_hint(
@@ -465,16 +896,42 @@ def _finalize_job_close_timeline_hint(
     workflow: dict[str, Any] | None = None,
     tenant_schema: str = '',
     payment_collected: bool = False,
+    booking: Any | None = None,
+    shipment: Any | None = None,
 ) -> dict[str, Any]:
     """Stay on job detail; driver closes the job from the timeline row."""
+    from mobile_api.dashboard.selectors import booking_selection_policy as booking_policy
+
     workflow = dict(workflow or {})
     hint = dict(_close_job_hint(workflow=workflow, tenant_schema=tenant_schema))
-    if payment_collected:
+    is_round_outbound = (
+        booking is not None
+        and shipment is not None
+        and booking_policy._is_outbound_line_type(shipment)
+        and booking_policy.normalized_trip_type(booking).casefold() == 'round'
+    )
+    if is_round_outbound:
+        hint['reason'] = (
+            'All steps complete. Tap End Job to finish round 1, '
+            'then start the return trip.'
+        )
+    elif payment_collected:
         hint.update(
             {
                 'reason': (
                     'Payment collected successfully. Tap Job Close to finish '
                     'this leg.'
+                ),
+                'show_completion_screen': True,
+                'payment_collected': True,
+            },
+        )
+    if payment_collected and is_round_outbound:
+        hint.update(
+            {
+                'reason': (
+                    'Payment collected successfully. Tap End Job to finish round 1, '
+                    'then start the return trip.'
                 ),
                 'show_completion_screen': True,
                 'payment_collected': True,
@@ -492,11 +949,27 @@ def _finalize_close_or_round_trip_continue_hint(
     driver: Any | None = None,
     payment_collected: bool = False,
 ) -> dict[str, Any]:
-    _ = (booking, shipment, driver)
+    from mobile_api.dashboard.selectors import booking_selection_policy as booking_policy
+
+    if (
+        booking is not None
+        and shipment is not None
+        and booking_policy.round_trip_defers_job_close(booking, shipment)
+    ):
+        return _finalize_hint(
+            _round_trip_leg_complete_continue_hint(
+                booking,
+                driver=driver,
+                workflow=workflow,
+            ),
+            workflow,
+        )
     return _finalize_job_close_timeline_hint(
         workflow=workflow,
         tenant_schema=tenant_schema,
         payment_collected=payment_collected,
+        booking=booking,
+        shipment=shipment,
     )
 
 
@@ -579,21 +1052,30 @@ def _requires_multipart_for_action(
     if req.get('auto_shipment_post') is True:
         return True
     photo_min = int(req.get('photo_min_count') or 0)
-    if req.get('photo') is True and photo_min >= 1:
+    if photo_min >= 1:
         return True
     if capture_mode in {'photo_evidence', 'loading_photos'}:
         return True
     return False
 
 
-def _finalize_hint(hint: dict[str, Any], workflow: dict[str, Any]) -> dict[str, Any]:
+def _finalize_hint(
+    hint: dict[str, Any],
+    workflow: dict[str, Any],
+    *,
+    pod_cod: dict[str, Any] | None = None,
+) -> dict[str, Any]:
     """Attach driver-facing flags derived from workflow execution_requirements."""
     out = dict(hint)
+    if pod_cod is not None and str(out.get('action') or '') == 'go_to_pod_capture':
+        from mobile_api.helpers.hard_copy_workflow_gate import coerce_digital_pod_capture_row
+
+        out = coerce_digital_pod_capture_row(out, pod_cod=pod_cod)
     action = str(out.get('action') or '')
     code = str(out.get('action_code') or '').strip()
     if action == 'execute_action_with_media':
         out['requires_multipart'] = True
-    elif action == 'execute_action' and code:
+    elif action in {'execute_action', 'go_to_evidence_capture'} and code:
         row = _resolve_action_row(workflow, code)
         out['requires_multipart'] = _requires_multipart_for_action(
             row,
@@ -604,32 +1086,99 @@ def _finalize_hint(hint: dict[str, Any], workflow: dict[str, Any]) -> dict[str, 
     return out
 
 
+def _build_evidence_capture_hint(
+    *,
+    action_code: str,
+    reason: str = '',
+    ui_mode: str = '',
+    screen_title: str = '',
+    show_close_job_button: bool = False,
+    payment_collected: bool = False,
+    workflow: dict[str, Any] | None = None,
+) -> dict[str, Any]:
+    from mobile_api.execution.evidence.constants import (
+        POD_CAPTURE_VIDEO_MAX_DURATION_SECONDS,
+    )
+    from mobile_api.execution.evidence.evidence_capture_ui import (
+        build_generic_evidence_capture_ui,
+    )
+    from mobile_api.helpers.evidence_requirement_flags import (
+        normalize_evidence_requirements,
+        sync_row_evidence_flags,
+    )
+
+    row = _resolve_action_row(workflow or {}, action_code) if action_code else {}
+    base_requirements = {
+        'gps': True,
+        'photo_enabled': True,
+        'video_enabled': True,
+        'photo_min_count': 0,
+        'video_min_count': 0,
+        'video_max_count': 1,
+        'video_max_duration_seconds': POD_CAPTURE_VIDEO_MAX_DURATION_SECONDS,
+        'note': False,
+        'note_required': False,
+        'requires_evidence_capture': True,
+        'capture_mode': 'optional_evidence',
+    }
+    base_requirements.update(dict(row.get('execution_requirements') or {}))
+    requirements = normalize_evidence_requirements(base_requirements)
+    title = (
+        (screen_title or '').strip()
+        or str(
+            row.get('execution_label')
+            or row.get('action_name')
+            or row.get('english_label')
+            or row.get('label')
+            or '',
+        ).strip()
+        or 'Capturing Action Evidences'
+    )
+    capture_ui = build_generic_evidence_capture_ui(
+        requirements,
+        action_code=action_code,
+        screen_title=title,
+    )
+    hint: dict[str, Any] = {
+        'action': 'go_to_evidence_capture',
+        'screen': 'evidence_capture',
+        'action_code': action_code,
+        'direct_execute': False,
+        'requires_evidence_capture': True,
+        'reason': reason,
+        'job_closed': False,
+        'show_completion_screen': False,
+        'screen_title': title,
+        'execution_requirements': requirements,
+        'capture_ui': capture_ui,
+        'photo_min_count': int(requirements.get('photo_min_count') or 0),
+        'video_min_count': int(requirements.get('video_min_count') or 0),
+    }
+    if ui_mode:
+        hint['ui_mode'] = ui_mode
+    if show_close_job_button:
+        hint['show_close_job_button'] = True
+    if payment_collected:
+        hint['payment_collected'] = True
+    return sync_row_evidence_flags(hint)
+
+
 def _close_job_hint(
     *,
     workflow: dict[str, Any] | None = None,
     tenant_schema: str = '',
 ) -> dict[str, Any]:
-    return {
-        'action': 'execute_action',
-        'screen': 'job_detail',
-        'ui_mode': 'job_close',
-        'action_code': resolve_job_close_action_code_from_context(
+    return _build_evidence_capture_hint(
+        action_code=resolve_job_close_action_code_from_context(
             workflow=workflow,
             tenant_schema=tenant_schema,
         ),
-        'reason': 'All steps complete. Tap Job Close to finish this leg.',
-        'job_closed': False,
-        'show_completion_screen': False,
-        'payment_collected': False,
-        'show_close_job_button': True,
-        'direct_execute': True,
-        'requires_gps': False,
-        'requires_photo': False,
-        'requires_video': False,
-        'requires_note': False,
-        'requires_evidence_capture': False,
-        'requires_multipart': False,
-    }
+        reason='All steps complete. Tap Job Close to finish this leg.',
+        ui_mode='job_close',
+        screen_title='Job Close',
+        show_close_job_button=True,
+        workflow=workflow,
+    )
 
 
 def _job_close_in_allowed_actions(allowed: list[Any]) -> bool:
@@ -643,6 +1192,79 @@ def _is_collect_payment_next(workflow: dict[str, Any], next_code: str) -> bool:
     return row_is_collect_payment_action(_resolve_action_row(workflow, next_code))
 
 
+def _is_delivery_arrival_next(workflow: dict[str, Any], next_code: str) -> bool:
+    return row_is_delivery_arrival_action(_resolve_action_row(workflow, next_code))
+
+
+def _workflow_has_step(
+    workflow: dict[str, Any],
+    predicate,
+    *,
+    tenant_schema: str = '',
+    resolve_code,
+) -> bool:
+    for row in workflow.get('allowed_actions') or []:
+        if isinstance(row, dict) and predicate(row):
+            return True
+    for key in ('next_action', 'primary_action'):
+        row = workflow.get(key) or {}
+        if isinstance(row, dict) and predicate(row):
+            return True
+    if workflow.get('allowed_actions'):
+        return False
+    return bool((resolve_code(workflow=workflow, tenant_schema=tenant_schema) or '').strip())
+
+
+def _delivery_arrival_step_due(
+    shipment: Any | None,
+    workflow: dict[str, Any],
+    shipment_status: str = '',
+    *,
+    tenant_schema: str = '',
+) -> bool:
+    if shipment is None:
+        return False
+    if shipment_delivery_arrival_done(shipment):
+        return False
+    status = (
+        (shipment_status or '').strip()
+        or (getattr(shipment, 'shipment_status', None) or '').strip()
+    )
+    if status in {
+        TenantShipment.ShipmentStatus.CLOSED,
+        TenantShipment.ShipmentStatus.CANCELLED,
+    }:
+        return False
+    if not shipment_at_or_past_in_transit(shipment):
+        return False
+    return _workflow_has_step(
+        workflow,
+        row_is_delivery_arrival_action,
+        tenant_schema=tenant_schema,
+        resolve_code=resolve_delivery_arrival_action_code_from_context,
+    )
+
+
+def _build_delivery_arrival_execute_hint(
+    workflow: dict[str, Any],
+    *,
+    tenant_schema: str = '',
+    action_code: str = '',
+) -> dict[str, Any]:
+    code = (
+        (action_code or '').strip()
+        or resolve_delivery_arrival_action_code_from_context(
+            workflow=workflow,
+            tenant_schema=tenant_schema,
+        )
+    )
+    return _build_evidence_capture_hint(
+        action_code=code,
+        reason='Confirm arrival at the delivery site.',
+        workflow=workflow,
+    )
+
+
 def _is_unloading_next(workflow: dict[str, Any], next_code: str) -> bool:
     return row_is_unloading_action(_resolve_action_row(workflow, next_code))
 
@@ -651,21 +1273,94 @@ def _unloading_step_due(
     shipment: Any | None,
     workflow: dict[str, Any],
     shipment_status: str = '',
+    *,
+    tenant_schema: str = '',
 ) -> bool:
     if shipment is None:
+        return False
+    if shipment_unloading_done(shipment):
         return False
     status = (
         (shipment_status or '').strip()
         or (getattr(shipment, 'shipment_status', None) or '').strip()
     )
-    if status != TenantShipment.ShipmentStatus.AT_DELIVERY:
+    if status in {
+        TenantShipment.ShipmentStatus.CLOSED,
+        TenantShipment.ShipmentStatus.CANCELLED,
+    }:
         return False
-    if shipment_unloading_done(shipment):
+    at_delivery_site = (
+        shipment_delivery_arrival_done(shipment)
+        or status
+        in {
+            TenantShipment.ShipmentStatus.AT_DELIVERY,
+            TenantShipment.ShipmentStatus.POD_SUBMITTED,
+            TenantShipment.ShipmentStatus.DELIVERED,
+        }
+    )
+    if not at_delivery_site:
         return False
-    for row in workflow.get('allowed_actions') or []:
-        if isinstance(row, dict) and row_is_unloading_action(row):
-            return True
-    return False
+    if not shipment_at_or_past_in_transit(shipment):
+        return False
+    return _workflow_has_step(
+        workflow,
+        row_is_unloading_action,
+        tenant_schema=tenant_schema,
+        resolve_code=resolve_unloading_action_code_from_context,
+    )
+
+
+def _unloading_completed_step_due(
+    shipment: Any | None,
+    workflow: dict[str, Any],
+    shipment_status: str = '',
+    *,
+    tenant_schema: str = '',
+) -> bool:
+    if shipment is None:
+        return False
+    if shipment_unloading_completed_done(shipment):
+        return False
+    if not shipment_delivery_arrival_done(shipment):
+        return False
+    if not shipment_unloading_done(shipment):
+        return False
+    status = (
+        (shipment_status or '').strip()
+        or (getattr(shipment, 'shipment_status', None) or '').strip()
+    )
+    if status in {
+        TenantShipment.ShipmentStatus.CLOSED,
+        TenantShipment.ShipmentStatus.CANCELLED,
+    }:
+        return False
+    if not shipment_at_or_past_in_transit(shipment):
+        return False
+    return _workflow_has_step(
+        workflow,
+        row_is_unloading_completed_action,
+        tenant_schema=tenant_schema,
+        resolve_code=resolve_unloading_completed_action_code_from_context,
+    )
+
+
+def _build_unloading_completed_execute_hint(
+    workflow: dict[str, Any],
+    *,
+    tenant_schema: str = '',
+    action_code: str = '',
+) -> dict[str, Any]:
+    code = (action_code or '').strip()
+    if not code:
+        code = resolve_unloading_completed_action_code_from_context(
+            workflow=workflow,
+            tenant_schema=tenant_schema,
+        )
+    return _build_evidence_capture_hint(
+        action_code=code,
+        reason='Confirm unloading is complete.',
+        workflow=workflow,
+    )
 
 
 def _build_unloading_execute_hint(
@@ -681,15 +1376,11 @@ def _build_unloading_execute_hint(
             tenant_schema=tenant_schema,
         )
     )
-    return {
-        'action': 'execute_action',
-        'screen': 'job_detail',
-        'action_code': code,
-        'direct_execute': True,
-        'reason': 'Confirm start unloading at delivery site.',
-        'job_closed': False,
-        'show_completion_screen': False,
-    }
+    return _build_evidence_capture_hint(
+        action_code=code,
+        reason='Confirm start unloading at delivery site.',
+        workflow=workflow,
+    )
 
 
 def _job_close_ready_for_hint(
@@ -728,6 +1419,7 @@ def build_next_action_hint(
     shipment: Any | None = None,
     booking: Any | None = None,
     driver: Any | None = None,
+    movement: Any | None = None,
     allowed_actions: Any | None = None,
     tenant_schema: str = '',
 ) -> dict[str, Any]:
@@ -744,7 +1436,23 @@ def build_next_action_hint(
       - Terminal state (job closed)
     """
     workflow = dict(workflow or {})
-    pod_cod = pod_cod or {}
+    movement_job = _movement_workflow_context(workflow, movement=movement)
+    if movement_job and not pod_cod:
+        pod_cod = _neutral_pod_cod_for_movement()
+    else:
+        pod_cod = pod_cod or {}
+
+    def _fin(hint: dict[str, Any]) -> dict[str, Any]:
+        return _finalize_hint(hint, workflow, pod_cod=pod_cod)
+
+    if movement is not None:
+        if _movement_terminal_for_hint(
+            movement,
+            action_code=action_code,
+            tenant_schema=tenant_schema,
+            workflow=workflow,
+        ):
+            return _finalize_hint(_movement_dashboard_hint(), workflow)
 
     if allowed_actions is not None:
         normalized = _normalize_allowed_actions(allowed_actions)
@@ -758,6 +1466,17 @@ def build_next_action_hint(
     if not next_code and allowed:
         first = allowed[0] if isinstance(allowed[0], dict) else {}
         next_code = str(first.get('action_code') or '').strip()
+
+    if movement_job and next_code:
+        next_row = _resolve_action_row(workflow, next_code)
+        if row_is_empty_move_action(next_row) or movement is not None:
+            return _finalize_hint(
+                _build_empty_move_execute_hint(
+                    workflow,
+                    action_code=next_code,
+                ),
+                workflow,
+            )
 
     shipment_status = _column_shipment_status(workflow, shipment)
     if shipment is not None:
@@ -779,12 +1498,35 @@ def build_next_action_hint(
     delivery_blocked = pod_cod.get('delivery_blocked', False)
 
     is_cod = (order_type or '').upper() == 'COD'
-    pod_just_submitted = _pod_execute_just_completed(workflow, pod_cod, action_code)
+    pod_just_submitted = _pod_execute_just_completed(
+        workflow,
+        pod_cod,
+        action_code,
+        tenant_schema=tenant_schema,
+    )
     payment_just_collected = _collect_payment_execute_just_completed(
         workflow,
         pod_cod,
         action_code,
     )
+
+    if workflow.get('backload_bootstrap_pending') and shipment is None and booking is not None and allowed:
+        open_job = _resolve_round_trip_return_open_job(booking, driver=driver)
+        row = _resolve_action_row(workflow, next_code)
+        label = row_action_reason_label(row, next_code) if row else 'Start the return trip.'
+        hint: dict[str, Any] = {
+            'action': 'refresh_job_detail',
+            'screen': 'job_detail',
+            'action_code': next_code,
+            'reason': label or 'Outbound leg complete. Start the return trip.',
+            'job_closed': False,
+            'show_completion_screen': False,
+            'leg_completed': True,
+            'booking_continues': True,
+        }
+        if open_job:
+            hint['open_job'] = open_job
+        return _finalize_hint(hint, workflow)
 
     # TERMINAL STATE — shipment column Closed (Delivered still needs job close)
     if is_job_closed or action_code_is_job_close(
@@ -792,32 +1534,38 @@ def build_next_action_hint(
         workflow=workflow,
         tenant_schema=tenant_schema,
     ):
-        open_job = _resolve_round_trip_return_open_job(booking, driver=driver)
+        open_job = resolve_round_trip_continuation_open_job(booking, driver=driver)
         booking_continues = bool(open_job)
+        if open_job:
+            return _finalize_hint(
+                _leg_complete_navigation_hint(
+                    open_job,
+                    reason=(
+                        'Outbound trip complete. Continue the return trip from this job.'
+                    ),
+                ),
+                workflow,
+            )
         hint: dict[str, Any] = {
             'action': 'go_to_dashboard',
             'screen': 'dashboard',
             'job_closed': not booking_continues,
             'show_completion_screen': True,
+            'reason': 'Job is complete. No more actions required.',
         }
-        if open_job:
-            hint.update(
-                {
-                    'reason': (
-                        'Outbound trip complete. Tap Open Job on My Jobs to '
-                        'start the return trip.'
-                    ),
-                    'leg_completed': True,
-                    'booking_continues': True,
-                    'open_job': open_job,
-                },
-            )
-        else:
-            hint['reason'] = 'Job is complete. No more actions required.'
         return _finalize_hint(hint, workflow)
 
-    # Job close is next — resolve tenant code from workflow / Action Master.
-    if next_code and row_is_job_close_action(_resolve_action_row(workflow, next_code)):
+    # Job close / round-trip handoff — after POD+COD gates, before delivery milestones.
+    if (
+        next_code
+        and row_is_job_close_action(_resolve_action_row(workflow, next_code))
+        and _job_close_ready_for_hint(
+            pod_cod=pod_cod,
+            order_type=order_type,
+            is_job_closed=is_job_closed,
+            shipment_status=shipment_status,
+        )
+    ):
         return _finalize_close_or_round_trip_continue_hint(
             workflow=workflow,
             tenant_schema=tenant_schema,
@@ -827,19 +1575,28 @@ def build_next_action_hint(
             payment_collected=payment_just_collected,
         )
 
-    # Hard copy custody still due — resume Upload POD step 2 before forward actions.
-    if _hard_copy_step_required(pod_cod):
+    # Delivery Arrival — first step at the delivery site after In Transit.
+    if _delivery_arrival_step_due(
+        shipment,
+        workflow,
+        shipment_status,
+        tenant_schema=tenant_schema,
+    ):
         return _finalize_hint(
-            _hard_copy_hint(
+            _build_delivery_arrival_execute_hint(
                 workflow,
-                pod_cod,
                 tenant_schema=tenant_schema,
             ),
             workflow,
         )
 
-    # Start Unloading at delivery — before POD upload and COD collection.
-    if _unloading_step_due(shipment, workflow, shipment_status):
+    # Start Unloading at delivery — before POD upload, hard copy, and COD collection.
+    if _unloading_step_due(
+        shipment,
+        workflow,
+        shipment_status,
+        tenant_schema=tenant_schema,
+    ):
         return _finalize_hint(
             _build_unloading_execute_hint(
                 workflow,
@@ -848,36 +1605,191 @@ def build_next_action_hint(
             workflow,
         )
 
+    # Unloading Completed — after Start Unloading, before POD / payment / close.
+    if _unloading_completed_step_due(
+        shipment,
+        workflow,
+        shipment_status,
+        tenant_schema=tenant_schema,
+    ):
+        return _finalize_hint(
+            _build_unloading_completed_execute_hint(
+                workflow,
+                tenant_schema=tenant_schema,
+            ),
+            workflow,
+        )
+
+    # Execute response immediately after Unloading Completed → digital POD (never hard copy).
+    if _unloading_completed_execute_just_completed(
+        action_code,
+        workflow,
+        tenant_schema=tenant_schema,
+    ) and _pod_upload_step_due(
+        shipment,
+        pod_cod,
+        workflow,
+        tenant_schema=tenant_schema,
+    ):
+        return _fin(
+            _build_digital_pod_capture_hint(
+                workflow,
+                pod_cod,
+                tenant_schema=tenant_schema,
+                shipment=shipment,
+            ),
+        )
+
+    # Upload POD — after delivery arrival + unloading (ignores out-of-order POD logs).
+    if _pod_upload_step_due(
+        shipment,
+        pod_cod,
+        workflow,
+        tenant_schema=tenant_schema,
+    ):
+        return _fin(
+            _build_digital_pod_capture_hint(
+                workflow,
+                pod_cod,
+                tenant_schema=tenant_schema,
+                shipment=shipment,
+            ),
+        )
+
+    # Digital POD step 1 — before hard-copy confirmation on HARD jobs.
+    if not digital_evidence_complete_for_pod_cod(pod_cod):
+        digital_due = pod_pending or hard_pod_pending
+        if digital_due and _pod_upload_step_due(
+            shipment,
+            pod_cod,
+            workflow,
+            tenant_schema=tenant_schema,
+        ):
+            return _fin(
+                _build_digital_pod_capture_hint(
+                    workflow,
+                    pod_cod,
+                    tenant_schema=tenant_schema,
+                    shipment=shipment,
+                ),
+            )
+
+    # Hard copy custody still due — Upload POD step 2 after digital POD + portal document.
+    if _hard_copy_step_required(pod_cod) and digital_evidence_complete_for_pod_cod(pod_cod):
+        return _finalize_hint(
+            _hard_copy_hint(
+                workflow,
+                pod_cod,
+                tenant_schema=tenant_schema,
+            ),
+            workflow,
+            pod_cod=pod_cod,
+        )
+
+    # Hard copy custody just completed — Collect Payment (COD only) or Job Close.
+    if _hard_copy_custody_execute_just_completed(
+        workflow,
+        pod_cod,
+        action_code,
+        tenant_schema=tenant_schema,
+    ):
+        if is_cod and not cod_collected and not treasury_pending:
+            return _finalize_hint(
+                _build_collect_payment_timeline_hint(
+                    workflow=workflow,
+                    tenant_schema=tenant_schema,
+                    shipment=shipment,
+                    booking=booking,
+                ),
+                workflow,
+            )
+        if _job_close_ready_for_hint(
+            pod_cod=pod_cod,
+            order_type=order_type,
+            is_job_closed=is_job_closed,
+            shipment_status=shipment_status,
+        ):
+            return _finalize_close_or_round_trip_continue_hint(
+                workflow=workflow,
+                tenant_schema=tenant_schema,
+                booking=booking,
+                shipment=shipment,
+                driver=driver,
+            )
+
+    # Digital POD logged but portal Shipment Document missing — do not open hard copy.
+    if (
+        digital_evidence_complete_for_pod_cod(pod_cod)
+        and bool(pod_cod.get('hard_pod_pending') or _hard_copy_applicable(pod_cod))
+        and not _hard_copy_step_required(pod_cod)
+    ):
+        message = (pod_cod.get('shipment_document_message') or '').strip()
+        if not message:
+            from iroad_tenants.operation_runtime.pod_action import (
+                POD_REQUIRES_SHIPMENT_DOCUMENT_MSG,
+            )
+
+            message = POD_REQUIRES_SHIPMENT_DOCUMENT_MSG
+        return _finalize_hint(
+            {
+                'action': 'refresh_job_detail',
+                'screen': 'job_detail',
+                'reason': message,
+                'shipment_document_required': True,
+                'shipment_document_ready': False,
+                'shipment_document_message': message,
+                'job_closed': False,
+                'show_completion_screen': False,
+            },
+            workflow,
+            pod_cod=pod_cod,
+        )
+
     # Digital POD upload is next — open evidence capture wizard step 1.
-    if pod_pending and _is_digital_pod_next(workflow, next_code):
+    if (
+        pod_pending
+        and _is_digital_pod_next(workflow, next_code, tenant_schema=tenant_schema)
+        and _pod_upload_step_due(
+            shipment,
+            pod_cod,
+            workflow,
+            tenant_schema=tenant_schema,
+        )
+    ):
         return _finalize_hint(
             _build_digital_pod_capture_hint(
                 workflow,
                 pod_cod,
                 tenant_schema=tenant_schema,
+                shipment=shipment,
             ),
             workflow,
         )
 
     next_row = _resolve_action_row(workflow, next_code) if next_code else {}
 
-    # Start job — direct execute, no evidence wizard (tenant-specific code).
+    # Start job — optional evidence screen (tenant-specific OA code).
     if next_code and row_is_start_job_action(next_row):
         return _finalize_hint(
-            {
-                'action': 'execute_action',
-                'screen': 'job_detail',
-                'action_code': next_code,
-                'direct_execute': True,
-                'requires_evidence_capture': False,
-                'reason': row_action_reason_label(next_row, next_code),
-                'job_closed': False,
-                'show_completion_screen': False,
-            },
+            _build_evidence_capture_hint(
+                action_code=next_code,
+                reason=row_action_reason_label(next_row, next_code),
+                workflow=workflow,
+            ),
             workflow,
         )
 
     # Start Unloading — GPS-only confirm at delivery site (tenant-specific code).
+    if _is_delivery_arrival_next(workflow, next_code):
+        return _finalize_hint(
+            _build_delivery_arrival_execute_hint(
+                workflow,
+                tenant_schema=tenant_schema,
+                action_code=next_code,
+            ),
+            workflow,
+        )
+
     if _is_unloading_next(workflow, next_code):
         return _finalize_hint(
             _build_unloading_execute_hint(
@@ -909,10 +1821,15 @@ def build_next_action_hint(
             payment_collected=payment_just_collected,
         )
 
-    # COD payment collection is next — only after unloading and POD gates pass.
-    if _is_collect_payment_next(workflow, next_code):
-        if pod_pending:
-            if _is_digital_pod_next(workflow, next_code) or any(
+    # COD payment collection is next — only for COD orders after POD / hard-copy gates.
+    if is_cod and _is_collect_payment_next(workflow, next_code):
+        if pod_pending and _pod_upload_step_due(
+            shipment,
+            pod_cod,
+            workflow,
+            tenant_schema=tenant_schema,
+        ):
+            if _is_digital_pod_next(workflow, next_code, tenant_schema=tenant_schema) or any(
                 row_has_digital_pod_upload(row)
                 for row in allowed
                 if isinstance(row, dict)
@@ -933,6 +1850,13 @@ def build_next_action_hint(
                 ),
                 workflow,
             )
+        if _hard_copy_step_required(pod_cod) and digital_evidence_complete_for_pod_cod(
+            pod_cod,
+        ):
+            return _finalize_hint(
+                _hard_copy_hint(workflow, pod_cod, tenant_schema=tenant_schema),
+                workflow,
+            )
         return _finalize_hint(
             _build_collect_payment_timeline_hint(
                 workflow=workflow,
@@ -946,46 +1870,65 @@ def build_next_action_hint(
         )
     if next_code and row_is_confirm_loaded_action(next_row):
         return _finalize_hint(
-            {
-                'action': 'execute_action_with_media',
-                'screen': 'job_detail',
-                'action_code': next_code,
-                'reason': (
+            _build_evidence_capture_hint(
+                action_code=next_code,
+                reason=(
                     row_action_reason_label(next_row, next_code)
-                    or 'Confirm cargo is loaded. '
-                    'Take at least 2 photos of loaded truck.'
+                    or 'Confirm cargo is loaded.'
                 ),
-                'requires_camera': True,
-                'job_closed': False,
-                'show_completion_screen': False,
-            },
+                workflow=workflow,
+            ),
             workflow,
         )
 
     # Normal next action available
     if next_code and allowed:
         row = _resolve_action_row(workflow, next_code)
-        if pod_pending and row_has_digital_pod_upload(row):
-            return _finalize_hint(
-                _build_digital_pod_capture_hint(
-                    workflow,
+        premature_pod = row_has_digital_pod_upload(row) and not _pod_upload_step_due(
+            shipment,
+            pod_cod,
+            workflow,
+            tenant_schema=tenant_schema,
+        )
+        if not premature_pod:
+            if (
+                pod_pending
+                and _pod_upload_step_due(
+                    shipment,
                     pod_cod,
+                    workflow,
                     tenant_schema=tenant_schema,
+                )
+                and (
+                    row_has_digital_pod_upload(row)
+                    or (
+                        resolve_digital_pod_action_code_from_context(
+                            pod_cod=pod_cod,
+                            workflow=workflow,
+                            tenant_schema=tenant_schema,
+                        )
+                        == next_code
+                    )
+                )
+            ):
+                return _finalize_hint(
+                    _build_digital_pod_capture_hint(
+                        workflow,
+                        pod_cod,
+                        tenant_schema=tenant_schema,
+                        shipment=shipment,
+                    ),
+                    workflow,
+                )
+            label = row_action_reason_label(row, next_code)
+            return _finalize_hint(
+                _build_evidence_capture_hint(
+                    action_code=next_code,
+                    reason=label,
+                    workflow=workflow,
                 ),
                 workflow,
             )
-        label = row_action_reason_label(row, next_code)
-        return _finalize_hint(
-            {
-                'action': 'execute_action',
-                'screen': 'job_detail',
-                'action_code': next_code,
-                'reason': label,
-                'job_closed': False,
-                'show_completion_screen': False,
-            },
-            workflow,
-        )
 
     # No allowed actions — job finished
     if is_job_closed:
@@ -1027,22 +1970,34 @@ def build_next_action_hint(
                 ),
                 workflow,
             )
-        if pod_pending:
-            digital_code = resolve_digital_pod_action_code_from_context(
-                pod_cod=pod_cod,
-                workflow=workflow,
-                tenant_schema=tenant_schema,
-            )
-            if digital_code:
-                return _finalize_hint(
-                    _build_digital_pod_capture_hint(
-                        workflow,
-                        pod_cod,
-                        tenant_schema=tenant_schema,
-                    ),
+        if pod_pending and _pod_upload_step_due(
+            shipment,
+            pod_cod,
+            workflow,
+            tenant_schema=tenant_schema,
+        ):
+            return _finalize_hint(
+                _build_digital_pod_capture_hint(
                     workflow,
-                )
-        if _unloading_step_due(shipment, workflow, shipment_status):
+                    pod_cod,
+                    tenant_schema=tenant_schema,
+                ),
+                workflow,
+            )
+        if _delivery_arrival_step_due(
+            shipment,
+            workflow,
+            shipment_status,
+            tenant_schema=tenant_schema,
+        ):
+            return _finalize_hint(
+                _build_delivery_arrival_execute_hint(
+                    workflow,
+                    tenant_schema=tenant_schema,
+                ),
+                workflow,
+            )
+        if _unloading_step_due(shipment, workflow, shipment_status, tenant_schema=tenant_schema):
             return _finalize_hint(
                 _build_unloading_execute_hint(
                     workflow,
@@ -1146,6 +2101,35 @@ def build_next_action_hint(
         )
 
     # Generic fallback
+    if (
+        shipment is not None
+        and _pod_upload_step_due(
+            shipment,
+            pod_cod,
+            workflow,
+            tenant_schema=tenant_schema,
+        )
+    ):
+        pod_code = resolve_digital_pod_action_code_from_context(
+            pod_cod=pod_cod,
+            workflow=workflow,
+            tenant_schema=tenant_schema,
+        )
+        if pod_code:
+            return _merge_pod_navigation_from_workflow_row(
+                _finalize_hint(
+                    _build_digital_pod_capture_hint(
+                        workflow,
+                        pod_cod,
+                        tenant_schema=tenant_schema,
+                        shipment=shipment,
+                    ),
+                    workflow,
+                ),
+                workflow,
+                pod_cod=pod_cod,
+            )
+
     hint = _finalize_hint(
         {
             'action': 'refresh_job_detail',
@@ -1156,4 +2140,4 @@ def build_next_action_hint(
         },
         workflow,
     )
-    return _merge_pod_navigation_from_workflow_row(hint, workflow)
+    return _merge_pod_navigation_from_workflow_row(hint, workflow, pod_cod=pod_cod)

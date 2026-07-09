@@ -26,7 +26,6 @@ _FORWARD_FROM_STATUSES = {
     },
     TenantShipment.ShipmentStatus.POD_SUBMITTED: {
         TenantShipment.ShipmentStatus.AT_DELIVERY,
-        TenantShipment.ShipmentStatus.IN_TRANSIT,
     },
     TenantShipment.ShipmentStatus.DELIVERED: {
         TenantShipment.ShipmentStatus.POD_SUBMITTED,
@@ -48,13 +47,20 @@ from iroad_tenants.operation_runtime.action_config_cache import (
 )
 from iroad_tenants.operation_runtime.movement_action_validator import (
     action_applies_to_movement_context,
+    empty_move_sequence_category_q,
     is_empty_movement,
     is_movement_only_context,
+)
+from iroad_tenants.operation_runtime.workflow_action_policy import (
+    cod_payment_action_q,
+    job_close_action_q,
+    pod_workflow_action_q,
 )
 from iroad_tenants.operation_runtime.shipment_execution_stage import (
     STAGE_COD,
     STAGE_COMPLETION,
     STAGE_DELIVERY,
+    STAGE_IN_TRANSIT,
     STAGE_PICKUP,
     STAGE_LOADING,
     STAGE_PRE_TRANSIT,
@@ -63,7 +69,7 @@ from iroad_tenants.operation_runtime.shipment_execution_stage import (
     derive_shipment_execution_stage,
 )
 # Mobile driver Job Detail — exclude dispatch/on-call catalog rows at the DB.
-_MOBILE_JOB_ACTION_SCOPES = ('job', 'without', '')
+_MOBILE_JOB_ACTION_SCOPES = ('job', 'on_call', 'without', '')
 
 # Shipment_status_impact column tokens that map to forward targets from current status.
 _SHIPMENT_IMPACT_DB_TOKENS = {
@@ -97,11 +103,7 @@ _SHIPMENT_IMPACT_DB_TOKENS = {
     ),
 }
 
-_COD_ACTION_CODE_HINTS = ('a9', 'action 9')
-_COD_LABEL_HINT = 'collect payment'
-
-_UNLOADING_CODE_HINTS = ('a8', 'oa-0007', 'action 8')
-_UNLOADING_LABEL_HINT = 'unloading'
+_UNLOADING_LABEL_HINTS = ('start unloading',)
 
 _PICKUP_CODE_HINTS = ('a2', 'action 2')
 _LOADING_CODE_HINTS = ('a3', 'action 3')
@@ -110,10 +112,27 @@ _REVERSAL_CODE_PREFIXES = ('r1', 'r2', 'r3', 'r4')
 
 _HARD_POD_RETRY_ACTION_Q = (
     Q(auto_pod_post=True, hard_copy_collection=True)
-    | Q(action_code__iexact='OA-0008')
-    | Q(action_code__iexact='A7')
+    | Q(auto_pod_post=True)
     | Q(hard_copy_collection=True)
 )
+
+
+def _shipment_job_close_candidates_allowed(
+    shipment,
+    *,
+    exclude_log_id=None,
+) -> bool:
+    try:
+        from iroad_tenants.operation_execution import (
+            _shipment_job_close_gates_satisfied,
+        )
+
+        return _shipment_job_close_gates_satisfied(
+            shipment,
+            exclude_log_id=exclude_log_id,
+        )
+    except Exception:
+        return False
 
 
 def _hard_pod_custody_outstanding(shipment) -> bool:
@@ -128,6 +147,19 @@ def _hard_pod_custody_outstanding(shipment) -> bool:
         return pod_type == TenantShipment.PodType.HARD
 
 
+def _pod_upload_still_pending(shipment, *, exclude_log_id=None) -> bool:
+    if shipment is None:
+        return False
+    from iroad_tenants.operation_runtime.shipment_execution_stage import (
+        shipment_ready_for_pod_capture,
+    )
+
+    return shipment_ready_for_pod_capture(
+        shipment,
+        exclude_log_id=exclude_log_id,
+    )
+
+
 def _reinclude_combined_pod_retries(
     qs: QuerySet,
     *,
@@ -135,14 +167,12 @@ def _reinclude_combined_pod_retries(
     executed_ids: set,
     exclude_log_id=None,
 ) -> QuerySet:
-    """Executed combined POD rows may run again for hard-copy custody confirmation."""
+    """Executed Upload POD rows may run again for hard-copy custody (label or flags)."""
     if not executed_ids or shipment is None:
         return qs
     from iroad_tenants.operation_execution import _combined_pod_allows_hard_copy_retry
 
-    retry_actions = TenantOperationAction.objects.filter(
-        action_id__in=executed_ids,
-    ).filter(_HARD_POD_RETRY_ACTION_Q)
+    retry_actions = TenantOperationAction.objects.filter(action_id__in=executed_ids)
     retry_ids = [
         action.action_id
         for action in retry_actions
@@ -152,6 +182,57 @@ def _reinclude_combined_pod_retries(
             exclude_log_id=exclude_log_id,
         )
     ]
+    if not retry_ids:
+        return qs
+    return qs | TenantOperationAction.objects.filter(action_id__in=retry_ids)
+
+
+def _reinclude_pending_pod_upload(
+    qs: QuerySet,
+    *,
+    shipment,
+    executed_ids: set,
+    exclude_log_id=None,
+) -> QuerySet:
+    """
+    Re-offer POD upload when a prior log exists but POD evidence is still invalid.
+
+    Label-only POD (``auto_pod_post`` off) logs OA-0009 on first tap; without this,
+    execute validation blocks the wizard even though ``pod_pending`` is true.
+    """
+    if not executed_ids or shipment is None:
+        return qs
+    from mobile_api.pod_capture.policy.canonical_pod_action_registry import (
+        is_pod_upload_action,
+    )
+    from iroad_tenants.operation_execution import _combined_pod_allows_hard_copy_retry
+    from iroad_tenants.operation_runtime.shipment_execution_stage import (
+        shipment_pod_prerequisites_done,
+        shipment_pod_upload_log_is_valid,
+    )
+
+    if shipment_pod_upload_log_is_valid(
+        shipment,
+        exclude_log_id=exclude_log_id,
+    ):
+        return qs
+    if not shipment_pod_prerequisites_done(
+        shipment,
+        exclude_log_id=exclude_log_id,
+    ):
+        return qs
+
+    retry_ids: list = []
+    for action in TenantOperationAction.objects.filter(action_id__in=executed_ids):
+        if not is_pod_upload_action(action):
+            continue
+        if _combined_pod_allows_hard_copy_retry(
+            action,
+            shipment,
+            exclude_log_id=exclude_log_id,
+        ):
+            continue
+        retry_ids.append(action.action_id)
     if not retry_ids:
         return qs
     return qs | TenantOperationAction.objects.filter(action_id__in=retry_ids)
@@ -191,14 +272,18 @@ def _apply_mobile_scope_filter(qs: QuerySet) -> QuerySet:
 
 def _apply_movement_mobile_scope_filter(qs: QuerySet) -> QuerySet:
     """Mobile scope for movement-only / empty-move jobs (EM catalog rows)."""
+    empty_move_q = empty_move_sequence_category_q()
     return (
         qs.filter(
             Q(action_scope__in=_MOBILE_JOB_ACTION_SCOPES)
-            | Q(sequence_category__iexact='empty_move')
-            | Q(action_code__istartswith='EM'),
+            | empty_move_q,
         )
         .exclude(admin_only=True)
-        .filter(Q(mobile_visible=True) | Q(hard_copy_collection=True))
+        .filter(
+            Q(mobile_visible=True)
+            | Q(hard_copy_collection=True)
+            | empty_move_q,
+        )
     )
 
 
@@ -214,7 +299,7 @@ def _prefilter_shipment_candidates(
     shipment,
     exclude_log_id=None,
 ) -> QuerySet:
-    qs = qs.exclude(Q(sequence_category__iexact='empty_move') | Q(action_code__istartswith='EM'))
+    qs = qs.exclude(Q(sequence_category__iexact='empty_move'))
     current = (shipment.shipment_status or '').strip()
     stage = derive_shipment_execution_stage(
         shipment,
@@ -244,16 +329,31 @@ def _prefilter_shipment_candidates(
                 TenantShipment.ShipmentStatus.CLOSED,
                 (TenantShipment.ShipmentStatus.CLOSED,),
             )
-            candidate_q |= Q(shipment_status_impact__in=closed_tokens)
+            candidate_q |= Q(shipment_status_impact__in=closed_tokens) | job_close_action_q()
             if _hard_pod_custody_outstanding(shipment):
-                candidate_q |= _HARD_POD_RETRY_ACTION_Q
+                candidate_q |= _HARD_POD_RETRY_ACTION_Q | pod_workflow_action_q()
+            if _pod_upload_still_pending(shipment, exclude_log_id=exclude_log_id):
+                candidate_q |= pod_workflow_action_q()
         return qs.filter(candidate_q).exclude(
-            Q(booking_status_impact__gt='') & Q(shipment_status_impact=''),
+            Q(booking_status_impact__gt='')
+            & Q(shipment_status_impact='')
+            & ~job_close_action_q(),
         )
 
     clauses = Q()
 
-    if current in {
+    if (
+        stage == STAGE_IN_TRANSIT
+        and current
+        in {
+            TenantShipment.ShipmentStatus.CREATED,
+            TenantShipment.ShipmentStatus.LOADED,
+        }
+    ):
+        forward_tokens = _forward_impact_tokens_for_status(
+            TenantShipment.ShipmentStatus.IN_TRANSIT,
+        )
+    elif current in {
         TenantShipment.ShipmentStatus.CREATED,
         TenantShipment.ShipmentStatus.LOADED,
     } and stage != STAGE_PRE_TRANSIT:
@@ -289,22 +389,38 @@ def _prefilter_shipment_candidates(
             TenantShipment.ShipmentStatus.DELIVERED,
         }
     ):
-        cod_q = Q()
-        for hint in _COD_ACTION_CODE_HINTS:
-            cod_q |= Q(action_code__icontains=hint)
-        cod_q |= Q(english_label__icontains=_COD_LABEL_HINT)
-        clauses |= cod_q
+        clauses |= cod_payment_action_q()
+
+    if stage == STAGE_IN_TRANSIT:
+        delivery_q = Q(english_label__icontains='delivery arrival')
+        delivery_q |= Q(english_label__icontains='arrival at delivery')
+        delivery_tokens = _SHIPMENT_IMPACT_DB_TOKENS.get(
+            TenantShipment.ShipmentStatus.AT_DELIVERY,
+            (TenantShipment.ShipmentStatus.AT_DELIVERY,),
+        )
+        delivery_q |= Q(shipment_status_impact__in=delivery_tokens)
+        clauses |= delivery_q | Q(shipment_status_impact='')
 
     if current == TenantShipment.ShipmentStatus.AT_DELIVERY or stage in {
         STAGE_DELIVERY,
         STAGE_POD,
         STAGE_COD,
+        STAGE_IN_TRANSIT,
     }:
         unload_q = Q()
-        for hint in _UNLOADING_CODE_HINTS:
-            unload_q |= Q(action_code__icontains=hint)
-        unload_q |= Q(english_label__icontains=_UNLOADING_LABEL_HINT)
+        for hint in _UNLOADING_LABEL_HINTS:
+            unload_q |= Q(english_label__icontains=hint)
+        unload_q |= Q(action_code__iexact='A8')
         clauses |= unload_q
+        clauses |= Q(english_label__icontains='unloading completed')
+
+    if stage in {
+        STAGE_DELIVERY,
+        STAGE_POD,
+        STAGE_COD,
+        STAGE_IN_TRANSIT,
+    }:
+        clauses |= pod_workflow_action_q()
 
     if current in {
         TenantShipment.ShipmentStatus.LOADED,
@@ -320,6 +436,8 @@ def _prefilter_shipment_candidates(
         TenantShipment.ShipmentStatus.DELIVERED,
     } or stage in {STAGE_DELIVERY, STAGE_POD}:
         clauses |= Q(hard_copy_collection=True) | Q(action_code__iexact='A7H')
+        if _hard_pod_custody_outstanding(shipment):
+            clauses |= _HARD_POD_RETRY_ACTION_Q | pod_workflow_action_q()
 
     if stage == STAGE_POD:
         clauses |= Q(movement_status_impact__in=('Completed', 'completed'))
@@ -327,9 +445,10 @@ def _prefilter_shipment_candidates(
             TenantShipment.ShipmentStatus.CLOSED,
             (TenantShipment.ShipmentStatus.CLOSED,),
         )
-        clauses |= Q(shipment_status_impact__in=closed_tokens) | Q(
-            action_code__iexact='A10',
-        )
+        clauses |= Q(shipment_status_impact__in=closed_tokens) | job_close_action_q()
+
+    if _shipment_job_close_candidates_allowed(shipment, exclude_log_id=exclude_log_id):
+        clauses |= job_close_action_q()
 
     if clauses:
         qs = qs.filter(clauses)
@@ -347,13 +466,17 @@ def _prefilter_shipment_candidates(
         & Q(movement_status_impact='')
         & Q(auto_movement_post=False)
         & Q(auto_pod_post=False)
-        & Q(hard_copy_collection=False),
+        & Q(hard_copy_collection=False)
+        & ~job_close_action_q()
+        & ~pod_workflow_action_q(),
     )
+    if (shipment.order_type or '').strip().upper() != 'COD':
+        qs = qs.exclude(cod_payment_action_q())
     return qs
 
 
 def _prefilter_booking_candidates(qs: QuerySet, *, booking) -> QuerySet:
-    qs = qs.exclude(Q(sequence_category__iexact='empty_move') | Q(action_code__istartswith='EM'))
+    qs = qs.exclude(Q(sequence_category__iexact='empty_move'))
     if booking.booking_status == TenantBooking.Status.CANCELLED:
         reversal_q = Q()
         for prefix in _REVERSAL_CODE_PREFIXES:
@@ -369,6 +492,7 @@ def _prefilter_booking_candidates(qs: QuerySet, *, booking) -> QuerySet:
     qs = qs.filter(
         Q(booking_status_impact__gt='')
         | Q(auto_shipment_post=True)
+        | Q(auto_movement_post=True)
         | pickup_loading_q,
     )
     if booking.booking_status != TenantBooking.Status.CONFIRMED:
@@ -380,9 +504,12 @@ def _prefilter_booking_candidates(qs: QuerySet, *, booking) -> QuerySet:
 
 def _prefilter_movement_only_candidates(qs: QuerySet, *, movement) -> QuerySet:
     empty_move = is_empty_movement(movement)
+    empty_move_q = empty_move_sequence_category_q()
     qs = qs.exclude(shipment_status_impact__gt='')
     qs = qs.exclude(
-        Q(auto_shipment_post=True) & Q(movement_status_impact=''),
+        Q(auto_shipment_post=True)
+        & Q(movement_status_impact='')
+        & ~empty_move_q,
     )
     if empty_move:
         qs = qs.exclude(
@@ -390,10 +517,9 @@ def _prefilter_movement_only_candidates(qs: QuerySet, *, movement) -> QuerySet:
         )
     return qs.filter(
         Q(movement_status_impact__gt='')
-        | Q(sequence_category__iexact='empty_move')
+        | empty_move_q
         | Q(auto_movement_post=True)
         | Q(action_code__istartswith='m')
-        | Q(action_code__istartswith='EM')
         | Q(english_label__icontains='movement'),
     )
 
@@ -429,12 +555,6 @@ def prefilter_allowed_action_candidates(
         shipment=shipment,
         movement=movement,
     )
-    if movement_only:
-        from iroad_tenants.operation_runtime.action_master_catalog import (
-            ensure_empty_move_action_master_rows,
-        )
-
-        ensure_empty_move_action_master_rows()
 
     qs = active_operation_actions_queryset(use_catalog_cache=not movement_only)
     if for_mobile:
@@ -452,7 +572,13 @@ def prefilter_allowed_action_candidates(
             shipment=shipment,
             exclude_log_id=exclude_log_id,
         )
-        return _reinclude_combined_pod_retries(
+        qs = _reinclude_combined_pod_retries(
+            qs,
+            shipment=shipment,
+            executed_ids=executed,
+            exclude_log_id=exclude_log_id,
+        )
+        return _reinclude_pending_pod_upload(
             qs,
             shipment=shipment,
             executed_ids=executed,

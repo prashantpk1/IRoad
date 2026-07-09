@@ -25,7 +25,11 @@ class EmptyMoveLocationsService:
     ) -> dict[str, Any]:
         schema = (tenant_schema or '').strip()
         if not schema:
-            return {'locations': []}
+            return {
+                'locations': [],
+                'manual_location_picker': False,
+                'route_capture_mode': 'gps',
+            }
 
         term = (search or '').strip()
         cap = max(1, min(int(limit or 100), 200))
@@ -48,4 +52,8 @@ class EmptyMoveLocationsService:
             serialize_location_point(row, request=request)
             for row in rows
         ]
-        return {'locations': locations}
+        return {
+            'locations': locations,
+            'manual_location_picker': False,
+            'route_capture_mode': 'gps',
+        }

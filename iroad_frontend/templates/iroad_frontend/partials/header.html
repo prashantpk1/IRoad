@@ -13,7 +13,7 @@
             />
           {% else %}
             <img
-              src="{% static 'landing/images/logo-elite.svg' %}"
+              src="{% static 'landing/images/logo.svg' %}?v=2"
               alt="{% if lang == 'ar' %}{{ home.logo_alt_ar|default:home.logo_alt_en }}{% else %}{{ home.logo_alt_en }}{% endif %}"
             />
           {% endif %}

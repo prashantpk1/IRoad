@@ -155,7 +155,7 @@ class WalletDetailProjectionTests(SimpleTestCase):
         txn.amount = 4500
         txn.transaction_date = None
         txn.transaction_category = 'Client Collection'
-        txn.transaction_type = 'Debit'
+        txn.transaction_type = 'Credit'
         txn.description = 'COD collection'
 
         payload = build_wallet_transaction_detail(txn)

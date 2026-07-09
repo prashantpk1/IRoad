@@ -41,6 +41,7 @@ EXCLUSIVE_MAX_ONE_TOGGLES = {
     'auto_shipment_post': 'Auto Shipment Post',
     'auto_pod_post': 'Auto POD Post',
     'hard_copy_collection': 'Hard Copy Collection',
+    'auto_treasury_post': 'Confirm Payment',
 }
 REQUIRED_EXACTLY_ONE_TOGGLE = 'auto_movement_post'
 REQUIRED_EXACTLY_ONE_TOGGLE_LABEL = 'Auto Movement Post'
@@ -54,16 +55,26 @@ OPERATION_IMPACT_FIELDS = (
     'auto_shipment_post',
     'auto_pod_post',
     'hard_copy_collection',
+    'auto_treasury_post',
     'booking_status_impact',
     'shipment_status_impact',
     'movement_status_impact',
 )
 
 
-def count_toggle_enabled(field_name: str, *, exclude_action_id=None, exclude_action_ids=None) -> int:
+def count_toggle_enabled(
+    field_name: str,
+    *,
+    exclude_action_id=None,
+    exclude_action_ids=None,
+    sequence_category: str | None = None,
+) -> int:
     from tenant_workspace.models import TenantOperationAction
 
     qs = TenantOperationAction.objects.filter(**{field_name: True})
+    category = (sequence_category or '').strip()
+    if field_name == REQUIRED_EXACTLY_ONE_TOGGLE and category in SEQUENCED_CATEGORIES:
+        qs = qs.filter(sequence_category=category)
     excluded = set()
     if exclude_action_id:
         excluded.add(exclude_action_id)
@@ -75,12 +86,32 @@ def count_toggle_enabled(field_name: str, *, exclude_action_id=None, exclude_act
     return qs.count()
 
 
-def default_auto_movement_post_enabled(*, exclude_action_id=None) -> bool:
-    """Default ON for the first action when no other action owns Auto Movement Post."""
+def default_auto_movement_post_enabled(
+    *,
+    exclude_action_id=None,
+    sequence_category: str = 'job',
+) -> bool:
+    """Default ON when no other action in the same Sequence Category owns Auto Movement Post."""
+    category = (sequence_category or '').strip()
+    if category not in SEQUENCED_CATEGORIES:
+        return False
     return count_toggle_enabled(
         REQUIRED_EXACTLY_ONE_TOGGLE,
         exclude_action_id=exclude_action_id,
+        sequence_category=category,
     ) == 0
+
+
+def default_mobile_visible_for_action_scope(action_scope: str) -> bool:
+    """
+    Portal-created actions: driver-facing scopes default to mobile-visible.
+
+    Internal ``without`` (cancel/reversal) actions stay hidden from the driver app.
+    """
+    scope = (action_scope or '').strip().casefold()
+    if scope == 'without':
+        return False
+    return scope in {'job', 'on_call'}
 
 
 def validate_configuration_toggles(
@@ -93,12 +124,15 @@ def validate_configuration_toggles(
     """PCS §9.2 — singleton toggle limits across Operation Action Master."""
     form_errors: dict[str, str] = {}
     excluded_ids = [value for value in (exclude_action_ids or ()) if value]
+    category = (form_data.get('sequence_category') or '').strip()
+    movement_category_scoped = category in SEQUENCED_CATEGORIES
     if enabled_counts is None:
         enabled_counts = {
             REQUIRED_EXACTLY_ONE_TOGGLE: count_toggle_enabled(
                 REQUIRED_EXACTLY_ONE_TOGGLE,
                 exclude_action_id=exclude_action_id,
                 exclude_action_ids=excluded_ids,
+                sequence_category=category if movement_category_scoped else None,
             ),
             **{
                 field_name: count_toggle_enabled(
@@ -112,14 +146,17 @@ def validate_configuration_toggles(
 
     movement_enabled = bool(form_data.get(REQUIRED_EXACTLY_ONE_TOGGLE))
     other_movement_count = enabled_counts.get(REQUIRED_EXACTLY_ONE_TOGGLE, 0)
-    if movement_enabled and other_movement_count > 0:
-        form_errors[REQUIRED_EXACTLY_ONE_TOGGLE] = (
-            f'Only one action can have {REQUIRED_EXACTLY_ONE_TOGGLE_LABEL} enabled.'
-        )
-    elif not movement_enabled and other_movement_count == 0:
-        form_errors[REQUIRED_EXACTLY_ONE_TOGGLE] = (
-            f'Exactly one action must have {REQUIRED_EXACTLY_ONE_TOGGLE_LABEL} enabled.'
-        )
+    if movement_category_scoped:
+        if movement_enabled and other_movement_count > 0:
+            form_errors[REQUIRED_EXACTLY_ONE_TOGGLE] = (
+                f'Only one action per Sequence Category can have '
+                f'{REQUIRED_EXACTLY_ONE_TOGGLE_LABEL} enabled.'
+            )
+        elif not movement_enabled and other_movement_count == 0:
+            form_errors[REQUIRED_EXACTLY_ONE_TOGGLE] = (
+                f'Exactly one action per Sequence Category must have '
+                f'{REQUIRED_EXACTLY_ONE_TOGGLE_LABEL} enabled.'
+            )
 
     for field_name, label in EXCLUSIVE_MAX_ONE_TOGGLES.items():
         if not form_data.get(field_name):
@@ -469,6 +506,11 @@ def apply_confirmed_sequence_swap(*, peer, current_action, form_data: dict) -> N
         others = TenantOperationAction.objects.filter(**{field_name: True}).exclude(
             pk=peer.pk,
         )
+        if (
+            field_name == REQUIRED_EXACTLY_ONE_TOGGLE
+            and category in SEQUENCED_CATEGORIES
+        ):
+            others = others.filter(sequence_category=category)
         for other in others:
             setattr(other, field_name, False)
             other.save(update_fields=[field_name, 'updated_at'])

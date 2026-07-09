@@ -38,6 +38,16 @@ class JobActionResolverTests(TestCase):
         )
         self.assertEqual(code, 'OA-0009')
 
+    def test_row_is_job_close_action_end_job_label(self):
+        self.assertTrue(
+            row_is_job_close_action(
+                {
+                    'action_code': 'OA-0011',
+                    'execution_label': 'End Job',
+                },
+            ),
+        )
+
     def test_row_is_job_close_action(self):
         self.assertTrue(
             row_is_job_close_action(

@@ -18,23 +18,23 @@ from iroad_frontend.models import (
 def _about_singleton_text():
     return {
         'page_title_en': (
-            'About IRoad - Transport Management SaaS Platform'
+            'About IRoute - Transport Management SaaS Platform'
         ),
-        'page_title_ar': 'عن آيرواد - منصة SaaS لإدارة النقل',
+        'page_title_ar': 'عن آيروت - منصة SaaS لإدارة النقل',
         'meta_description_en': (
-            'Learn how IRoad helps transport companies digitize operations, '
+            'Learn how IRoute helps transport companies digitize operations, '
             'manage fleet and drivers, and gain full visibility.'
         ),
         'meta_description_ar': (
-            'تعرّف على كيف تساعد آيرواد شركات النقل على رقمنة العمليات وإدارة '
+            'تعرّف على كيف تساعد آيروت شركات النقل على رقمنة العمليات وإدارة '
             'الأسطول والسائقين وتحقيق رؤية كاملة.'
         ),
-        'page_header_h1_en': 'About IRoad',
-        'page_header_h1_ar': 'عن آيرواد',
-        'breadcrumb_current_en': 'About IRoad',
-        'breadcrumb_current_ar': 'عن آيرواد',
-        'about_kicker_en': 'About IRoad',
-        'about_kicker_ar': 'عن آيرواد',
+        'page_header_h1_en': 'About IRoute',
+        'page_header_h1_ar': 'عن آيروت',
+        'breadcrumb_current_en': 'About IRoute',
+        'breadcrumb_current_ar': 'عن آيروت',
+        'about_kicker_en': 'About IRoute',
+        'about_kicker_ar': 'عن آيروت',
         'about_heading_part1_en': 'Driving Transport Efficiency Through',
         'about_heading_part1_ar': 'نقود كفاءة النقل عبر',
         'about_heading_part2_en': 'Smart SaaS Technology',
@@ -45,16 +45,16 @@ def _about_singleton_text():
         'about_counter_1_label_en': 'System Availability',
         'about_counter_1_label_ar': 'توفر النظام',
         'about_counter_2_value': '100+',
-        'about_counter_2_label_en': 'Companies Using IRoad',
-        'about_counter_2_label_ar': 'شركة تستخدم آيرواد',
+        'about_counter_2_label_en': 'Companies Using IRoute',
+        'about_counter_2_label_ar': 'شركة تستخدم آيروت',
         'about_mid_title_en': 'Built for Modern Transport Businesses',
         'about_mid_title_ar': 'مُصمَّم لشركات النقل الحديثة',
         'about_mid_body_en': (
-            'IRoad connects operations, fleet, finance, and reporting into '
+            'IRoute connects operations, fleet, finance, and reporting into '
             'a single unified system.'
         ),
         'about_mid_body_ar': (
-            'تربط آيرواد العمليات والأسطول والمالية والتقارير في نظام موحّد.'
+            'تربط آيروت العمليات والأسطول والمالية والتقارير في نظام موحّد.'
         ),
         'about_body_en': (
             'We provide a complete digital ecosystem for transport '
@@ -73,12 +73,12 @@ def _about_singleton_text():
         'about_explore_label_ar': 'استكشف المنصة',
         'about_explore_url': '/about/',
         'about_footer_text_en': (
-            'IRoad is a modern transport management system designed to help '
+            'IRoute is a modern transport management system designed to help '
             'logistics companies streamline operations, manage fleet, and '
             'gain full business visibility.'
         ),
         'about_footer_text_ar': (
-            'آيرواد نظام حديث لإدارة النقل يُساعد شركات اللوجستيات على تبسيط '
+            'آيروت نظام حديث لإدارة النقل يُساعد شركات اللوجستيات على تبسيط '
             'العمليات وإدارة الأسطول وتحقيق رؤية كاملة للأعمال.'
         ),
         'about_footer_cta_label_en': 'Book a Demo',
@@ -89,8 +89,8 @@ def _about_singleton_text():
         'about_review_label_ar': '+4,200 تقييم',
         'approach_kicker_en': 'Our Approach',
         'approach_kicker_ar': 'نهجنا',
-        'approach_heading_en': 'How IRoad Transforms Transport Operations',
-        'approach_heading_ar': 'كيف تحوّل آيرواد عمليات النقل',
+        'approach_heading_en': 'How IRoute Transforms Transport Operations',
+        'approach_heading_ar': 'كيف تحوّل آيروت عمليات النقل',
         'approach_body_en': (
             'We focus on automation, visibility, and control to simplify '
             'complex logistics workflows.'
@@ -103,14 +103,14 @@ def _about_singleton_text():
         'approach_cta_url': '/contact/',
         'how_kicker_en': 'How It Works',
         'how_kicker_ar': 'كيف يعمل',
-        'how_heading_en': 'How IRoad streamlines your transport workflows',
-        'how_heading_ar': 'كيف تبسّط آيرواد سير عمل النقل لديك',
+        'how_heading_en': 'How IRoute streamlines your transport workflows',
+        'how_heading_ar': 'كيف تبسّط آيروت سير عمل النقل لديك',
         'how_footer_text_en': (
             'Automate operations, improve visibility, and scale with '
-            'confidence using IRoad.'
+            'confidence using IRoute.'
         ),
         'how_footer_text_ar': (
-            'أتمتة العمليات وتحسين الرؤية والتوسع بثقة مع آيرواد.'
+            'أتمتة العمليات وتحسين الرؤية والتوسع بثقة مع آيروت.'
         ),
         'how_footer_link_label_en': 'Start Free Trial',
         'how_footer_link_label_ar': 'ابدأ مجاناً',
@@ -120,14 +120,14 @@ def _about_singleton_text():
         'how_review_label_ar': '+4,200 تقييم',
         'faq_kicker_en': 'FAQs',
         'faq_kicker_ar': 'الأسئلة الشائعة',
-        'faq_heading_en': 'Answers to common questions about IRoad TMS',
-        'faq_heading_ar': 'إجابات عن أسئلة شائعة حول نظام آيرواد لإدارة النقل',
+        'faq_heading_en': 'Answers to common questions about IRoute TMS',
+        'faq_heading_ar': 'إجابات عن أسئلة شائعة حول نظام آيروت لإدارة النقل',
         'faq_intro_en': (
-            'Learn how IRoad helps transport companies automate workflows, '
+            'Learn how IRoute helps transport companies automate workflows, '
             'manage fleets, and improve operational visibility.'
         ),
         'faq_intro_ar': (
-            'تعرّف على كيف تساعد آيرواد شركات النقل على أتمتة سير العمل وإدارة '
+            'تعرّف على كيف تساعد آيروت شركات النقل على أتمتة سير العمل وإدارة '
             'الأساطيل وتحسين الرؤية التشغيلية.'
         ),
         'faq_view_all_label_en': "View all FAQ's",
@@ -213,15 +213,15 @@ HOW_WORK_STEPS = [
 FAQ_ITEMS = [
     {
         'order': 1,
-        'question_en': 'Q1. What is IRoad TMS?',
-        'question_ar': 'س1. ما هو نظام آيرواد لإدارة النقل؟',
+        'question_en': 'Q1. What is IRoute TMS?',
+        'question_ar': 'س1. ما هو نظام آيروت لإدارة النقل؟',
         'answer_en': (
-            'IRoad is a SaaS-based transport management system that '
+            'IRoute is a SaaS-based transport management system that '
             'helps companies manage orders, booking, fleet, drivers, '
             'finance, POD, and reports in one platform.'
         ),
         'answer_ar': (
-            'آيرواد نظام SaaS لإدارة النقل يساعد الشركات على إدارة الطلبات '
+            'آيروت نظام SaaS لإدارة النقل يساعد الشركات على إدارة الطلبات '
             'والحجز والأسطول والسائقين والمالية وإثبات التسليم والتقارير في منصة واحدة.'
         ),
     },
@@ -230,11 +230,11 @@ FAQ_ITEMS = [
         'question_en': 'Q2. Can I manage fleet and drivers?',
         'question_ar': 'س2. هل يمكنني إدارة الأسطول والسائقين؟',
         'answer_en': (
-            'Yes. IRoad includes fleet and driver management tools for '
+            'Yes. IRoute includes fleet and driver management tools for '
             'allocation, availability tracking, and assignment control.'
         ),
         'answer_ar': (
-            'نعم. تتضمن آيرواد أدوات لإدارة الأسطول والسائقين للتخصيص وتتبع '
+            'نعم. تتضمن آيروت أدوات لإدارة الأسطول والسائقين للتخصيص وتتبع '
             'التوفر والتحكم في التعيينات.'
         ),
     },
@@ -243,12 +243,12 @@ FAQ_ITEMS = [
         'question_en': 'Q3. Does it support invoicing & payments?',
         'question_ar': 'س3. هل يدعم الفوترة والمدفوعات؟',
         'answer_en': (
-            'Yes. IRoad includes integrated finance features for '
+            'Yes. IRoute includes integrated finance features for '
             'invoicing, payments, and transport-related financial '
             'tracking.'
         ),
         'answer_ar': (
-            'نعم. تتضمن آيرواد ميزات مالية متكاملة للفوترة والمدفوعات '
+            'نعم. تتضمن آيروت ميزات مالية متكاملة للفوترة والمدفوعات '
             'والتتبع المالي المرتبط بالنقل.'
         ),
     },
@@ -257,12 +257,12 @@ FAQ_ITEMS = [
         'question_en': 'Q4. Is it suitable for small transport companies?',
         'question_ar': 'س4. هل يناسب شركات النقل الصغيرة؟',
         'answer_en': (
-            'Absolutely. IRoad is designed for businesses of different '
+            'Absolutely. IRoute is designed for businesses of different '
             'sizes, from small teams to multi-branch transport '
             'operations.'
         ),
         'answer_ar': (
-            'بالتأكيد. صُممت آيرواد لأعمال بأحجام مختلفة من الفرق الصغيرة '
+            'بالتأكيد. صُممت آيروت لأعمال بأحجام مختلفة من الفرق الصغيرة '
             'إلى عمليات نقل متعددة الفروع.'
         ),
     },
@@ -271,11 +271,11 @@ FAQ_ITEMS = [
         'question_en': 'Q5. Can I track shipments in real-time?',
         'question_ar': 'س5. هل يمكنني تتبع الشحنات لحظياً؟',
         'answer_en': (
-            'Yes. IRoad provides real-time shipment tracking and status '
+            'Yes. IRoute provides real-time shipment tracking and status '
             'updates from booking through delivery and POD.'
         ),
         'answer_ar': (
-            'نعم. توفر آيرواد تتبعاً لحظياً للشحنات وتحديثات الحالة من الحجز '
+            'نعم. توفر آيروت تتبعاً لحظياً للشحنات وتحديثات الحالة من الحجز '
             'حتى التسليم وإثبات التسليم.'
         ),
     },
@@ -284,12 +284,12 @@ FAQ_ITEMS = [
         'question_en': 'Q6. Is data secure?',
         'question_ar': 'س6. هل البيانات آمنة؟',
         'answer_en': (
-            'Yes. IRoad uses secure, role-based access and '
+            'Yes. IRoute uses secure, role-based access and '
             'platform-level safeguards to protect operational and '
             'financial data.'
         ),
         'answer_ar': (
-            'نعم. تستخدم آيرواد وصولاً آمناً حسب الدور وضمانات على مستوى المنصة '
+            'نعم. تستخدم آيروت وصولاً آمناً حسب الدور وضمانات على مستوى المنصة '
             'لحماية البيانات التشغيلية والمالية.'
         ),
     },

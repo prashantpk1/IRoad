@@ -56,6 +56,8 @@ class DashboardLifecycleIntegrationTests(SimpleTestCase):
             booking_item_type='Outbound',
             shipment_status=TenantShipment.ShipmentStatus.DELIVERED,
             shipment_sequence=1,
+            pod_status=TenantShipment.PodStatus.COMPLETED,
+            order_type='Credit',
         )
         backload = TenantShipment(
             shipment_id=uuid.uuid4(),

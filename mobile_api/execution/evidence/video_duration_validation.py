@@ -1,7 +1,7 @@
 """
 mobile_api/execution/evidence/video_duration_validation.py
 
-POD / A7 video clip duration enforcement (max 15 seconds).
+POD / A7 video clip duration enforcement (max 60 seconds).
 """
 from __future__ import annotations
 

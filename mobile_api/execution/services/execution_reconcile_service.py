@@ -17,6 +17,8 @@ from mobile_api.execution.dto.authoritative_execution_context import (
 from mobile_api.execution.dto.execute_action_context import ExecuteActionContext
 from mobile_api.execution.guards.execution_ownership_guard import ExecutionOwnershipGuard
 from mobile_api.execution.services.execution_context_adapter import (
+    finalize_execute_scope,
+    pivot_execute_context_for_round_trip_continuation,
     pivot_execute_context_to_born_shipment,
     sync_from_job_detail,
     to_job_detail_context,
@@ -62,6 +64,7 @@ class ExecutionReconcileService:
         Single projection-cache load + reconcile + workflow + sync metadata.
         """
         self._ownership_guard.resolve_entity(context)
+        finalize_execute_scope(context)
         self._ownership_guard.assert_driver_may_execute(context)
 
         projection = ExecutionProjectionCache.attach(context)
@@ -90,6 +93,7 @@ class ExecutionReconcileService:
         One post-mutation projection pass (no duplicate log scans).
         """
         pivot_execute_context_to_born_shipment(context)
+        pivot_execute_context_for_round_trip_continuation(context)
         projection = ExecutionProjectionCache.attach(context)
         projection.build_post_execute_sections(request=request)
         context.authoritative = dict(self.build_authoritative_context(context))

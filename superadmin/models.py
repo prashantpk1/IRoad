@@ -607,7 +607,7 @@ class LegalIdentity(models.Model):
     updated_at = models.DateTimeField(auto_now=True)
 
     def __str__(self):
-        return 'IRoad Legal Identity'
+        return 'IRoute Legal Identity'
 
     class Meta:
         db_table = 'config_legal_identity'

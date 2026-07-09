@@ -183,13 +183,24 @@ class ExecutionValidationTests(SimpleTestCase):
             payload={
                 'client_action_id': 'cid-1',
                 'content_hash': 'hash-stale',
-                'workflow_version': 'wf-server',
+                'workflow_version': 'wf-old',
             },
         )
         with self.assertRaises(ExecuteActionError) as exc:
             StaleExecutionGuard().assert_not_stale(ctx)
         self.assertEqual(exc.exception.code, 'stale_content_hash')
         self.assertTrue(exc.exception.validation_error['refresh_required'])
+        self.assertIn('sync_metadata', exc.exception.validation_error)
+
+    def test_matching_workflow_version_ignores_content_hash_mismatch(self):
+        ctx = _context(
+            payload={
+                'client_action_id': 'cid-1',
+                'content_hash': 'hash-stale',
+                'workflow_version': 'wf-server',
+            },
+        )
+        StaleExecutionGuard().assert_not_stale(ctx)
 
     def test_stale_workflow_version(self):
         ctx = _context(
@@ -328,6 +339,38 @@ class ExecutionValidationTests(SimpleTestCase):
                 svc.validate_action_master(ctx)
         self.assertEqual(exc.exception.code, 'action_not_allowed')
 
+    def test_pod_execute_blocked_when_shipment_document_missing(self):
+        ctx = _context(action_code='OA-0009')
+        ctx.shipment = SimpleNamespace(pk='sh-1', pod_doc_count=2, booking_id=None)
+        action = SimpleNamespace(
+            action_code='OA-0009',
+            english_label='POD',
+            auto_pod_post=True,
+        )
+        svc = ExecutionValidationService(operation_action_model=MagicMock())
+        svc._operation_action_model.objects.filter.return_value.first.return_value = action
+
+        with patch.object(
+            OperationExecutionService,
+            'validate_operation_action_allowed',
+            return_value=None,
+        ), patch.object(
+            ExecutionReconcileService,
+            'apply_status_overlays',
+            _fake_apply_overlays,
+        ), patch.object(
+            svc,
+            '_action_in_allowed_list',
+            return_value=True,
+        ), patch(
+            'iroad_tenants.operation_runtime.pod_action.shipment_has_layer_zero_document',
+            return_value=False,
+        ):
+            with self.assertRaises(ExecuteActionError) as exc:
+                svc.validate_pre_execute_after_idempotency(ctx)
+        self.assertEqual(exc.exception.code, 'shipment_document_required')
+        self.assertIn('shipment document', str(exc.exception).casefold())
+
     def test_action_not_found(self):
         ctx = _context(action_code='UNKNOWN')
         svc = ExecutionValidationService(operation_action_model=MagicMock())
@@ -371,3 +414,183 @@ class ExecutionValidationTests(SimpleTestCase):
             ExecutionValidationService._booking_item_type(ctx),
             'Backload',
         )
+
+
+class HardPodCustodyExecuteBypassTests(SimpleTestCase):
+    def test_stale_guard_skips_internal_hard_pod_chain(self):
+        guard = StaleExecutionGuard()
+        ctx = ExecuteActionContext(
+            driver=_driver(),
+            tenant_schema='tenant_test',
+            user_id='user-1',
+            job_type='shipment',
+            job_id='ship-1',
+            action_code='OA-0008',
+            payload={'execution_origin': 'hard_pod_custody_submit'},
+            sync_metadata={'content_hash': 'server', 'workflow_version': 'wf'},
+        )
+        guard.assert_not_stale(ctx)
+
+    def test_stale_guard_skips_scope_redirect(self):
+        guard = StaleExecutionGuard()
+        ctx = ExecuteActionContext(
+            driver=_driver(),
+            tenant_schema='tenant_test',
+            user_id='user-1',
+            job_type='booking',
+            job_id='booking-1',
+            action_code='OA-0001',
+            payload={
+                'content_hash': 'shipment-hash',
+                'workflow_version': 'wf-1',
+            },
+            resolver_meta={'backload_booking_redirect': True},
+            sync_metadata={
+                'content_hash': 'booking-hash',
+                'workflow_version': 'wf-2',
+            },
+        )
+        guard.assert_not_stale(ctx)
+
+    @patch(
+        'mobile_api.hard_pod.services.hard_pod_execute_integration.HardPodExecuteIntegrationService._custody_promoted_for_shipment',
+        return_value=False,
+    )
+    def test_hard_copy_custody_execute_skips_digital_photo_requirements(self, _mock_promoted):
+        from mobile_api.execution.evidence.evidence_validation_service import (
+            EvidenceValidationService,
+        )
+
+        action = SimpleNamespace(
+            action_code='OA-0008',
+            auto_pod_post=True,
+            hard_copy_collection=True,
+        )
+        ctx = ExecuteActionContext(
+            driver=_driver(),
+            tenant_schema='tenant_test',
+            user_id='user-1',
+            job_type='shipment',
+            job_id='ship-1',
+            action_code='OA-0008',
+            payload={
+                'custody_submission_id': str(uuid4()),
+                'capture_mode': 'hard_copy_confirmation',
+            },
+            shipment=_shipment(status='POD_Submitted'),
+            operation_action=action,
+        )
+        service = EvidenceValidationService()
+        service.validate_required_evidence(ctx)
+
+    def test_label_only_pod_hard_copy_execute_allowed_outside_workflow_list(self):
+        """OA-* POD by english_label — step 2 execute after custody submit."""
+        ctx = _context(
+            action_code='OA-0009',
+            authoritative={'allowed_actions': [{'action_code': 'OA-0010'}]},
+        )
+        ctx.shipment = SimpleNamespace(
+            pk='ship-1',
+            pod_type='Hard',
+            order_type='COD',
+        )
+        action = SimpleNamespace(
+            action_code='OA-0009',
+            english_label='POD',
+            auto_pod_post=False,
+            hard_copy_collection=False,
+        )
+        svc = ExecutionValidationService(operation_action_model=MagicMock())
+        with patch(
+            'iroad_tenants.operation_execution._combined_pod_allows_hard_copy_retry',
+            return_value=True,
+        ), patch.object(
+            OperationExecutionService,
+            'validate_operation_action_allowed',
+            return_value=None,
+        ):
+            self.assertTrue(svc._combined_pod_execute_allowed(ctx, action))
+
+    def test_booking_execute_pivots_to_shipment_before_pod_validation(self):
+        """Hard POD confirm on booking scope must attach shipment before policy check."""
+        booking = SimpleNamespace(
+            pk='bk-1',
+            booking_id='bk-1',
+            booking_status='Confirmed',
+        )
+        shipment = SimpleNamespace(
+            pk='ship-1',
+            shipment_id='ship-1',
+            pod_type='Hard',
+            order_type='COD',
+            booking=booking,
+        )
+        ctx = _context(
+            job_type='booking',
+            job_id='bk-1',
+            action_code='OA-0009',
+            shipment=None,
+            booking=booking,
+            payload={
+                'client_action_id': 'client-uuid-1',
+                'custody_submission_id': str(uuid4()),
+                'capture_mode': 'hard_copy_confirmation',
+            },
+        )
+        action = SimpleNamespace(
+            pk=uuid4(),
+            action_code='OA-0009',
+            english_label='POD',
+            auto_pod_post=True,
+            hard_copy_collection=True,
+            status='Active',
+        )
+        svc = ExecutionValidationService(operation_action_model=MagicMock())
+        svc._operation_action_model.objects.filter.return_value.first.return_value = action
+        with patch(
+            'mobile_api.execution.services.execution_validation_service.finalize_execute_scope',
+            side_effect=lambda context: (
+                setattr(context, 'shipment', shipment)
+                or setattr(context, 'job_type', 'shipment')
+                or setattr(context, 'job_id', 'ship-1')
+                or True
+            ),
+        ), patch.object(
+            ExecutionReconcileService,
+            'apply_status_overlays',
+            _fake_apply_overlays,
+        ), patch.object(
+            svc,
+            '_booking_item_type',
+            return_value='Outbound',
+        ), patch.object(
+            OperationExecutionService,
+            'validate_operation_action_allowed',
+            return_value=None,
+        ) as mock_validate, patch.object(
+            svc,
+            '_action_in_allowed_list',
+            return_value=True,
+        ):
+            svc.validate_action_master(ctx)
+            mock_validate.assert_called_once()
+            self.assertIs(ctx.shipment, shipment)
+
+
+class HardPodCustodyRecoveryGuardTests(SimpleTestCase):
+    def test_recovery_skipped_while_promotion_active(self):
+        from mobile_api.hard_pod.services.hard_pod_custody_recovery import (
+            hard_pod_promotion_guard,
+            try_recover_unpromoted_hard_pod_custody,
+        )
+
+        driver = _driver()
+        shipment = _shipment()
+        with hard_pod_promotion_guard():
+            self.assertFalse(
+                try_recover_unpromoted_hard_pod_custody(
+                    driver=driver,
+                    shipment=shipment,
+                    tenant_schema='tenant_test',
+                ),
+            )

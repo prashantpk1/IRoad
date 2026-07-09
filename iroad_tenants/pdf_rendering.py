@@ -60,11 +60,17 @@ html, body {
     padding-right: 24px !important;
 }
 .org-block { display: table-cell !important; vertical-align: middle !important; }
-.org-seal::before {
-    top: 3px !important;
-    right: 3px !important;
-    bottom: 3px !important;
-    left: 3px !important;
+.org-logo {
+    display: table-cell !important;
+    vertical-align: middle !important;
+}
+.iroute-wordmark {
+    font-family: 'Segoe UI', Arial, Helvetica, sans-serif !important;
+    font-size: 28pt !important;
+    font-weight: 900 !important;
+    letter-spacing: -2px !important;
+    color: #3B82F6 !important;
+    line-height: 1 !important;
 }
 .section-head,
 .section-titles {
@@ -116,9 +122,8 @@ tbody td:last-child { border-right: none !important; }
     background: #3B82F6 !important;
     color: #FFFFFF !important;
 }
-.org-seal {
+.org-logo--white {
     background: #3B82F6 !important;
-    border-color: #3B82F6 !important;
 }
 </style>
 """
@@ -197,15 +202,79 @@ def prepare_print_html_for_wkhtmltopdf(html_content: str, *, base_url: str = '')
 
     - Expands CSS variables (reference templates rely on them heavily).
     - Injects wkhtmltopdf layout fallbacks (grid/logical CSS are unsupported).
-    - Injects ``<base>`` so uploaded logos resolve when ``SITE_URL`` is configured.
+    - Strips external font requests (offline-safe fallbacks are in CSS).
+    - Rewrites uploaded media URLs to local filesystem paths for wkhtmltopdf.
     """
     prepared = expand_print_css_variables(html_content or '')
     prepared = inject_wkhtmltopdf_compat_styles(prepared)
-    site = (base_url or getattr(settings, 'SITE_URL', '') or '').strip().rstrip('/')
-    if site and '<base ' not in prepared.lower():
-        base_tag = f'<base href="{site}/">'
-        prepared = prepared.replace('<head>', f'<head>\n{base_tag}', 1)
+    prepared = rewrite_print_html_for_wkhtmltopdf(prepared)
     return prepared
+
+
+def _local_file_uri(path: str) -> str:
+    normalized = os.path.abspath(path).replace('\\', '/')
+    if os.name == 'nt':
+        return f'file:///{normalized}'
+    return f'file://{normalized}'
+
+
+def rewrite_print_html_for_wkhtmltopdf(html_content: str) -> str:
+    """
+    Make print HTML fully offline for wkhtmltopdf.
+
+    External HTTP fetches (Google Fonts, SITE_URL static/media) cause
+    ConnectionRefusedError when the dev server is unreachable from the subprocess.
+    """
+    content = html_content or ''
+
+    content = re.sub(
+        r'<link[^>]*fonts\.googleapis\.com[^>]*>\s*',
+        '',
+        content,
+        flags=re.IGNORECASE,
+    )
+    content = re.sub(
+        r'<link[^>]*fonts\.gstatic\.com[^>]*>\s*',
+        '',
+        content,
+        flags=re.IGNORECASE,
+    )
+    content = re.sub(
+        r'<link[^>]*rel=["\']preconnect["\'][^>]*>\s*',
+        '',
+        content,
+        flags=re.IGNORECASE,
+    )
+    content = re.sub(r'<base\s+[^>]*>\s*', '', content, flags=re.IGNORECASE)
+
+    media_url = (getattr(settings, 'MEDIA_URL', '') or '/media/').rstrip('/')
+    media_root = str(getattr(settings, 'MEDIA_ROOT', '') or '').replace('\\', '/')
+    if media_url and media_root:
+        if not media_root.endswith('/'):
+            media_root += '/'
+
+        site = (getattr(settings, 'SITE_URL', '') or '').strip().rstrip('/')
+        prefixes = {media_url}
+        if site:
+            prefixes.add(f'{site}{media_url}')
+
+        def _media_src_replacer(match: re.Match) -> str:
+            raw_url = match.group(1)
+            local_path = ''
+            for prefix in prefixes:
+                if raw_url.startswith(prefix + '/'):
+                    rel = raw_url[len(prefix):].lstrip('/')
+                    candidate = f'{media_root}{rel}'
+                    if os.path.isfile(candidate):
+                        local_path = candidate
+                        break
+            if not local_path:
+                return match.group(0)
+            return f'src="{_local_file_uri(local_path)}"'
+
+        content = re.sub(r'src="([^"]+)"', _media_src_replacer, content)
+
+    return content
 
 
 def inject_pdf_auto_print_action(pdf_content):

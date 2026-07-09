@@ -81,7 +81,7 @@ class PodCodPolicyTests(SimpleTestCase):
                 msg=f'expected False for {status}',
             )
 
-    def test_hard_pod_pending(self):
+    def test_hard_pod_pending_after_digital_pod_at_delivery(self):
         shipment = _shipment(
             pod_type=TenantShipment.PodType.HARD,
             pod_status=TenantShipment.PodStatus.NOT_COMPLETED,
@@ -90,15 +90,49 @@ class PodCodPolicyTests(SimpleTestCase):
             'mobile_api.dashboard.selectors.pod_cod_policy.HardPodCustodyAuthorityService',
         ) as mock_authority, patch(
             'mobile_api.dashboard.selectors.pod_cod_policy.HardPODCustodySubmission',
-        ) as mock_submission:
+        ) as mock_submission, patch(
+            'iroad_tenants.operation_runtime.shipment_execution_stage.shipment_unloading_completed_done',
+            return_value=True,
+        ):
             mock_authority.return_value.resolve_authority.return_value = {
                 'custody_authority': '',
             }
             _mock_no_promoted_submission(mock_submission)
-            self.assertTrue(policy.derive_hard_pod_pending(shipment))
+            self.assertTrue(
+                policy.derive_hard_pod_pending(
+                    shipment,
+                    log_evidence={'pod_uploaded': True},
+                )
+            )
+
+    def test_hard_pod_not_pending_at_unloading_completed_before_digital_pod(self):
+        """Unloading Completed (OA-0008) must not surface hard-copy pending."""
+        shipment = _shipment(
+            pod_type=TenantShipment.PodType.HARD,
+            pod_status=TenantShipment.PodStatus.NOT_COMPLETED,
+        )
+        with patch(
+            'mobile_api.dashboard.selectors.pod_cod_policy.HardPodCustodyAuthorityService',
+        ) as mock_authority, patch(
+            'mobile_api.dashboard.selectors.pod_cod_policy.HardPODCustodySubmission',
+        ) as mock_submission, patch(
+            'iroad_tenants.operation_runtime.shipment_execution_stage.shipment_unloading_completed_done',
+            return_value=False,
+        ):
+            mock_authority.return_value.resolve_authority.return_value = {
+                'custody_authority': '',
+            }
+            _mock_no_promoted_submission(mock_submission)
+            self.assertFalse(policy.derive_hard_pod_pending(shipment))
+            self.assertFalse(
+                policy.derive_hard_pod_pending(
+                    shipment,
+                    log_evidence={'pod_uploaded': False},
+                )
+            )
 
     def test_hard_pod_pending_from_booking_when_shipment_pod_type_still_digital(self):
-        """OA-0008 may not classify pod_type Hard until hard-copy execute."""
+        """Booking Hard POD applies only after digital POD at delivery."""
         shipment = _shipment(
             pod_type=TenantShipment.PodType.DIGITAL,
             pod_status=TenantShipment.PodStatus.NOT_COMPLETED,
@@ -108,12 +142,20 @@ class PodCodPolicyTests(SimpleTestCase):
             'mobile_api.dashboard.selectors.pod_cod_policy.HardPodCustodyAuthorityService',
         ) as mock_authority, patch(
             'mobile_api.dashboard.selectors.pod_cod_policy.HardPODCustodySubmission',
-        ) as mock_submission:
+        ) as mock_submission, patch(
+            'iroad_tenants.operation_runtime.shipment_execution_stage.shipment_unloading_completed_done',
+            return_value=True,
+        ):
             mock_authority.return_value.resolve_authority.return_value = {
                 'custody_authority': '',
             }
             _mock_no_promoted_submission(mock_submission)
-            self.assertTrue(policy.derive_hard_pod_pending(shipment))
+            self.assertTrue(
+                policy.derive_hard_pod_pending(
+                    shipment,
+                    log_evidence={'pod_uploaded': True},
+                )
+            )
 
     def test_digital_booking_never_requires_hard_copy_even_if_shipment_hard(self):
         shipment = _shipment(
@@ -134,7 +176,7 @@ class PodCodPolicyTests(SimpleTestCase):
             self.assertFalse(policy.derive_hard_pod_pending(shipment))
 
     def test_hard_pod_still_pending_when_hard_copy_received_without_a7h(self):
-        """Digital A7 may have set HARD_COPY_RECEIVED before A7H — keep pending."""
+        """Digital POD may have set HARD_COPY_RECEIVED before custody execute."""
         shipment = _shipment(
             pod_type=TenantShipment.PodType.HARD,
             pod_status=TenantShipment.PodStatus.COMPLETED,
@@ -143,13 +185,39 @@ class PodCodPolicyTests(SimpleTestCase):
             'mobile_api.dashboard.selectors.pod_cod_policy.HardPodCustodyAuthorityService',
         ) as mock_authority, patch(
             'mobile_api.dashboard.selectors.pod_cod_policy.HardPODCustodySubmission',
-        ) as mock_submission:
+        ) as mock_submission, patch(
+            'iroad_tenants.operation_runtime.shipment_execution_stage.shipment_unloading_completed_done',
+            return_value=True,
+        ):
             mock_authority.return_value.resolve_authority.return_value = {
                 'custody_authority': '',
             }
             _mock_no_promoted_submission(mock_submission)
             self.assertTrue(policy.derive_hard_pod_pending(shipment))
         self.assertTrue(policy.derive_pod_compliant(shipment))
+
+    def test_hard_pod_pending_when_upload_log_loaded_without_explicit_evidence(self):
+        """Defer/repair paths load mobile log evidence when callers omit log_evidence."""
+        shipment = _shipment(
+            pod_type=TenantShipment.PodType.HARD,
+            pod_status=TenantShipment.PodStatus.NOT_COMPLETED,
+        )
+        with patch(
+            'iroad_tenants.operation_runtime.side_effects._mobile_log_evidence_for_shipment',
+            return_value={'pod_uploaded': True},
+        ), patch(
+            'mobile_api.dashboard.selectors.pod_cod_policy.HardPodCustodyAuthorityService',
+        ) as mock_authority, patch(
+            'mobile_api.dashboard.selectors.pod_cod_policy.HardPODCustodySubmission',
+        ) as mock_submission, patch(
+            'iroad_tenants.operation_runtime.shipment_execution_stage.shipment_unloading_completed_done',
+            return_value=True,
+        ):
+            mock_authority.return_value.resolve_authority.return_value = {
+                'custody_authority': '',
+            }
+            _mock_no_promoted_submission(mock_submission)
+            self.assertTrue(policy.derive_hard_pod_pending(shipment))
 
     def test_hard_pod_not_pending_when_a7h_log_present(self):
         shipment = _shipment(
@@ -285,6 +353,14 @@ class PodCodPolicyTests(SimpleTestCase):
             order_type='COD',
         )
         mock_validate.return_value = None
+        self.assertFalse(policy.derive_delivery_blocked(shipment))
+
+    def test_delivery_not_blocked_while_in_transit(self):
+        shipment = _shipment(
+            order_type='COD',
+            shipment_status=TenantShipment.ShipmentStatus.IN_TRANSIT,
+            pod_status=TenantShipment.PodStatus.NOT_COMPLETED,
+        )
         self.assertFalse(policy.derive_delivery_blocked(shipment))
 
     @patch(

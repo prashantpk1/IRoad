@@ -126,7 +126,11 @@ class ExecutionProjectionCache:
             self._timeline_built = True
         if self._execute_context.job_type == 'shipment' and self._execute_context.shipment is not None:
             if not self._pod_cod_built:
-                self._execute_context.pod_cod = build_pod_cod_section(ctx, request=request)
+                self._execute_context.pod_cod = build_pod_cod_section(
+                    ctx,
+                    request=request,
+                    allow_hard_pod_recovery=False,
+                )
                 ctx.pod_cod = dict(self._execute_context.pod_cod or {})
                 self._pod_cod_built = True
         self._execute_context.round_trip = build_round_trip_section(ctx, request=request)
@@ -166,7 +170,11 @@ class ExecutionProjectionCache:
         reconcile_job_detail_entities(ctx, request=request)
 
         if self._execute_context.job_type == 'shipment' and self._execute_context.shipment is not None:
-            self._execute_context.pod_cod = build_pod_cod_section(ctx, request=request)
+            self._execute_context.pod_cod = build_pod_cod_section(
+                ctx,
+                request=request,
+                allow_hard_pod_recovery=False,
+            )
             self._execute_context.round_trip = build_round_trip_section(ctx, request=request)
             ctx.pod_cod = dict(self._execute_context.pod_cod or {})
             ctx.round_trip = dict(self._execute_context.round_trip or {})
@@ -181,6 +189,14 @@ class ExecutionProjectionCache:
 
         self._execute_context.timeline = build_timeline_section(ctx, request=request)
         ctx.timeline = dict(self._execute_context.timeline or {})
+
+        if self._execute_context.job_type == 'movement' and ctx.movement is not None:
+            from mobile_api.job_detail.projections.job_header_projection import (
+                build_job_header,
+            )
+
+            ctx.job_header = build_job_header(ctx, request=request)
+            self._execute_context.job = dict(ctx.job_header or {})
 
         projection_svc = JobDetailProjectionService()
         ctx.resolver_meta = dict(ctx.resolver_meta or {})

@@ -12,6 +12,10 @@ from mobile_api.helpers.job_action_resolver import (
     row_is_collect_payment_action,
     row_is_job_close_action,
 )
+from mobile_api.helpers.hard_copy_workflow_gate import (
+    _empty_hard_copy_checklist_block,
+    hard_copy_step_due,
+)
 from mobile_api.pod_capture.services.pod_capture_action_resolver import (
     CANONICAL_FALLBACK_HARD_COPY_POD_ACTION_CODE,
 )
@@ -24,11 +28,7 @@ HARD_COPY_GATE_REASON = (
 
 
 def _hard_copy_due(pod_cod: dict[str, Any] | None) -> bool:
-    pod = dict(pod_cod or {})
-    if not pod.get('hard_pod_pending') or pod.get('pod_pending'):
-        return False
-    block = dict(pod.get('hard_copy_confirmation') or {})
-    return bool(block.get('applicable') or block.get('required'))
+    return hard_copy_step_due(pod_cod)
 
 
 def build_hard_pod_primary_overlay(pod_cod: dict[str, Any] | None) -> dict[str, Any]:
@@ -106,14 +106,55 @@ def finalize_pod_cod_hard_copy_navigation(
     return pod
 
 
+def _strip_premature_hard_copy_ui(pod: dict[str, Any]) -> dict[str, Any]:
+    """Keep hard-copy checklist off job detail until digital POD + document gate pass."""
+    from mobile_api.helpers.hard_copy_workflow_gate import hard_copy_step_due
+
+    if hard_copy_step_due(pod):
+        return pod
+    block = dict(pod.get('hard_copy_confirmation') or {})
+    if not block:
+        return pod
+    block.pop('confirmation_ui', None)
+    pod['hard_copy_confirmation'] = block
+    return pod
+
+
 def enrich_pod_cod_hard_copy_gate(pod_cod: dict[str, Any] | None) -> dict[str, Any]:
     """Expose payment block flags while hard-copy custody is outstanding."""
+    from mobile_api.helpers.hard_copy_workflow_gate import (
+        digital_evidence_complete_for_pod_cod,
+        unloading_pending_for_pod_workflow,
+    )
+
     pod = dict(pod_cod or {})
+    pod = _strip_premature_hard_copy_ui(pod)
+    if unloading_pending_for_pod_workflow(pod) or not digital_evidence_complete_for_pod_cod(
+        pod,
+    ):
+        pod['hard_pod_pending'] = False
+        pod['hard_pod_capture_due'] = False
+        block = dict(pod.get('hard_copy_confirmation') or {})
+        if block:
+            block['documents'] = []
+            block['pages'] = []
+            block.pop('confirmation_ui', None)
+            pod['hard_copy_confirmation'] = block
     if not _hard_copy_due(pod):
+        if digital_evidence_complete_for_pod_cod(pod):
+            pod['hard_pod_pending'] = False
+            pod['hard_pod_capture_due'] = False
+            block = dict(pod.get('hard_copy_confirmation') or {})
+            if block:
+                pod['hard_copy_confirmation'] = _empty_hard_copy_checklist_block(block)
         return finalize_pod_cod_hard_copy_navigation(pod)
     pod['payment_collection_blocked'] = True
     pod['payment_collection_block_reason'] = HARD_COPY_GATE_REASON
-    pod['digital_pod_complete'] = not bool(pod.get('pod_pending'))
+    from mobile_api.helpers.hard_copy_workflow_gate import (
+        digital_evidence_complete_for_pod_cod,
+    )
+
+    pod['digital_pod_complete'] = digital_evidence_complete_for_pod_cod(pod)
     return pod
 
 

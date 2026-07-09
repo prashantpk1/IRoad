@@ -251,6 +251,60 @@ class HardPodSubmitServiceTests(TransactionTestCase):
         self.assertEqual(submission.custody_events.count(), 4)
 
     @patch(
+        'mobile_api.hard_pod.services.hard_pod_submit_service.promote_custody_submission',
+        return_value={
+            'promoted': True,
+            'execute_action_code': 'OA-0008',
+            'action_log_id': 'log-hard-1',
+            'next_collect_payment_action_code': 'OA-0009',
+        },
+    )
+    @patch(
+        'mobile_api.hard_pod.services.hard_pod_submit_service.resolve_hard_pod_promotion_action_code',
+        return_value='OA-0008',
+    )
+    @patch(
+        'mobile_api.hard_pod.services.hard_pod_submit_service.validate_confirmed_pages',
+        return_value=[
+            {
+                'page_id': 'page-1',
+                'document_id': 'doc-1',
+                'line_no': 1,
+                'physical_page_no': 1,
+                'label': 'DN-1020-P1',
+            }
+        ],
+    )
+    @patch('mobile_api.hard_pod.services.hard_pod_submit_service.schema_context')
+    @patch.object(HardPodSecurityGuard, 'resolve_and_assert_shipment')
+    @patch.object(HardPodSecurityGuard, 'assert_media_paths')
+    def test_submit_chains_hard_pod_execute(
+        self,
+        mock_media,
+        mock_resolve_shipment,
+        mock_schema,
+        _mock_validate_pages,
+        mock_promotion_code,
+        mock_promote,
+    ):
+        mock_schema.return_value.__enter__ = MagicMock(return_value=None)
+        mock_schema.return_value.__exit__ = MagicMock(return_value=False)
+        mock_resolve_shipment.return_value = self.shipment
+
+        service = HardPodSubmitService()
+        result = service.submit_custody(
+            driver=self.driver,
+            tenant_schema=self.tenant_schema,
+            payload=self._payload(),
+        )
+
+        mock_promote.assert_called_once()
+        self.assertTrue(result['execute_step']['promoted'])
+        self.assertEqual(result['next_step']['reason'], 'hard_pod_workflow_complete')
+        self.assertFalse(result['next_step']['requires_execute_action'])
+        self.assertEqual(result['next_step']['next_action_code'], 'OA-0009')
+
+    @patch(
         'mobile_api.hard_pod.services.hard_pod_submit_service.validate_confirmed_pages',
         return_value=[{'page_id': 'page-1', 'document_id': 'doc-1', 'line_no': 1}],
     )

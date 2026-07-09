@@ -138,9 +138,7 @@ def build_entity_versions(context: JobDetailContext) -> dict[str, str]:
 
 
 def resolve_content_hash(context: JobDetailContext) -> str:
-    existing = (context.content_hash or '').strip()
-    if existing:
-        return existing
+    """Always derive from current projection slices (never reuse a stale cached hash)."""
     pod_flags = {k: v for k, v in (context.pod_cod or {}).items() if isinstance(v, bool)}
     fp = build_content_fingerprint(
         context,

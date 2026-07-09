@@ -2,8 +2,8 @@
 Driver Treasury operational helpers (IRoute Ch.13).
 
 Maps UI categories to ledger types:
-  Client Collection  -> Debit  (COD cash into driver wallet)
-  Custody Collection -> Credit (cash handed to custody / transfer out)
+  Client Collection  -> Credit (COD cash into driver wallet — balance up)
+  Custody Collection -> Debit  (cash handed to custody / supervisor — balance down)
 """
 from __future__ import annotations
 
@@ -29,10 +29,10 @@ DRIVER_TXN_REF_PREFIX = 'TT'
 
 _CATEGORY_TO_TYPE = {
     DriverTreasuryTransaction.TransactionCategory.CLIENT_COLLECTION: (
-        DriverTreasuryTransaction.TransactionType.DEBIT
+        DriverTreasuryTransaction.TransactionType.CREDIT
     ),
     DriverTreasuryTransaction.TransactionCategory.CUSTODY_COLLECTION: (
-        DriverTreasuryTransaction.TransactionType.CREDIT
+        DriverTreasuryTransaction.TransactionType.DEBIT
     ),
 }
 
@@ -129,7 +129,7 @@ def cod_client_collection_exists(
         transaction_category=(
             DriverTreasuryTransaction.TransactionCategory.CLIENT_COLLECTION
         ),
-        transaction_type=DriverTreasuryTransaction.TransactionType.DEBIT,
+        transaction_type=DriverTreasuryTransaction.TransactionType.CREDIT,
     ).exists()
 
 
@@ -140,7 +140,7 @@ def post_cod_collection_for_action9(
     amount: Decimal | None = None,
 ) -> DriverTreasuryTransaction | None:
     """
-    Action 9 (Collect Payment): Debit · Client Collection on driver wallet.
+    Action 9 (Collect Payment): Credit · Client Collection on driver wallet.
     Idempotent per shipment + treasury (DB unique constraint).
     """
     if shipment is None:
@@ -196,7 +196,7 @@ def post_cod_collection_for_action9(
         transaction_sequence=txn_seq,
         transaction_date=txn_date,
         driver_treasury=treasury,
-        transaction_type=DriverTreasuryTransaction.TransactionType.DEBIT,
+        transaction_type=DriverTreasuryTransaction.TransactionType.CREDIT,
         transaction_category=(
             DriverTreasuryTransaction.TransactionCategory.CLIENT_COLLECTION
         ),

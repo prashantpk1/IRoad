@@ -75,7 +75,7 @@ Returns **summary** (total balance) plus the full filtered transaction list (no 
   "shipment": {
     "shipment_no": "SH-2026-1001",
     "status": "Completed",
-    "transaction_type": "Debit",
+    "transaction_type": "Credit",
     "transaction_type_label": "Received Amount",
     "route": { "type": "Round", "route_display": "Jeddah → Riyadh" },
     "payment_method": "COD",
@@ -90,9 +90,9 @@ Returns **summary** (total balance) plus the full filtered transaction list (no 
 
 - **Read-only** — wallet does not create treasury rows; A9 / admin paths do.
 - Driver sees only their **active** `DriverTreasury` wallet.
-- **Client Collection · Debit** = cash received (UI: “Received Amount”, `cash_flow: in`).
-- **Custody Collection · Credit** = cash handed over (`cash_flow: out`).
-- Balance = `DriverTreasury.current_balance` (debits − credits).
+- **Client Collection · Credit** = cash received (UI: “Received Amount”, `cash_flow: in`).
+- **Custody Collection · Debit** = cash handed over (`cash_flow: out`).
+- Balance = `DriverTreasury.current_balance` (credits − debits).
 
 ## Errors
 

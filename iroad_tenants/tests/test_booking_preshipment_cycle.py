@@ -92,7 +92,12 @@ class BookingPreshipmentCycleTests(SimpleTestCase):
         )
         self.assertFalse(is_backload_leg_pending(booking))
         self.assertTrue(is_backload_preshipment_cycle(booking, 'Backload'))
-        self.assertFalse(is_backload_preshipment_cycle(booking, 'Outbound'))
+        self.assertTrue(is_backload_preshipment_cycle(booking, 'Outbound'))
+        self.assertEqual(resolve_preshipment_booking_item_type(booking, ''), 'Backload')
+        self.assertEqual(
+            resolve_preshipment_booking_item_type(booking, 'Outbound'),
+            'Backload',
+        )
 
     @patch(
         'iroad_tenants.operation_runtime.booking_preshipment_cycle.TenantOperationActionLog'

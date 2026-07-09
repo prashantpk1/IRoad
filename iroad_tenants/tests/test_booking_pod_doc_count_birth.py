@@ -107,8 +107,6 @@ class BookingPodDocCountTests(SimpleTestCase):
             'iroad_tenants.views.TenantCargoMaster',
         ), patch(
             'iroad_tenants.views._tenant_booking_sync_pod_doc_counts_to_shipments',
-        ), patch(
-            'iroad_tenants.operation_runtime.pod_action._birth_delivery_note_scaffold',
         ):
             _tenant_shipment_birth_from_booking_line(booking, matched_line)
 
@@ -161,8 +159,6 @@ class BookingPodDocCountTests(SimpleTestCase):
             'iroad_tenants.views.TenantCargoMaster',
         ), patch(
             'iroad_tenants.views._tenant_booking_sync_pod_doc_counts_to_shipments',
-        ), patch(
-            'iroad_tenants.operation_runtime.pod_action._birth_delivery_note_scaffold',
         ):
             _tenant_shipment_birth_from_booking_line(booking, matched_line)
 

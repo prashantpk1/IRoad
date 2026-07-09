@@ -26,6 +26,7 @@ class PodCaptureScreenRoutingTests(TestCase):
                     'applicable': True,
                     'required': True,
                     'pending': True,
+                    'actionable': True,
                     'execute_action_code': 'A7H',
                     'pages': [{'label': 'Page 1'}],
                 },
@@ -40,10 +41,12 @@ class PodCaptureScreenRoutingTests(TestCase):
             {
                 'hard_pod_pending': True,
                 'digital_evidence_complete': True,
+                'unloading_pending': False,
                 'hard_copy_confirmation': {
                     'applicable': True,
                     'required': True,
                     'pending': True,
+                    'actionable': True,
                     'execute_action_code': 'A7H',
                     'pages': [{'label': 'Page 1'}],
                 },
@@ -56,6 +59,42 @@ class PodCaptureScreenRoutingTests(TestCase):
         self.assertEqual(routing['screen_title'], HARD_COPY_SCREEN_TITLE)
         self.assertEqual(routing['ui_mode'], UI_MODE_HARD_POD_CONFIRMATION)
 
+    def test_starts_digital_when_unloading_still_pending(self):
+        routing = build_pod_capture_get_routing(
+            {
+                'hard_pod_pending': True,
+                'digital_evidence_complete': True,
+                'unloading_pending': True,
+                'hard_copy_confirmation': {
+                    'applicable': True,
+                    'required': True,
+                    'pending': True,
+                    'execute_action_code': 'OA-0008',
+                },
+            }
+        )
+        self.assertEqual(routing['capture_mode'], UI_MODE_DIGITAL_EVIDENCE)
+        self.assertEqual(routing['active_step'], 'digital_evidence')
+
+    def test_stays_digital_when_document_gate_blocks_hard_copy(self):
+        routing = build_pod_capture_get_routing(
+            {
+                'hard_pod_pending': True,
+                'digital_evidence_complete': True,
+                'unloading_pending': False,
+                'hard_copy_confirmation': {
+                    'applicable': True,
+                    'required': True,
+                    'pending': True,
+                    'actionable': False,
+                    'execute_action_code': 'A7H',
+                    'pages': [],
+                },
+            }
+        )
+        self.assertEqual(routing['capture_mode'], UI_MODE_DIGITAL_EVIDENCE)
+        self.assertEqual(routing['active_step'], 'digital_evidence')
+
     def test_routes_to_digital_evidence_by_default(self):
         routing = build_pod_capture_get_routing(
             {
@@ -67,13 +106,17 @@ class PodCaptureScreenRoutingTests(TestCase):
         self.assertEqual(routing['action_code'], 'A7')
         self.assertEqual(routing['ui_mode'], UI_MODE_DIGITAL_EVIDENCE)
 
-    def test_step_query_forces_hard_copy_screen(self):
+    def test_step_query_forces_hard_copy_screen_when_digital_complete(self):
         routing = build_pod_capture_get_routing(
             {
-                'hard_pod_pending': False,
+                'hard_pod_pending': True,
+                'digital_evidence_complete': True,
+                'unloading_pending': False,
                 'hard_copy_confirmation': {
                     'required': True,
-                    'pending': False,
+                    'pending': True,
+                    'applicable': True,
+                    'actionable': True,
                     'execute_action_code': 'A7H',
                 },
             },

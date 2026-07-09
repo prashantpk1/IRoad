@@ -26,6 +26,7 @@ from mobile_api.helpers.job_location_serialization import (
     serialize_route,
 )
 from mobile_api.helpers.route_backload_proxy import backload_route_booking_proxy
+from mobile_api.helpers.open_job_pointer import attach_open_job_pointer
 
 
 def build_booking_card(
@@ -215,7 +216,7 @@ def _attach_preferred_job_pointer(
         payload['job_no'] = str(getattr(booking, 'booking_no', '') or '')
         payload['booking_item_type'] = 'Backload'
         payload['backload_bootstrap_pending'] = True
-        _attach_open_job_pointer(payload)
+        attach_open_job_pointer(payload)
         return
 
     if active is not None:
@@ -226,7 +227,7 @@ def _attach_preferred_job_pointer(
         payload['booking_item_type'] = str(
             getattr(active, 'booking_item_type', '') or ''
         ).strip()
-        _attach_open_job_pointer(payload)
+        attach_open_job_pointer(payload)
         return
 
     payload['job_type'] = 'booking'
@@ -237,24 +238,7 @@ def _attach_preferred_job_pointer(
         payload['backload_bootstrap_pending'] = True
     else:
         payload['booking_item_type'] = 'Outbound'
-    _attach_open_job_pointer(payload)
-
-
-def _attach_open_job_pointer(payload: dict[str, Any]) -> None:
-    """Explicit target for dashboard Open Job (mirrors job_type/job_id fields)."""
-    job_type = str(payload.get('job_type') or '').strip()
-    job_id = str(payload.get('job_id') or '').strip()
-    if not job_type or not job_id:
-        return
-    open_job: dict[str, Any] = {
-        'job_type': job_type,
-        'job_id': job_id,
-        'job_no': str(payload.get('job_no') or ''),
-        'booking_item_type': str(payload.get('booking_item_type') or ''),
-    }
-    if payload.get('backload_bootstrap_pending'):
-        open_job['backload_bootstrap_pending'] = True
-    payload['open_job'] = open_job
+    attach_open_job_pointer(payload)
 
 
 def _empty_booking_card() -> dict[str, Any]:

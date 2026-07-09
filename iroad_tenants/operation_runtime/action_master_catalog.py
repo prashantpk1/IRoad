@@ -14,6 +14,32 @@ from tenant_workspace.models import TenantOperationAction, TenantOperationAction
 AUTO_COD_VERIFY_CHANNEL = 'auto_cod_verify'
 AUTO_COD_VERIFY_ACTION_CODE = 'A_POD_VERIFY'
 AUTO_COD_VERIFY_IDEMPOTENCY_PREFIX = 'auto-pod-verify-'
+AUTO_COD_VERIFY_LOG_NO_PREFIX = 'LOG-POD-VERIFY-'
+AUTO_COD_VERIFY_ENGLISH_LABEL = 'POD Verified'
+AUTO_COD_VERIFY_ARABIC_LABEL = 'تم التحقق من POD'
+SYSTEM_AUTO_POD_VERIFY_CHANNELS = frozenset(
+    {
+        AUTO_COD_VERIFY_CHANNEL,
+        'auto_pod_verify',
+        'mobile_job_close_ready',
+    },
+)
+
+
+def is_system_auto_pod_verify_channel(channel: str) -> bool:
+    """Backend-only POD verify logs — no Action Master row required."""
+    return (channel or '').strip() in SYSTEM_AUTO_POD_VERIFY_CHANNELS
+
+
+def exclude_admin_hidden_system_logs(qs):
+    """Hide backend-only auto POD verify reconciler rows from tenant admin lists."""
+    from django.db.models import Q
+
+    return qs.exclude(
+        Q(source_channel__in=SYSTEM_AUTO_POD_VERIFY_CHANNELS)
+        | Q(log_no__startswith=AUTO_COD_VERIFY_LOG_NO_PREFIX)
+        | Q(idempotency_key__startswith=AUTO_COD_VERIFY_IDEMPOTENCY_PREFIX)
+    )
 
 
 @dataclass(frozen=True)
@@ -123,16 +149,6 @@ PRODUCTION_ACTION_MASTER: tuple[ActionMasterSpec, ...] = (
         prerequisite_action_codes=('A6',),
     ),
     ActionMasterSpec(
-        action_code='A7H',
-        english_label='Hard POD Collection',
-        arabic_label='Hard POD Collection',
-        sequence_number=72,
-        hard_copy_collection=True,
-        # Hard copy is a sub-step inside Upload POD (A7), not a separate timeline row.
-        mobile_visible=False,
-        prerequisite_action_codes=('A7',),
-    ),
-    ActionMasterSpec(
         action_code='A8',
         english_label='Unloading Completed',
         arabic_label='Unloading Completed',
@@ -159,216 +175,155 @@ PRODUCTION_ACTION_MASTER: tuple[ActionMasterSpec, ...] = (
         prerequisite_action_codes=('A8', 'A9'),
         condition_code='A9_required_if_COD',
     ),
-    ActionMasterSpec(
-        action_code=AUTO_COD_VERIFY_ACTION_CODE,
-        english_label='POD Verified',
-        arabic_label='POD Verified',
-        sequence_number=75,
-        mobile_visible=False,
-        admin_only=False,
-        shipment_status_impact='Delivered',
-        action_scope='job',
-        sequence_category='',
-    ),
-    ActionMasterSpec(
-        action_code='EM1',
-        english_label='Start Movement',
-        arabic_label='Start Movement',
-        sequence_number=1,
-        movement_status_impact='In_Progress',
-        action_scope='job',
-        sequence_category='empty_move',
-    ),
-    ActionMasterSpec(
-        action_code='EM2',
-        english_label='Depart Empty',
-        arabic_label='Depart Empty',
-        sequence_number=2,
-        prerequisite_action_codes=('EM1',),
-        action_scope='job',
-        sequence_category='empty_move',
-    ),
-    ActionMasterSpec(
-        action_code='EM3',
-        english_label='Arrival At Destination',
-        arabic_label='Arrival At Destination',
-        sequence_number=3,
-        prerequisite_action_codes=('EM2',),
-        action_scope='job',
-        sequence_category='empty_move',
-    ),
-    ActionMasterSpec(
-        action_code='EM4',
-        english_label='Complete Movement',
-        arabic_label='Complete Movement',
-        sequence_number=4,
-        movement_status_impact='Completed',
-        prerequisite_action_codes=('EM3',),
-        action_scope='job',
-        sequence_category='empty_move',
-    ),
-    ActionMasterSpec(
-        action_code='R1',
-        english_label='Cancel Shipment',
-        arabic_label='Cancel Shipment',
-        sequence_number=1,
-        mobile_visible=False,
-        admin_only=True,
-        shipment_status_impact='Cancelled',
-        action_scope='without',
-        sequence_category='without',
-    ),
-    ActionMasterSpec(
-        action_code='R2',
-        english_label='Cancel Booking Item',
-        arabic_label='Cancel Booking Item',
-        sequence_number=2,
-        mobile_visible=False,
-        admin_only=True,
-        booking_status_impact='cancelled',
-        action_scope='without',
-        sequence_category='without',
-    ),
-    ActionMasterSpec(
-        action_code='R3',
-        english_label='Cancel Booking',
-        arabic_label='Cancel Booking',
-        sequence_number=3,
-        mobile_visible=False,
-        admin_only=True,
-        booking_status_impact='cancelled',
-        action_scope='without',
-        sequence_category='without',
-    ),
-    ActionMasterSpec(
-        action_code='R4',
-        english_label='Reject POD',
-        arabic_label='Reject POD',
-        sequence_number=4,
-        mobile_visible=False,
-        admin_only=True,
-        action_scope='without',
-        sequence_category='without',
-    ),
 )
 
-EMPTY_MOVE_ACTION_CODES = frozenset({'EM1', 'EM2', 'EM3', 'EM4'})
+# Legacy EM* codes — runtime fallbacks only; never auto-seeded (tenant defines empty_move rows).
+LEGACY_EMPTY_MOVE_ACTION_CODES = frozenset({'EM1', 'EM2', 'EM3', 'EM4'})
+EMPTY_MOVE_ACTION_CODES = LEGACY_EMPTY_MOVE_ACTION_CODES
+
+# PDF Table 10/11 — tenant-defined in Operation Action Master (never auto-seeded).
+WITHOUT_SCOPE_CANCEL_SHIPMENT_LABEL = 'Cancel Shipment'
+WITHOUT_SCOPE_CANCEL_BOOKING_ITEM_LABEL = 'Cancel Booking Item'
+WITHOUT_SCOPE_CANCEL_BOOKING_LABEL = 'Cancel Booking'
+WITHOUT_SCOPE_REJECT_POD_LABEL = 'Reject POD'
+WITHOUT_SCOPE_CANCEL_MOVEMENT_LABEL = 'Cancel Movement'
+WITHOUT_SCOPE_INCIDENT_REPORT_LABEL = 'Incident Report'
 
 
-def _action_master_model_fields() -> set[str]:
-    return {field.name for field in TenantOperationAction._meta.fields}
+WITHOUT_SCOPE_MARKER = 'without'
 
 
-def ensure_empty_move_action_master_rows() -> bool:
-    """
-    Idempotently seed EM1–EM4 for the current tenant schema.
+def active_without_scope_action_options():
+    """Active Operation Action rows with scope/category ``without`` (admin reversals)."""
+    from django.db.models import Q
 
-    Empty-move mobile workflow depends on these rows; tenants created before the
-    catalog included EM actions may have none ACTIVE.
-    """
-    from iroad_tenants.operation_runtime.action_config_cache import (
-        invalidate_active_action_catalog_cache,
+    return TenantOperationAction.objects.filter(
+        status=TenantOperationAction.Status.ACTIVE,
+    ).filter(
+        Q(action_scope=WITHOUT_SCOPE_MARKER)
+        | Q(sequence_category=WITHOUT_SCOPE_MARKER),
+    ).order_by('sequence_number', 'action_code')
+
+
+def _active_without_scope_actions(*, english_label: str):
+    """Active Operation Action rows for a without-scope English label."""
+    from django.db.models import Q
+
+    label = (english_label or '').strip()
+    if not label:
+        return TenantOperationAction.objects.none()
+
+    base = TenantOperationAction.objects.filter(
+        status=TenantOperationAction.Status.ACTIVE,
+        english_label__iexact=label,
     )
+    scoped = base.filter(
+        Q(action_scope=WITHOUT_SCOPE_MARKER)
+        | Q(sequence_category=WITHOUT_SCOPE_MARKER)
+    ).order_by('sequence_number', 'action_code')
+    if scoped.exists():
+        return scoped
+    return base.order_by('sequence_number', 'action_code')
 
-    model_fields = _action_master_model_fields()
-    changed = False
-    for spec in PRODUCTION_ACTION_MASTER:
-        if spec.action_code not in EMPTY_MOVE_ACTION_CODES:
-            continue
-        defaults = spec.defaults(model_fields)
+
+def resolve_without_scope_action(
+    *,
+    english_label: str,
+    legacy_action_codes: tuple[str, ...] = (),
+) -> TenantOperationAction | None:
+    """
+    Resolve a tenant-configured ``without``-scope Operation Action.
+
+    Never auto-creates rows — admins define these in Operation Action Master
+    (PDF Tables 10/11, e.g. OA-0017..OA-0021).
+
+    Resolution order:
+      1. Legacy action codes (R1, R2, …) when still present in tenant data.
+      2. Active row matching English label with scope/category ``without``.
+      3. Active row matching English label only (single match).
+    """
+    for code in legacy_action_codes:
         row = TenantOperationAction.objects.filter(
-            action_code__iexact=spec.action_code,
-        ).first()
-        if row is None:
-            TenantOperationAction.objects.create(
-                action_code=spec.action_code,
-                **defaults,
-            )
-            changed = True
-            continue
-        if row.status != TenantOperationAction.Status.ACTIVE:
-            row.status = TenantOperationAction.Status.ACTIVE
-            changed = True
-        patch = {
-            field: value
-            for field, value in defaults.items()
-            if getattr(row, field) != value
-        }
-        if patch:
-            for field, value in patch.items():
-                setattr(row, field, value)
-            row.save(update_fields=[*patch.keys(), 'updated_at'])
-            changed = True
-    if changed:
-        invalidate_active_action_catalog_cache()
-    else:
-        missing = not all(
-            TenantOperationAction.objects.filter(
-                action_code__iexact=code,
-                status=TenantOperationAction.Status.ACTIVE,
-            ).exists()
-            for code in EMPTY_MOVE_ACTION_CODES
-        )
-        if missing:
-            invalidate_active_action_catalog_cache()
-    return changed
-
-
-_EXCLUDED_FALLBACK_CODES = frozenset(
-    {'A6', 'A7', 'A8', 'A9', 'A10', 'A1', 'A2', 'A3', 'A4', 'A5'},
-)
-
-
-def resolve_auto_cod_verify_action() -> TenantOperationAction | None:
-    """
-    Resolve the Action Master row used for post-A9 auto POD verify logs.
-
-    Never use ``icontains='Deliver'`` — that incorrectly matches ``At_Delivery`` (A6).
-    """
-    verify = TenantOperationAction.objects.filter(
-        action_code__iexact=AUTO_COD_VERIFY_ACTION_CODE,
-        status=TenantOperationAction.Status.ACTIVE,
-    ).first()
-    if verify is not None:
-        impact = resolve_shipment_status_impact(verify.shipment_status_impact)
-        if impact == TenantShipment.ShipmentStatus.DELIVERED:
-            return verify
-
-    for row in TenantOperationAction.objects.filter(
-        status=TenantOperationAction.Status.ACTIVE,
-    ).exclude(
-        action_code__in=_EXCLUDED_FALLBACK_CODES,
-    ).order_by('sequence_number', 'action_code'):
-        code = (row.action_code or '').strip().upper()
-        if code == AUTO_COD_VERIFY_ACTION_CODE:
-            continue
-        impact = resolve_shipment_status_impact(row.shipment_status_impact)
-        if impact == TenantShipment.ShipmentStatus.DELIVERED:
-            return row
-    return None
-
-
-def resolve_auto_close_job_action() -> TenantOperationAction | None:
-    """Resolve Action Master job-close row for post-Delivered auto-close logs."""
-    for code in ('A10', 'OA-0010'):
-        close_action = TenantOperationAction.objects.filter(
             action_code__iexact=code,
             status=TenantOperationAction.Status.ACTIVE,
         ).first()
-        if close_action is not None:
-            impact = resolve_shipment_status_impact(close_action.shipment_status_impact)
-            if impact == TenantShipment.ShipmentStatus.CLOSED:
-                return close_action
-    for row in TenantOperationAction.objects.filter(
-        status=TenantOperationAction.Status.ACTIVE,
-    ).order_by('sequence_number', 'action_code'):
-        code = (row.action_code or '').strip().upper()
-        if code not in {'A10', 'OA-0010'}:
-            continue
-        impact = resolve_shipment_status_impact(row.shipment_status_impact)
-        if impact == TenantShipment.ShipmentStatus.CLOSED:
+        if row is not None:
             return row
-    return None
+
+    label = (english_label or '').strip()
+    if not label:
+        return None
+
+    scoped = _active_without_scope_actions(english_label=label)
+    if scoped.count() == 1:
+        return scoped.first()
+    if scoped.count() > 1:
+        return scoped.first()
+
+    fallback = TenantOperationAction.objects.filter(
+        status=TenantOperationAction.Status.ACTIVE,
+        english_label__iexact=label,
+    ).order_by('sequence_number', 'action_code')
+    if fallback.count() == 1:
+        return fallback.first()
+    return fallback.first() if fallback.exists() else None
+
+
+def cancel_action_configuration_error(english_label: str) -> str:
+    return (
+        f'Operation Action "{english_label}" is not configured. '
+        'Create an Active Operation Action with Action Scope "Without", '
+        f'English label "{english_label}", and Shipment Status Impact "Cancelled".'
+    )
+
+
+def resolve_cancel_shipment_action() -> TenantOperationAction | None:
+    return resolve_without_scope_action(
+        english_label=WITHOUT_SCOPE_CANCEL_SHIPMENT_LABEL,
+        legacy_action_codes=('R1',),
+    )
+
+
+def resolve_cancel_booking_item_action() -> TenantOperationAction | None:
+    return resolve_without_scope_action(
+        english_label=WITHOUT_SCOPE_CANCEL_BOOKING_ITEM_LABEL,
+        legacy_action_codes=('R2',),
+    )
+
+
+def resolve_cancel_booking_action() -> TenantOperationAction | None:
+    return resolve_without_scope_action(
+        english_label=WITHOUT_SCOPE_CANCEL_BOOKING_LABEL,
+        legacy_action_codes=('R3',),
+    )
+
+
+def resolve_reject_pod_action() -> TenantOperationAction | None:
+    return resolve_without_scope_action(
+        english_label=WITHOUT_SCOPE_REJECT_POD_LABEL,
+        legacy_action_codes=('R4',),
+    )
+
+
+def resolve_cancel_movement_action() -> TenantOperationAction | None:
+    return resolve_without_scope_action(
+        english_label=WITHOUT_SCOPE_CANCEL_MOVEMENT_LABEL,
+    )
+
+
+def resolve_incident_report_action() -> TenantOperationAction | None:
+    return resolve_without_scope_action(
+        english_label=WITHOUT_SCOPE_INCIDENT_REPORT_LABEL,
+    )
+
+
+def resolve_auto_close_job_action() -> TenantOperationAction | None:
+    """Resolve Action Master job-close row (dynamic — not fixed A10/OA-0010)."""
+    from iroad_tenants.operation_runtime.workflow_action_policy import (
+        resolve_job_close_operation_action,
+    )
+
+    return resolve_job_close_operation_action()
 
 
 def validate_production_action_master() -> list[str]:
@@ -399,30 +354,21 @@ def validate_production_action_master() -> list[str]:
             errors.append(
                 f'{spec.action_code}: mobile_visible must be {spec.mobile_visible}',
             )
-        if spec.action_code == AUTO_COD_VERIFY_ACTION_CODE and row.admin_only:
-            errors.append(f'{spec.action_code}: must not be admin_only')
-
-    verify = resolve_auto_cod_verify_action()
-    if verify is None:
-        errors.append(
-            f'{AUTO_COD_VERIFY_ACTION_CODE} missing or shipment_status_impact not Delivered',
-        )
     return errors
 
 
 def repair_auto_cod_verify_logs(*, dry_run: bool = False) -> int:
     """
-    Re-link auto_cod_verify logs to the correct verify action (fixes A6 mis-attachment).
-    """
-    verify_action = resolve_auto_cod_verify_action()
-    if verify_action is None:
-        return 0
+    Clear mistaken Action Master links on backend auto POD verify logs.
 
+    Auto verify is log-only (``operation_action`` NULL); legacy rows may still
+    point at A6 or other mis-attached actions.
+    """
     wrong_qs = TenantOperationActionLog.objects.filter(
-        source_channel=AUTO_COD_VERIFY_CHANNEL,
-    ).exclude(operation_action_id=verify_action.pk)
+        source_channel__in=SYSTEM_AUTO_POD_VERIFY_CHANNELS,
+    ).exclude(operation_action__isnull=True)
 
     count = wrong_qs.count()
     if count and not dry_run:
-        wrong_qs.update(operation_action=verify_action)
+        wrong_qs.update(operation_action=None)
     return count

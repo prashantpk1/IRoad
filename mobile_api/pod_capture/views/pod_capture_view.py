@@ -10,6 +10,7 @@ from __future__ import annotations
 import logging
 
 from django.utils.translation import gettext as _
+from django_tenants.utils import schema_context
 from rest_framework.parsers import FormParser, JSONParser, MultiPartParser
 
 from mobile_api.helpers.mobile_driver_session import resolve_mobile_driver_session
@@ -103,75 +104,76 @@ class PodCaptureAPIView(MobileAPIView):
             )
 
         shipment = resolved.shipment
-        updated = getattr(shipment, 'updated_at', None)
-        hash_value = updated.isoformat() if hasattr(updated, 'isoformat') else ''
-        log_evidence = resolve_shipment_log_evidence(
-            shipment,
-            driver=driver,
-            tenant_schema=tenant_schema,
-        )
-        pod_section = build_pod_section_metadata(
-            shipment,
-            driver=driver,
-            tenant_schema=tenant_schema,
-            log_evidence=log_evidence,
-        )
-        requested_step = str(
-            request.query_params.get('step')
-            or request.query_params.get('capture_step')
-            or ''
-        ).strip()
-        routing = build_pod_capture_get_routing(
-            pod_section,
-            requested_step=requested_step,
-        )
-        digital = dict(pod_section.get('digital_evidence') or {})
-        hard_block = dict(pod_section.get('hard_copy_confirmation') or {})
-        from mobile_api.pod_capture.services.pod_section_metadata import (
-            DIGITAL_EVIDENCE_SCREEN_TITLE,
-            HARD_COPY_SCREEN_TITLE,
-            UI_MODE_DIGITAL_EVIDENCE,
-            UI_MODE_HARD_POD_CONFIRMATION,
-            build_hard_copy_confirmation_ui,
-        )
-
-        capture_mode = (routing.get('capture_mode') or '').strip().casefold()
-        is_hard_copy_step = capture_mode == 'hard_copy_confirmation'
-        screen_contract = ''
-        if is_hard_copy_step:
-            pages = list(hard_block.get('pages') or [])
-            confirmation_ui = dict(hard_block.get('confirmation_ui') or {})
-            if not confirmation_ui and pages:
-                confirmation_ui = build_hard_copy_confirmation_ui(pages)
-            screen_title = HARD_COPY_SCREEN_TITLE
-            ui_mode = UI_MODE_HARD_POD_CONFIRMATION
-            capture_ui = {}
-            screen_contract = 'confirmation_ui'
-        else:
-            confirmation_ui = {}
-            screen_title = (
-                pod_section.get('screen_title')
-                or digital.get('screen_title')
-                or DIGITAL_EVIDENCE_SCREEN_TITLE
+        with schema_context(tenant_schema):
+            updated = getattr(shipment, 'updated_at', None)
+            hash_value = updated.isoformat() if hasattr(updated, 'isoformat') else ''
+            log_evidence = resolve_shipment_log_evidence(
+                shipment,
+                driver=driver,
+                tenant_schema=tenant_schema,
             )
-            ui_mode = UI_MODE_DIGITAL_EVIDENCE
-            capture_ui = pod_section.get('capture_ui') or digital.get('capture_ui') or {}
-        data = {
-            'shipment_id': str(getattr(shipment, 'pk', None) or shipment_id),
-            'content_hash': hash_value,
-            'workflow_version': hash_value,
-            'entity_versions': {
-                'shipment': hash_value,
-            },
-            'generated_at': hash_value,
-            'pod_section': pod_section,
-            'screen_title': screen_title,
-            'ui_mode': ui_mode,
-            'capture_ui': capture_ui,
-            'confirmation_ui': confirmation_ui,
-            'screen_contract': screen_contract,
-            **routing,
-        }
+            pod_section = build_pod_section_metadata(
+                shipment,
+                driver=driver,
+                tenant_schema=tenant_schema,
+                log_evidence=log_evidence,
+            )
+            requested_step = str(
+                request.query_params.get('step')
+                or request.query_params.get('capture_step')
+                or ''
+            ).strip()
+            routing = build_pod_capture_get_routing(
+                pod_section,
+                requested_step=requested_step,
+            )
+            digital = dict(pod_section.get('digital_evidence') or {})
+            hard_block = dict(pod_section.get('hard_copy_confirmation') or {})
+            from mobile_api.pod_capture.services.pod_section_metadata import (
+                DIGITAL_EVIDENCE_SCREEN_TITLE,
+                HARD_COPY_SCREEN_TITLE,
+                UI_MODE_DIGITAL_EVIDENCE,
+                UI_MODE_HARD_POD_CONFIRMATION,
+                build_hard_copy_confirmation_ui,
+            )
+
+            capture_mode = (routing.get('capture_mode') or '').strip().casefold()
+            is_hard_copy_step = capture_mode == 'hard_copy_confirmation'
+            screen_contract = ''
+            if is_hard_copy_step:
+                pages = list(hard_block.get('pages') or [])
+                confirmation_ui = dict(hard_block.get('confirmation_ui') or {})
+                if not confirmation_ui and pages:
+                    confirmation_ui = build_hard_copy_confirmation_ui(pages)
+                screen_title = HARD_COPY_SCREEN_TITLE
+                ui_mode = UI_MODE_HARD_POD_CONFIRMATION
+                capture_ui = {}
+                screen_contract = 'confirmation_ui'
+            else:
+                confirmation_ui = {}
+                screen_title = (
+                    pod_section.get('screen_title')
+                    or digital.get('screen_title')
+                    or DIGITAL_EVIDENCE_SCREEN_TITLE
+                )
+                ui_mode = UI_MODE_DIGITAL_EVIDENCE
+                capture_ui = pod_section.get('capture_ui') or digital.get('capture_ui') or {}
+            data = {
+                'shipment_id': str(getattr(shipment, 'pk', None) or shipment_id),
+                'content_hash': hash_value,
+                'workflow_version': hash_value,
+                'entity_versions': {
+                    'shipment': hash_value,
+                },
+                'generated_at': hash_value,
+                'pod_section': pod_section,
+                'screen_title': screen_title,
+                'ui_mode': ui_mode,
+                'capture_ui': capture_ui,
+                'confirmation_ui': confirmation_ui,
+                'screen_contract': screen_contract,
+                **routing,
+            }
         return self.success(
             message=_('mobile.pod_capture.success'),
             data=data,

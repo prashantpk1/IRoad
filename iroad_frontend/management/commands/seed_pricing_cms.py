@@ -34,20 +34,20 @@ from iroad_frontend.models import (
 
 def _pricing_singleton_text():
     return {
-        'page_title_en': 'IRoad - SaaS Transport Management System Pricing Page',
-        'page_title_ar': 'آيرواد - صفحة أسعار نظام إدارة النقل SaaS',
+        'page_title_en': 'IRoute - SaaS Transport Management System Pricing Page',
+        'page_title_ar': 'آيروت - صفحة أسعار نظام إدارة النقل SaaS',
         'meta_description_en': (
-            'IRoad pricing plans for transport teams — Starter, Business, and '
+            'IRoute pricing plans for transport teams — Starter, Business, and '
             'Enterprise. Compare modules, trials, and support.'
         ),
         'meta_description_ar': (
-            'خطط أسعار آيرواد لفرق النقل — المبتدئ والأعمال والمؤسسات. قارن '
+            'خطط أسعار آيروت لفرق النقل — المبتدئ والأعمال والمؤسسات. قارن '
             'الوحدات والتجارب والدعم.'
         ),
         'page_header_h1_en': (
-            'IRoad - SaaS Transport Management System Pricing Page'
+            'IRoute - SaaS Transport Management System Pricing Page'
         ),
-        'page_header_h1_ar': 'صفحة أسعار آيرواد - نظام إدارة النقل SaaS',
+        'page_header_h1_ar': 'صفحة أسعار آيروت - نظام إدارة النقل SaaS',
         'breadcrumb_current_en': 'Pricing plans',
         'breadcrumb_current_ar': 'خطط الأسعار',
         'pricing_kicker_en': 'Pricing Plans',
@@ -67,18 +67,18 @@ def _pricing_singleton_text():
         'partner_heading_en': 'Trusted by Transport Businesses Across Regions',
         'partner_heading_ar': 'موثوق به من شركات النقل عبر المناطق',
         'partner_body_en': (
-            'IRoad helps logistics companies digitize operations and scale '
+            'IRoute helps logistics companies digitize operations and scale '
             'efficiently.'
         ),
         'partner_body_ar': (
-            'تساعد آيرواد شركات اللوجستيات على رقمنة العمليات والتوسع بكفاءة.'
+            'تساعد آيروت شركات اللوجستيات على رقمنة العمليات والتوسع بكفاءة.'
         ),
         'partner_cta_label_en': 'Book a Demo',
         'partner_cta_label_ar': 'احجز عرضاً',
         'partner_cta_url': '/contact/',
         'partner_email_label_en': 'Email',
         'partner_email_label_ar': 'البريد الإلكتروني',
-        'partner_email_value': 'support@iroad.com',
+        'partner_email_value': 'support@iroute.com',
         'partner_platform_label_en': 'Cloud-Based Platform (Accessible Anywhere)',
         'partner_platform_label_ar': 'منصة سحابية (متاحة من أي مكان)',
         'counter_1_value': '24/7',
@@ -98,18 +98,18 @@ def _pricing_singleton_text():
         'counter_5_label_ar': 'شريك',
         'testimonials_kicker_en': 'Our Testimonials',
         'testimonials_kicker_ar': 'آراء عملائنا',
-        'testimonials_heading_en': 'What transport teams say about IRoad',
-        'testimonials_heading_ar': 'ماذا يقول فرق النقل عن آيرواد',
+        'testimonials_heading_en': 'What transport teams say about IRoute',
+        'testimonials_heading_ar': 'ماذا يقول فرق النقل عن آيروت',
         'faq_kicker_en': 'FAQs',
         'faq_kicker_ar': 'الأسئلة الشائعة',
-        'faq_heading_en': 'Answers to common questions about IRoad',
-        'faq_heading_ar': 'إجابات عن أسئلة شائعة حول آيرواد',
+        'faq_heading_en': 'Answers to common questions about IRoute',
+        'faq_heading_ar': 'إجابات عن أسئلة شائعة حول آيروت',
         'faq_intro_en': (
-            'Find clear, detailed answers about IRoad TMS, plans, modules, '
+            'Find clear, detailed answers about IRoute TMS, plans, modules, '
             'support, and data security.'
         ),
         'faq_intro_ar': (
-            'اعثر على إجابات واضحة ومفصلة عن نظام آيرواد لإدارة النقل والخطط '
+            'اعثر على إجابات واضحة ومفصلة عن نظام آيروت لإدارة النقل والخطط '
             'والوحدات والدعم وأمان البيانات.'
         ),
         'faq_view_all_label_en': 'View all FAQs',
@@ -170,14 +170,14 @@ INTERACTIVE_STEPS = [
 PRICING_FAQS = [
     {
         'order': 1,
-        'question_en': 'What plans does IRoad offer?',
-        'question_ar': 'ما الخطط التي يقدمها آيرواد؟',
+        'question_en': 'What plans does IRoute offer?',
+        'question_ar': 'ما الخطط التي يقدمها آيروت؟',
         'answer_en': (
-            'IRoad offers Starter, Business, and Enterprise plans to fit teams '
+            'IRoute offers Starter, Business, and Enterprise plans to fit teams '
             'of all sizes.'
         ),
         'answer_ar': (
-            'يقدم آيرواد خطط المبتدئ والأعمال والمؤسسات لتناسب فرق العمل '
+            'يقدم آيروت خطط المبتدئ والأعمال والمؤسسات لتناسب فرق العمل '
             'بجميع الأحجام.'
         ),
     },

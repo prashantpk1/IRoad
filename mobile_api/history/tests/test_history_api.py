@@ -236,25 +236,86 @@ class HistoryCardProjectionTests(SimpleTestCase):
         empty_shipment.order_type = ''
         self.assertEqual(payment_method_tag(empty_shipment, fallback_booking), 'Credit')
 
-    def test_resolve_history_route_parses_route_display_cities(self):
+    def test_resolve_history_route_aligns_route_with_address_cities(self):
         from mobile_api.history.projections.history_card_projection import resolve_history_route
 
-        shipment = MagicMock()
-        shipment.route_display = 'delhi To Mumbai'
-        shipment.booking = None
-        loading = MagicMock()
-        loading.city = 'delhi'
-        delivery = MagicMock()
-        delivery.city = 'delhi'
-        shipment.loading_address = loading
-        shipment.delivery_address = delivery
+        pickup = MagicMock()
+        pickup.city = 'Riyadh'
+        pickup.english_label = 'Main Warehouse, Riyadh'
+        pickup.arabic_label = ''
+        pickup.display_name = 'Main Warehouse, Riyadh'
+        pickup.address_line_1 = 'Address line 2'
+        pickup.address_line_2 = ''
+        pickup.district = ''
+        pickup.province = ''
+        pickup.street = ''
+        pickup.building_no = ''
+        pickup.postal_code = ''
+        pickup.map_link = ''
+        pickup.contact_name = ''
+        pickup.mobile_no_1 = ''
+        pickup.mobile_no_2 = ''
+        pickup.site_instructions = ''
+        pickup.address_id = uuid4()
+        pickup.address_code = 'AD-1'
 
-        route = resolve_history_route(shipment, None)
-        self.assertEqual(route['origin_city'], 'delhi')
-        self.assertEqual(route['destination_city'], 'Mumbai')
-        self.assertEqual(route['route_display'], 'delhi To Mumbai')
-        self.assertEqual(route['route_display_start'], 'delhi')
-        self.assertEqual(route['route_display_end'], 'Mumbai')
+        drop = MagicMock()
+        drop.city = 'Jeddah'
+        drop.english_label = 'Backload Drop, Jeddah'
+        drop.arabic_label = ''
+        drop.display_name = 'Backload Drop, Jeddah'
+        drop.address_line_1 = 'Address line 2'
+        drop.address_line_2 = ''
+        drop.district = ''
+        drop.province = ''
+        drop.street = ''
+        drop.building_no = ''
+        drop.postal_code = ''
+        drop.map_link = ''
+        drop.contact_name = ''
+        drop.mobile_no_1 = ''
+        drop.mobile_no_2 = ''
+        drop.site_instructions = ''
+        drop.address_id = uuid4()
+        drop.address_code = 'AD-2'
+
+        origin = MagicMock()
+        origin.display_label = 'jeddah'
+        origin.location_name_english = 'jeddah'
+        origin.location_name_arabic = ''
+        destination = MagicMock()
+        destination.display_label = 'Makkah'
+        destination.location_name_english = 'Makkah'
+        destination.location_name_arabic = ''
+
+        route_master = MagicMock()
+        route_master.route_id = uuid4()
+        route_master.route_code = 'RT-1'
+        route_master.route_label = 'jeddah — Makkah'
+        route_master.route_type = 'Domestic'
+        route_master.origin_point = origin
+        route_master.destination_point = destination
+
+        booking = MagicMock()
+        booking.trip_type = 'Round'
+        booking.route = route_master
+        booking.route_direction = 'forward'
+        booking.route_display = 'jeddah — Makkah'
+        booking.loading_address = pickup
+        booking.delivery_address = drop
+
+        shipment = MagicMock()
+        shipment.route_display = ''
+        shipment.booking = booking
+        shipment.booking_item_type = 'Backload'
+        shipment.loading_address = pickup
+        shipment.delivery_address = drop
+
+        route = resolve_history_route(shipment, booking)
+        self.assertEqual(route['origin_city'], 'Jeddah')
+        self.assertEqual(route['destination_city'], 'Riyadh')
+        self.assertIn('Jeddah', route['route_display'])
+        self.assertIn('Riyadh', route['route_display'])
 
     def test_resolve_trip_type_from_booking(self):
         from mobile_api.history.projections.history_card_projection import resolve_trip_type
@@ -325,8 +386,12 @@ class HistoryCardProjectionTests(SimpleTestCase):
 
         origin = MagicMock()
         origin.display_label = 'Alec Sexton4'
+        origin.location_name_english = 'Alec Sexton4'
+        origin.location_name_arabic = ''
         destination = MagicMock()
         destination.display_label = 'Goa'
+        destination.location_name_english = 'Goa'
+        destination.location_name_arabic = ''
 
         route_master = MagicMock()
         route_master.route_id = uuid4()
@@ -343,6 +408,8 @@ class HistoryCardProjectionTests(SimpleTestCase):
         booking.route = route_master
         booking.route_direction = 'forward'
         booking.route_display = 'delhi — Goa'
+        booking.loading_address = None
+        booking.delivery_address = None
 
         shipment = MagicMock()
         shipment.pk = uuid4()
@@ -507,3 +574,183 @@ class HistoryCardProjectionTests(SimpleTestCase):
         self.assertEqual(payload['drop_address']['address_code'], 'AD-DROP')
         self.assertEqual(payload['drop_address']['city'], 'Jeddah')
         self.assertEqual(payload['drop_address']['map_link'], 'https://maps.example/drop')
+
+    def test_workflow_loading_timestamp_precedes_delivery(self):
+        from datetime import datetime, timezone
+
+        from mobile_api.history.projections.history_detail_projection import (
+            build_workflow_status,
+        )
+
+        booking = MagicMock()
+        booking.order_type = 'COD'
+        booking.loading_address = None
+        booking.delivery_address = None
+        booking.route_display = ''
+
+        shipment = MagicMock()
+        shipment.shipment_no = 'SH-0102'
+        shipment.shipment_status = TenantShipment.ShipmentStatus.CLOSED
+        shipment.order_type = 'COD'
+        shipment.collection_status = TenantShipment.CollectionStatus.COLLECTED
+        shipment.pod_status = TenantShipment.PodStatus.COMPLETED
+        shipment.booking = booking
+        shipment.cargo = None
+        shipment.loading_address = None
+        shipment.delivery_address = None
+        shipment.route_display = ''
+        shipment.booking_item_type = 'Backload'
+
+        t_load = datetime(2026, 6, 24, 15, 1, tzinfo=timezone.utc)
+        t_confirm = datetime(2026, 6, 24, 15, 3, tzinfo=timezone.utc)
+        t_delivery = datetime(2026, 6, 24, 15, 2, tzinfo=timezone.utc)
+
+        def _action(code, label):
+            action = MagicMock()
+            action.action_code = code
+            action.english_label = label
+            action.arabic_label = ''
+            action.shipment_status_impact = ''
+            action.movement_status_impact = ''
+            action.auto_pod_post = False
+            action.auto_treasury_post = False
+            action.sequence_category = ''
+            action.admin_only = False
+            return action
+
+        def _row(code, label, log_date):
+            row = MagicMock()
+            row.operation_action = _action(code, label)
+            row.log_date = log_date
+            row.created_at = log_date
+            row.media_rows = MagicMock(all=MagicMock(return_value=[]))
+            row.latitude = ''
+            row.longitude = ''
+            return row
+
+        logs = [
+            _row('OA-0004', 'Confirm Loaded', t_confirm),
+            _row('OA-0006', 'Delivery Arrival', t_delivery),
+            _row('OA-0003', 'Start Loading', t_load),
+        ]
+        workflow = build_workflow_status(shipment, logs)
+        by_key = {row['step_key']: row for row in workflow}
+        self.assertIn('03:01 PM', by_key['loading']['display_timestamp'])
+        self.assertIn('03:02 PM', by_key['delivery']['display_timestamp'])
+
+    @patch('mobile_api.history.projections.history_timeline_projection.JobDetailTimelineService')
+    def test_closed_cod_workflow_shows_full_milestone_chain(self, mock_timeline_service):
+        from datetime import datetime, timezone
+
+        from mobile_api.history.projections.history_detail_projection import (
+            build_workflow_status,
+        )
+
+        def _action(code, label, **kwargs):
+            action = MagicMock()
+            action.action_id = code
+            action.action_code = code
+            action.english_label = label
+            action.arabic_label = ''
+            action.sequence_number = kwargs.get('sequence_number', 0)
+            action.shipment_status_impact = kwargs.get('shipment_status_impact', '')
+            action.movement_status_impact = ''
+            action.auto_pod_post = kwargs.get('auto_pod_post', False)
+            action.hard_copy_collection = kwargs.get('hard_copy_collection', False)
+            action.auto_treasury_post = kwargs.get('auto_treasury_post', False)
+            action.sequence_category = ''
+            action.admin_only = False
+            return action
+
+        actions = [
+            _action('OA-0002', 'Pickup', sequence_number=2),
+            _action('OA-0003', 'Start Loading', sequence_number=3),
+            _action('OA-0005', 'In Transit', sequence_number=5),
+            _action('OA-0006', 'Delivery Arrival', sequence_number=6, shipment_status_impact='At_Delivery'),
+            _action('OA-0007', 'Start Unloading', sequence_number=7),
+            _action(
+                'OA-0008',
+                'POD',
+                sequence_number=8,
+                auto_pod_post=True,
+                hard_copy_collection=True,
+                shipment_status_impact='Delivered',
+            ),
+            _action('OA-0009', 'Collect Payment', sequence_number=9, auto_treasury_post=True),
+            _action('OA-0010', 'Job Closed', sequence_number=10, shipment_status_impact='Closed'),
+        ]
+        service = MagicMock()
+        service._workflow_actions.return_value = actions
+        service._filter_workflow_actions_for_context.return_value = actions
+        mock_timeline_service.return_value = service
+
+        booking = MagicMock()
+        booking.order_type = 'COD'
+        booking.loading_address = None
+        booking.delivery_address = None
+        booking.route_display = 'Riyadh → Jeddah'
+
+        shipment = MagicMock()
+        shipment.shipment_no = 'SH-0102'
+        shipment.shipment_status = TenantShipment.ShipmentStatus.CLOSED
+        shipment.order_type = ''
+        shipment.collection_status = TenantShipment.CollectionStatus.COLLECTED
+        shipment.pod_status = TenantShipment.PodStatus.COMPLETED
+        shipment.booking = booking
+        shipment.cargo = None
+        shipment.loading_address = None
+        shipment.delivery_address = None
+        shipment.route_display = ''
+        shipment.booking_item_type = 'Backload'
+        shipment.booking_item_ref = ''
+        shipment.pk = uuid4()
+
+        def _log(code, label, when, **kwargs):
+            row = MagicMock()
+            row.operation_action = _action(code, label, **kwargs)
+            row.log_id = uuid4()
+            row.log_no = f'L-{code}'
+            row.log_date = when
+            row.created_at = when
+            row.latitude = ''
+            row.longitude = ''
+            row.media_rows = MagicMock(all=MagicMock(return_value=[]))
+            return row
+
+        t0 = datetime(2026, 6, 24, 15, 0, tzinfo=timezone.utc)
+        logs = [
+            _log('OA-0002', 'Pickup', t0, sequence_number=2),
+            _log('OA-0003', 'Start Loading', t0.replace(minute=1), sequence_number=3),
+            _log('OA-0005', 'In Transit', t0.replace(minute=2), sequence_number=5),
+            _log('OA-0006', 'Delivery Arrival', t0.replace(minute=3), sequence_number=6, shipment_status_impact='At_Delivery'),
+            _log('OA-0007', 'Start Unloading', t0.replace(minute=4), sequence_number=7),
+            _log(
+                'OA-0008',
+                'POD',
+                t0.replace(minute=5),
+                sequence_number=8,
+                auto_pod_post=True,
+                hard_copy_collection=True,
+                shipment_status_impact='Delivered',
+            ),
+            _log('OA-0009', 'Collect Payment', t0.replace(minute=6), sequence_number=9, auto_treasury_post=True),
+            _log('OA-0010', 'Job Closed', t0.replace(minute=7), sequence_number=10, shipment_status_impact='Closed'),
+        ]
+
+        workflow = build_workflow_status(shipment, logs)
+        keys = [row['step_key'] for row in workflow]
+        self.assertEqual(
+            keys,
+            [
+                'pickup',
+                'loading',
+                'in_transit',
+                'delivery',
+                'pod',
+                'unloading',
+                'payment',
+                'job_closed',
+            ],
+        )
+        self.assertTrue(all(row['completed'] for row in workflow))
+        self.assertTrue(all(row['display_timestamp'] for row in workflow))

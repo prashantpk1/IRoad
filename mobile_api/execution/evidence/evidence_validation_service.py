@@ -28,6 +28,7 @@ from mobile_api.execution.evidence.execution_media_security import (
 from mobile_api.execution.exceptions import ExecuteActionError
 from mobile_api.execution.messages import execute_user_message
 from mobile_api.helpers.action_execution_metadata import build_execution_requirements
+from mobile_api.helpers.evidence_requirement_flags import normalize_evidence_requirements
 from mobile_api.pod_capture.policy.canonical_pod_action_registry import (
     is_pod_upload_action,
 )
@@ -88,6 +89,9 @@ class EvidenceValidationService:
         if operation_action is None:
             return
 
+        if self._is_hard_copy_custody_promotion_execute(context):
+            return
+
         payload = context.payload or {}
         bundle_id = self._auto_attach_staged_pod_bundle(context)
         if bundle_id:
@@ -99,7 +103,9 @@ class EvidenceValidationService:
             self._attach_operational_issue_warnings(context)
             return
 
-        requirements = build_execution_requirements(operation_action)
+        requirements = normalize_evidence_requirements(
+            build_execution_requirements(operation_action),
+        )
         self._validate_gps(payload, requirements)
         self._validate_notes(payload, requirements)
         self._media_security.validate_media(context)
@@ -206,15 +212,48 @@ class EvidenceValidationService:
         context.payload['capture_bundle_id'] = bundle_id
         return bundle_id
 
+    def _is_hard_copy_custody_promotion_execute(
+        self,
+        context: ExecuteActionContext,
+    ) -> bool:
+        """Hard-copy step 2 — custody checklist already captured; no digital evidence."""
+        payload = dict(context.payload or {})
+        if not (
+            str(payload.get('custody_submission_id') or '').strip()
+            or str(payload.get('client_submission_id') or '').strip()
+        ):
+            return False
+        action = context.operation_action
+        if action is None:
+            return False
+        from mobile_api.hard_pod.services.hard_pod_execute_integration import (
+            HardPodExecuteIntegrationService,
+        )
+        from mobile_api.pod_capture.policy.canonical_pod_action_registry import (
+            is_hard_pod_action,
+            is_pod_upload_action,
+        )
+
+        if not (is_hard_pod_action(action) or is_pod_upload_action(action)):
+            return False
+        return not HardPodExecuteIntegrationService._is_digital_first_combined_pod_execute(
+            action=action,
+            shipment=context.shipment,
+            payload=payload,
+            tenant_schema=(context.tenant_schema or '').strip(),
+            context=context,
+        )
+
     @staticmethod
     def _is_digital_pod_execute(operation_action: Any | None) -> bool:
         if operation_action is None:
             return False
-        code = (getattr(operation_action, 'action_code', '') or '').strip().upper()
-        if code == 'A7':
-            return True
         if bool(getattr(operation_action, 'auto_pod_post', False)):
             return True
+        from mobile_api.pod_capture.policy.canonical_pod_action_registry import (
+            is_pod_upload_action,
+        )
+
         return is_pod_upload_action(operation_action)
 
     @staticmethod
@@ -458,7 +497,7 @@ class EvidenceValidationService:
 
         items = normalize_media_items(list((context.payload or {}).get('media') or []))
         video_min = int(requirements.get('video_min_count') or 0)
-        requires_video = bool(requirements.get('video')) or video_min > 0
+        requires_video = video_min > 0
         requires_signature = bool(requirements.get('signature'))
         video_count = sum(
             1 for item in items if (item.media_type or '') in VIDEO_MEDIA_TYPES
@@ -487,8 +526,8 @@ class EvidenceValidationService:
         )
         photo_min = int(requirements.get('photo_min_count') or 0)
         video_min = int(requirements.get('video_min_count') or 0)
-        requires_photo = bool(requirements.get('photo')) or photo_min > 0
-        requires_video = bool(requirements.get('video')) or video_min > 0
+        requires_photo = photo_min > 0
+        requires_video = video_min > 0
         requires_signature = bool(requirements.get('signature'))
 
         if not items and not (requires_photo or requires_video or requires_signature):
@@ -589,9 +628,7 @@ class EvidenceValidationService:
             video_duration_exceeded_message,
         )
 
-        requires_video = bool(requirements.get('video')) or int(
-            requirements.get('video_min_count') or 0
-        ) > 0
+        requires_video = int(requirements.get('video_min_count') or 0) > 0
         max_duration_raw = requirements.get('video_max_duration_seconds')
         if max_duration_raw is None and not requires_video:
             return

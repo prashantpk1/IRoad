@@ -154,7 +154,7 @@ class PodCaptureResponseBuilder:
         requires_execute = bundle.is_promotable() and not bundle.is_promoted()
         hard_block = dict((pod_section or {}).get('hard_copy_confirmation') or {})
         digital_block = dict((pod_section or {}).get('digital_evidence') or {})
-        has_hard_copy_step = bool(hard_block.get('applicable') or hard_block.get('required'))
+        allow_wizard_next = bool(hard_block.get('applicable'))
         shipment_pk = getattr(context, 'shipment_id', '') or ''
         base_capture = f'/api/v1/mobile/driver/jobs/shipments/{shipment_pk}/pod/capture/'
         digital_code = (
@@ -177,7 +177,7 @@ class PodCaptureResponseBuilder:
             'execute_action_code': digital_code,
             'execute_ready': bundle.is_promotable(),
         }
-        if has_hard_copy_step:
+        if allow_wizard_next:
             step.update(
                 {
                     'wizard_next_step': 'hard_copy_confirmation',

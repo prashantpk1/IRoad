@@ -94,6 +94,7 @@ from .views import (
     TenantSupportTicketListView,
     TenantDashboardView,
     TenantDashboardFleetGpsView,
+    TenantDashboardResourceStatsView,
     TenantDashboardSearchView,
     TenantDashboardSearchResultsView,
     TenantUsersAdministrationDeleteView,
@@ -240,6 +241,11 @@ urlpatterns = [
         'dashboard/fleet-gps/',
         TenantDashboardFleetGpsView.as_view(),
         name='tenant_dashboard_fleet_gps',
+    ),
+    path(
+        'dashboard/resource-stats/',
+        TenantDashboardResourceStatsView.as_view(),
+        name='tenant_dashboard_resource_stats',
     ),
     path(
         'dashboard/search/',

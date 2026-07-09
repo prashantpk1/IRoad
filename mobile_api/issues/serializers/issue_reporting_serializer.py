@@ -26,7 +26,8 @@ class IssueMediaItemSerializer(serializers.Serializer):
 
 class IssueReportingRequestSerializer(serializers.Serializer):
     client_issue_id = serializers.CharField(max_length=128)
-    shipment_id = serializers.CharField(max_length=64)
+    shipment_id = serializers.CharField(max_length=64, required=False, allow_blank=True, default='')
+    movement_id = serializers.CharField(max_length=64, required=False, allow_blank=True, default='')
     issue_type = serializers.ChoiceField(
         choices=[c.value for c in OperationalIssue.IssueType],
     )
@@ -58,8 +59,20 @@ class IssueReportingRequestSerializer(serializers.Serializer):
     def validate(self, attrs: dict) -> dict:
         lat = attrs.get('latitude')
         lon = attrs.get('longitude')
-        if lat is not None:
-            attrs['latitude'] = str(lat)
-        if lon is not None:
-            attrs['longitude'] = str(lon)
+        if lat is None or lon is None:
+            raise serializers.ValidationError(
+                str(_('mobile.issues.gps_required')),
+                code='gps_required',
+            )
+        attrs['latitude'] = str(lat)
+        attrs['longitude'] = str(lon)
+        shipment_ref = str(attrs.get('shipment_id') or '').strip()
+        movement_ref = str(attrs.get('movement_id') or '').strip()
+        if not shipment_ref and not movement_ref:
+            raise serializers.ValidationError(
+                str(_('mobile.validation.failed')),
+                code='job_reference_required',
+            )
+        attrs['shipment_id'] = shipment_ref
+        attrs['movement_id'] = movement_ref
         return attrs

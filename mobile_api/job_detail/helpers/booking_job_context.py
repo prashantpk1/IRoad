@@ -12,10 +12,14 @@ from iroad_tenants.operation_runtime.booking_preshipment_cycle import (
 )
 from iroad_tenants.operation_runtime.impacts import operation_action_matches
 from iroad_tenants.operation_runtime.shipment_execution_stage import (
+    is_confirm_loaded_action,
     is_loading_action,
     is_pickup_action,
 )
 from mobile_api.dashboard.selectors import booking_selection_policy as policy
+from mobile_api.helpers.backload_booking_redirect import (
+    backload_preshipment_pending_on_booking,
+)
 from mobile_api.helpers.booking_endpoint_addresses import should_swap_leg_endpoint_addresses
 from mobile_api.helpers.route_backload_proxy import backload_route_booking_proxy
 from mobile_api.job_detail.dto.job_detail_context import JobDetailContext
@@ -127,7 +131,11 @@ def resolve_booking_job_execution_context(context: JobDetailContext) -> dict[str
         shipments_all,
         driver=context.driver,
     )
-    backload_bootstrap = policy.is_backload_leg_pending(booking, shipments_all)
+    backload_bootstrap = backload_preshipment_pending_on_booking(
+        driver=context.driver,
+        booking=booking,
+        shipments=shipments_all,
+    )
     show_backload_route = policy.should_display_backload_route(
         booking,
         shipments_all,
@@ -175,7 +183,9 @@ def is_booking_preshipment_action(action: Any) -> bool:
         return True
     if is_pickup_action(action) or is_loading_action(action):
         return True
-    if bool(getattr(action, 'auto_shipment_post', False)):
+    if is_confirm_loaded_action(action):
+        return True
+    if getattr(action, 'auto_shipment_post', False) is True:
         return True
     return False
 

@@ -13,14 +13,14 @@ from mobile_api.helpers.action_execution_metadata import (
 def _action(**kwargs):
     base = {
         'action_id': '00000000-0000-0000-0000-000000000001',
-        'action_code': 'A7',
-        'english_label': 'Upload POD',
+        'action_code': 'OA-0008',
+        'english_label': 'POD',
         'auto_pod_post': False,
         'hard_copy_collection': False,
         'movement_status_impact': '',
         'booking_status_impact': '',
         'shipment_status_impact': '',
-        'sequence_number': 7,
+        'sequence_number': 8,
         'action_scope': 'job',
         'sequence_category': '',
     }
@@ -29,20 +29,22 @@ def _action(**kwargs):
 
 
 class ActionExecutionMetadataTests(TestCase):
-    def test_auto_pod_post_requires_photo_video_optional(self):
+    def test_auto_pod_post_optional_photo_video_via_pod_policy(self):
         req = build_execution_requirements(
             _action(auto_pod_post=True),
         )
-        self.assertTrue(req['photo'])
-        self.assertGreaterEqual(req['photo_min_count'], 1)
-        self.assertFalse(req['video'])
+        self.assertTrue(req['photo_enabled'])
+        self.assertEqual(req['photo_min_count'], 0)
+        self.assertFalse(req['photo'])
+        self.assertTrue(req['video_enabled'])
         self.assertEqual(req['video_min_count'], 0)
+        self.assertFalse(req['video'])
         self.assertTrue(req['video_optional'])
 
     def test_hard_pod_action_uses_custody_flow_not_photo_evidence(self):
         req = build_execution_requirements(
             _action(
-                action_code='A7H',
+                action_code='OA-HARD',
                 english_label='Hard POD Collection',
                 hard_copy_collection=True,
             ),
@@ -54,47 +56,27 @@ class ActionExecutionMetadataTests(TestCase):
         self.assertTrue(req['custody_submission_required'])
         self.assertEqual(req['capture_mode'], 'hard_copy_confirmation')
 
-    def test_a8_row_never_routes_to_pod_capture(self):
+    def test_unloading_row_routes_to_evidence_capture(self):
         row = project_allowed_action_row(
             _action(
-                action_code='A8',
-                english_label='Unloading Completed',
+                action_code='OA-0007',
+                english_label='Start Unloading',
                 movement_status_impact='Completed',
             ),
         )
-        self.assertEqual(row['action'], 'execute_action')
-        self.assertEqual(row['screen'], 'job_detail')
-        self.assertFalse(row['requires_photo'])
-        self.assertNotIn('capture_ui', row)
-        self.assertEqual(row['execution_requirements']['photo'], False)
-
-    def test_a10_job_closed_has_no_capture_requirements(self):
-        action = _action(
-            action_code='A10',
-            english_label='Job Closed',
-            booking_status_impact='Executed',
-            shipment_status_impact='Closed',
-            sequence_number=10,
-        )
-        req = build_execution_requirements(action)
-        self.assertFalse(req['gps'])
-        self.assertFalse(req['photo'])
-        self.assertFalse(req['video'])
-        self.assertFalse(req['note'])
-        self.assertEqual(req['photo_min_count'], 0)
-        self.assertEqual(req['shipment_status_impact'], 'Closed')
-
-        row = project_allowed_action_row(action)
-        self.assertFalse(row['requires_gps'])
+        self.assertEqual(row['action'], 'go_to_evidence_capture')
+        self.assertEqual(row['screen'], 'evidence_capture')
+        self.assertTrue(row['requires_evidence_capture'])
+        self.assertFalse(row['direct_execute'])
         self.assertFalse(row['requires_photo'])
         self.assertFalse(row['requires_video'])
-        self.assertFalse(row['requires_note'])
-        self.assertEqual(row['action'], 'execute_action')
-        self.assertEqual(row['screen'], 'job_detail')
-        self.assertFalse(row['execution_requirements']['gps'])
-        self.assertFalse(row['execution_requirements']['note'])
+        self.assertTrue(row['show_photo'])
+        self.assertTrue(row['show_video'])
+        self.assertTrue(row['allow_submit_without_media'])
+        self.assertTrue(row['capture_ui']['allow_submit_without_media'])
+        self.assertFalse(row['capture_ui']['submit_validation']['photo_required'])
 
-    def test_oa_0010_job_closed_has_no_capture_requirements(self):
+    def test_oa_0010_job_closed_routes_to_evidence_capture(self):
         action = _action(
             action_code='OA-0010',
             english_label='Job Closed',
@@ -103,16 +85,17 @@ class ActionExecutionMetadataTests(TestCase):
             sequence_number=10,
         )
         req = build_execution_requirements(action)
-        self.assertFalse(req['note'])
-        self.assertTrue(req.get('direct_execute'))
+        self.assertFalse(req['direct_execute'])
+        self.assertTrue(req['requires_evidence_capture'])
+        self.assertEqual(req['photo_min_count'], 0)
 
         row = project_allowed_action_row(action)
-        self.assertEqual(row['action'], 'execute_action')
-        self.assertEqual(row['screen'], 'job_detail')
+        self.assertEqual(row['action'], 'go_to_evidence_capture')
+        self.assertEqual(row['screen'], 'evidence_capture')
         self.assertEqual(row.get('ui_mode'), 'job_close')
-        self.assertEqual(row.get('screen_title'), 'Job Close')
-        self.assertTrue(row.get('direct_execute'))
-        self.assertFalse(row['requires_note'])
+        self.assertFalse(row.get('direct_execute'))
+        self.assertFalse(row['requires_photo'])
+        self.assertTrue(row['show_photo'])
 
     def test_oa_0009_primary_action_routes_to_collect_payment_screen(self):
         from decimal import Decimal
@@ -141,10 +124,10 @@ class ActionExecutionMetadataTests(TestCase):
         )
         self.assertFalse(row.get('direct_execute'))
 
-    def test_a9_note_not_required(self):
+    def test_collect_payment_note_not_required(self):
         req = build_execution_requirements(
             _action(
-                action_code='A9',
+                action_code='OA-0009',
                 english_label='Collect Payment',
                 auto_treasury_post=True,
                 sequence_number=9,
@@ -168,21 +151,50 @@ class ActionExecutionMetadataTests(TestCase):
         self.assertEqual(button['wizard_next_step'], 'hard_copy_confirmation')
         self.assertFalse(button['complete_upload_after_execute'])
 
-    def test_a1_start_job_has_no_capture_requirements(self):
+    def test_label_only_pod_routes_to_pod_capture_with_capture_ui(self):
+        row = project_allowed_action_row(
+            _action(
+                action_code='OA-0009',
+                english_label='POD',
+                sequence_number=9,
+            ),
+            tenant_schema='tenant_test',
+        )
+        self.assertEqual(row['action'], 'go_to_pod_capture')
+        self.assertEqual(row['screen'], 'pod_capture')
+        self.assertIn('primary_button', row['capture_ui'])
+
+    def test_oa_0001_start_job_routes_to_evidence_capture(self):
         action = _action(
-            action_code='A1',
+            action_code='OA-0001',
             english_label='Start Job',
             booking_status_impact='In_Execution',
             sequence_number=1,
         )
         req = build_execution_requirements(action)
-        self.assertFalse(req['gps'])
-        self.assertFalse(req['photo'])
-        self.assertFalse(req['video'])
-        self.assertFalse(req['note'])
+        self.assertTrue(req['requires_evidence_capture'])
+        self.assertEqual(req['photo_min_count'], 0)
+        self.assertEqual(req['video_min_count'], 0)
 
         row = project_allowed_action_row(action)
-        self.assertFalse(row['requires_gps'])
+        self.assertEqual(row['action'], 'go_to_evidence_capture')
+        self.assertEqual(row['screen'], 'evidence_capture')
+        self.assertTrue(row['requires_evidence_capture'])
+        self.assertFalse(row.get('direct_execute'))
         self.assertFalse(row['requires_photo'])
-        self.assertFalse(row['requires_video'])
-        self.assertFalse(row['requires_note'])
+        self.assertTrue(row['show_photo'])
+        self.assertTrue(row['show_video'])
+
+    def test_empty_move_catalog_action_routes_to_evidence_capture(self):
+        action = _action(
+            action_code='OA-0014',
+            english_label='Start Movement',
+            sequence_category='empty_move',
+            sequence_number=1,
+        )
+        row = project_allowed_action_row(action)
+        self.assertEqual(row['action'], 'go_to_evidence_capture')
+        self.assertEqual(row['screen'], 'evidence_capture')
+        self.assertEqual(row['ui_mode'], 'empty_move')
+        self.assertTrue(row['requires_evidence_capture'])
+        self.assertTrue(row.get('capture_ui'))

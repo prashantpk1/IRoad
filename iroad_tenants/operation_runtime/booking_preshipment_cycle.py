@@ -36,7 +36,24 @@ def _norm_trip(booking: Any) -> str:
 
 
 def _is_execution_complete(shipment: Any) -> bool:
-    return _norm_status(shipment) in _EXECUTION_COMPLETE
+    try:
+        from mobile_api.dashboard.selectors.booking_selection_policy import (
+            is_shipment_execution_complete,
+        )
+        return is_shipment_execution_complete(shipment)
+    except (ImportError, Exception):
+        return _norm_status(shipment) in _EXECUTION_COMPLETE
+
+
+def _is_business_complete(shipment: Any) -> bool:
+    try:
+        from mobile_api.dashboard.selectors.booking_selection_policy import (
+            is_shipment_business_complete,
+        )
+        return is_shipment_business_complete(shipment)
+    except (ImportError, Exception):
+        return _norm_status(shipment) == TenantShipment.ShipmentStatus.CLOSED
+
 
 
 def _countable_shipments(booking: Any) -> list[Any]:
@@ -109,13 +126,13 @@ def _is_cancelled(shipment: Any) -> bool:
 
 def _outbound_primary_resolved(booking: Any) -> bool:
     """
-    Outbound leg is finished (closed/delivered) or cancelled — backload may start.
+    Outbound leg is business-closed or cancelled — backload may start.
     """
     outbound_rows = _outbound_shipments(booking)
     if not outbound_rows:
         return False
     return all(
-        _is_cancelled(s) or _is_execution_complete(s)
+        _is_cancelled(s) or _is_business_complete(s)
         for s in outbound_rows
     )
 
@@ -174,7 +191,7 @@ def is_backload_leg_pending(booking: Any) -> bool:
     primary = _primary_outbound_legs(booking)
     if not primary:
         return False
-    return all(_is_execution_complete(s) for s in primary)
+    return all(_is_business_complete(s) or _is_cancelled(s) for s in primary)
 
 
 def resolve_preshipment_booking_item_type(
@@ -188,9 +205,14 @@ def resolve_preshipment_booking_item_type(
     default to ``Backload`` so outbound preshipment logs do not block A1 or mis-route A4.
     """
     raw = (booking_item_type or '').strip()
-    if booking is not None and is_backload_leg_pending(booking):
-        if not raw or _norm_line(raw) == 'outbound':
-            return 'Backload'
+    if booking is not None and _norm_trip(booking) == 'round':
+        if is_backload_leg_pending(booking):
+            if not raw or _norm_line(raw) == 'outbound':
+                return 'Backload'
+        elif _outbound_primary_resolved(booking):
+            if not raw or _norm_line(raw) == 'outbound':
+                if is_backload_preshipment_cycle(booking, 'Backload'):
+                    return 'Backload'
     if raw:
         return raw
     if booking is not None and is_backload_leg_pending(booking):

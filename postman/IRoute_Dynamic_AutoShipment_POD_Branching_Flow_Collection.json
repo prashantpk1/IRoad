@@ -12,11 +12,11 @@
     },
     {
       "key": "_iroute_h2",
-      "value": "var irouteLogHint = function(hint, label) {\n  hint = hint || {};\n  console.log('=== ' + (label || 'HINT') + ' ===');\n  console.log('action:', hint.action, '| code:', hint.action_code, '| screen:', hint.screen);\n  console.log('capture_mode:', hint.capture_mode, '| ui_mode:', hint.ui_mode);\n  console.log('requires_multipart:', hint.requires_multipart);\n  console.log('reason:', hint.reason, '| job_closed:', hint.job_closed);\n}\nvar irouteSaveDashboardJob = function(d) {\n  d = d || {};\n  var active = d.active_job || {};\n  var current = d.current_job || {};\n  if (active.job_id) {\n    var jt = active.job_type || 'shipment';\n    irouteEnvSet('job_id', active.job_id);\n    irouteEnvSet('job_type', jt);\n    if (jt === 'booking') irouteEnvSet('booking_id', active.job_id);\n    if (jt === 'shipment') irouteEnvSet('shipment_id', active.job_id);\n  }\n  if (current.booking_id) irouteEnvSet('booking_id', current.booking_id);\n  if (active.job_no) irouteEnvSet('shipment_no', active.job_no);\n}\nvar irouteSyncFromDashboard = function(d) {\n  d = d || {};\n  irouteSaveDashboardJob(d);\n  if (d.sync_metadata) irouteSaveSync({ sync_metadata: d.sync_metadata });\n  var current = d.current_job || {};\n  if ((d.active_job || {}).job_type === 'booking' && current.open_job) {\n    irouteApplyOpenJob({ open_job: current.open_job });\n  }\n  var wf = d.workflow || {};\n  var row = iroutePickNextAction({ workflow: wf, next_action_hint: d.next_action_hint || {} });\n  var code = (row.action_code || '').trim();\n  var req = row.execution_requirements || {};\n  var stuck = irouteHandleWorkflowStuck({ workflow: wf, next_action_hint: d.next_action_hint || {}, job: (d.active_job || {}) });\n  if (stuck) {\n    irouteEnvSet('execute_action_code', '');\n    return '';\n  }\n  irouteEnvSet('execute_action_code', code);\n  irouteEnvSet('execute_action_label', row.execution_label || row.action_name || code);\n  irouteEnvSet('execute_use_multipart', irouteNeedsMultipart(req, {}) ? 'true' : 'false');\n  irouteEnvSet('execute_photo_min_count', String(req.photo_min_count != null ? req.photo_min_count : (req.photo ? 1 : 0)));\n  irouteEnvSet('execute_auto_shipment_post', req.auto_shipment_post === true ? 'true' : 'false');\n  irouteEnvSet('workflow_context_label', ((wf.workflow_metadata || {}).context_label) || '');\n  console.log('[IRoute] dashboard sync \u2192 execute_action_code:', code || '(empty)', '| multipart:', pm.variables.get('execute_use_multipart'));\n  irouteLogExecutePlan();\n  return code;\n}\nvar irouteApplyOpenJob = function(hint) {\n  hint = hint || {};\n  var open = hint.open_job || hint;\n  if (!open.job_id) return false;\n  var jt = open.job_type || 'booking';\n  irouteEnvSet('job_id', open.job_id);\n  irouteEnvSet('job_type', jt);\n  if (jt === 'booking') {\n    irouteEnvSet('booking_id', open.job_id);\n    irouteEnvSet('auto_shipment_birth_done', 'false');\n    irouteEnvSet('auto_shipment_a4_done', 'false');\n    irouteEnvSet('ready_for_pod', 'false');\n    irouteEnvSet('needs_pod_capture', 'false');\n    irouteEnvSet('execute_is_pod_action', 'false');\n    irouteEnvSet('job_closed', 'false');\n    irouteEnvSet('skip_preshipment', 'false');\n    irouteEnvSet('workflow_path', 'full_preship');\n  }\n  if (jt === 'shipment') {\n    irouteEnvSet('shipment_id', open.job_id);\n    irouteEnvSet('auto_shipment_birth_done', 'true');\n    irouteEnvSet('auto_shipment_a4_done', 'true');\n  }\n  if (open.job_no) irouteEnvSet('shipment_no', open.job_no);\n  console.log('[IRoute] open_job \u2192', jt, open.job_id, open.booking_item_type || '');\n  return true;\n}\nvar irouteTransitionToShipment = function(d) {\n  d = d || {};\n  var active = d.active_job || {};\n  var current = d.current_job || {};\n  if (active.job_type === 'booking' && active.job_id) {\n    var open = current.open_job;\n    if (open && open.job_id) {\n      irouteApplyOpenJob({ open_job: open });\n    } else {\n      irouteEnvSet('job_id', active.job_id);\n      irouteEnvSet('job_type', 'booking');\n      irouteEnvSet('booking_id', active.job_id);\n      if (active.job_no) irouteEnvSet('shipment_no', active.job_no);\n    }\n    return;\n  }\n  if (active.job_type === 'shipment' && active.job_id) {\n    irouteEnvSet('job_id', active.job_id);\n    irouteEnvSet('job_type', 'shipment');\n    irouteEnvSet('shipment_id', active.job_id);\n    irouteEnvSet('auto_shipment_birth_done', 'true');\n    irouteEnvSet('auto_shipment_a4_done', 'true');\n  }\n  var ship = ((d || {}).current_job || {}).active_shipment || {};\n  if (ship.shipment_id) irouteEnvSet('shipment_id', ship.shipment_id);\n}\nvar iroutePickNextAction = function(data) {\n  data = data || {};\n  var wf = data.workflow || {};\n  var allowed = wf.allowed_actions || [];\n  if (!allowed.length) return {};\n\n  var hint = data.next_action_hint || {};\n  var primary = wf.primary_action || wf.next_action || {};\n  if (primary && primary.action_code) {\n    for (var i = 0; i < allowed.length; i++) {\n      if (allowed[i].action_code === primary.action_code) return allowed[i];\n    }\n    // A7H / hard_copy rows are stripped from allowed_actions \u2014 trust overlay primary.\n    if (irouteIsDelegatedNavigation(primary)) return primary;\n  }\n\n  if (hint.action === 'go_to_pod_capture' && hint.action_code) {\n    for (var h = 0; h < allowed.length; h++) {\n      if (allowed[h].action_code === hint.action_code) return allowed[h];\n    }\n    return hint;\n  }\n  if (hint.action === 'go_to_payment_collection' && hint.action_code) {\n    for (var p = 0; p < allowed.length; p++) {\n      if (allowed[p].action_code === hint.action_code) return allowed[p];\n    }\n    return hint;\n  }\n\n  if (hint.action === 'execute_action' && hint.action_code) {\n    for (var j = 0; j < allowed.length; j++) {\n      if (allowed[j].action_code === hint.action_code) return allowed[j];\n    }\n  }\n\n  return allowed[0];\n}\nvar irouteHandleWorkflowStuck = function(data) {\n  data = data || {};\n  var allowed = (data.workflow || {}).allowed_actions || [];\n  var hint = data.next_action_hint || {};\n  if (allowed.length > 0) {\n    irouteEnvSet('workflow_stuck', 'false');\n    return false;\n  }\n  irouteEnvSet('workflow_stuck', 'true');\n  irouteEnvSet('execute_action_code', '');\n  irouteEnvSet('execute_use_multipart', 'false');\n  console.error('>>> WORKFLOW STUCK: allowed_actions is empty \u2014 do NOT run Execute.');\n  console.error('>>> Trust allowed_actions only (ignore timeline green checks).');\n  if (hint.action === 'refresh_job_detail') {\n    console.warn('>>> API returned refresh_job_detail only \u2014 redeploy backend or use a fresh booking.');\n  }\n  var job = data.job || {};\n  if (job.backload_bootstrap_pending === true) {\n    console.warn('>>> Backload bootstrap: run OA-0001 Start Job first (outbound preshipment logs must not count).');\n  }\n  return true;\n}\nvar irouteSkipIfWorkflowStuck = function() {\n  if (pm.variables.get('workflow_stuck') === 'true') {\n    console.error('[IRoute] SKIP', pm.info.requestName, '\u2014 workflow_stuck (allowed_actions empty)');\n    if (pm.execution && pm.execution.skipRequest) pm.execution.skipRequest();\n  }\n}\n"
+      "value": "var irouteLogHint = function(hint, label) {\n  hint = hint || {};\n  console.log('=== ' + (label || 'HINT') + ' ===');\n  console.log('action:', hint.action, '| code:', hint.action_code, '| screen:', hint.screen);\n  console.log('capture_mode:', hint.capture_mode, '| ui_mode:', hint.ui_mode);\n  console.log('requires_multipart:', hint.requires_multipart);\n  console.log('reason:', hint.reason, '| job_closed:', hint.job_closed);\n}\nvar irouteSaveDashboardJob = function(d) {\n  d = d || {};\n  var active = d.active_job || {};\n  var current = d.current_job || {};\n  if (active.job_id) {\n    var jt = active.job_type || 'shipment';\n    irouteEnvSet('job_id', active.job_id);\n    irouteEnvSet('job_type', jt);\n    if (jt === 'booking') irouteEnvSet('booking_id', active.job_id);\n    if (jt === 'shipment') irouteEnvSet('shipment_id', active.job_id);\n  }\n  if (current.booking_id) irouteEnvSet('booking_id', current.booking_id);\n  if (active.job_no) irouteEnvSet('shipment_no', active.job_no);\n}\nvar irouteSyncFromDashboard = function(d) {\n  d = d || {};\n  irouteSaveDashboardJob(d);\n  if (d.sync_metadata) irouteSaveSync({ sync_metadata: d.sync_metadata });\n  var current = d.current_job || {};\n  if ((d.active_job || {}).job_type === 'booking' && current.open_job) {\n    irouteApplyOpenJob({ open_job: current.open_job });\n  }\n  var wf = d.workflow || {};\n  var row = iroutePickNextAction({ workflow: wf, next_action_hint: d.next_action_hint || {} });\n  var code = (row.action_code || '').trim();\n  var req = row.execution_requirements || {};\n  var stuck = irouteHandleWorkflowStuck({ workflow: wf, next_action_hint: d.next_action_hint || {}, job: (d.active_job || {}) });\n  if (stuck) {\n    irouteEnvSet('execute_action_code', '');\n    return '';\n  }\n  irouteEnvSet('execute_action_code', code);\n  irouteEnvSet('execute_action_label', row.execution_label || row.action_name || code);\n  irouteEnvSet('execute_use_multipart', irouteNeedsMultipart(req, {}) ? 'true' : 'false');\n  irouteEnvSet('execute_photo_min_count', String(req.photo_min_count != null ? req.photo_min_count : (req.photo ? 1 : 0)));\n  irouteEnvSet('execute_auto_shipment_post', req.auto_shipment_post === true ? 'true' : 'false');\n  irouteEnvSet('workflow_context_label', ((wf.workflow_metadata || {}).context_label) || '');\n  console.log('[IRoute] dashboard sync \u2192 execute_action_code:', code || '(empty)', '| multipart:', pm.variables.get('execute_use_multipart'));\n  irouteLogExecutePlan();\n  return code;\n}\nvar irouteApplyOpenJob = function(hint) {\n  hint = hint || {};\n  var open = hint.open_job || hint;\n  if (!open.job_id) return false;\n  var jt = open.job_type || 'booking';\n  irouteEnvSet('job_id', open.job_id);\n  irouteEnvSet('job_type', jt);\n  if (jt === 'booking') {\n    irouteEnvSet('booking_id', open.job_id);\n    irouteEnvSet('auto_shipment_birth_done', 'false');\n    irouteEnvSet('auto_shipment_a4_done', 'false');\n    irouteEnvSet('ready_for_pod', 'false');\n    irouteEnvSet('needs_pod_capture', 'false');\n    irouteEnvSet('execute_is_pod_action', 'false');\n    irouteEnvSet('job_closed', 'false');\n    irouteEnvSet('skip_preshipment', 'false');\n    irouteEnvSet('workflow_path', 'full_preship');\n  }\n  if (jt === 'shipment') {\n    irouteEnvSet('shipment_id', open.job_id);\n    irouteEnvSet('auto_shipment_birth_done', 'true');\n    irouteEnvSet('auto_shipment_a4_done', 'true');\n  }\n  if (open.job_no) irouteEnvSet('shipment_no', open.job_no);\n  console.log('[IRoute] open_job \u2192', jt, open.job_id, open.booking_item_type || '');\n  return true;\n}\nvar irouteTransitionToShipment = function(d) {\n  d = d || {};\n  var active = d.active_job || {};\n  var current = d.current_job || {};\n  if (active.job_type === 'booking' && active.job_id) {\n    var open = current.open_job;\n    if (open && open.job_id) {\n      irouteApplyOpenJob({ open_job: open });\n    } else {\n      irouteEnvSet('job_id', active.job_id);\n      irouteEnvSet('job_type', 'booking');\n      irouteEnvSet('booking_id', active.job_id);\n      if (active.job_no) irouteEnvSet('shipment_no', active.job_no);\n    }\n    return;\n  }\n  if (active.job_type === 'shipment' && active.job_id) {\n    irouteEnvSet('job_id', active.job_id);\n    irouteEnvSet('job_type', 'shipment');\n    irouteEnvSet('shipment_id', active.job_id);\n    irouteEnvSet('auto_shipment_birth_done', 'true');\n    irouteEnvSet('auto_shipment_a4_done', 'true');\n  }\n  var ship = ((d || {}).current_job || {}).active_shipment || {};\n  if (ship.shipment_id) irouteEnvSet('shipment_id', ship.shipment_id);\n}\nvar iroutePickNextAction = function(data) {\n  data = data || {};\n  var wf = data.workflow || {};\n  var allowed = wf.allowed_actions || [];\n  var hint = data.next_action_hint || {};\n  var primary = wf.primary_action || wf.next_action || {};\n  if (!allowed.length) {\n  if (hint.action_code && (\n    hint.action === 'go_to_pod_capture' ||\n    hint.action === 'go_to_payment_collection' ||\n    hint.action === 'go_to_evidence_capture' ||\n    hint.action === 'execute_action'\n  )) {\n    return hint;\n  }\n  if (primary && primary.action_code) return primary;\n  var timelineEmpty = irouteGetTimeline(data);\n  var pendingEmpty = irouteFindTimelinePending(timelineEmpty, function () { return true; });\n  if (pendingEmpty && pendingEmpty.action_code) return pendingEmpty;\n  return {};\n  }\n\n  if (primary && primary.action_code) {\n    for (var i = 0; i < allowed.length; i++) {\n      if (allowed[i].action_code === primary.action_code) return allowed[i];\n    }\n    // A7H / hard_copy rows are stripped from allowed_actions \u2014 trust overlay primary.\n    if (irouteIsDelegatedNavigation(primary)) return primary;\n  }\n\n  if (hint.action === 'go_to_pod_capture' && hint.action_code) {\n    for (var h = 0; h < allowed.length; h++) {\n      if (allowed[h].action_code === hint.action_code) return allowed[h];\n    }\n    return hint;\n  }\n  if (hint.action === 'go_to_payment_collection' && hint.action_code) {\n    for (var p = 0; p < allowed.length; p++) {\n      if (allowed[p].action_code === hint.action_code) return allowed[p];\n    }\n    return hint;\n  }\n\n  if (hint.action === 'execute_action' && hint.action_code) {\n    for (var j = 0; j < allowed.length; j++) {\n      if (allowed[j].action_code === hint.action_code) return allowed[j];\n    }\n  }\n\n  return allowed[0];\n}\nvar irouteHandleWorkflowStuck = function(data) {\n  data = data || {};\n  var allowed = (data.workflow || {}).allowed_actions || [];\n  var hint = data.next_action_hint || {};\n  if (allowed.length > 0) {\n    irouteEnvSet('workflow_stuck', 'false');\n    return false;\n  }\n  var hintCode = String(\n    hint.execute_action_code || hint.action_code ||\n    ((hint.capture_ui || {}).primary_button || {}).execute_action_code || ''\n  ).trim();\n  if (hintCode && (\n    hint.action === 'go_to_pod_capture' ||\n    hint.action === 'go_to_payment_collection' ||\n    hint.ready_for_pod === true ||\n    hint.needs_pod_capture === true ||\n    hint.show_pod_capture_button === true\n  )) {\n    irouteEnvSet('workflow_stuck', 'false');\n    console.warn('[IRoute] allowed_actions empty \u2014 trusting next_action_hint', hint.action, hintCode);\n    return false;\n  }\n  irouteEnvSet('workflow_stuck', 'true');\n  irouteEnvSet('execute_action_code', '');\n  irouteEnvSet('execute_use_multipart', 'false');\n  console.error('>>> WORKFLOW STUCK: allowed_actions is empty \u2014 do NOT run Execute.');\n  console.error('>>> Trust allowed_actions only (ignore timeline green checks).');\n  if (hint.action === 'refresh_job_detail') {\n    console.warn('>>> API returned refresh_job_detail only \u2014 redeploy backend or use a fresh booking.');\n  }\n  var job = data.job || {};\n  if (job.backload_bootstrap_pending === true) {\n    console.warn('>>> Backload bootstrap: run OA-0001 Start Job first (outbound preshipment logs must not count).');\n  }\n  return true;\n}\nvar irouteSkipIfWorkflowStuck = function() {\n  if (pm.variables.get('workflow_stuck') === 'true') {\n    console.error('[IRoute] SKIP', pm.info.requestName, '\u2014 workflow_stuck (allowed_actions empty)');\n    if (pm.execution && pm.execution.skipRequest) pm.execution.skipRequest();\n  }\n}\n"
     },
     {
       "key": "_iroute_h3",
-      "value": "var irouteSyncJobDetail = function(data) {\n  data = data || {};\n  var job = data.job || {};\n  var exec = data.execution || {};\n  if (!job.job_id && exec.job_id) {\n    job = {\n      job_id: exec.job_id,\n      job_type: exec.job_type || 'shipment',\n      job_no: exec.job_no || pm.variables.get('shipment_no') || ''\n    };\n  }\n  var wf = data.workflow || {};\n  var meta = wf.workflow_metadata || {};\n  var allowed = wf.allowed_actions || [];\n  var hint = data.next_action_hint || {};\n  var pod = data.pod_cod || {};\n  irouteSaveSync(data);\n  irouteSaveBranchState(data);\n  irouteMarkShipmentBirth(data);\n  irouteSyncWorkflowStage(data);\n  if (job.backload_bootstrap_pending === true) {\n    irouteEnvSet('backload_bootstrap_pending', 'true');\n    irouteEnvSet('booking_item_type', job.booking_item_type || 'Backload');\n    console.log('[IRoute] backload bootstrap \u2014 each leg starts OA-0001 Start Job');\n  } else {\n    irouteEnvSet('backload_bootstrap_pending', 'false');\n  }\n  if (irouteHandleWorkflowStuck(data)) {\n    iroutePrintSyncSummary();\n    return '';\n  }\n  if (hint.job_closed && hint.open_job && hint.booking_continues) {\n    irouteApplyOpenJob(hint);\n    irouteEnvSet('execute_action_code', '');\n    irouteEnvSet('ready_for_pod', 'false');\n    irouteEnvSet('needs_pod_capture', 'false');\n    irouteEnvSet('needs_hard_pod_confirm', 'false');\n    irouteEnvSet('execute_is_pod_action', 'false');\n    irouteLogHint(hint, 'LEG_COMPLETE');\n    console.log('[IRoute] outbound leg closed \u2014 switched to backload booking; re-sync from Job Detail or Dashboard.');\n    return '';\n  }\n  if (hint.job_closed === true || hint.action === 'go_to_dashboard') {\n    irouteEnvSet('execute_action_code', '');\n    irouteEnvSet('needs_hard_pod_confirm', 'false');\n    irouteEnvSet('needs_pod_capture', 'false');\n    irouteEnvSet('ready_for_pod', 'false');\n    irouteEnvSet('job_closed', 'true');\n    irouteLogHint(hint, 'JOB_CLOSED');\n    return '';\n  }\n  irouteEnvSet('workflow_context_label', meta.context_label || '');\n  irouteEnvSet('allowed_action_count', String(meta.allowed_action_count != null ? meta.allowed_action_count : allowed.length));\n  if (job.job_id) {\n    irouteEnvSet('job_id', job.job_id);\n    irouteEnvSet('job_type', job.job_type || pm.variables.get('job_type') || 'shipment');\n    if (job.job_type === 'booking') irouteEnvSet('booking_id', job.job_id);\n    if (job.job_type === 'shipment') irouteEnvSet('shipment_id', job.job_id);\n    if (job.job_no) irouteEnvSet('shipment_no', job.job_no);\n  }\n  var row = iroutePickNextAction(data);\n  var code = (row.action_code || '').trim();\n  var req = row.execution_requirements || {};\n  irouteEnvSet('execute_action_code', code);\n  irouteEnvSet('execute_action_label', row.execution_label || row.action_name || code);\n  irouteEnvSet('execute_use_multipart', irouteNeedsMultipart(req, hint) ? 'true' : 'false');\n  if (hint.requires_multipart === true || hint.requires_multipart === false) {\n    irouteEnvSet('execute_use_multipart', hint.requires_multipart ? 'true' : 'false');\n  }\n  irouteEnvSet('execute_photo_min_count', String(req.photo_min_count != null ? req.photo_min_count : (req.photo ? 1 : 0)));\n  irouteEnvSet('execute_auto_shipment_post', req.auto_shipment_post === true ? 'true' : 'false');\n  irouteEnvSet('execute_use_cod', (job.order_type === 'COD' && req.auto_treasury_post) ? 'true' : 'false');\n  irouteEnvSet('execute_is_pod_action', (req.auto_pod_post === true) ? 'true' : 'false');\n  var primary = wf.primary_action || wf.next_action || {};\n  var steps = hint.pod_capture_steps || primary.pod_capture_steps || [];\n  var hardPodSteps = steps.indexOf('hard_copy_confirmation') >= 0;\n  var hardFromPod = pod.hard_pod_pending === true;\n  irouteEnvSet('hard_pod_required', (hardFromPod || hint.hard_pod === true || hardPodSteps) ? 'true' : 'false');\n  var digitalFirst = hint.active_step === 'digital_evidence' || hint.capture_mode === 'digital_evidence' || steps[0] === 'digital_evidence' || steps[0] === 'digital';\n  irouteEnvSet('needs_pod_capture', 'false');\n  irouteEnvSet('needs_hard_pod_confirm', 'false');\n  var podCode = irouteResolvePodActionCode(data);\n  if (podCode) {\n    irouteEnvSet('pod_upload_action_code', podCode);\n    if (req.auto_pod_post || hint.action === 'go_to_pod_capture' || irouteFindActionByFlag(allowed, 'auto_pod_post')) {\n      irouteEnvSet('ready_for_pod', 'true');\n    }\n  } else if (req.auto_pod_post || hint.action === 'go_to_pod_capture') {\n    irouteEnvSet('pod_upload_action_code', code || pm.variables.get('pod_upload_action_code') || '');\n    irouteEnvSet('ready_for_pod', 'true');\n  }\n  var hardCode = irouteResolveHardCopyActionCode(data);\n  if (hardCode) irouteEnvSet('hard_copy_action_code', hardCode);\n  else if (row.hard_copy_collection || req.hard_copy_collection) irouteEnvSet('hard_copy_action_code', code);\n  irouteApplyScreenRouting(data, row, hint, pod);\n  code = (pm.variables.get('execute_action_code') || code || '').trim();\n  if (job.job_type === 'shipment' && job.job_id) {\n    irouteEnvSet('auto_shipment_birth_done', 'true');\n    irouteEnvSet('auto_shipment_a4_done', 'true');\n  }\n  irouteEnvSet('job_closed', hint.job_closed === true ? 'true' : 'false');\n  console.log('execute_action_code:', code || '(empty)', '| context:', meta.context_label || '');\n  console.log('workflow_path:', pm.variables.get('workflow_path') || '(unset)', '| ready_for_pod:', pm.variables.get('ready_for_pod'));\n  irouteLogHint(hint, 'SYNC');\n  irouteLogExecutePlan();\n  return code;\n}\nvar irouteLogExecutePlan = function() {\n  var code = pm.variables.get('execute_action_code') || '(empty)';\n  var label = pm.variables.get('execute_action_label') || code;\n  var mp = pm.variables.get('execute_use_multipart');\n  var photos = pm.variables.get('execute_photo_min_count') || '0';\n  var autoShip = pm.variables.get('execute_auto_shipment_post');\n  console.log('=== EXECUTE PLAN ===');\n  console.log('action:', code, '|', label);\n  console.log('multipart:', mp, '| auto_shipment_post:', autoShip, '| photo_min:', photos);\n  console.log('hint.requires_multipart:', pm.variables.get('execute_use_multipart'));\n  if (mp === 'true') {\n    console.log('NEXT: 01b multipart \u2014 attach JPG/PNG to media[0][file_ref] (and media[1] if photo_min >= 2). Keys must be media_type + file_ref, NOT type/file.');\n  } else {\n    console.log('NEXT: 01c JSON only \u2014 skip 01b (Start Job, Pickup, GPS steps use direct_execute).');\n  }\n}\nvar irouteAssertExecuteReady = function(requireMultipart) {\n  var code = pm.variables.get('execute_action_code');\n  if (!code) {\n    throw new Error('execute_action_code empty \u2014 run 01a Job Detail first, then execute.');\n  }\n  if (!pm.variables.get('workflow_version') || !pm.variables.get('content_hash')) {\n    throw new Error('workflow_version/content_hash empty \u2014 run 01a Job Detail sync before execute.');\n  }\n  if (requireMultipart && pm.variables.get('execute_use_multipart') !== 'true') {\n    throw new Error('Wrong step for ' + code + ': execute_use_multipart is not true \u2014 use 01c Execute (JSON), not 01b.');\n  }\n}\nvar irouteAssertExecuteAction = function(data, optional) {\n  if (pm.variables.get('workflow_stuck') === 'true') {\n    if (optional) return;\n    pm.test('workflow stuck \u2014 allowed_actions empty', function () {\n      pm.expect.fail('Trust allowed_actions only. Redeploy backend or use a fresh booking \u2014 do not execute from timeline.');\n    });\n    return;\n  }\n  var code = pm.variables.get('execute_action_code');\n  var hint = (data || {}).next_action_hint || {};\n  if (code || hint.job_closed === true) return;\n  if (optional) return;\n  var label = pm.variables.get('workflow_context_label') || '';\n  var help = label.indexOf('no shipment') >= 0\n    ? 'Configure Operation Actions on booking in Action Master (include Auto Shipment Post on confirm-loaded step).'\n    : 'allowed_actions is empty \u2014 check Action Master operation impacts and driver assignment.';\n  pm.test('execute_action_code required \u2014 ' + help, function () {\n    pm.expect(code, help + ' | ' + label).to.be.ok;\n  });\n}\nvar irouteNewClientActionId = function() {\n  var code = (pm.variables.get('execute_action_code') || 'act').toLowerCase();\n  return code.replace(/[^a-z0-9]+/g, '-') + '-' + pm.variables.replaceIn('{{$guid}}');\n}\nvar irouteSkipIfNoAction = function() {\n  if (!pm.variables.get('execute_action_code') || pm.variables.get('job_closed') === 'true') {\n    console.log('[IRoute] SKIP', pm.info.requestName, '\u2014 no execute_action_code or job_closed');\n    if (pm.execution && pm.execution.skipRequest) pm.execution.skipRequest();\n  }\n}\n"
+      "value": "var irouteSyncJobDetail = function(data) {\n  data = data || {};\n  var job = data.job || {};\n  var exec = data.execution || {};\n  if (!job.job_id && exec.job_id) {\n    job = {\n      job_id: exec.job_id,\n      job_type: exec.job_type || 'shipment',\n      job_no: exec.job_no || pm.variables.get('shipment_no') || ''\n    };\n  }\n  var wf = data.workflow || {};\n  var meta = wf.workflow_metadata || {};\n  var allowed = wf.allowed_actions || [];\n  var hint = data.next_action_hint || {};\n  var pod = data.pod_cod || {};\n  irouteSaveSync(data);\n  irouteSaveBranchState(data);\n  irouteMarkShipmentBirth(data);\n  irouteSyncWorkflowStage(data);\n  if (job.backload_bootstrap_pending === true) {\n    irouteEnvSet('backload_bootstrap_pending', 'true');\n    irouteEnvSet('booking_item_type', job.booking_item_type || 'Backload');\n    console.log('[IRoute] backload bootstrap \u2014 each leg starts OA-0001 Start Job');\n  } else {\n    irouteEnvSet('backload_bootstrap_pending', 'false');\n  }\n  if (irouteHandleWorkflowStuck(data)) {\n    iroutePrintSyncSummary();\n    return '';\n  }\n  if (hint.job_closed && hint.open_job && hint.booking_continues) {\n    irouteApplyOpenJob(hint);\n    irouteEnvSet('execute_action_code', '');\n    irouteEnvSet('ready_for_pod', 'false');\n    irouteEnvSet('needs_pod_capture', 'false');\n    irouteEnvSet('needs_hard_pod_confirm', 'false');\n    irouteEnvSet('execute_is_pod_action', 'false');\n    irouteLogHint(hint, 'LEG_COMPLETE');\n    console.log('[IRoute] outbound leg closed \u2014 switched to backload booking; re-sync from Job Detail or Dashboard.');\n    return '';\n  }\n  if (hint.job_closed === true || hint.action === 'go_to_dashboard') {\n    irouteEnvSet('execute_action_code', '');\n    irouteEnvSet('needs_hard_pod_confirm', 'false');\n    irouteEnvSet('needs_pod_capture', 'false');\n    irouteEnvSet('ready_for_pod', 'false');\n    irouteEnvSet('job_closed', 'true');\n    irouteLogHint(hint, 'JOB_CLOSED');\n    return '';\n  }\n  irouteEnvSet('workflow_context_label', meta.context_label || '');\n  irouteEnvSet('allowed_action_count', String(meta.allowed_action_count != null ? meta.allowed_action_count : allowed.length));\n  if (job.job_id) {\n    irouteEnvSet('job_id', job.job_id);\n    irouteEnvSet('job_type', job.job_type || pm.variables.get('job_type') || 'shipment');\n    if (job.job_type === 'booking') irouteEnvSet('booking_id', job.job_id);\n    if (job.job_type === 'shipment') irouteEnvSet('shipment_id', job.job_id);\n    if (job.job_no) irouteEnvSet('shipment_no', job.job_no);\n  }\n  var row = iroutePickNextAction(data);\n  var code = (row.action_code || '').trim();\n  var req = row.execution_requirements || {};\n  irouteEnvSet('execute_action_code', code);\n  irouteEnvSet('execute_action_label', row.execution_label || row.action_name || code);\n  irouteEnvSet('execute_use_multipart', irouteNeedsMultipart(req, hint) ? 'true' : 'false');\n  if (hint.requires_multipart === true || hint.requires_multipart === false) {\n    irouteEnvSet('execute_use_multipart', hint.requires_multipart ? 'true' : 'false');\n  }\n  irouteEnvSet('execute_photo_min_count', String(req.photo_min_count != null ? req.photo_min_count : (req.photo ? 1 : 0)));\n  irouteEnvSet('execute_auto_shipment_post', req.auto_shipment_post === true ? 'true' : 'false');\n  irouteEnvSet('execute_use_cod', (job.order_type === 'COD' && req.auto_treasury_post) ? 'true' : 'false');\n  irouteEnvSet('execute_is_pod_action', (req.auto_pod_post === true) ? 'true' : 'false');\n  var primary = wf.primary_action || wf.next_action || {};\n  var steps = hint.pod_capture_steps || primary.pod_capture_steps || [];\n  var hardPodSteps = steps.indexOf('hard_copy_confirmation') >= 0;\n  var hardFromPod = pod.hard_pod_pending === true;\n  irouteEnvSet('hard_pod_required', (hardFromPod || hint.hard_pod === true || hardPodSteps) ? 'true' : 'false');\n  var digitalFirst = hint.active_step === 'digital_evidence' || hint.capture_mode === 'digital_evidence' || steps[0] === 'digital_evidence' || steps[0] === 'digital';\n  irouteEnvSet('needs_pod_capture', hint.needs_pod_capture === true ? 'true' : 'false');\n  irouteEnvSet('needs_hard_pod_confirm', 'false');\n  var podCode = irouteResolvePodActionCode(data);\n  if (podCode) {\n    irouteEnvSet('pod_upload_action_code', podCode);\n    if (\n      req.auto_pod_post ||\n      hint.action === 'go_to_pod_capture' ||\n      hint.ready_for_pod === true ||\n      hint.needs_pod_capture === true ||\n      irouteFindActionByFlag(allowed, 'auto_pod_post')\n    ) {\n      irouteEnvSet('ready_for_pod', 'true');\n    }\n  } else if (\n    req.auto_pod_post ||\n    hint.action === 'go_to_pod_capture' ||\n    hint.ready_for_pod === true ||\n    hint.needs_pod_capture === true\n  ) {\n    irouteEnvSet('pod_upload_action_code', code || pm.variables.get('pod_upload_action_code') || '');\n    irouteEnvSet('ready_for_pod', 'true');\n  }\n  if (hint.action === 'go_to_pod_capture' || hint.ready_for_pod === true || hint.needs_pod_capture === true) {\n    irouteEnvSet('execute_is_pod_action', 'true');\n  }\n  var hardCode = irouteResolveHardCopyActionCode(data);\n  if (hardCode) irouteEnvSet('hard_copy_action_code', hardCode);\n  else if (row.hard_copy_collection || req.hard_copy_collection) irouteEnvSet('hard_copy_action_code', code);\n  irouteApplyScreenRouting(data, row, hint, pod);\n  code = (pm.variables.get('execute_action_code') || code || '').trim();\n  if (job.job_type === 'shipment' && job.job_id) {\n    irouteEnvSet('auto_shipment_birth_done', 'true');\n    irouteEnvSet('auto_shipment_a4_done', 'true');\n  }\n  irouteEnvSet('job_closed', hint.job_closed === true ? 'true' : 'false');\n  console.log('execute_action_code:', code || '(empty)', '| context:', meta.context_label || '');\n  console.log('workflow_path:', pm.variables.get('workflow_path') || '(unset)', '| ready_for_pod:', pm.variables.get('ready_for_pod'));\n  irouteLogHint(hint, 'SYNC');\n  irouteLogExecutePlan();\n  return code;\n}\nvar irouteLogExecutePlan = function() {\n  var code = pm.variables.get('execute_action_code') || '(empty)';\n  var label = pm.variables.get('execute_action_label') || code;\n  var mp = pm.variables.get('execute_use_multipart');\n  var photos = pm.variables.get('execute_photo_min_count') || '0';\n  var autoShip = pm.variables.get('execute_auto_shipment_post');\n  console.log('=== EXECUTE PLAN ===');\n  console.log('action:', code, '|', label);\n  console.log('multipart:', mp, '| auto_shipment_post:', autoShip, '| photo_min:', photos);\n  console.log('hint.requires_multipart:', pm.variables.get('execute_use_multipart'));\n  if (mp === 'true') {\n    console.log('NEXT: 01b multipart \u2014 attach JPG/PNG to media[0][file_ref] (and media[1] if photo_min >= 2). Keys must be media_type + file_ref, NOT type/file.');\n  } else {\n    console.log('NEXT: 01c JSON only \u2014 skip 01b (Start Job, Pickup, GPS steps use direct_execute).');\n  }\n}\nvar irouteAssertExecuteReady = function(requireMultipart) {\n  var code = pm.variables.get('execute_action_code');\n  if (!code) {\n    throw new Error('execute_action_code empty \u2014 run 01a Job Detail first, then execute.');\n  }\n  if (!pm.variables.get('workflow_version') || !pm.variables.get('content_hash')) {\n    throw new Error('workflow_version/content_hash empty \u2014 run 01a Job Detail sync before execute.');\n  }\n  if (requireMultipart && pm.variables.get('execute_use_multipart') !== 'true') {\n    throw new Error('Wrong step for ' + code + ': execute_use_multipart is not true \u2014 use 01c Execute (JSON), not 01b.');\n  }\n}\nvar irouteAssertExecuteAction = function(data, optional) {\n  if (pm.variables.get('workflow_stuck') === 'true') {\n    if (optional) return;\n    pm.test('workflow stuck \u2014 allowed_actions empty', function () {\n      pm.expect.fail('Trust allowed_actions only. Redeploy backend or use a fresh booking \u2014 do not execute from timeline.');\n    });\n    return;\n  }\n  var code = pm.variables.get('execute_action_code');\n  var hint = (data || {}).next_action_hint || {};\n  if (code || hint.job_closed === true) return;\n  if (optional) return;\n  var label = pm.variables.get('workflow_context_label') || '';\n  var help = label.indexOf('no shipment') >= 0\n    ? 'Configure Operation Actions on booking in Action Master (include Auto Shipment Post on confirm-loaded step).'\n    : 'allowed_actions is empty \u2014 check Action Master operation impacts and driver assignment.';\n  pm.test('execute_action_code required \u2014 ' + help, function () {\n    pm.expect(code, help + ' | ' + label).to.be.ok;\n  });\n}\nvar irouteNewClientActionId = function() {\n  var code = (pm.variables.get('execute_action_code') || 'act').toLowerCase();\n  return code.replace(/[^a-z0-9]+/g, '-') + '-' + pm.variables.replaceIn('{{$guid}}');\n}\nvar irouteSkipIfNoAction = function() {\n  if (!pm.variables.get('execute_action_code') || pm.variables.get('job_closed') === 'true') {\n    console.log('[IRoute] SKIP', pm.info.requestName, '\u2014 no execute_action_code or job_closed');\n    if (pm.execution && pm.execution.skipRequest) pm.execution.skipRequest();\n  }\n}\n"
     },
     {
       "key": "_iroute_h4",
@@ -290,7 +290,7 @@
               }
             }
           ],
-          "id": "5ff58c28-18d5-4093-af96-8a0ac11dbced"
+          "id": "3640b40f-7be1-4fc8-bbbd-7fafff069c7c"
         },
         {
           "name": "02 - Dashboard (active job)",
@@ -353,7 +353,7 @@
               }
             }
           ],
-          "id": "6ed4da32-c310-4741-bc9c-811ceca216b0"
+          "id": "47cd3687-9e87-4992-88ab-65f3048aea6b"
         },
         {
           "name": "03 - Job Detail (sync allowed_actions)",
@@ -399,7 +399,7 @@
               }
             }
           ],
-          "id": "9ee987ca-ab3d-43aa-990d-2d5b13e6b1b5"
+          "id": "bf8e49b4-7720-4085-a3f7-1b170211de2f"
         }
       ]
     },
@@ -465,7 +465,7 @@
               }
             }
           ],
-          "id": "19c857f4-fb0f-438c-9160-f955df846294"
+          "id": "28b978bf-e52f-47a6-9f55-7ff624dc8c10"
         },
         {
           "name": "01b - Execute (multipart if required)",
@@ -604,7 +604,7 @@
               }
             }
           ],
-          "id": "89545d17-3b18-4f85-9fe1-5c8ff2e4b8c3"
+          "id": "14f45764-e9ad-4d35-8b30-0bed6890f8dd"
         },
         {
           "name": "01c - Execute (JSON)",
@@ -707,7 +707,7 @@
               }
             }
           ],
-          "id": "91f1bbf0-fa89-4f85-8728-6491dbf3cf3c"
+          "id": "1b99c24d-07f7-4f95-ae6d-21a81e48e59c"
         },
         {
           "name": "01d - Dashboard refresh",
@@ -750,7 +750,7 @@
               }
             }
           ],
-          "id": "845e1d52-1f03-4752-ac4e-06c80aa10846"
+          "id": "87fa2b69-261a-4dde-88de-8a7bc9bd966a"
         }
       ]
     },
@@ -815,7 +815,7 @@
               }
             }
           ],
-          "id": "1b4aa748-8885-4450-a1ef-31dc728d6e1e"
+          "id": "8b998dec-e333-418d-89c6-727dd9e005cc"
         },
         {
           "name": "10 - POD Capture POST (photo + signature + video)",
@@ -953,7 +953,7 @@
               }
             }
           ],
-          "id": "63164813-5dd6-499b-8d0b-9996ac0c40a3"
+          "id": "57a459e3-4f8c-46c2-a1ce-0afbca1d6088"
         },
         {
           "name": "10.5 - Job Detail (refresh before POD upload)",
@@ -998,7 +998,7 @@
               }
             }
           ],
-          "id": "ca18da7e-0e71-4557-a666-eafe238f5068"
+          "id": "14e0710d-948f-45b9-8aa5-5906fee91109"
         },
         {
           "name": "11 - Execute POD upload (auto_pod_post action)",
@@ -1078,7 +1078,7 @@
               }
             }
           ],
-          "id": "a796d00d-4840-4559-b786-e016860f2ac2"
+          "id": "d9258e06-e8a3-4614-987b-4558440d5103"
         }
       ]
     },
@@ -1128,7 +1128,7 @@
               }
             }
           ],
-          "id": "387de9d4-ed07-4515-bce0-55ad842a3d17"
+          "id": "62a2fcf7-85d8-4fa0-a10f-555fc5f3fb05"
         }
       ]
     },
@@ -1191,7 +1191,7 @@
               }
             }
           ],
-          "id": "e19e5908-26e9-452e-99b5-c77f191632b5"
+          "id": "fbbbd32e-d272-4a79-a3d3-885d352b5875"
         },
         {
           "name": "14A - Execute post-POD action (dynamic, optional)",
@@ -1262,7 +1262,7 @@
               }
             }
           ],
-          "id": "6cb4bde0-2be5-4fde-b0b6-c5b3affb6eb2"
+          "id": "31ab66b6-f6ec-4d6f-aaf6-fc571c130b9b"
         }
       ]
     },
@@ -1325,7 +1325,7 @@
               }
             }
           ],
-          "id": "f078be24-8dcf-4980-8948-45f0950e52da"
+          "id": "517fe42a-98e4-4460-bb83-bdca4b2f80ef"
         },
         {
           "name": "13C - Hard copy confirmation UI",
@@ -1383,7 +1383,7 @@
               }
             }
           ],
-          "id": "87f8e81b-66df-4d68-a392-8da0564f17f6"
+          "id": "38434075-31dd-42b9-acad-9d560ce49bb0"
         },
         {
           "name": "14B - Hard POD Documents GET",
@@ -1442,7 +1442,7 @@
               }
             }
           ],
-          "id": "e2edace0-edf6-498b-ae67-2cd85383ec21"
+          "id": "eb905672-9172-41ac-9f4a-0784c3c06f94"
         },
         {
           "name": "15B - Hard POD Submit",
@@ -1508,7 +1508,7 @@
               }
             }
           ],
-          "id": "33097c88-8fce-4a23-bd80-0d6fba25c101"
+          "id": "b62e0830-fbfb-4028-b406-a6f24358875d"
         },
         {
           "name": "15.5B - Job Detail refresh (before hard copy execute)",
@@ -1573,7 +1573,7 @@
               }
             }
           ],
-          "id": "ae941a28-f18d-405d-a0c5-cd0fe095878b"
+          "id": "c4afc9b0-a48f-4bf3-bda9-038507039cc2"
         },
         {
           "name": "16B - Execute Hard Copy (dynamic)",
@@ -1681,7 +1681,7 @@
               }
             }
           ],
-          "id": "0cc270b4-48d8-41b2-8c7a-60a8ec8fa7fe"
+          "id": "e1a343ca-ad21-40a2-ade0-ba11816b3f46"
         },
         {
           "name": "17B - Execute optional post-Hard-POD action (dynamic)",
@@ -1752,7 +1752,7 @@
               }
             }
           ],
-          "id": "cafd3218-c658-4d00-9d6a-6836bcf4ddfb"
+          "id": "55131f99-512b-48ef-ba74-cc65e340a1a9"
         }
       ]
     },
@@ -1800,7 +1800,7 @@
               }
             }
           ],
-          "id": "a16554f8-235d-4509-800f-846ed846489b"
+          "id": "47d89e3a-ac5b-43aa-a796-8cb43a5c050a"
         },
         {
           "name": "18b - Execute COD (auto_treasury_post)",
@@ -1870,7 +1870,7 @@
               }
             }
           ],
-          "id": "fac90caf-d7fc-492c-a2ee-d67439d8bc2d"
+          "id": "6fc55441-0834-466c-aca0-83d1272d35ae"
         },
         {
           "name": "19 - Job Detail (expect close)",
@@ -1912,7 +1912,7 @@
               }
             }
           ],
-          "id": "66136a49-0042-423c-987c-242f244ff0c8"
+          "id": "5963a7c2-16b4-4ad8-a209-b60486e668ac"
         },
         {
           "name": "20 - Execute Job Close (dynamic)",
@@ -2013,7 +2013,7 @@
               }
             }
           ],
-          "id": "74035bd1-7864-4909-8545-b42a31d3fde9"
+          "id": "3845a363-e3b1-4457-a333-19945d466b06"
         }
       ]
     }

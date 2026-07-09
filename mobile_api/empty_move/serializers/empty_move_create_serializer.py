@@ -1,4 +1,4 @@
-"""Request validation for driver empty move creation."""
+"""Request validation for driver empty-move creation."""
 from __future__ import annotations
 
 from django.utils.translation import gettext_lazy as _
@@ -7,13 +7,23 @@ from rest_framework import serializers
 from iroad_tenants.operation_runtime.movement_ops import VALID_EMPTY_MOVE_REASONS
 
 
-def _coord_pair(lat: float | None, lng: float | None) -> tuple[float, float] | None:
-    if lat is None or lng is None:
+def _coord_pair(latitude, longitude) -> tuple[float, float] | None:
+    if latitude is None or longitude is None:
         return None
-    return lat, lng
+    try:
+        return float(latitude), float(longitude)
+    except (TypeError, ValueError):
+        return None
 
 
 class EmptyMoveCreateRequestSerializer(serializers.Serializer):
+    """
+    PCS §5.1 — GPS-only empty move create.
+
+    Driver selects a reason and presses Start with current GPS. Manual from/to
+    pickers are optional legacy fields only.
+    """
+
     empty_move_reason = serializers.ChoiceField(
         choices=sorted(VALID_EMPTY_MOVE_REASONS),
     )
@@ -56,28 +66,43 @@ class EmptyMoveCreateRequestSerializer(serializers.Serializer):
             return True
         return bool(address) and latitude is not None and longitude is not None
 
+    @staticmethod
+    def _start_gps_complete(attrs: dict) -> bool:
+        if _coord_pair(attrs.get('from_latitude'), attrs.get('from_longitude')):
+            return True
+        return _coord_pair(attrs.get('latitude'), attrs.get('longitude')) is not None
+
     def validate(self, attrs):
         attrs['from_address'] = str(attrs.get('from_address') or '').strip()
         attrs['to_address'] = str(attrs.get('to_address') or '').strip()
 
-        if not self._endpoint_complete(
+        legacy_from = self._endpoint_complete(
             location_id=attrs.get('from_location_id'),
             address=attrs['from_address'],
             latitude=attrs.get('from_latitude'),
             longitude=attrs.get('from_longitude'),
-        ):
-            raise serializers.ValidationError(
-                {'from_address': _('mobile.empty_move.from_location_required')},
-            )
-        if not self._endpoint_complete(
+        )
+        legacy_to = self._endpoint_complete(
             location_id=attrs.get('to_location_id'),
             address=attrs['to_address'],
             latitude=attrs.get('to_latitude'),
             longitude=attrs.get('to_longitude'),
-        ):
-            raise serializers.ValidationError(
-                {'to_address': _('mobile.empty_move.to_location_required')},
-            )
+        )
+        legacy_manual_route = legacy_from and legacy_to
+
+        if not legacy_manual_route:
+            if not self._start_gps_complete(attrs):
+                raise serializers.ValidationError(
+                    {
+                        'latitude': _(
+                            'mobile.empty_move.start_gps_required',
+                        ),
+                    },
+                )
+            if attrs.get('from_latitude') is None and attrs.get('latitude') is not None:
+                attrs['from_latitude'] = attrs.get('latitude')
+                attrs['from_longitude'] = attrs.get('longitude')
+            return attrs
 
         from_id = attrs.get('from_location_id')
         to_id = attrs.get('to_location_id')

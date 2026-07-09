@@ -131,4 +131,5 @@ class JobDetailSyncMetadataTests(SimpleTestCase):
             content_hash='preset',
         )
         meta = build_job_detail_sync_metadata(ctx)
-        self.assertEqual(meta['content_hash'], 'preset')
+        self.assertNotEqual(meta['content_hash'], 'preset')
+        self.assertEqual(meta['content_hash'], resolve_content_hash(ctx))

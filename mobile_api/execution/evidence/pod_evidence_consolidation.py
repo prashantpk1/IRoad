@@ -18,7 +18,15 @@ from mobile_api.execution.evidence.constants import (
 
 def is_pod_capture_requirements(requirements: dict[str, Any] | None) -> bool:
     data = requirements or {}
-    return bool(data.get('signature')) or int(data.get('video_max_count') or 0) > 0
+    if bool(data.get('auto_pod_post')):
+        return True
+    if bool(data.get('signature')):
+        return True
+    if str(data.get('pod_capture_type') or '').strip():
+        return True
+    if int(data.get('video_max_count') or 0) > 0:
+        return True
+    return str(data.get('capture_mode') or '').strip().casefold() == 'digital_evidence'
 
 
 def consolidate_pod_evidence_dicts(

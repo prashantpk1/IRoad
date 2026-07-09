@@ -1,6 +1,8 @@
 """Truck/driver operational eligibility queries (PCS §6.2.1)."""
 from __future__ import annotations
 
+import uuid
+
 from django.db.models import Q
 
 from iroad_tenants.fleet_operational_rules import (
@@ -83,11 +85,53 @@ def operation_driver_options_payload(*, include_driver_ids=None) -> list[dict[st
     return [_driver_option_row(driver) for driver in drivers[:500]]
 
 
+def _coerce_uuid(value):
+    try:
+        return uuid.UUID(str(value or '').strip())
+    except (TypeError, ValueError, AttributeError):
+        return None
+
+
+def _truck_include_primary_keys(include_truck_ids=None) -> list[uuid.UUID]:
+    """Accept truck UUIDs or truck_code values (e.g. TR-0003) for include lists."""
+    include_uuids: list[uuid.UUID] = []
+    include_codes: list[str] = []
+    for value in include_truck_ids or []:
+        if not value:
+            continue
+        parsed = _coerce_uuid(value)
+        if parsed is not None:
+            include_uuids.append(parsed)
+            continue
+        code = str(value).strip()
+        if code:
+            include_codes.append(code)
+    if include_codes:
+        include_uuids.extend(
+            TruckMaster.objects.filter(truck_code__in=include_codes).values_list(
+                'pk',
+                flat=True,
+            )
+        )
+    return list(dict.fromkeys(include_uuids))
+
+
+def _driver_include_primary_keys(include_driver_ids=None) -> list[uuid.UUID]:
+    include_uuids: list[uuid.UUID] = []
+    for value in include_driver_ids or []:
+        if not value:
+            continue
+        parsed = _coerce_uuid(value)
+        if parsed is not None:
+            include_uuids.append(parsed)
+    return list(dict.fromkeys(include_uuids))
+
+
 def booking_eligible_trucks_queryset(*, include_truck_ids=None):
     qs = TruckMaster.active_objects.filter(
         Q(operational_status='') | Q(operational_status=TruckMaster.OperationalStatus.AVAILABLE)
     )
-    include_ids = [pk for pk in (include_truck_ids or []) if pk]
+    include_ids = _truck_include_primary_keys(include_truck_ids)
     if include_ids:
         qs = TruckMaster.objects.filter(Q(pk__in=qs.values('pk')) | Q(pk__in=include_ids)).distinct()
     return qs.select_related('default_driver_id').order_by('truck_code')
@@ -95,7 +139,7 @@ def booking_eligible_trucks_queryset(*, include_truck_ids=None):
 
 def booking_eligible_drivers_queryset(*, include_driver_ids=None):
     qs = DriverMaster.active_objects.all()
-    include_ids = [pk for pk in (include_driver_ids or []) if pk]
+    include_ids = _driver_include_primary_keys(include_driver_ids)
     if include_ids:
         qs = DriverMaster.objects.filter(Q(pk__in=qs.values('pk')) | Q(pk__in=include_ids)).distinct()
     return qs.order_by('driver_code')

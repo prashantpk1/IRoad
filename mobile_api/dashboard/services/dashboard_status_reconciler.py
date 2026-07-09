@@ -30,6 +30,10 @@ from iroad_tenants.operation_runtime.movement_state_machine import (
     is_terminal_movement_status,
 )
 
+from mobile_api.helpers.shipment_status_mobile import mobile_effective_shipment_status
+
+from tenant_workspace.models import TenantShipment
+
 # API contract values
 AUTHORITY_ACTION_LOGS = 'action_logs'
 AUTHORITY_COLUMNS_FALLBACK = 'columns_fallback'
@@ -330,7 +334,10 @@ def _aggregate_workflow_integrity(bundle: dict[str, Any]) -> dict[str, Any]:
 
 def authoritative_shipment_status(context: DriverDashboardContext) -> str:
     block = (context.reconciliation or {}).get('shipment') or {}
-    return (block.get('authoritative_status') or '').strip()
+    auth = (block.get('authoritative_status') or '').strip()
+    if context.active_shipment is not None:
+        return mobile_effective_shipment_status(context.active_shipment, auth)
+    return auth
 
 
 def authoritative_movement_status(context: DriverDashboardContext) -> str:
@@ -338,13 +345,27 @@ def authoritative_movement_status(context: DriverDashboardContext) -> str:
     return (block.get('authoritative_status') or '').strip()
 
 
-def _overlay_status_from_block(block: dict[str, Any] | None) -> str | None:
+def _overlay_status_from_block(
+    block: dict[str, Any] | None,
+    *,
+    shipment: Any | None = None,
+) -> str | None:
     if not block:
         return None
     wi = block.get('workflow_integrity') or {}
     auth = (block.get('authoritative_status') or '').strip()
     if not auth:
         return None
+    if shipment is not None:
+        auth = mobile_effective_shipment_status(
+            shipment,
+            auth,
+            repair_column=auth
+            in {
+                TenantShipment.ShipmentStatus.DELIVERED,
+                TenantShipment.ShipmentStatus.POD_SUBMITTED,
+            },
+        )
     if wi.get('authority_source') == AUTHORITY_ACTION_LOGS and wi.get('log_count', 0) > 0:
         return auth
     if wi.get('fallback_to_columns') or wi.get('missing_log_warning'):
@@ -368,7 +389,10 @@ def apply_reconciled_status_overlays(
 
     try:
         ship_block = (context.reconciliation or {}).get('shipment') or {}
-        overlay_ship = _overlay_status_from_block(ship_block)
+        overlay_ship = _overlay_status_from_block(
+            ship_block,
+            shipment=context.active_shipment,
+        )
         if context.active_shipment is not None and overlay_ship is not None:
             s = context.active_shipment
             snapshots.append((s, 'shipment_status', getattr(s, 'shipment_status', None)))

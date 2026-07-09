@@ -35,6 +35,7 @@ class JobDetailFoundationTests(SimpleTestCase):
                 'alerts',
                 'sync_metadata',
                 'operational_issues',
+                'support_actions',
                 'unresolved_issue_count',
                 'blocking_recommendation',
                 'next_action_hint',

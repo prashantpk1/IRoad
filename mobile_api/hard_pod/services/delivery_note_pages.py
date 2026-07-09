@@ -3,8 +3,8 @@ mobile_api/hard_pod/services/delivery_note_pages.py
 
 Delivery-note page lines for Hard POD physical custody confirmation (mobile checklist).
 
-Source of truth: ``TenantShipmentDocument`` rows with ``is_delivery_note=True`` and
-their ``TenantShipmentDocumentPage`` subform (IRoute Ch. 6).
+Source of truth: ``TenantShipmentDocument`` rows (``is_delivery_note`` may be true or false)
+and their ``TenantShipmentDocumentPage`` subform (IRoute Ch. 6). POD child rows are excluded.
 """
 from __future__ import annotations
 
@@ -86,33 +86,33 @@ def _flatten_pages(documents: list[dict[str, Any]]) -> list[dict[str, Any]]:
     return rows
 
 
+def _shipment_source_documents_queryset(shipment_pk, *, booking_id=None):
+    from tenant_workspace.models import TenantShipmentDocument
+
+    qs = TenantShipmentDocument.objects.filter(shipment_id=shipment_pk).exclude(
+        document_type__iexact='pod',
+    )
+    if qs.exists():
+        return qs
+    if booking_id:
+        return TenantShipmentDocument.objects.filter(booking_id=booking_id).exclude(
+            document_type__iexact='pod',
+        )
+    return qs
+
+
 def _load_delivery_note_documents(
     shipment: Any,
     *,
     limit: int,
 ) -> list[dict[str, Any]]:
-    from tenant_workspace.models import TenantShipmentDocument
-
     shipment_pk = getattr(shipment, 'pk', None)
+    booking_id = getattr(shipment, 'booking_id', None)
     documents = list(
-        TenantShipmentDocument.objects.filter(
-            shipment_id=shipment_pk,
-            is_delivery_note=True,
-        )
+        _shipment_source_documents_queryset(shipment_pk, booking_id=booking_id)
         .prefetch_related('document_pages', 'pod_pages')
         .order_by('-updated_at', '-created_at')[:10]
     )
-    if not documents:
-        booking_id = getattr(shipment, 'booking_id', None)
-        if booking_id:
-            documents = list(
-                TenantShipmentDocument.objects.filter(
-                    booking_id=booking_id,
-                    is_delivery_note=True,
-                )
-                .prefetch_related('document_pages', 'pod_pages')
-                .order_by('-updated_at', '-created_at')[:10]
-            )
     if not documents:
         return [_synthetic_document_from_shipment(shipment, limit=limit)]
 

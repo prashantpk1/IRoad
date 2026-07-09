@@ -447,3 +447,100 @@ class MovementPolicyTests(SimpleTestCase):
         self.assertTrue(
             _action_is_allowed(action, movement=movement, shipment=None),
         )
+
+    @patch(
+        'iroad_tenants.operation_runtime.movement_execution_engine.movement_executed_action_ids',
+        return_value=set(),
+    )
+    @patch(
+        'iroad_tenants.operation_runtime.movement_action_validator._movement_executed_action_codes',
+        return_value=set(),
+    )
+    @patch(
+        'iroad_tenants.operation_runtime.movement_action_validator.validate_movement_completion_stage',
+        return_value=None,
+    )
+    @patch(
+        'iroad_tenants.operation_runtime.movement_action_validator._empty_move_catalog_has_arrived_action',
+        return_value=False,
+    )
+    @patch(
+        'iroad_tenants.operation_runtime.movement_action_validator.movement_log_milestone_flags',
+        return_value={
+            'start_done': True,
+            'in_transit_done': True,
+            'arrived_done': False,
+            'complete_done': False,
+        },
+    )
+    @patch(
+        'iroad_tenants.operation_runtime.movement_action_validator.derive_movement_execution_stage',
+        return_value=STAGE_IN_TRANSIT,
+    )
+    @patch(
+        'iroad_tenants.operation_runtime.movement_action_validator.movement_workflow_column_for_policy',
+        return_value=TenantTruckMovementLog.Status.IN_PROGRESS,
+    )
+    def test_three_step_end_job_allowed_after_departure(
+        self,
+        _workflow_column,
+        _stage,
+        _flags,
+        _no_arrived_step,
+        _completion_ok,
+        _executed_codes,
+        _ids,
+    ):
+        movement = _movement(status=TenantTruckMovementLog.Status.IN_PROGRESS)
+        end_job = _action(
+            'OA-0016',
+            'End Job',
+            sequence_category='empty_move',
+            movement_status_impact='completed',
+            prerequisite_action_codes='OA-0015',
+        )
+        self.assertTrue(
+            movement_action_allowed(end_job, movement=movement),
+        )
+
+    @patch(
+        'iroad_tenants.operation_runtime.movement_action_validator._ordered_empty_move_catalog_actions',
+    )
+    @patch(
+        'iroad_tenants.operation_runtime.movement_execution_engine.movement_executed_action_ids',
+        return_value=set(),
+    )
+    @patch(
+        'iroad_tenants.operation_runtime.movement_action_validator.movement_log_milestone_flags',
+        return_value={'start_done': False, 'in_transit_done': False, 'arrived_done': False, 'complete_done': False},
+    )
+    @patch(
+        'iroad_tenants.operation_runtime.movement_action_validator.derive_movement_execution_stage',
+        return_value=STAGE_CREATED,
+    )
+    @patch(
+        'iroad_tenants.operation_runtime.movement_action_validator.movement_workflow_column_for_policy',
+        return_value=TenantTruckMovementLog.Status.SCHEDULED,
+    )
+    def test_empty_move_start_allowed_by_sequence_category(
+        self,
+        _workflow_column,
+        _stage,
+        _flags,
+        _ids,
+        mock_catalog,
+    ):
+        movement = _movement()
+        start = _action(
+            'OA-0014',
+            'Start Job',
+            sequence_category='empty_move',
+            movement_status_impact='In_Progress',
+            prerequisite_action_codes='EM1',
+        )
+        start.auto_shipment_post = True
+        start.sequence_number = 1
+        mock_catalog.return_value = [start]
+        self.assertTrue(
+            movement_action_allowed(start, movement=movement),
+        )

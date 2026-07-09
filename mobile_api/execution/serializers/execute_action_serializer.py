@@ -75,6 +75,12 @@ class ExecuteActionRequestSerializer(serializers.Serializer):
 
     # Optional extensions (orchestrator / kernel)
     map_link = serializers.CharField(required=False, allow_blank=True, default='')
+    location_address = serializers.CharField(
+        required=False,
+        allow_blank=True,
+        max_length=500,
+        help_text='Reverse-geocoded address for empty-move route endpoints.',
+    )
     mobile_cod_amount = serializers.DecimalField(
         max_digits=18,
         decimal_places=2,

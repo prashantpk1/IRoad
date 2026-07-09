@@ -8,6 +8,7 @@ from __future__ import annotations
 import hashlib
 import os
 import uuid
+from dataclasses import dataclass
 from typing import Any, Mapping
 
 from django.core.files.base import ContentFile
@@ -16,18 +17,28 @@ from django.utils.translation import gettext_lazy as _
 from django_tenants.utils import schema_context
 
 from mobile_api.execution.evidence.constants import EXECUTION_MEDIA_MAX_ITEMS
-from mobile_api.job_detail.guards.entity_lookup import lookup_shipment_by_reference
+from mobile_api.job_detail.guards.entity_lookup import (
+    lookup_movement_by_reference,
+    lookup_shipment_by_reference,
+)
 from mobile_api.job_detail.guards.ownership import (
+    driver_owns_movement,
     driver_owns_shipment_leg,
     driver_pk,
+    movement_is_driver_accessible,
+    movement_is_empty_move_job,
     shipment_is_driver_accessible,
 )
+from mobile_api.job_detail.services.movement_job_resolver import resolve_empty_move_job
 from mobile_api.issues.dto.issue_response_builder import IssueResponseBuilder
 from mobile_api.issues.exceptions import IssueReportingError
 from mobile_api.issues.models.operational_issue import OperationalIssue
 from mobile_api.issues.services.issue_escalation_service import IssueEscalationService
 from mobile_api.issues.services.issue_reconciliation_service import (
     IssueReconciliationService,
+)
+from mobile_api.issues.services.issue_action_log_bridge import (
+    append_incident_report_action_log,
 )
 from mobile_api.issues.staging.issue_bundle_service import IssueBundleService
 
@@ -40,6 +51,14 @@ def _coord_str(value: Any) -> str:
     if value is None or value == '':
         return ''
     return str(value).strip()[:32]
+
+
+@dataclass(frozen=True)
+class _IssueJobScope:
+    job_type: str
+    scope_id: str
+    shipment: Any | None = None
+    movement: Any | None = None
 
 
 class IssueReportingService:
@@ -68,6 +87,7 @@ class IssueReportingService:
         schema = (tenant_schema or '').strip()
         client_issue_id = (payload.get('client_issue_id') or '').strip()
         shipment_ref = (payload.get('shipment_id') or '').strip()
+        movement_ref = (payload.get('movement_id') or '').strip()
         driver_id = str(driver_pk(driver) or '').strip()
         issue_type = (payload.get('issue_type') or '').strip()
         severity = (payload.get('severity') or '').strip()
@@ -122,7 +142,7 @@ class IssueReportingService:
                     existing=existing,
                     tenant_schema=schema,
                     driver_id=driver_id,
-                    shipment_id=shipment_ref,
+                    shipment_id=str(getattr(existing, 'shipment_id', '') or ''),
                     integrity_checksum=expected_checksum,
                 )
             except ValueError as exc:
@@ -156,30 +176,38 @@ class IssueReportingService:
                 ) from exc
 
             evidence_rows = list(existing.evidence_rows.order_by('line_no'))
+            replay_scope = _IssueJobScope(
+                job_type='movement' if movement_ref else 'shipment',
+                scope_id=str(getattr(existing, 'shipment_id', '') or ''),
+            )
             return self._build_full_response(
                 issue=existing,
                 evidence_rows=evidence_rows,
                 replayed=True,
+                job_scope=replay_scope,
             )
 
         with schema_context(schema):
-            shipment = self._resolve_shipment(driver=driver, shipment_id=shipment_ref)
-            shipment_pk = str(
-                getattr(shipment, 'pk', '') or getattr(shipment, 'shipment_id', '')
-            ).strip()
+            job_scope = self._resolve_job_scope(
+                driver=driver,
+                shipment_ref=shipment_ref,
+                movement_ref=movement_ref,
+                tenant_schema=schema,
+            )
+            scope_id = job_scope.scope_id
 
             media_items = self._rehome_inline_issue_uploads(
                 media_items=media_items,
                 tenant_schema=schema,
                 driver_pk=driver_id,
-                shipment_pk=shipment_pk,
+                shipment_pk=scope_id,
             )
 
             self._validate_media_paths(
                 media_items=media_items,
                 tenant_schema=schema,
                 driver_pk=driver_id,
-                shipment_pk=shipment_pk,
+                shipment_pk=scope_id,
             )
 
             blocking_recommended = self._reconciliation.compute_blocking_recommended(
@@ -196,7 +224,7 @@ class IssueReportingService:
                     [
                         schema,
                         driver_id,
-                        shipment_pk,
+                        scope_id,
                         client_issue_id,
                         issue_type,
                         severity,
@@ -215,7 +243,7 @@ class IssueReportingService:
             create_kwargs = dict(
                 tenant_schema=schema,
                 driver_id=driver_id,
-                shipment_id=shipment_pk,
+                shipment_id=scope_id,
                 client_issue_id=client_issue_id,
                 issue_type=issue_type,
                 severity=severity,
@@ -250,11 +278,20 @@ class IssueReportingService:
                     auto_escalate=auto_escalate,
                 )
                 issue.refresh_from_db()
+                append_incident_report_action_log(
+                    shipment=job_scope.shipment,
+                    movement=job_scope.movement,
+                    driver=driver,
+                    payload=payload,
+                    client_issue_id=client_issue_id,
+                    tenant_schema=schema,
+                )
 
             return self._build_full_response(
                 issue=issue,
                 evidence_rows=evidence_rows,
                 replayed=not created,
+                job_scope=job_scope,
             )
 
     def _build_full_response(
@@ -263,6 +300,7 @@ class IssueReportingService:
         issue: OperationalIssue,
         evidence_rows: list[Any],
         replayed: bool,
+        job_scope: _IssueJobScope | None = None,
     ) -> dict[str, Any]:
         unresolved = self._reconciliation.count_unresolved_for_shipment(
             tenant_schema=issue.tenant_schema,
@@ -281,6 +319,146 @@ class IssueReportingService:
             timeline_preview=timeline_preview,
             workflow_impact=workflow_impact,
             replayed=replayed,
+            job_type=(job_scope.job_type if job_scope else 'shipment'),
+            movement_id=(
+                job_scope.scope_id if job_scope and job_scope.job_type == 'movement' else ''
+            ),
+        )
+
+    def _resolve_job_scope(
+        self,
+        *,
+        driver: Any,
+        shipment_ref: str,
+        movement_ref: str,
+        tenant_schema: str,
+    ) -> _IssueJobScope:
+        movement_ref = (movement_ref or '').strip()
+        shipment_ref = (shipment_ref or '').strip()
+
+        if movement_ref:
+            return self._resolve_movement_scope(
+                driver,
+                movement_ref,
+                tenant_schema=tenant_schema,
+            )
+
+        if shipment_ref:
+            shipment = lookup_shipment_by_reference(shipment_ref)
+            if shipment is not None:
+                return self._resolve_shipment_scope(driver, shipment)
+
+            movement = lookup_movement_by_reference(shipment_ref)
+            if movement is not None:
+                return self._resolve_movement_scope(
+                    driver,
+                    shipment_ref,
+                    tenant_schema=tenant_schema,
+                    movement=movement,
+                )
+
+        raise IssueReportingError(
+            str(_('mobile.jobs.not_found')),
+            code='job_not_found',
+            http_status=404,
+            message_key='mobile.jobs.not_found',
+        )
+
+    def _resolve_shipment_scope(self, driver: Any, shipment: Any) -> _IssueJobScope:
+        if not shipment_is_driver_accessible(shipment):
+            raise IssueReportingError(
+                str(_('mobile.jobs.inactive')),
+                code='job_inactive',
+                http_status=404,
+                message_key='mobile.jobs.inactive',
+            )
+        booking = getattr(shipment, 'booking', None)
+        if not driver_owns_shipment_leg(driver, booking, shipment):
+            raise IssueReportingError(
+                str(_('mobile.auth.forbidden')),
+                code='forbidden',
+                http_status=403,
+                message_key='mobile.auth.forbidden',
+            )
+        scope_id = str(
+            getattr(shipment, 'pk', '') or getattr(shipment, 'shipment_id', '') or ''
+        ).strip()
+        return _IssueJobScope(
+            job_type='shipment',
+            scope_id=scope_id,
+            shipment=shipment,
+            movement=None,
+        )
+
+    def _resolve_movement_scope(
+        self,
+        driver: Any,
+        movement_ref: str,
+        *,
+        tenant_schema: str,
+        movement: Any | None = None,
+    ) -> _IssueJobScope:
+        if movement is None:
+            ctx = resolve_empty_move_job(
+                driver,
+                movement_ref,
+                tenant_schema=tenant_schema,
+            )
+            if not ctx.ok:
+                code = (ctx.error_code or 'job_not_found').strip()
+                if code == 'forbidden':
+                    raise IssueReportingError(
+                        str(_('mobile.auth.forbidden')),
+                        code='forbidden',
+                        http_status=403,
+                        message_key='mobile.auth.forbidden',
+                    )
+                if code == 'job_inactive':
+                    raise IssueReportingError(
+                        str(_('mobile.jobs.inactive')),
+                        code='job_inactive',
+                        http_status=404,
+                        message_key='mobile.jobs.inactive',
+                    )
+                raise IssueReportingError(
+                    str(_('mobile.jobs.not_found')),
+                    code='job_not_found',
+                    http_status=404,
+                    message_key='mobile.jobs.not_found',
+                )
+            movement = ctx.entity_row
+
+        if not movement_is_empty_move_job(movement):
+            raise IssueReportingError(
+                str(_('mobile.jobs.not_found')),
+                code='job_not_found',
+                http_status=404,
+                message_key='mobile.jobs.not_found',
+            )
+        if not movement_is_driver_accessible(movement):
+            raise IssueReportingError(
+                str(_('mobile.jobs.inactive')),
+                code='job_inactive',
+                http_status=404,
+                message_key='mobile.jobs.inactive',
+            )
+        if not driver_owns_movement(driver, movement):
+            raise IssueReportingError(
+                str(_('mobile.auth.forbidden')),
+                code='forbidden',
+                http_status=403,
+                message_key='mobile.auth.forbidden',
+            )
+        scope_id = str(
+            getattr(movement, 'pk', '')
+            or getattr(movement, 'movement_id', '')
+            or movement_ref
+        ).strip()
+        return _IssueJobScope(
+            job_type='movement',
+            scope_id=scope_id,
+            shipment=None,
+            movement=movement,
         )
 
     def _resolve_shipment(self, *, driver: Any, shipment_id: str) -> Any:
@@ -301,22 +479,7 @@ class IssueReportingService:
                 http_status=404,
                 message_key='mobile.jobs.not_found',
             )
-        if not shipment_is_driver_accessible(shipment):
-            raise IssueReportingError(
-                str(_('mobile.jobs.inactive')),
-                code='job_inactive',
-                http_status=404,
-                message_key='mobile.jobs.inactive',
-            )
-        booking = getattr(shipment, 'booking', None)
-        if not driver_owns_shipment_leg(driver, booking, shipment):
-            raise IssueReportingError(
-                str(_('mobile.auth.forbidden')),
-                code='forbidden',
-                http_status=403,
-                message_key='mobile.auth.forbidden',
-            )
-        return shipment
+        return self._resolve_shipment_scope(driver, shipment).shipment
 
     @staticmethod
     def _validate_issue_type(issue_type: str) -> None:

@@ -5,8 +5,8 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <meta name="description" content="{{ otp_meta_description|default:'iRoad Admin Dashboard - OTP Verification' }}" />
-    <title>{{ otp_page_title|default:'OTP Verification' }} | iRoad</title>
+    <meta name="description" content="{{ otp_meta_description|default:'IRoute Admin Dashboard - OTP Verification' }}" />
+    <title>{{ otp_page_title|default:'OTP Verification' }} | IRoute</title>
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link
@@ -148,7 +148,7 @@
         <div class="auth-form-container">
           <div class="auth-form-header">
             <div class="auth-brand">
-              <span class="auth-logo">i<span>Road</span></span>
+              <img src="{% static 'landing/images/logo.svg' %}?v=2" alt="IRoute Logo" style="height: 48px; width: auto;" />
             </div>
             <h1 class="auth-title">{{ otp_page_title|default:'OTP Verification' }}</h1>
             <p class="auth-subtitle">
@@ -256,7 +256,7 @@
           </p>
 
           <div class="auth-footer">
-            <p>&copy; 2026 iRoad. All rights reserved.</p>
+            <p>&copy; 2026 IRoute. All rights reserved.</p>
           </div>
         </div>
       </div>

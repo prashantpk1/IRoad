@@ -2029,7 +2029,7 @@ class DriverTreasury(models.Model):
     def recalculate_balance(self):
         """
         Recalculate current_balance from all transactions.
-        Debit increases wallet (cash in); Credit decreases (cash out).
+        Credit increases wallet (cash in); Debit decreases (cash out).
         """
         from django.db.models import Sum
         credits = self.transactions.filter(
@@ -2046,7 +2046,7 @@ class DriverTreasury(models.Model):
             total=Sum('amount')
         )['total'] or Decimal('0.00')
 
-        self.current_balance = debits - credits
+        self.current_balance = credits - debits
         self.save(update_fields=['current_balance'])
 
     def clean(self):
@@ -2145,7 +2145,7 @@ class DriverTreasuryTransaction(models.Model):
                 fields=['driver_treasury', 'shipment', 'transaction_category'],
                 condition=models.Q(
                     transaction_category='Client Collection',
-                    transaction_type='Debit',
+                    transaction_type='Credit',
                     shipment__isnull=False,
                 ),
                 name='tenant_dtt_unique_cod_per_wallet_shipment',
@@ -3431,6 +3431,7 @@ class TenantBooking(models.Model):
     class Status(models.TextChoices):
         DRAFT = 'Draft', 'Draft'
         CONFIRMED = 'Confirmed', 'Confirmed'
+        COMPLETED = 'Completed', 'Completed'
         CANCELLED = 'Cancelled', 'Cancelled'
 
     booking_id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)

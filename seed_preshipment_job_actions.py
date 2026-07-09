@@ -1,4 +1,4 @@
-"""Seed job Action Master OA-0001..OA-0010 (+ system A_POD_VERIFY).
+"""Seed job Action Master OA-0001..OA-0010.
 
 Renames legacy shipment codes OA-0003..0006 → OA-0005..0008, then seeds:
   OA-0001 Start Job
@@ -180,23 +180,6 @@ JOB_ACTIONS: tuple[dict[str, Any], ...] = (
         'shipment_status_impact': 'Closed',
         'movement_status_impact': '',
         'condition_code': 'A9_required_if_COD',
-    },
-    {
-        'action_code': 'A_POD_VERIFY',
-        'english_label': 'POD Verified',
-        'arabic_label': 'تم التحقق من POD',
-        'sequence_number': 75,
-        'auto_movement_post': False,
-        'auto_shipment_post': False,
-        'auto_pod_post': False,
-        'hard_copy_collection': False,
-        'mobile_visible': False,
-        'admin_only': False,
-        'booking_status_impact': '',
-        'shipment_status_impact': 'Delivered',
-        'movement_status_impact': '',
-        'action_scope': 'job',
-        'sequence_category': 'job',
     },
 )
 

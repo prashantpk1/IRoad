@@ -7,8 +7,8 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <meta name="description" content="{% block description %}iRoad Admin Dashboard{% endblock %}" />
-    <title>{% block title %}iRoad Admin{% endblock %}</title>
+    <meta name="description" content="{% block description %}IRoute Admin Dashboard{% endblock %}" />
+    <title>{% block title %}IRoute Admin{% endblock %}</title>
 
     <!-- Google Fonts -->
     <link rel="preconnect" href="https://fonts.googleapis.com" />
@@ -225,14 +225,14 @@
     {% if auth_tab_sync_bump %}
     <script>
       try {
-        localStorage.setItem('iroad_auth_bump', String(Date.now()));
+        localStorage.setItem('iroute_auth_bump', String(Date.now()));
       } catch (e) {}
     </script>
     {% endif %}
     {% if user.is_authenticated %}
     <script>
       window.addEventListener('storage', function (ev) {
-        if (ev.key === 'iroad_logout_bump' && ev.newValue) {
+        if (ev.key === 'iroute_logout_bump' && ev.newValue) {
           window.location.href = '{% url "login" %}';
         }
       });

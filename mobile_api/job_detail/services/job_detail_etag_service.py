@@ -29,7 +29,7 @@ __all__ = [
     'JOB_DETAIL_NAVIGATION_CONTRACT_VERSION',
 ]
 
-JOB_DETAIL_NAVIGATION_CONTRACT_VERSION = '3'
+JOB_DETAIL_NAVIGATION_CONTRACT_VERSION = '6'
 
 
 def _reconciliation_versions(context: JobDetailContext) -> dict[str, str]:

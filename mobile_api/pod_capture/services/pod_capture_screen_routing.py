@@ -42,13 +42,19 @@ def build_pod_capture_get_routing(
         hard_block.get('pending')
     )
     digital_complete = bool(pod_section.get('digital_evidence_complete'))
+    unloading_pending = bool(pod_section.get('unloading_pending'))
 
-    # Step 1 is always digital on first open. Step 2 (hard copy) when:
-    # - client requests ``?step=hard_copy_confirmation``, or
-    # - digital POD is done and hard custody is still outstanding (resume).
-    if step in {'hard_copy', 'hard_copy_confirmation', 'a7h'} or (
-        hard_applicable and hard_pending and digital_complete
-    ):
+    hard_copy_ready = (
+        hard_applicable
+        and hard_pending
+        and digital_complete
+        and not unloading_pending
+        and bool(hard_block.get('actionable'))
+    )
+
+    # Step 1 is always digital on first open. Step 2 (hard copy) only when unloading
+    # and digital POD are complete and hard custody is still outstanding.
+    if hard_copy_ready:
         return {
             'screen': POD_CAPTURE_SCREEN,
             'capture_mode': HARD_COPY_CONFIRMATION_SCREEN,

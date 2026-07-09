@@ -66,7 +66,7 @@ def _seed_actions(*, dry_run: bool) -> dict[str, int]:
 
 
 class Command(BaseCommand):
-    help = 'Seed and validate production Action Master (A1–A10, A_POD_VERIFY, R1–R4).'
+    help = 'Seed and validate production Action Master (A1–A10).'
 
     def add_arguments(self, parser):
         parser.add_argument(
@@ -83,7 +83,7 @@ class Command(BaseCommand):
         parser.add_argument(
             '--repair-logs',
             action='store_true',
-            help='Re-link auto_cod_verify logs to A_POD_VERIFY',
+            help='Clear mistaken Action Master links on backend auto POD verify logs',
         )
         parser.add_argument(
             '--skip-seed',

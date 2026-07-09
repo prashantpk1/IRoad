@@ -115,6 +115,18 @@ def hard_pod_stage_reached(
     if status in _TERMINAL_SHIPMENT_STATUSES:
         return False
     if status in _HARD_POD_ACTIONABLE_STATUSES:
+        if status == TenantShipment.ShipmentStatus.AT_DELIVERY:
+            try:
+                from iroad_tenants.operation_runtime.shipment_execution_stage import (
+                    shipment_unloading_completed_done,
+                )
+
+                if not shipment_unloading_completed_done(shipment):
+                    if bool(evidence.get('pod_uploaded')):
+                        return True
+                    return False
+            except Exception:
+                pass
         return True
     return bool(evidence.get('pod_uploaded'))
 
@@ -204,6 +216,13 @@ def is_hard_pod_custody_complete(
     if not shipment_id:
         return False
     try:
+        from iroad_tenants.operation_execution import _pending_hard_pod_custody_exists
+
+        if _pending_hard_pod_custody_exists(shipment):
+            return False
+    except Exception:
+        pass
+    try:
         authority = HardPodCustodyAuthorityService().resolve_authority(
             tenant_schema=schema,
             shipment_id=shipment_id,
@@ -249,14 +268,46 @@ def enrich_log_evidence_hard_pod(
         if classify_pod_action_role(action) == PodActionRole.HARD_POD:
             out['hard_pod_log'] = True
             break
-        code = (getattr(action, 'action_code', '') or '').strip().upper()
-        if getattr(action, 'hard_copy_collection', False) and code not in {
-            'OA-0008',
-            'A7',
-        }:
+        from iroad_tenants.operation_execution import (
+            _is_standalone_hard_copy_collection_action,
+        )
+
+        if _is_standalone_hard_copy_collection_action(action):
             out['hard_pod_log'] = True
             break
     return out
+
+
+def _resolve_log_evidence_for_shipment(
+    shipment: Any | None,
+    log_evidence: dict[str, bool] | None,
+    *,
+    tenant_schema: str = '',
+    driver: Any | None = None,
+    logs: list[Any] | None = None,
+) -> dict[str, bool]:
+    """Load Action Log evidence when callers omit it (status defer / repair paths)."""
+    evidence = dict(log_evidence or {})
+    if evidence or shipment is None:
+        return evidence
+    shipment_pk = getattr(shipment, 'pk', None)
+    if not shipment_pk:
+        return evidence
+    try:
+        from iroad_tenants.operation_runtime.side_effects import (
+            _mobile_log_evidence_for_shipment,
+        )
+
+        evidence = _mobile_log_evidence_for_shipment(shipment)
+        return enrich_log_evidence_hard_pod(
+            evidence,
+            shipment,
+            tenant_schema=tenant_schema,
+            driver=driver,
+            logs=logs,
+        )
+    except Exception:
+        return {}
 
 
 def derive_hard_pod_pending(
@@ -264,15 +315,28 @@ def derive_hard_pod_pending(
     *,
     log_evidence: dict[str, bool] | None = None,
     tenant_schema: str = '',
+    driver: Any | None = None,
+    logs: list[Any] | None = None,
 ) -> bool:
     """
     Hard-copy POD custody still outstanding for this shipment.
 
     Digital POD / DN verification (e.g. ``COMPLIANT``) do **not** clear hard-copy
-    pending — only an A7H Action Log or promoted Hard POD custody submission.
+    pending — only a standalone hard-copy Action Log or promoted custody submission.
+
+    Hard-copy is **not** outstanding at Unloading Completed — only after digital
+    POD (``pod_uploaded`` log evidence) or an in-flight custody submission.
     """
     if shipment is None:
         return False
+
+    evidence = _resolve_log_evidence_for_shipment(
+        shipment,
+        log_evidence,
+        tenant_schema=tenant_schema,
+        driver=driver,
+        logs=logs,
+    )
 
     pod_type_hard = shipment_requires_hard_copy(shipment)
     if not pod_type_hard:
@@ -284,7 +348,6 @@ def derive_hard_pod_pending(
         except Exception:
             return False
 
-    evidence = log_evidence or {}
     if not hard_pod_stage_reached(shipment, log_evidence=evidence):
         return False
 
@@ -292,6 +355,7 @@ def derive_hard_pod_pending(
         shipment,
         log_evidence=evidence,
         tenant_schema=tenant_schema,
+        driver=driver,
     ):
         return False
 
@@ -306,9 +370,18 @@ def derive_hard_pod_pending(
             return True
     except Exception:
         pass
+    try:
+        from iroad_tenants.operation_runtime.shipment_execution_stage import (
+            shipment_unloading_completed_done,
+        )
+
+        if not shipment_unloading_completed_done(shipment):
+            return False
+    except Exception:
+        return False
     if derive_pod_compliant(shipment):
         return True
-    return True
+    return False
 
 
 def derive_cod_pending(shipment: Any | None) -> bool:
@@ -373,6 +446,12 @@ def derive_delivery_blocked(shipment: Any | None) -> bool:
         return False
     status = (getattr(shipment, 'shipment_status', None) or '').strip()
     if status in _TERMINAL_SHIPMENT_STATUSES:
+        return False
+    if status not in {
+        TenantShipment.ShipmentStatus.AT_DELIVERY,
+        TenantShipment.ShipmentStatus.POD_SUBMITTED,
+        TenantShipment.ShipmentStatus.DELIVERED,
+    }:
         return False
 
     try:

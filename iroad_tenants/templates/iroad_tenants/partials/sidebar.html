@@ -1,3 +1,4 @@
+{% load static %}
     <!-- Mobile Menu Toggle -->
     <button class="mobile-menu-toggle" aria-label="Toggle menu">
       <i class="bi bi-list"></i>
@@ -10,9 +11,23 @@
     <aside class="sidebar" id="appSidebar" data-server-nav-state="1">
       <!-- Sidebar Header -->
       <div class="sidebar-header">
+        <style>
+          .sidebar-logo .logo-full {
+            display: inline-block;
+          }
+          .sidebar-logo .logo-collapsed-icon {
+            display: none !important;
+          }
+          .sidebar.collapsed .sidebar-logo .logo-full {
+            display: none !important;
+          }
+          .sidebar.collapsed .sidebar-logo .logo-collapsed-icon {
+            display: flex !important;
+          }
+        </style>
         <a href="{% url 'iroad_tenants:tenant_dashboard' %}" class="sidebar-logo bidi-ltr" dir="ltr">
-          <span class="logo-icon" aria-hidden="true">i</span>
-          <span class="logo-label">Road</span>
+          <img src="{% static 'landing/images/logo.svg' %}?v=2" alt="IRoute Logo" class="logo-full" style="height: 32px; width: auto;" />
+          <span class="logo-icon logo-collapsed-icon" aria-hidden="true">I</span>
         </a>
       </div>
 
@@ -387,6 +402,12 @@
                 <a href="{% url 'iroad_tenants:tenant_operation_actions_list' %}" class="submenu-link{% if request.resolver_match and request.resolver_match.url_name == 'tenant_operation_actions_list' %} active{% endif %}">
                   <i class="bi bi-record-circle"></i>
                   <span>Operation Actions</span>
+                </a>
+              </li>
+              <li class="submenu-item">
+                <a href="{% url 'iroad_tenants:tenant_operation_action_log_list' %}" class="submenu-link{% if request.resolver_match and 'tenant_operation_action_log' in request.resolver_match.url_name %} active{% endif %}">
+                  <i class="bi bi-journal-text"></i>
+                  <span>Operation Action Log</span>
                 </a>
               </li>
               {% endif %}

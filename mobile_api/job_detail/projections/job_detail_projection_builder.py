@@ -35,6 +35,17 @@ def _shipment_pk(context: JobDetailContext) -> str:
     return str(context.job_id or '').strip()
 
 
+def _job_scope_id(context: JobDetailContext) -> str:
+    if context.job_type == 'movement' and context.movement is not None:
+        return str(
+            getattr(context.movement, 'pk', None)
+            or getattr(context.movement, 'movement_id', None)
+            or context.job_id
+            or ''
+        ).strip()
+    return _shipment_pk(context)
+
+
 def load_operational_issues(
     *,
     tenant_schema: str,
@@ -80,7 +91,19 @@ def build_operational_issues_visibility(
         blocking_recommendation: bool
     """
     _ = request
-    if context.job_type != 'shipment' or context.shipment is None:
+    if context.job_type not in {'shipment', 'movement'}:
+        return {
+            'operational_issues': [],
+            'unresolved_issue_count': 0,
+            'blocking_recommendation': False,
+        }
+    if context.job_type == 'shipment' and context.shipment is None:
+        return {
+            'operational_issues': [],
+            'unresolved_issue_count': 0,
+            'blocking_recommendation': False,
+        }
+    if context.job_type == 'movement' and context.movement is None:
         return {
             'operational_issues': [],
             'unresolved_issue_count': 0,
@@ -88,10 +111,10 @@ def build_operational_issues_visibility(
         }
 
     tenant_schema = (context.tenant_schema or '').strip()
-    shipment_id = _shipment_pk(context)
+    scope_id = _job_scope_id(context)
     issues = load_operational_issues(
         tenant_schema=tenant_schema,
-        shipment_id=shipment_id,
+        shipment_id=scope_id,
     )
 
     unresolved = [row for row in issues if row.is_unresolved]

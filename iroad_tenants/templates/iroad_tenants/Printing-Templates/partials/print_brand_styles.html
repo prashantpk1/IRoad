@@ -138,33 +138,53 @@ body[data-status="draft"] .page::before {
 }
 
 .org-block { display: flex; gap: 16px; align-items: center; }
-.org-seal {
-    width: 64px; height: 64px;
-    background: var(--brand-blue);
-    color: white;
-    display: flex; align-items: center; justify-content: center;
+
+/* IRoute brand wordmark — typography logo (wkhtmltopdf-safe, no network) */
+.iroute-wordmark {
+    font-family: 'Segoe UI', Arial, Helvetica, sans-serif;
+    font-size: 28pt;
+    font-weight: 900;
+    letter-spacing: -2px;
+    color: #3B82F6;
+    line-height: 1;
+    white-space: nowrap;
+}
+.org-logo--blue .iroute-wordmark {
+    color: #3B82F6;
+}
+.org-logo--white .iroute-wordmark {
+    color: #FFFFFF;
+}
+
+/* IRoute brand logos — Dynamic Blue on light paper; White on Dynamic Blue */
+.org-logo {
     flex-shrink: 0;
-    border: 2px solid var(--brand-blue);
-    position: relative;
-    overflow: hidden;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 48px;
 }
-.org-seal::before {
-    content: ''; position: absolute;
-    top: 3px; right: 3px; bottom: 3px; left: 3px;
-    inset: 3px;
-    border: 1px solid rgba(255,255,255,0.4);
-}
-.org-seal .mark {
-    font-family: var(--font-en);
-    font-weight: 700; font-size: 20pt;
-    letter-spacing: -1px; line-height: 1;
-}
-.org-seal img {
-    width: 100%;
-    height: 100%;
+.org-logo-img {
+    display: block;
+    height: 48px;
+    width: auto;
+    max-width: 220px;
     object-fit: contain;
-    position: relative;
-    z-index: 1;
+}
+.org-logo--blue {
+    padding: 2px 0;
+}
+.org-logo--tenant .org-logo-img {
+    max-height: 56px;
+    max-width: 180px;
+}
+.org-logo--white {
+    background: var(--brand-blue);
+    padding: 8px 16px;
+    border-radius: 4px;
+}
+.org-logo--white .iroute-wordmark {
+    font-size: 22pt;
 }
 
 .org-info { flex: 1; min-width: 0; }

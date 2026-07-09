@@ -13,7 +13,7 @@ from iroad_tenants.operation_runtime.impacts import (
     resolve_movement_status_impact,
     resolve_shipment_status_impact,
 )
-from tenant_workspace.models import TenantOperationActionLog, TenantTruckMovementLog
+from tenant_workspace.models import TenantOperationActionLog, TenantShipment, TenantTruckMovementLog
 
 # Align with operation_execution forward rank.
 SHIPMENT_STATUS_RANK = {
@@ -41,6 +41,71 @@ def shipment_status_rank(status: str | None) -> int:
 
 def movement_status_rank(status: str | None) -> int:
     return MOVEMENT_STATUS_RANK.get((status or '').strip(), 0)
+
+
+def _status_for_rank(rank: int) -> str | None:
+    for status, value in SHIPMENT_STATUS_RANK.items():
+        if value == rank:
+            return status
+    return None
+
+
+def _clamp_authoritative_for_delivery_prerequisites(
+    logs,
+    authoritative: str | None,
+) -> str | None:
+    """
+    Log-derived status must not skip delivery arrival / unloading milestones.
+
+    Out-of-order POD logs must not block drivers from seeing delivery-phase actions.
+    """
+    if not authoritative:
+        return authoritative
+    from iroad_tenants.operation_runtime.shipment_execution_stage import (
+        _delivery_milestones_from_log_rows,
+        is_delivery_arrival_action,
+        is_unloading_action,
+    )
+    from mobile_api.pod_capture.policy.canonical_pod_action_registry import (
+        is_pod_upload_action,
+    )
+
+    delivery_done, unloading_done = _delivery_milestones_from_log_rows(logs or [])
+    pod_ts = None
+    delivery_ts = None
+    unloading_ts = None
+    for log in logs or []:
+        action = getattr(log, 'operation_action', None)
+        if action is None:
+            continue
+        ts = getattr(log, 'log_date', None) or getattr(log, 'created_at', None)
+        if ts is None:
+            continue
+        if is_pod_upload_action(action):
+            pod_ts = ts if pod_ts is None or ts > pod_ts else pod_ts
+        if is_delivery_arrival_action(action):
+            delivery_ts = ts if delivery_ts is None or ts > delivery_ts else delivery_ts
+        if is_unloading_action(action):
+            unloading_ts = ts if unloading_ts is None or ts > unloading_ts else unloading_ts
+
+    pod_valid = pod_ts is None or (
+        delivery_ts is not None
+        and unloading_ts is not None
+        and pod_ts >= delivery_ts
+        and pod_ts >= unloading_ts
+    )
+
+    cap_rank = shipment_status_rank(authoritative)
+    if not delivery_done:
+        cap_rank = min(cap_rank, shipment_status_rank('In Transit'))
+    elif not unloading_done:
+        cap_rank = min(cap_rank, shipment_status_rank('At Delivery'))
+    elif not pod_valid:
+        cap_rank = min(cap_rank, shipment_status_rank('At Delivery'))
+
+    if shipment_status_rank(authoritative) <= cap_rank:
+        return authoritative
+    return _status_for_rank(cap_rank) or authoritative
 
 
 def scoped_shipment_action_logs(
@@ -169,6 +234,7 @@ def _impact_from_log(log_row, *, kind: str) -> str | None:
             (action.movement_status_impact or '').strip(),
         )
     from iroad_tenants.operation_runtime.latest_state import (
+        clamp_shipment_status_cache_for_hard_pod,
         resolve_effective_shipment_status_for_action,
     )
 
@@ -178,10 +244,18 @@ def _impact_from_log(log_row, *, kind: str) -> str | None:
         shipment=shipment,
     )
     if effective:
-        return effective
-    return resolve_shipment_status_impact(
+        return clamp_shipment_status_cache_for_hard_pod(shipment, effective)
+    raw = resolve_shipment_status_impact(
         (action.shipment_status_impact or '').strip(),
     )
+    if not raw:
+        return None
+    if (
+        raw == TenantShipment.ShipmentStatus.DELIVERED
+        and getattr(action, 'auto_pod_post', False)
+    ):
+        raw = TenantShipment.ShipmentStatus.POD_SUBMITTED
+    return clamp_shipment_status_cache_for_hard_pod(shipment, raw)
 
 
 def aggregate_latest_action_log(
@@ -270,6 +344,34 @@ def derive_shipment_status_from_logs(logs) -> dict[str, Any]:
         authoritative = peak_impact
     elif latest_impact:
         authoritative = latest_impact
+
+    from iroad_tenants.operation_runtime.shipment_execution_stage import (
+        infer_shipment_status_from_milestone_log_rows,
+    )
+
+    shipment = None
+    for log in logs or []:
+        candidate = getattr(log, 'shipment', None)
+        if candidate is not None:
+            shipment = candidate
+            break
+
+    milestone_status = infer_shipment_status_from_milestone_log_rows(
+        logs,
+        shipment=shipment,
+    )
+    if milestone_status and (
+        not authoritative
+        or shipment_status_rank(milestone_status) > shipment_status_rank(authoritative)
+    ):
+        authoritative = milestone_status
+
+    authoritative = _clamp_authoritative_for_delivery_prerequisites(logs, authoritative)
+    from iroad_tenants.operation_runtime.latest_state import (
+        clamp_shipment_status_cache_for_hard_pod,
+    )
+
+    authoritative = clamp_shipment_status_cache_for_hard_pod(shipment, authoritative)
 
     return {
         'latest_impact_status': latest_impact,

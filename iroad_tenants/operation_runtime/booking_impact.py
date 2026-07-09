@@ -27,6 +27,12 @@ def apply_booking_status_impact(booking, raw_impact) -> None:
             booking.save(update_fields=['booking_status', 'updated_at'])
         return
 
+    if impact_key == 'completed':
+        from iroad_tenants.booking_status import sync_booking_status_after_item_change
+
+        sync_booking_status_after_item_change(booking)
+        return
+
     if booking.booking_status == TenantBooking.Status.DRAFT:
         booking.booking_status = TenantBooking.Status.CONFIRMED
         booking.save(update_fields=['booking_status', 'updated_at'])

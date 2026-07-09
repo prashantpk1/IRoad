@@ -16,9 +16,9 @@ from typing import Any
 from mobile_api.execution.evidence.constants import (
     POD_CAPTURE_VIDEO_MAX_COUNT,
     POD_CAPTURE_VIDEO_MAX_DURATION_SECONDS,
-    POD_CAPTURE_VIDEO_MIN_COUNT,
 )
 from mobile_api.helpers.action_execution_metadata import build_execution_requirements
+from mobile_api.helpers.evidence_requirement_flags import normalize_evidence_requirements
 from mobile_api.pod_capture.policy.canonical_pod_action_registry import (
     is_hard_pod_action,
     is_pod_upload_action,
@@ -47,6 +47,8 @@ def merge_execution_requirements(
         'gps',
         'photo',
         'video',
+        'photo_enabled',
+        'video_enabled',
         'video_optional',
         'note',
         'note_required',
@@ -103,38 +105,28 @@ def derive_pod_type_overlay(
                     token = 'hard'
 
     if token == 'digital':
-        overlay['photo'] = True
-        overlay['photo_min_count'] = max(int(overlay.get('photo_min_count') or 0), 1)
-        # IRoute §14.5.1 — digital POD: photo + signature + one video clip (max 15s).
-        overlay['video'] = True
-        overlay['video_min_count'] = max(
-            int(overlay.get('video_min_count') or 0),
-            POD_CAPTURE_VIDEO_MIN_COUNT,
-        )
+        overlay['photo_enabled'] = True
+        overlay['video_enabled'] = True
         overlay['video_max_count'] = max(
             int(overlay.get('video_max_count') or 0),
             POD_CAPTURE_VIDEO_MAX_COUNT,
         )
-        overlay['video_optional'] = False
+        overlay['video_optional'] = int(overlay.get('video_min_count') or 0) <= 0
         overlay['video_max_duration_seconds'] = POD_CAPTURE_VIDEO_MAX_DURATION_SECONDS
     elif token == 'soft':
-        overlay['photo'] = True
-        overlay['photo_min_count'] = max(int(overlay.get('photo_min_count') or 0), 1)
+        overlay['photo_enabled'] = True
     elif token == 'hard':
-        overlay['photo'] = True
+        overlay['photo_enabled'] = True
         overlay['hard_copy_collection'] = True
-        overlay['photo_min_count'] = max(int(overlay.get('photo_min_count') or 0), 1)
     elif token == 'signature':
         overlay['signature'] = True
-        overlay['photo_min_count'] = max(int(overlay.get('photo_min_count') or 0), 0)
     elif token == 'video':
-        overlay['video'] = True
-        overlay['video_min_count'] = max(int(overlay.get('video_min_count') or 0), 1)
+        overlay['video_enabled'] = True
     elif token == 'multi_page':
         page_count = int(getattr(shipment, 'pod_doc_count', None) or 0)
         doc_min = max(page_count, 1)
         overlay['document_min_count'] = doc_min
-        overlay['photo_min_count'] = max(int(overlay.get('photo_min_count') or 0), 1)
+        overlay['photo_enabled'] = True
 
     return overlay
 
@@ -159,12 +151,9 @@ def build_pod_capture_requirements(
             base.get('signature')
         )
     if is_hard_pod_action(operation_action) or merged.get('hard_copy_collection'):
-        merged['photo'] = True
-        merged['photo_min_count'] = max(int(merged.get('photo_min_count') or 0), 1)
+        merged['photo_enabled'] = True
 
     merged['pod_capture_type'] = (pod_capture_type or '').strip().casefold()
     if not int(merged.get('video_max_duration_seconds') or 0):
         merged['video_max_duration_seconds'] = POD_CAPTURE_VIDEO_MAX_DURATION_SECONDS
-    if int(merged.get('video_min_count') or 0) > 0 and bool(merged.get('video')):
-        merged['video_optional'] = False
-    return merged
+    return normalize_evidence_requirements(merged)

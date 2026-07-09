@@ -174,8 +174,13 @@ class DashboardContextService:
             exclude_booking_id=exclude_booking_id,
         )
         if empty_selection is not None:
-            context.empty_move_selection = empty_selection
-            context.active_empty_movement = empty_selection.movement
+            from mobile_api.dashboard.selectors.movement_selection_policy import (
+                is_active_empty_move,
+            )
+
+            if is_active_empty_move(empty_selection.movement):
+                context.empty_move_selection = empty_selection
+                context.active_empty_movement = empty_selection.movement
 
         assert_dashboard_scope_ownership(
             driver,

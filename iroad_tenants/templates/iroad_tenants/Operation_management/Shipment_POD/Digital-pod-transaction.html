@@ -148,6 +148,12 @@
         </div>
       </div>
 
+      <div class="alert alert-light border mb-3" role="alert">
+        <i class="bi bi-info-circle me-2"></i>
+        <strong>Auto POD:</strong> Document Info (Doc No, date, type, ref, page count) is fetched from the delivery note.
+        <strong>Booking/Shipment</strong>, <strong>POD Status</strong>, and <strong>POD Pages</strong> are completed manually below.
+      </div>
+
       <!-- Digital POD Form -->
       <form id="digitalPodForm" method="post">
         {% csrf_token %}
@@ -203,6 +209,7 @@
                       data-booking-no="{{ doc.booking_no|default:'' }}"
                       data-booking-item="{{ doc.booking_item|default:'' }}"
                       data-pod-type="{{ doc.pod_type|default:'' }}"
+                      data-pod-status="{{ doc.pod_status|default:'Not Completed' }}"
                       data-document-type="{{ doc.document_type|default:'' }}"
                       data-document-date="{{ doc.document_date|default:'' }}"
                       data-page-count="{{ doc.page_count|default:1 }}"
@@ -263,23 +270,37 @@
             <div class="field-group">
               <h3 class="field-group-title">
                 <i class="bi bi-truck"></i> Booking and Shipment Info
+                <span class="text-muted small fw-normal">(manual)</span>
               </h3>
               <div class="fields-grid cols-3">
                 <div class="field">
                   <label for="bookingNoDisplay" class="form-label">Booking No</label>
-                  <input type="text" class="form-control" id="bookingNoDisplay" value="{{ pod_form_data.booking_no|default:'' }}" readonly />
+                  <input type="text" class="form-control" id="bookingNoDisplay" value="{{ pod_form_data.booking_no|default:'' }}" placeholder="Select shipment below" readonly />
                   <input type="hidden" id="bookingId" name="booking_id" value="{{ pod_form_data.booking_id|default:'' }}" />
                   <input type="hidden" id="bookingNo" name="booking_no" value="{{ pod_form_data.booking_no|default:'' }}" />
                 </div>
                 <div class="field">
                   <label for="bookingItemDisplay" class="form-label">Booking Item</label>
-                  <input type="text" class="form-control" id="bookingItemDisplay" value="{{ pod_form_data.booking_item|default:'' }}" readonly />
+                  <input type="text" class="form-control" id="bookingItemDisplay" value="{{ pod_form_data.booking_item|default:'' }}" placeholder="From shipment" readonly />
                   <input type="hidden" id="bookingItem" name="booking_item" value="{{ pod_form_data.booking_item|default:'' }}" />
                 </div>
                 <div class="field">
-                  <label for="shipmentDisplay" class="form-label">Shipment</label>
-                  <input type="text" class="form-control" id="shipmentDisplay" value="{{ pod_form_data.shipment_no|default:'' }}" readonly />
-                  <input type="hidden" id="shipmentRef" name="shipment_id" value="{{ pod_form_data.shipment_id|default:'' }}" />
+                  <label for="shipmentRef" class="form-label">Shipment <span class="required">*</span></label>
+                  <select class="form-select {% if form_errors.shipment_id %}is-invalid{% endif %}" id="shipmentRef" name="shipment_id" required>
+                    <option value="" {% if not pod_form_data.shipment_id %}selected{% endif %} disabled>- Select Shipment -</option>
+                    {% for shipment in pod_shipment_options %}
+                    <option
+                      value="{{ shipment.shipment_id }}"
+                      data-shipment-no="{{ shipment.shipment_no }}"
+                      data-booking-id="{{ shipment.booking_id|default:'' }}"
+                      data-booking-no="{{ shipment.booking_no|default:'' }}"
+                      data-booking-item="{{ shipment.booking_item|default:'' }}"
+                      data-pod-type="{{ shipment.pod_type|default:'' }}"
+                      data-pod-status="{{ shipment.pod_status|default:'Not Completed' }}"
+                      {% if pod_form_data.shipment_id == shipment.shipment_id %}selected{% endif %}
+                    >{{ shipment.shipment_no }}{% if shipment.booking_no %} — {{ shipment.booking_no }}{% endif %}</option>
+                    {% endfor %}
+                  </select>
                   {% if form_errors.shipment_id %}<div class="invalid-feedback d-block">{{ form_errors.shipment_id }}</div>{% endif %}
                 </div>
               </div>
@@ -287,22 +308,29 @@
             <div class="field-group" id="podStatusInfoGroup">
               <h3 class="field-group-title">
                 <i class="bi bi-shield-check"></i> POD Status Info
+                <span class="text-muted small fw-normal">(manual)</span>
               </h3>
               <div class="fields-grid cols-3">
                 <div class="field">
                   <label for="podType" class="form-label">POD Type</label>
-                  <input type="text" class="form-control" id="podTypeDisplay" value="{{ pod_form_data.pod_type|default:'' }}" readonly />
-                  <input type="hidden" id="podType" name="pod_type" value="{{ pod_form_data.pod_type|default:'' }}" />
+                  <select class="form-select {% if form_errors.pod_type %}is-invalid{% endif %}" id="podType" name="pod_type">
+                    <option value="" {% if not pod_form_data.pod_type %}selected{% endif %} disabled>- Select POD Type -</option>
+                    {% for pod_type in operation_pod_type_options %}
+                    <option value="{{ pod_type }}" {% if pod_form_data.pod_type == pod_type %}selected{% endif %}>{{ pod_type }}</option>
+                    {% endfor %}
+                  </select>
                   {% if form_errors.pod_type %}<div class="invalid-feedback d-block">{{ form_errors.pod_type }}</div>{% endif %}
                   
                 </div>
                 <div class="field">
                   <label for="podStatus" class="form-label">POD Status</label>
-                  <select class="form-select {% if form_errors.status %}is-invalid{% endif %}" id="podStatus" name="status" required>
-                    <option value="Draft" {% if pod_form_data.status == 'Draft' or not pod_form_data.status %}selected{% endif %}>Draft</option>
-                    <option value="Posted" {% if pod_form_data.status == 'Posted' %}selected{% endif %}>Posted</option>
+                  <select class="form-select" id="podStatus" name="pod_status">
+                    <option value="" disabled>-Select POD status-</option>
+                    {% for pod_status in operation_pod_status_options %}
+                    <option value="{{ pod_status }}" {% if pod_form_data.pod_status|default:'Not Completed' == pod_status %}selected{% endif %}>{{ pod_status }}</option>
+                    {% endfor %}
                   </select>
-                  {% if form_errors.status %}<div class="invalid-feedback d-block">{{ form_errors.status }}</div>{% endif %}
+                  <input type="hidden" name="status" value="Posted" />
                 </div>
                 <div class="field">
                   <label for="receiverUserId" class="form-label">Receiver <span class="required">*</span></label>
@@ -329,6 +357,7 @@
             </div>
             <div class="form-card-header-text">
               <h2 class="form-card-title">POD Pages</h2>
+              <p class="text-muted small mb-0">Add lines manually — link each page to an action log or enter map URL.</p>
       </div>
             <button
               type="button"
@@ -493,10 +522,9 @@
         const bookingNoDisplay = document.getElementById("bookingNoDisplay");
         const bookingItemInput = document.getElementById("bookingItem");
         const bookingItemDisplay = document.getElementById("bookingItemDisplay");
-        const shipmentRefInput = document.getElementById("shipmentRef");
-        const shipmentDisplay = document.getElementById("shipmentDisplay");
-        const podTypeInput = document.getElementById("podType");
-        const podTypeDisplay = document.getElementById("podTypeDisplay");
+        const shipmentRefSelect = document.getElementById("shipmentRef");
+        const podTypeSelect = document.getElementById("podType");
+        const podStatusSelect = document.getElementById("podStatus");
         const podLinesBody = document.getElementById("podLinesBody");
         const podForm = document.getElementById("digitalPodForm");
         const podPagesJsonInput = document.getElementById("podPagesJson");
@@ -508,9 +536,49 @@
         }
 
         function getSelectedShipmentId() {
-          return shipmentRefInput ? shipmentRefInput.value || "" : "";
+          return shipmentRefSelect ? shipmentRefSelect.value || "" : "";
         }
 
+        function syncShipmentLinkageFromSelect() {
+          const opt = selectedOption(shipmentRefSelect);
+          if (!opt || !opt.value) {
+            if (bookingIdInput) bookingIdInput.value = "";
+            if (bookingNoInput) bookingNoInput.value = "";
+            if (bookingNoDisplay) bookingNoDisplay.value = "";
+            if (bookingItemInput) bookingItemInput.value = "";
+            if (bookingItemDisplay) bookingItemDisplay.value = "";
+            syncAllActionLogSelects();
+            return;
+          }
+          if (bookingIdInput) bookingIdInput.value = opt.getAttribute("data-booking-id") || "";
+          if (bookingNoInput) bookingNoInput.value = opt.getAttribute("data-booking-no") || "";
+          if (bookingNoDisplay) bookingNoDisplay.value = opt.getAttribute("data-booking-no") || "";
+          if (bookingItemInput) bookingItemInput.value = opt.getAttribute("data-booking-item") || "";
+          if (bookingItemDisplay) bookingItemDisplay.value = opt.getAttribute("data-booking-item") || "";
+          const suggestedPodType = opt.getAttribute("data-pod-type") || "";
+          if (podTypeSelect && suggestedPodType && !podTypeSelect.value) {
+            podTypeSelect.value = suggestedPodType;
+          }
+          const suggestedPodStatus = opt.getAttribute("data-pod-status") || "";
+          if (podStatusSelect && suggestedPodStatus && podStatusSelect.value === "Not Completed") {
+            podStatusSelect.value = suggestedPodStatus;
+          }
+          syncAllActionLogSelects();
+        }
+
+        function syncDocumentInfoFromDocNo() {
+          const opt = selectedOption(docNoSelect);
+          if (!opt || !opt.value) return;
+          if (sourceDocumentInput) sourceDocumentInput.value = opt.value;
+          const docType = opt.getAttribute("data-document-type") || "";
+          const docDate = opt.getAttribute("data-document-date") || "";
+          const pageCount = opt.getAttribute("data-page-count") || "";
+          if (docType && documentTypeSelect) documentTypeSelect.value = docType;
+          if (docDate && documentDateInput) documentDateInput.value = docDate;
+          if (pageCount && pageCountInput) pageCountInput.value = pageCount;
+          const headerRef = opt.getAttribute("data-document-ref-no") || "";
+          fillDocRefSelect(headerRef.toUpperCase() === "PENDING" ? "" : headerRef);
+        }
         function fillDocRefSelect(selectedRef) {
           if (!docRefSelect || !docNoSelect) return;
           const docId = docNoSelect.value || "";
@@ -527,31 +595,6 @@
           } else if (refs.length === 1) {
             docRefSelect.value = refs[0].value;
           }
-        }
-
-        function syncFetchedFieldsFromDocNo() {
-          const opt = selectedOption(docNoSelect);
-          if (!opt || !opt.value) return;
-          if (sourceDocumentInput) sourceDocumentInput.value = opt.value;
-          if (bookingIdInput) bookingIdInput.value = opt.getAttribute("data-booking-id") || "";
-          if (bookingNoInput) bookingNoInput.value = opt.getAttribute("data-booking-no") || "";
-          if (bookingNoDisplay) bookingNoDisplay.value = opt.getAttribute("data-booking-no") || "";
-          if (bookingItemInput) bookingItemInput.value = opt.getAttribute("data-booking-item") || "";
-          if (bookingItemDisplay) bookingItemDisplay.value = opt.getAttribute("data-booking-item") || "";
-          if (shipmentRefInput) shipmentRefInput.value = opt.getAttribute("data-shipment-id") || "";
-          if (shipmentDisplay) shipmentDisplay.value = opt.getAttribute("data-shipment-no") || "";
-          const podType = opt.getAttribute("data-pod-type") || "";
-          if (podTypeInput) podTypeInput.value = podType;
-          if (podTypeDisplay) podTypeDisplay.value = podType;
-          const docType = opt.getAttribute("data-document-type") || "";
-          const docDate = opt.getAttribute("data-document-date") || "";
-          const pageCount = opt.getAttribute("data-page-count") || "";
-          if (docType && documentTypeSelect) documentTypeSelect.value = docType;
-          if (docDate && documentDateInput) documentDateInput.value = docDate;
-          if (pageCount && pageCountInput) pageCountInput.value = pageCount;
-          fillDocRefSelect(opt.getAttribute("data-document-ref-no") || "");
-          syncAllActionLogSelects();
-          populatePodLinesFromSourcePages(deliveryNotePagesMap[opt.value] || []);
         }
 
         function filteredActionLogOptions(shipmentId) {
@@ -596,8 +639,52 @@
           }
         }
 
-        function applyActionLogEvidence(row) {
+        function isManualPodLineSource(row) {
+          const sourceSelect = row ? row.querySelector(".pod-line-source") : null;
+          return !!(sourceSelect && sourceSelect.value === "Manual");
+        }
+
+        function applyPodLineSourceMode(row) {
           if (!row) return;
+          const manual = isManualPodLineSource(row);
+          const actionLogSelect = row.querySelector(".pod-line-action-log");
+          const mapInput = row.querySelector(".pod-line-map-url");
+          if (actionLogSelect) {
+            actionLogSelect.disabled = manual;
+            if (manual) {
+              actionLogSelect.value = "";
+              actionLogSelect.removeAttribute("data-selected");
+            }
+          }
+          if (mapInput) {
+            mapInput.readOnly = !manual;
+            mapInput.placeholder = manual ? "Enter map URL" : "From action log GPS";
+          }
+          if (manual) {
+            const storageInput = row.querySelector(".pod-line-attachment-storage");
+            const labelInput = row.querySelector(".pod-line-attachment-label");
+            const preview = row.querySelector(".pod-line-attachment-preview");
+            if (preview) preview.remove();
+            const emptyState = row.querySelector(".pod-line-attachment-empty");
+            if (emptyState) emptyState.style.display = "";
+            if (storageInput) storageInput.value = "";
+            if (labelInput) labelInput.value = "";
+            return;
+          }
+          applyActionLogEvidence(row);
+        }
+
+        function attachPodLineSourceHandler(row) {
+          const sourceSelect = row ? row.querySelector(".pod-line-source") : null;
+          if (!sourceSelect) return;
+          sourceSelect.addEventListener("change", function () {
+            applyPodLineSourceMode(row);
+          });
+          applyPodLineSourceMode(row);
+        }
+
+        function applyActionLogEvidence(row) {
+          if (!row || isManualPodLineSource(row)) return;
           const select = row.querySelector(".pod-line-action-log");
           const mapInput = row.querySelector(".pod-line-map-url");
           const meta = select ? actionLogMeta(select.value) : null;
@@ -683,6 +770,9 @@
             if (sn) sn.textContent = idx + 1;
           });
           lineCounter = podLinesBody.querySelectorAll("tr").length;
+          if (pageCountInput) {
+            pageCountInput.value = String(Math.max(lineCounter, 1));
+          }
         }
 
         function populatePodLinesFromSourcePages(pages) {
@@ -697,6 +787,7 @@
               fillDocPageSelect(row.querySelector(".pod-line-doc-page"), "Page-" + pageNo);
               fillActionLogSelect(row.querySelector(".pod-line-action-log"));
               attachPodLineDeleteHandler(row);
+              attachPodLineSourceHandler(row);
             }
             renumberLines();
             return;
@@ -708,12 +799,16 @@
             fillDocPageSelect(row.querySelector(".pod-line-doc-page"), page.page_id);
             fillActionLogSelect(row.querySelector(".pod-line-action-log"));
             attachPodLineDeleteHandler(row);
+            attachPodLineSourceHandler(row);
           });
           renumberLines();
         }
 
         if (docNoSelect) {
-          docNoSelect.addEventListener("change", syncFetchedFieldsFromDocNo);
+          docNoSelect.addEventListener("change", syncDocumentInfoFromDocNo);
+        }
+        if (shipmentRefSelect) {
+          shipmentRefSelect.addEventListener("change", syncShipmentLinkageFromSelect);
         }
         if (docRefSelect) {
           docRefSelect.addEventListener("change", function () {
@@ -731,6 +826,7 @@
             fillDocPageSelect(row.querySelector(".pod-line-doc-page"));
             fillActionLogSelect(row.querySelector(".pod-line-action-log"));
             attachPodLineDeleteHandler(row);
+            attachPodLineSourceHandler(row);
             renumberLines();
           });
           podLinesBody.querySelectorAll(".pod-action-btn.delete").forEach(function (btn) {
@@ -743,9 +839,17 @@
 
         if (docNoSelect && docNoSelect.value) {
           fillDocRefSelect("{{ pod_form_data.document_ref_no|default:''|escapejs }}");
-          syncFetchedFieldsFromDocNo();
+          syncDocumentInfoFromDocNo();
         } else {
           syncAllActionLogSelects();
+        }
+        if (shipmentRefSelect && shipmentRefSelect.value) {
+          syncShipmentLinkageFromSelect();
+        }
+        if (podLinesBody) {
+          podLinesBody.querySelectorAll("tr").forEach(function (row) {
+            attachPodLineSourceHandler(row);
+          });
         }
 
         if (podForm && podLinesBody && podPagesJsonInput) {
@@ -753,10 +857,12 @@
             const rows = podLinesBody.querySelectorAll("tr");
             const payload = [];
             rows.forEach(function (row) {
+              const source = (row.querySelector(".pod-line-source") || {}).value || "Action Log";
+              const manual = source === "Manual";
               payload.push({
                 doc_page: (row.querySelector(".pod-line-doc-page") || {}).value || "",
-                source: (row.querySelector(".pod-line-source") || {}).value || "Action Log",
-                action_log_id: (row.querySelector(".pod-line-action-log") || {}).value || "",
+                source: source,
+                action_log_id: manual ? "" : ((row.querySelector(".pod-line-action-log") || {}).value || ""),
                 map_url: (row.querySelector(".pod-line-map-url") || {}).value || "",
                 attachment_label: (row.querySelector(".pod-line-attachment-label") || {}).value || "",
                 attachment_storage_path: (row.querySelector(".pod-line-attachment-storage") || {}).value || "",

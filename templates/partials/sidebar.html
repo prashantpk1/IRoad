@@ -1,11 +1,25 @@
-{% load i18n %}
+{% load i18n %}{% load static %}
 <!-- Sidebar (unified by main.js) -->
 <aside class="sidebar" id="appSidebar">
   <!-- Sidebar Header -->
   <div class="sidebar-header">
-    <a href="{% url 'dashboard' %}" class="sidebar-logo bidi-ltr" dir="ltr" aria-label="{% translate 'iRoad Home' %}">
-      <span class="logo-icon" aria-hidden="true">i</span>
-      <span class="logo-label">Road</span>
+    <style>
+      .sidebar-logo .logo-full {
+        display: inline-block;
+      }
+      .sidebar-logo .logo-collapsed-icon {
+        display: none !important;
+      }
+      .sidebar.collapsed .sidebar-logo .logo-full {
+        display: none !important;
+      }
+      .sidebar.collapsed .sidebar-logo .logo-collapsed-icon {
+        display: flex !important;
+      }
+    </style>
+    <a href="{% url 'dashboard' %}" class="sidebar-logo bidi-ltr" dir="ltr" aria-label="{% translate 'IRoute Home' %}">
+      <img src="{% static 'landing/images/logo.svg' %}?v=2" alt="IRoute Logo" class="logo-full" style="height: 32px; width: auto;" />
+      <span class="logo-icon logo-collapsed-icon" aria-hidden="true">I</span>
     </a>
   </div>
 

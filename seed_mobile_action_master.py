@@ -32,7 +32,7 @@ def setup_django() -> None:
 
 setup_django()
 
-# Re-export production catalog (includes A_POD_VERIFY).
+# Re-export production catalog.
 from iroad_tenants.operation_runtime.action_master_catalog import (  # noqa: E402
     PRODUCTION_ACTION_MASTER as CANONICAL_ACTIONS,
 )

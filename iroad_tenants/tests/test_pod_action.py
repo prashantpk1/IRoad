@@ -1,6 +1,7 @@
 """POD action side-effect classification tests."""
 from __future__ import annotations
 
+from django.core.exceptions import ValidationError
 from types import SimpleNamespace
 from unittest import TestCase
 from unittest.mock import MagicMock, patch
@@ -291,7 +292,7 @@ class BirthPodFromActionLogTests(TestCase):
         action_log.shipment = shipment
         action_log.operation_action = SimpleNamespace(action_code='A7')
         source_document = MagicMock(pk='dn-1')
-        mock_document_model.objects.filter.return_value.order_by.return_value.first.return_value = (
+        mock_document_model.objects.filter.return_value.exclude.return_value.order_by.return_value.first.return_value = (
             source_document
         )
         existing_pod = MagicMock()
@@ -302,22 +303,15 @@ class BirthPodFromActionLogTests(TestCase):
         self.assertIs(result, existing_pod)
         mock_classify.assert_not_called()
 
-    @patch('iroad_tenants.operation_runtime.pod_action._auto_create_delivery_note_for_a7')
-    @patch('iroad_tenants.operation_runtime.pod_action._find_existing_pod_for_source', return_value=None)
-    @patch('iroad_tenants.operation_runtime.pod_action._allocate_unique_pod_record_no', return_value=('POD-1', 1))
-    @patch('iroad_tenants.operation_runtime.pod_action.TenantShipmentPodPage')
     @patch('iroad_tenants.operation_runtime.pod_action.TenantShipmentDocument')
-    def test_birth_pod_auto_creates_delivery_note_for_oa0008_auto_pod_post(
+    def test_birth_pod_requires_shipment_document_for_manual_pod_doc_count(
         self,
         mock_document_model,
-        mock_pod_page_model,
-        mock_allocate,
-        mock_find_existing,
-        mock_auto_dn,
     ):
         shipment = MagicMock()
         shipment.booking_id = None
         shipment.pk = 'sh-1'
+        shipment.pod_doc_count = 2
         action_log = MagicMock()
         action_log.shipment = shipment
         action_log.operation_action = SimpleNamespace(
@@ -325,21 +319,45 @@ class BirthPodFromActionLogTests(TestCase):
             english_label='POD',
             auto_pod_post=True,
         )
-        source_document = MagicMock(pk='dn-1', document_ref_no='SH-90', page_count=1)
-        mock_auto_dn.return_value = source_document
-        mock_document_model.objects.filter.return_value.order_by.return_value.first.return_value = (
+        mock_document_model.objects.filter.return_value.exclude.return_value.order_by.return_value.first.return_value = (
             None
         )
-        created_pod = MagicMock()
-        mock_document_model.return_value = created_pod
-        mock_document_model.Status = type('S', (), {'DRAFT': 'Draft'})()
 
-        with patch(
-            'iroad_tenants.views._tenant_shipment_document_apply_foreign_keys',
-        ), patch(
-            'iroad_tenants.views._tenant_shipment_pod_build_line_rows_from_source',
-            return_value=[],
-        ):
+        with self.assertRaises(ValidationError) as ctx:
             birth_pod_from_action_log(action_log)
 
-        mock_auto_dn.assert_called_once()
+        self.assertIn('shipment document has not been created', str(ctx.exception).casefold())
+
+    @patch('iroad_tenants.operation_runtime.pod_action.ensure_shipment_document_for_pod_upload')
+    @patch('iroad_tenants.operation_runtime.pod_action.TenantShipmentDocument')
+    def test_birth_pod_auto_scaffolds_delivery_note_when_doc_count_zero(
+        self,
+        mock_document_model,
+        mock_ensure,
+    ):
+        from iroad_tenants.operation_runtime.pod_action import birth_pod_from_action_log
+
+        shipment = MagicMock()
+        shipment.booking_id = None
+        shipment.pk = 'sh-1'
+        shipment.pod_doc_count = 0
+        scaffold_doc = MagicMock(pk='dn-scaffold')
+        mock_ensure.return_value = scaffold_doc
+        action_log = MagicMock()
+        action_log.shipment = shipment
+        action_log.operation_action = SimpleNamespace(
+            action_code='OA-0008',
+            english_label='POD',
+            auto_pod_post=True,
+        )
+        mock_document_model.objects.filter.return_value.exclude.return_value.order_by.return_value.first.return_value = None
+        mock_document_model.objects.filter.return_value.order_by.return_value.first.return_value = None
+
+        with patch(
+            'iroad_tenants.operation_runtime.pod_action._find_existing_pod_for_source',
+            return_value=MagicMock(),
+        ):
+            result = birth_pod_from_action_log(action_log)
+
+        self.assertIsNotNone(result)
+        mock_ensure.assert_called_once()

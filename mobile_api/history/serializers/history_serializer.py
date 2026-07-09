@@ -32,6 +32,11 @@ class HistoryDetailResponseSerializer(serializers.Serializer):
         required=False,
         default=list,
     )
+    timeline_preview = serializers.ListField(
+        child=serializers.DictField(),
+        required=False,
+        default=list,
+    )
     timeline = serializers.DictField(required=False, default=dict)
     actions_fired_count = serializers.IntegerField(required=False, default=0)
     history_projection_version = serializers.CharField(

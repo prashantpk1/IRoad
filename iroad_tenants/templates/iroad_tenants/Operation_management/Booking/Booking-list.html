@@ -394,57 +394,7 @@
           </div>
 
           <!-- Pagination -->
-          <div class="eal-pagination">
-            <div class="eal-pagination-info">
-              {% if booking_page_obj and booking_page_obj.paginator.count %}
-              Showing
-              <strong>{{ booking_page_obj.start_index }}&ndash;{{ booking_page_obj.end_index }}</strong>
-              of
-              <strong>{{ booking_page_obj.paginator.count }}</strong>
-              bookings
-              {% else %}
-              Showing <strong>0</strong> of <strong>0</strong> bookings
-              {% endif %}
-            </div>
-            <div class="eal-pagination-controls">
-              {% if booking_page_obj.has_previous %}
-              <a
-                class="eal-page-btn"
-                title="Previous"
-                href="?{% if booking_search_query %}q={{ booking_search_query|urlencode }}&{% endif %}page={{ booking_page_obj.previous_page_number }}"
-              >
-                <i class="bi bi-chevron-left"></i>
-              </a>
-              {% else %}
-              <button class="eal-page-btn" title="Previous" disabled>
-                <i class="bi bi-chevron-left"></i>
-              </button>
-              {% endif %}
-              {% for page_num in booking_page_obj.paginator.page_range %}
-              {% if page_num == booking_page_obj.number %}
-              <span class="eal-page-btn active">{{ page_num }}</span>
-              {% else %}
-              <a
-                class="eal-page-btn"
-                href="?{% if booking_search_query %}q={{ booking_search_query|urlencode }}&{% endif %}page={{ page_num }}"
-              >{{ page_num }}</a>
-              {% endif %}
-              {% endfor %}
-              {% if booking_page_obj.has_next %}
-              <a
-                class="eal-page-btn"
-                title="Next"
-                href="?{% if booking_search_query %}q={{ booking_search_query|urlencode }}&{% endif %}page={{ booking_page_obj.next_page_number }}"
-              >
-                <i class="bi bi-chevron-right"></i>
-              </a>
-              {% else %}
-              <button class="eal-page-btn" title="Next" disabled>
-                <i class="bi bi-chevron-right"></i>
-              </button>
-              {% endif %}
-            </div>
-          </div>
+          {% include 'iroad_tenants/partials/eal_list_pagination.html' with page_obj=booking_page_obj pagination_start=pagination_start pagination_end=pagination_end pagination_total=pagination_total pagination_prev_url=pagination_prev_url pagination_next_url=pagination_next_url pagination_page_links=pagination_page_links pagination_label='bookings' %}
         </div>
       </div>
 {% endblock %}

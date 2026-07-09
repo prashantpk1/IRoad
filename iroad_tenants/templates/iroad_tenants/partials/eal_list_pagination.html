@@ -4,26 +4,45 @@
   page_obj — optional; when set, marks the active page number
   pagination_label — optional suffix (e.g. "users", "roles")
 {% endcomment %}
-{% if pagination_total > 0 %}
 <div class="eal-pagination">
   <div class="eal-pagination-info">
-    Showing <strong>{{ pagination_start }}-{{ pagination_end }}</strong> of <strong>{{ pagination_total }}</strong>
+    {% if pagination_total %}
+    Showing <strong>{{ pagination_start }}&ndash;{{ pagination_end }}</strong> of <strong>{{ pagination_total }}</strong>
     {% if pagination_label %} {{ pagination_label }}{% endif %}
+    {% else %}
+    Showing <strong>0</strong> of <strong>0</strong>
+    {% if pagination_label %} {{ pagination_label }}{% endif %}
+    {% endif %}
   </div>
+  {% if pagination_total > 0 %}
   <div class="eal-pagination-controls">
     {% if pagination_prev_url %}
-    <a class="eal-page-btn" href="{{ pagination_prev_url }}" title="Previous"><i class="bi bi-chevron-left"></i></a>
+    <a class="eal-page-btn" href="{{ pagination_prev_url }}" title="Previous" aria-label="Previous">
+      <i class="bi bi-chevron-left" aria-hidden="true"></i>
+    </a>
     {% else %}
-    <span class="eal-page-btn disabled opacity-50"><i class="bi bi-chevron-left"></i></span>
+    <button type="button" class="eal-page-btn" title="Previous" aria-label="Previous" disabled>
+      <i class="bi bi-chevron-left" aria-hidden="true"></i>
+    </button>
     {% endif %}
     {% for num, href in pagination_page_links %}
-    <a class="eal-page-btn{% if page_obj and num == page_obj.number %} active{% endif %}" href="{{ href }}">{{ num }}</a>
+      {% if href == None %}
+      <span class="eal-page-btn eal-page-ellipsis" aria-hidden="true">&hellip;</span>
+      {% elif page_obj and num == page_obj.number %}
+      <span class="eal-page-btn active" aria-current="page">{{ num }}</span>
+      {% else %}
+      <a class="eal-page-btn" href="{{ href }}">{{ num }}</a>
+      {% endif %}
     {% endfor %}
     {% if pagination_next_url %}
-    <a class="eal-page-btn" href="{{ pagination_next_url }}" title="Next"><i class="bi bi-chevron-right"></i></a>
+    <a class="eal-page-btn" href="{{ pagination_next_url }}" title="Next" aria-label="Next">
+      <i class="bi bi-chevron-right" aria-hidden="true"></i>
+    </a>
     {% else %}
-    <span class="eal-page-btn disabled opacity-50"><i class="bi bi-chevron-right"></i></span>
+    <button type="button" class="eal-page-btn" title="Next" aria-label="Next" disabled>
+      <i class="bi bi-chevron-right" aria-hidden="true"></i>
+    </button>
     {% endif %}
   </div>
+  {% endif %}
 </div>
-{% endif %}

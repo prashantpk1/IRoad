@@ -2,7 +2,7 @@
   "info": {
     "_postman_id": "b2c3d4e5-f6a7-8901-bcde-f12345678901",
     "name": "IRoute — Driver Empty Move Flow",
-    "description": "EMPTY MOVE FLOW (driver confirms each step)\n\nMODE A — Tenant Location Master:\n  01 Login → 02 Dashboard → 02a Locations → 02b Create\n\nMODE B — Live GPS + address (no 02a):\n  01 Login → 02 Dashboard → 02b-live Create\n\nEXECUTE SEQUENCE (do not skip):\n  03 Job Detail → 04a EM1 Start Pickup → 05 EM2 Depart → 05c EM3 Arrive → 06 EM4 Complete\n\nRULES:\n  - movement_job_id from 02 Dashboard, 02b create, or 03 job detail\n  - content_hash + workflow_version from 03 (refresh after each execute)\n  - Each execute uses a NEW client_action_id (set in prerequest — never reuse)\n  - If EM2 sticks: check replayed=true — re-send with fresh guid\n  - 409 idempotency_key_scope_mismatch = use new client_action_id",
+    "description": "EMPTY MOVE FLOW — PCS §G (3 steps: Start Job → Departure → End Job)\n\nNO NEW API — same endpoints; response contract for addresses:\n  • Start Job UI → job.pickup_address (from_address, from GPS)\n  • End Job UI → job.delivery_address / job.drop_address (to_address, NEW arrival GPS)\n  • Do NOT copy pickup_address into End Job\n  • After Departure: delivery_address appears (awaiting_arrival_gps until End Job execute)\n\nPATH:\n  01 Login → 02b-live Create (reason + departure GPS + from_address only)\n  → 03 Job Detail → 04 Step1 → 05 Step2 → 05b Refresh → 06 Step3 (delivery GPS + location_address)\n\nAction codes from workflow_status only — never hardcode OA-0014 etc.\n\nSet collection variables: driver_email, driver_password, tenant_id, base_url.",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
   "variable": [
@@ -59,12 +59,12 @@
     {
       "key": "pickup_location_id",
       "value": "",
-      "description": "REQUIRED UUID — Tenant Location Master (Pickup / from). NOT map place numeric ID."
+      "description": "LEGACY optional — GPS-only create does not need this"
     },
     {
       "key": "delivery_location_id",
       "value": "",
-      "description": "REQUIRED UUID — Tenant Location Master (Delivery / to). NOT map place numeric ID."
+      "description": "LEGACY optional — arrival GPS set on last execute step"
     },
     {
       "key": "empty_move_reason",
@@ -114,7 +114,7 @@
     {
       "key": "execute_client_action_id",
       "value": "",
-      "description": "Set in prerequest before each EM1–EM4 execute (fresh UUID per send)"
+      "description": "Fresh UUID per execute step (prerequest)"
     },
     {
       "key": "from_address",
@@ -125,6 +125,46 @@
       "key": "to_address",
       "value": "Industrial Area, Makkah, Saudi Arabia",
       "description": "Live location — reverse-geocoded or map-picker address (to / delivery)"
+    },
+    {
+      "key": "empty_move_step_1_code",
+      "value": "",
+      "description": "Auto-set from job detail workflow_status step 1"
+    },
+    {
+      "key": "empty_move_step_2_code",
+      "value": "",
+      "description": "Auto-set from job detail workflow_status step 2"
+    },
+    {
+      "key": "empty_move_step_3_code",
+      "value": "",
+      "description": "Auto-set from job detail workflow_status step 3 (End Job)"
+    },
+    {
+      "key": "empty_move_step_count",
+      "value": "",
+      "description": "PCS empty-move workflow step count (3: Start Job, Departure, End Job)"
+    },
+    {
+      "key": "departure_latitude",
+      "value": "",
+      "description": "Departure GPS — same as pickup_latitude"
+    },
+    {
+      "key": "departure_longitude",
+      "value": "",
+      "description": "Departure GPS — same as pickup_longitude"
+    },
+    {
+      "key": "arrival_latitude",
+      "value": "",
+      "description": "Arrival GPS — same as delivery_latitude"
+    },
+    {
+      "key": "arrival_longitude",
+      "value": "",
+      "description": "Arrival GPS — same as delivery_longitude"
     }
   ],
   "event": [
@@ -133,7 +173,7 @@
       "script": {
         "type": "text/javascript",
         "exec": [
-          "// Shared helpers for execute requests (see prerequest on 04a–06).",
+          "// Shared: run 03 Job Detail before execute steps; codes come from workflow_status.",
           "pm.collectionVariables.unset('execute_client_action_id');"
         ]
       }
@@ -275,7 +315,7 @@
       ]
     },
     {
-      "name": "02a — List Empty Move Locations (get UUIDs)",
+      "name": "02a — [LEGACY] List Locations (optional)",
       "request": {
         "method": "GET",
         "header": [
@@ -329,7 +369,7 @@
       ]
     },
     {
-      "name": "02b-live — Create Empty Move (Live GPS + Address — no Location UUIDs)",
+      "name": "02b-live — Create Empty Move (GPS departure only — PCS §5.1)",
       "request": {
         "method": "POST",
         "header": [
@@ -352,7 +392,7 @@
         ],
         "body": {
           "mode": "raw",
-          "raw": "{\n  \"empty_move_reason\": \"{{empty_move_reason}}\",\n  \"from_address\": \"{{from_address}}\",\n  \"from_latitude\": {{pickup_latitude}},\n  \"from_longitude\": {{pickup_longitude}},\n  \"to_address\": \"{{to_address}}\",\n  \"to_latitude\": {{delivery_latitude}},\n  \"to_longitude\": {{delivery_longitude}},\n  \"client_action_id\": \"em-create-live-{{$guid}}\",\n  \"notes\": \"{{empty_move_notes}}\"\n}",
+          "raw": "{\n  \"empty_move_reason\": \"{{empty_move_reason}}\",\n  \"latitude\": {{pickup_latitude}},\n  \"longitude\": {{pickup_longitude}},\n  \"from_address\": \"{{from_address}}\",\n  \"to_address\": \"{{to_address}}\",\n  \"client_action_id\": \"em-create-live-{{$guid}}\",\n  \"notes\": \"{{empty_move_notes}}\"\n}",
           "options": {
             "raw": {
               "language": "json"
@@ -360,7 +400,7 @@
           }
         },
         "url": "{{base_url}}/driver/empty-moves/",
-        "description": "LIVE LOCATION MODE — GPS + reverse-geocoded address.\n\nDo NOT send from_location_id / to_location_id.\n\nREQUIRED: from_address + from_latitude + from_longitude AND to_address + to_latitude + to_longitude.\n\nOn success (201): saves movement_job_id. Status Scheduled — run 04a EM1 to start pickup."
+        "description": "PRIMARY CREATE — reason + device GPS only.\nDo NOT send to_latitude / to_longitude / location IDs.\nArrival GPS is captured on the last workflow execute step."
       },
       "event": [
         {
@@ -373,22 +413,16 @@
               "if (resp.status === 1 && resp.data && resp.data.empty_move) {",
               "    var em = resp.data.empty_move;",
               "    pm.collectionVariables.set('movement_job_id', em.movement_id || em.job_id);",
-              "    pm.test('Empty move created (live location)', function () {",
-              "        pm.expect(em.movement_no).to.exist;",
-              "    });",
-              "    pm.test('From location has GPS stored on TML', function () {",
+              "    pm.test('Empty move created', function () { pm.expect(em.movement_no).to.exist; });",
+              "    pm.test('Departure GPS stored on TML', function () {",
               "        pm.expect(em.from_location.latitude).to.exist;",
               "        pm.expect(em.from_location.longitude).to.exist;",
-              "        pm.expect(em.from_location.label).to.exist;",
               "    });",
-              "    pm.test('To location has GPS stored on TML', function () {",
-              "        pm.expect(em.to_location.latitude).to.exist;",
-              "        pm.expect(em.to_location.longitude).to.exist;",
-              "        pm.expect(em.to_location.label).to.exist;",
-              "    });",
-              "    pm.test('workflow_started is false until driver runs EM1', function () {",
-              "        pm.expect(em.workflow_started).to.eql(false);",
-              "    });",
+              "    if (resp.data.workflow_contract) {",
+              "        pm.test('manual_location_picker is false', function () {",
+              "            pm.expect(resp.data.workflow_contract.manual_location_picker).to.eql(false);",
+              "        });",
+              "    }",
               "}"
             ]
           }
@@ -396,7 +430,7 @@
       ]
     },
     {
-      "name": "02b — Create Empty Move (Tenant Location UUIDs + GPS)",
+      "name": "02b — [LEGACY] Create with Location UUIDs",
       "request": {
         "method": "POST",
         "header": [
@@ -427,7 +461,7 @@
           }
         },
         "url": "{{base_url}}/driver/empty-moves/",
-        "description": "POST /driver/empty-moves/ — creates TML in Scheduled status.\n\nPREREQUISITE: Run 02a for pickup_location_id and delivery_location_id UUIDs.\n\nDriver starts pickup manually via 04a EM1."
+        "description": "LEGACY — prefer 02b-live GPS-only create for mobile."
       },
       "event": [
         {
@@ -443,7 +477,7 @@
               "    pm.test(\"Empty move created\", function() {",
               "        pm.expect(em.movement_no).to.exist;",
               "    });",
-              "    pm.test('workflow_started is false until driver runs EM1', function() {",
+              "    pm.test('workflow_started is false until first execute step', function() {",
               "        pm.expect(em.workflow_started).to.eql(false);",
               "    });",
               "}"
@@ -463,7 +497,7 @@
           }
         ],
         "url": "{{base_url}}/driver/jobs/movement/{{movement_job_id}}/",
-        "description": "GET empty move detail after 02b create.\nStatus should be Scheduled until EM1.\nSaves content_hash and workflow_version for execute calls.\nAssert allowed actions include EM1 (Start at Pickup)."
+        "description": "Job detail — saves sync metadata and dynamic empty_move_step_*_code from workflow_status / allowed_actions."
       },
       "event": [
         {
@@ -476,30 +510,83 @@
               "    pm.collectionVariables.set('movement_job_id', resp.data.job.job_id);",
               "}",
               "if (resp.data && resp.data.sync_metadata) {",
-              "    pm.collectionVariables.set(",
-              "        \"content_hash\",",
-              "        resp.data.sync_metadata.content_hash",
-              "    );",
-              "    pm.collectionVariables.set(",
-              "        \"workflow_version\",",
-              "        resp.data.sync_metadata.workflow_version",
-              "    );",
-              "    pm.test(",
-              "        \"Sync metadata saved for empty move execute\",",
-              "        function() {",
-              "            pm.expect(resp.data.sync_metadata.content_hash).to.exist;",
-              "        }",
-              "    );",
+              "    pm.collectionVariables.set('content_hash', resp.data.sync_metadata.content_hash);",
+              "    pm.collectionVariables.set('workflow_version', resp.data.sync_metadata.workflow_version);",
+              "    pm.test('Sync metadata saved', function () {",
+              "        pm.expect(resp.data.sync_metadata.content_hash).to.exist;",
+              "    });",
               "}",
-              "pm.test(\"Allowed actions contains EM1 (pickup start)\", function() {",
-              "    var allowed = (resp.data && resp.data.workflow && resp.data.workflow.allowed_actions) || [];",
-              "    var codes = allowed.map(function(a) { return a.action_code; });",
-              "    pm.expect(codes).to.include(\"EM1\");",
+              "function saveEmptyMoveWorkflow(resp) {",
+              "    var data = (resp && resp.data) || {};",
+              "    var wf = data.workflow || {};",
+              "    var status = wf.workflow_status || [];",
+              "    var allowed = wf.allowed_actions || [];",
+              "    var codes = [];",
+              "    function stepOrder(key) {",
+              "        var m = String(key || '').match(/^(?:seq_|step_)(\\d+)$/);",
+              "        if (m) return parseInt(m[1], 10);",
+              "        var legacy = { pickup: 1, in_transit: 2, delivery: 3, complete: 4 };",
+              "        return legacy[key] || 99;",
+              "    }",
+              "    function isEmptyMoveStepAction(a) {",
+              "        if (!a || !a.action_code) return false;",
+              "        var cat = String(a.action_category || '').toLowerCase();",
+              "        if (cat === 'without') return false;",
+              "        var req = a.execution_requirements || {};",
+              "        if (String(req.sequence_category || '').toLowerCase() === 'empty_move') return true;",
+              "        if (cat === 'empty_move') return true;",
+              "        return false;",
+              "    }",
+              "    if (status.length) {",
+              "        var ordered = status.slice().sort(function (a, b) { return stepOrder(a.step_key) - stepOrder(b.step_key); });",
+              "        ordered.forEach(function (s) { if (s.action_code) codes.push(s.action_code); });",
+              "    }",
+              "    if (!codes.length) {",
+              "        allowed.filter(isEmptyMoveStepAction).forEach(function (a) { codes.push(a.action_code); });",
+              "    }",
+              "    ['empty_move_step_1_code','empty_move_step_2_code','empty_move_step_3_code'].forEach(function (k) {",
+              "        pm.collectionVariables.unset(k);",
+              "    });",
+              "    if (codes[0]) pm.collectionVariables.set('empty_move_step_1_code', codes[0]);",
+              "    if (codes[1]) pm.collectionVariables.set('empty_move_step_2_code', codes[1]);",
+              "    if (codes[2]) pm.collectionVariables.set('empty_move_step_3_code', codes[2]);",
+              "    pm.collectionVariables.set('empty_move_step_count', String(codes.length));",
+              "    console.log('empty_move workflow codes:', codes.join(', '));",
+              "    return codes;",
+              "}",
+              "var codes = saveEmptyMoveWorkflow(resp);",
+              "pm.test('Workflow has at least one empty-move step', function () {",
+              "    pm.expect(codes.length).to.be.above(0);",
+              "});",
+              "pm.test('First allowed action routes to evidence capture', function () {",
+              "    var allowed = (resp.data.workflow && resp.data.workflow.allowed_actions) || [];",
+              "    if (allowed.length) {",
+              "        pm.expect(allowed[0].action).to.eql('go_to_evidence_capture');",
+              "        pm.expect(allowed[0].screen).to.eql('evidence_capture');",
+              "    }",
               "});",
               "if (resp.data && resp.data.workflow && resp.data.workflow.workflow_status) {",
-              "    pm.test(\"Pickup step not completed before EM1\", function() {",
-              "        var pickup = resp.data.workflow.workflow_status.find(function(s) { return s.step_key === 'pickup'; });",
-              "        pm.expect(pickup && pickup.completed).to.eql(false);",
+              "    pm.test('Workflow status uses dynamic step keys', function () {",
+              "        var steps = resp.data.workflow.workflow_status;",
+              "        pm.expect(steps[0].step_key).to.match(/^(seq_|step_)\\d+$|^(pickup|in_transit|delivery|complete)$/);",
+              "    });",
+              "}",
+              "var job = (resp.data && resp.data.job) || {};",
+              "var pickup = job.pickup_address || {};",
+              "var delivery = job.delivery_address || {};",
+              "var drop = job.drop_address || {};",
+              "console.log('pickup_address.from_address=', pickup.from_address || pickup.display_name);",
+              "console.log('delivery_address.to_address=', delivery.to_address || delivery.display_name || '(empty)');",
+              "console.log('delivery awaiting_arrival_gps=', delivery.awaiting_arrival_gps);",
+              "pm.test('pickup_address has departure GPS fields', function () {",
+              "    pm.expect(pickup.location_capture_mode).to.eql('gps');",
+              "    pm.expect(pickup.latitude).to.exist;",
+              "});",
+              "if (delivery && Object.keys(delivery).length) {",
+              "    pm.test('delivery_address must not reuse from_address text', function () {",
+              "        if (delivery.to_address && pickup.from_address) {",
+              "            pm.expect(delivery.to_address).to.not.eql(pickup.from_address);",
+              "        }",
               "    });",
               "}"
             ]
@@ -522,7 +609,7 @@
       }
     },
     {
-      "name": "04a — Execute EM1 Start at Pickup",
+      "name": "04 — Execute Step 1 (Start Job — seq 1)",
       "request": {
         "method": "POST",
         "header": [
@@ -537,15 +624,15 @@
         ],
         "body": {
           "mode": "raw",
-          "raw": "{\n  \"client_action_id\": \"{{execute_client_action_id}}\",\n  \"workflow_version\": \"{{workflow_version}}\",\n  \"content_hash\": \"{{content_hash}}\",\n  \"latitude\": {{pickup_latitude}},\n  \"longitude\": {{pickup_longitude}},\n  \"notes\": \"Start empty move at Pickup\"\n}",
+          "raw": "{\n  \"client_action_id\": \"{{execute_client_action_id}}\",\n  \"workflow_version\": \"{{workflow_version}}\",\n  \"content_hash\": \"{{content_hash}}\",\n  \"latitude\": {pickup_latitude},\n  \"longitude\": {pickup_longitude},\n  \"notes\": \"Start empty move — departure GPS\"\n}",
           "options": {
             "raw": {
               "language": "json"
             }
           }
         },
-        "url": "{{base_url}}/driver/jobs/movement/{{movement_job_id}}/actions/EM1/execute/",
-        "description": "Driver confirms pickup / starts movement. Pickup step turns green after this."
+        "url": "{{base_url}}/driver/jobs/movement/{{movement_job_id}}/actions/{{empty_move_step_1_code}}/execute/",
+        "description": "Execute tenant empty-move step using `{empty_move_step_1_code}` from request 03.\nMobile: open evidence_capture first when `action` = go_to_evidence_capture.\nGPS: pickup_latitude / pickup_longitude on this request body."
       },
       "event": [
         {
@@ -558,7 +645,8 @@
               "    if (!v || String(v).indexOf('{{') >= 0) { throw new Error(name + ' missing — run 01, 02b, 03 first.'); }",
               "}",
               "requireVar('movement_job_id'); requireVar('content_hash'); requireVar('workflow_version'); requireVar('access_token');",
-              "pm.collectionVariables.set('execute_client_action_id', 'em-start-' + pm.variables.replaceIn('{{$guid}}'));"
+              "requireVar('empty_move_step_1_code');",
+              "pm.collectionVariables.set('execute_client_action_id', 'em-empty_move_step_1-' + pm.variables.replaceIn('{{$guid}}'));"
             ]
           }
         },
@@ -573,10 +661,45 @@
               "pm.test('Not a cross-job replay', function () {",
               "    if (exec.replayed) { pm.expect(exec.replayed).to.eql(false); }",
               "});",
-              "pm.test('Next action is EM2', function () {",
-              "    var next = (resp.data.workflow && resp.data.workflow.next_action) || {};",
-              "    pm.expect(next.action_code).to.eql('EM2');",
-              "});",
+              "function saveEmptyMoveWorkflow(resp) {",
+              "    var data = (resp && resp.data) || {};",
+              "    var wf = data.workflow || {};",
+              "    var status = wf.workflow_status || [];",
+              "    var allowed = wf.allowed_actions || [];",
+              "    var codes = [];",
+              "    function stepOrder(key) {",
+              "        var m = String(key || '').match(/^(?:seq_|step_)(\\d+)$/);",
+              "        if (m) return parseInt(m[1], 10);",
+              "        var legacy = { pickup: 1, in_transit: 2, delivery: 3, complete: 4 };",
+              "        return legacy[key] || 99;",
+              "    }",
+              "    function isEmptyMoveStepAction(a) {",
+              "        if (!a || !a.action_code) return false;",
+              "        var cat = String(a.action_category || '').toLowerCase();",
+              "        if (cat === 'without') return false;",
+              "        var req = a.execution_requirements || {};",
+              "        if (String(req.sequence_category || '').toLowerCase() === 'empty_move') return true;",
+              "        if (cat === 'empty_move') return true;",
+              "        return false;",
+              "    }",
+              "    if (status.length) {",
+              "        var ordered = status.slice().sort(function (a, b) { return stepOrder(a.step_key) - stepOrder(b.step_key); });",
+              "        ordered.forEach(function (s) { if (s.action_code) codes.push(s.action_code); });",
+              "    }",
+              "    if (!codes.length) {",
+              "        allowed.filter(isEmptyMoveStepAction).forEach(function (a) { codes.push(a.action_code); });",
+              "    }",
+              "    ['empty_move_step_1_code','empty_move_step_2_code','empty_move_step_3_code'].forEach(function (k) {",
+              "        pm.collectionVariables.unset(k);",
+              "    });",
+              "    if (codes[0]) pm.collectionVariables.set('empty_move_step_1_code', codes[0]);",
+              "    if (codes[1]) pm.collectionVariables.set('empty_move_step_2_code', codes[1]);",
+              "    if (codes[2]) pm.collectionVariables.set('empty_move_step_3_code', codes[2]);",
+              "    pm.collectionVariables.set('empty_move_step_count', String(codes.length));",
+              "    console.log('empty_move workflow codes:', codes.join(', '));",
+              "    return codes;",
+              "}",
+              "if (resp.status === 1 && resp.data) { saveEmptyMoveWorkflow(resp); }",
               "if (resp.status === 1 && resp.data && resp.data.sync_metadata) {",
               "    pm.collectionVariables.set('content_hash', resp.data.sync_metadata.content_hash);",
               "    pm.collectionVariables.set('workflow_version', resp.data.sync_metadata.workflow_version);",
@@ -587,7 +710,7 @@
       ]
     },
     {
-      "name": "05 — Execute EM2 Depart Empty",
+      "name": "05 — Execute Step 2 (Departure — seq 2)",
       "request": {
         "method": "POST",
         "header": [
@@ -602,15 +725,15 @@
         ],
         "body": {
           "mode": "raw",
-          "raw": "{\n  \"client_action_id\": \"{{execute_client_action_id}}\",\n  \"workflow_version\": \"{{workflow_version}}\",\n  \"content_hash\": \"{{content_hash}}\",\n  \"latitude\": {{pickup_latitude}},\n  \"longitude\": {{pickup_longitude}},\n  \"notes\": \"Departing empty from Pickup (Jeddah)\"\n}",
+          "raw": "{\n  \"client_action_id\": \"{{execute_client_action_id}}\",\n  \"workflow_version\": \"{{workflow_version}}\",\n  \"content_hash\": \"{{content_hash}}\",\n  \"location_address\": \"{{to_address}}\",\n  \"notes\": \"Departure — set delivery destination text\"\n}",
           "options": {
             "raw": {
               "language": "json"
             }
           }
         },
-        "url": "{{base_url}}/driver/jobs/movement/{{movement_job_id}}/actions/EM2/execute/",
-        "description": "Fires EM2 action to log departure.\n\nPREREQUISITE: Run 04a EM1 first so pickup is complete.\nUse a fresh client_action_id each run (Postman {{$guid}})."
+        "url": "{{base_url}}/driver/jobs/movement/{{movement_job_id}}/actions/{{empty_move_step_2_code}}/execute/",
+        "description": "Departure (OA-0015) — sends location_address as planned delivery destination (to_address). Response includes data.job.delivery_address for End Job UI."
       },
       "event": [
         {
@@ -621,7 +744,7 @@
               "function requireVar(name) {",
               "    var v = pm.collectionVariables.get(name) || '';",
               "    if (!v || String(v).indexOf('{{') >= 0) {",
-              "        throw new Error(name + ' is missing. Run 01 Login, then 02 Dashboard (or 02b Create), then 03 Job Detail before EM2.');",
+              "throw new Error(name + ' is missing. Run 01 Login, 02b-live Create, then 03 Job Detail first.');",
               "    }",
               "    return v;",
               "}",
@@ -629,7 +752,8 @@
               "requireVar('content_hash');",
               "requireVar('workflow_version');",
               "requireVar('access_token');",
-              "pm.collectionVariables.set('execute_client_action_id', 'em-depart-' + pm.variables.replaceIn('{{$guid}}'));"
+              "requireVar('empty_move_step_2_code');",
+              "pm.collectionVariables.set('execute_client_action_id', 'em-empty_move_step_2-' + pm.variables.replaceIn('{{$guid}}'));"
             ]
           }
         },
@@ -640,30 +764,66 @@
             "exec": [
               "var resp = pm.response.json();",
               "var exec = (resp.data && resp.data.execution) || {};",
-              "pm.test('Status code is 200 or 201', function () { pm.expect(pm.response.code).to.be.oneOf([200, 201]); });",
-              "pm.test('EM2 not a stale cross-job replay', function () {",
-              "    if (exec.replayed) {",
-              "        var steps = (resp.data.workflow && resp.data.workflow.workflow_status) || [];",
-              "        var inTransit = steps.find(function(s) { return s.step_key === 'in_transit'; });",
-              "        pm.expect(inTransit && inTransit.completed, 'Replay must belong to this movement').to.eql(true);",
-              "    } else { pm.expect(exec.replayed).to.eql(false); }",
+              "pm.test('Status 200 or 201', function () { pm.expect(pm.response.code).to.be.oneOf([200, 201]); });",
+              "pm.test('Not a cross-job replay', function () {",
+              "    if (exec.replayed) { pm.expect(exec.replayed).to.eql(false); }",
               "});",
-              "pm.test('Next action advances past EM2', function () {",
-              "    var next = (resp.data.workflow && resp.data.workflow.next_action) || {};",
-              "    pm.expect(next.action_code).to.eql('EM3');",
-              "});",
+              "function saveEmptyMoveWorkflow(resp) {",
+              "    var data = (resp && resp.data) || {};",
+              "    var wf = data.workflow || {};",
+              "    var status = wf.workflow_status || [];",
+              "    var allowed = wf.allowed_actions || [];",
+              "    var codes = [];",
+              "    function stepOrder(key) {",
+              "        var m = String(key || '').match(/^(?:seq_|step_)(\\d+)$/);",
+              "        if (m) return parseInt(m[1], 10);",
+              "        var legacy = { pickup: 1, in_transit: 2, delivery: 3, complete: 4 };",
+              "        return legacy[key] || 99;",
+              "    }",
+              "    function isEmptyMoveStepAction(a) {",
+              "        if (!a || !a.action_code) return false;",
+              "        var cat = String(a.action_category || '').toLowerCase();",
+              "        if (cat === 'without') return false;",
+              "        var req = a.execution_requirements || {};",
+              "        if (String(req.sequence_category || '').toLowerCase() === 'empty_move') return true;",
+              "        if (cat === 'empty_move') return true;",
+              "        return false;",
+              "    }",
+              "    if (status.length) {",
+              "        var ordered = status.slice().sort(function (a, b) { return stepOrder(a.step_key) - stepOrder(b.step_key); });",
+              "        ordered.forEach(function (s) { if (s.action_code) codes.push(s.action_code); });",
+              "    }",
+              "    if (!codes.length) {",
+              "        allowed.filter(isEmptyMoveStepAction).forEach(function (a) { codes.push(a.action_code); });",
+              "    }",
+              "    ['empty_move_step_1_code','empty_move_step_2_code','empty_move_step_3_code'].forEach(function (k) {",
+              "        pm.collectionVariables.unset(k);",
+              "    });",
+              "    if (codes[0]) pm.collectionVariables.set('empty_move_step_1_code', codes[0]);",
+              "    if (codes[1]) pm.collectionVariables.set('empty_move_step_2_code', codes[1]);",
+              "    if (codes[2]) pm.collectionVariables.set('empty_move_step_3_code', codes[2]);",
+              "    pm.collectionVariables.set('empty_move_step_count', String(codes.length));",
+              "    console.log('empty_move workflow codes:', codes.join(', '));",
+              "    return codes;",
+              "}",
+              "if (resp.status === 1 && resp.data) { saveEmptyMoveWorkflow(resp); }",
               "if (resp.status === 1 && resp.data && resp.data.sync_metadata) {",
-              "    pm.collectionVariables.set(\"content_hash\", resp.data.sync_metadata.content_hash);",
-              "    pm.collectionVariables.set(\"workflow_version\", resp.data.sync_metadata.workflow_version);",
-              "    pm.test(\"Sync hash updated from empty move execute\", function() { pm.expect(resp.data.sync_metadata.content_hash).to.exist; });",
-              "}"
+              "    pm.collectionVariables.set('content_hash', resp.data.sync_metadata.content_hash);",
+              "    pm.collectionVariables.set('workflow_version', resp.data.sync_metadata.workflow_version);",
+              "}",
+              "var job = (resp.data && resp.data.job) || {};",
+              "var delivery = job.delivery_address || job.drop_address || {};",
+              "pm.test('delivery_address after Departure execute', function () {",
+              "    pm.expect(delivery.to_address || delivery.display_name).to.exist;",
+              "    pm.expect(delivery.location_capture_mode).to.eql('gps');",
+              "});"
             ]
           }
         }
       ]
     },
     {
-      "name": "05b — Refresh Job Detail (Post EM2)",
+      "name": "05b — Refresh Job Detail (after Departure — check delivery_address)",
       "request": {
         "method": "GET",
         "header": [
@@ -673,7 +833,7 @@
           }
         ],
         "url": "{{base_url}}/driver/jobs/movement/{{movement_job_id}}/",
-        "description": "Refresh state and assert allowed actions contain EM3."
+        "description": "Run after Step 2 (Departure). Asserts delivery_address / drop_address unlocked for End Job — must NOT copy pickup_address."
       },
       "event": [
         {
@@ -682,15 +842,115 @@
             "type": "text/javascript",
             "exec": [
               "var resp = pm.response.json();",
-              "pm.test(\"Status code is 200\", function () { pm.response.to.have.status(200); });",
-              "if (resp.data && resp.data.sync_metadata) {",
-              "    pm.collectionVariables.set(\"content_hash\", resp.data.sync_metadata.content_hash);",
-              "    pm.collectionVariables.set(\"workflow_version\", resp.data.sync_metadata.workflow_version);",
+              "pm.test('Status code is 200', function () { pm.response.to.have.status(200); });",
+              "var job = (resp.data && resp.data.job) || {};",
+              "var pickup = job.pickup_address || {};",
+              "var delivery = job.delivery_address || job.drop_address || {};",
+              "pm.test('delivery_address present after Departure', function () {",
+              "    pm.expect(Object.keys(delivery).length).to.be.above(0);",
+              "    pm.expect(delivery.location_capture_mode).to.eql('gps');",
+              "});",
+              "pm.test('End Job address not copied from Start Job', function () {",
+              "    if (delivery.to_address && pickup.from_address) {",
+              "        pm.expect(delivery.to_address).to.not.eql(pickup.from_address);",
+              "    }",
+              "    if (delivery.latitude && pickup.latitude && delivery.longitude && pickup.longitude) {",
+              "        var same = delivery.latitude === pickup.latitude && delivery.longitude === pickup.longitude;",
+              "        if (same) { pm.expect(delivery.awaiting_arrival_gps).to.eql(true); }",
+              "    }",
+              "});",
+              "function saveEmptyMoveWorkflow(resp) {",
+              "    var data = (resp && resp.data) || {};",
+              "    var wf = data.workflow || {};",
+              "    var status = wf.workflow_status || [];",
+              "    var allowed = wf.allowed_actions || [];",
+              "    var codes = [];",
+              "    function stepOrder(key) {",
+              "        var m = String(key || '').match(/^(?:seq_|step_)(\\d+)$/);",
+              "        if (m) return parseInt(m[1], 10);",
+              "        var legacy = { pickup: 1, in_transit: 2, delivery: 3, complete: 4 };",
+              "        return legacy[key] || 99;",
+              "    }",
+              "    function isEmptyMoveStepAction(a) {",
+              "        if (!a || !a.action_code) return false;",
+              "        var cat = String(a.action_category || '').toLowerCase();",
+              "        if (cat === 'without') return false;",
+              "        var req = a.execution_requirements || {};",
+              "        if (String(req.sequence_category || '').toLowerCase() === 'empty_move') return true;",
+              "        if (cat === 'empty_move') return true;",
+              "        return false;",
+              "    }",
+              "    if (status.length) {",
+              "        var ordered = status.slice().sort(function (a, b) { return stepOrder(a.step_key) - stepOrder(b.step_key); });",
+              "        ordered.forEach(function (s) { if (s.action_code) codes.push(s.action_code); });",
+              "    }",
+              "    if (!codes.length) {",
+              "        allowed.filter(isEmptyMoveStepAction).forEach(function (a) { codes.push(a.action_code); });",
+              "    }",
+              "    ['empty_move_step_1_code','empty_move_step_2_code','empty_move_step_3_code'].forEach(function (k) {",
+              "        pm.collectionVariables.unset(k);",
+              "    });",
+              "    if (codes[0]) pm.collectionVariables.set('empty_move_step_1_code', codes[0]);",
+              "    if (codes[1]) pm.collectionVariables.set('empty_move_step_2_code', codes[1]);",
+              "    if (codes[2]) pm.collectionVariables.set('empty_move_step_3_code', codes[2]);",
+              "    pm.collectionVariables.set('empty_move_step_count', String(codes.length));",
+              "    console.log('empty_move workflow codes:', codes.join(', '));",
+              "    return codes;",
               "}",
-              "pm.test(\"Allowed actions contains EM3\", function() {",
-              "    var allowed = (resp.data && resp.data.workflow && resp.data.workflow.allowed_actions) || [];",
-              "    var codes = allowed.map(function(a) { return a.action_code; });",
-              "    pm.expect(codes).to.include(\"EM3\");",
+              "if (resp.data && resp.data.sync_metadata) {",
+              "    pm.collectionVariables.set('content_hash', resp.data.sync_metadata.content_hash);",
+              "    pm.collectionVariables.set('workflow_version', resp.data.sync_metadata.workflow_version);",
+              "}",
+              "saveEmptyMoveWorkflow(resp);"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "05c — Resolve Arrival Geocode (after Departure)",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{access_token}}"
+          },
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          },
+          {
+            "key": "Accept",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"latitude\": {{delivery_latitude}},\n  \"longitude\": {{delivery_longitude}}\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        },
+        "url": "{{base_url}}/driver/empty-moves/{{movement_job_id}}/geocode-arrival/",
+        "description": "Geocodes the arrival coordinates to get the delivery address 'to_address' using GPS and updates the movement job."
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "var resp = pm.response.json();",
+              "pm.test('Status code is 200', function () { pm.response.to.have.status(200); });",
+              "pm.test('Status is 1', function () { pm.expect(resp.status).to.eql(1); });",
+              "var addr = (resp.data && resp.data.delivery_address) || {};",
+              "pm.test('delivery_address is resolved', function () {",
+              "    pm.expect(addr.to_address).to.exist;",
+              "    pm.expect(addr.latitude).to.exist;",
+              "    pm.expect(addr.longitude).to.exist;",
               "});"
             ]
           }
@@ -698,7 +958,7 @@
       ]
     },
     {
-      "name": "05c — Execute EM3 Arrival At Destination",
+      "name": "06 — Execute Step 3 (End Job — seq 3, terminal)",
       "request": {
         "method": "POST",
         "header": [
@@ -713,15 +973,15 @@
         ],
         "body": {
           "mode": "raw",
-          "raw": "{\n  \"client_action_id\": \"{{execute_client_action_id}}\",\n  \"workflow_version\": \"{{workflow_version}}\",\n  \"content_hash\": \"{{content_hash}}\",\n  \"latitude\": {{delivery_latitude}},\n  \"longitude\": {{delivery_longitude}},\n  \"notes\": \"Arriving at Delivery (Makkah)\"\n}",
+          "raw": "{\n  \"client_action_id\": \"{{execute_client_action_id}}\",\n  \"workflow_version\": \"{{workflow_version}}\",\n  \"content_hash\": \"{{content_hash}}\",\n  \"latitude\": {{delivery_latitude}},\n  \"longitude\": {{delivery_longitude}},\n  \"notes\": \"Complete empty move — arrival GPS only (uses delivery_address from Departure)\"\n}",
           "options": {
             "raw": {
               "language": "json"
             }
           }
         },
-        "url": "{{base_url}}/driver/jobs/movement/{{movement_job_id}}/actions/EM3/execute/",
-        "description": "EM3 — arrive at delivery. Use fresh client_action_id (prerequest)."
+        "url": "{{base_url}}/driver/jobs/movement/{{movement_job_id}}/actions/{{empty_move_step_3_code}}/execute/",
+        "description": "End Job (OA-0016) — arrival GPS only. to_address comes from delivery_address set at create/Departure. Response includes data.job even when job_closed=true."
       },
       "event": [
         {
@@ -734,7 +994,8 @@
               "    if (!v || String(v).indexOf('{{') >= 0) { throw new Error(name + ' missing — run prior steps first.'); }",
               "}",
               "requireVar('movement_job_id'); requireVar('content_hash'); requireVar('workflow_version'); requireVar('access_token');",
-              "pm.collectionVariables.set('execute_client_action_id', 'em-arrive-' + pm.variables.replaceIn('{{$guid}}'));"
+              "requireVar('empty_move_step_3_code');",
+              "pm.collectionVariables.set('execute_client_action_id', 'em-empty_move_step_3-' + pm.variables.replaceIn('{{$guid}}'));"
             ]
           }
         },
@@ -746,48 +1007,66 @@
               "var resp = pm.response.json();",
               "var exec = (resp.data && resp.data.execution) || {};",
               "pm.test('Status 200 or 201', function () { pm.expect(pm.response.code).to.be.oneOf([200, 201]); });",
-              "pm.test('Next action is EM4', function () {",
-              "    var next = (resp.data.workflow && resp.data.workflow.next_action) || {};",
-              "    pm.expect(next.action_code).to.eql('EM4');",
+              "pm.test('Not a cross-job replay', function () {",
+              "    if (exec.replayed) { pm.expect(exec.replayed).to.eql(false); }",
               "});",
+              "function saveEmptyMoveWorkflow(resp) {",
+              "    var data = (resp && resp.data) || {};",
+              "    var wf = data.workflow || {};",
+              "    var status = wf.workflow_status || [];",
+              "    var allowed = wf.allowed_actions || [];",
+              "    var codes = [];",
+              "    function stepOrder(key) {",
+              "        var m = String(key || '').match(/^(?:seq_|step_)(\\d+)$/);",
+              "        if (m) return parseInt(m[1], 10);",
+              "        var legacy = { pickup: 1, in_transit: 2, delivery: 3, complete: 4 };",
+              "        return legacy[key] || 99;",
+              "    }",
+              "    function isEmptyMoveStepAction(a) {",
+              "        if (!a || !a.action_code) return false;",
+              "        var cat = String(a.action_category || '').toLowerCase();",
+              "        if (cat === 'without') return false;",
+              "        var req = a.execution_requirements || {};",
+              "        if (String(req.sequence_category || '').toLowerCase() === 'empty_move') return true;",
+              "        if (cat === 'empty_move') return true;",
+              "        return false;",
+              "    }",
+              "    if (status.length) {",
+              "        var ordered = status.slice().sort(function (a, b) { return stepOrder(a.step_key) - stepOrder(b.step_key); });",
+              "        ordered.forEach(function (s) { if (s.action_code) codes.push(s.action_code); });",
+              "    }",
+              "    if (!codes.length) {",
+              "        allowed.filter(isEmptyMoveStepAction).forEach(function (a) { codes.push(a.action_code); });",
+              "    }",
+              "    ['empty_move_step_1_code','empty_move_step_2_code','empty_move_step_3_code'].forEach(function (k) {",
+              "        pm.collectionVariables.unset(k);",
+              "    });",
+              "    if (codes[0]) pm.collectionVariables.set('empty_move_step_1_code', codes[0]);",
+              "    if (codes[1]) pm.collectionVariables.set('empty_move_step_2_code', codes[1]);",
+              "    if (codes[2]) pm.collectionVariables.set('empty_move_step_3_code', codes[2]);",
+              "    pm.collectionVariables.set('empty_move_step_count', String(codes.length));",
+              "    console.log('empty_move workflow codes:', codes.join(', '));",
+              "    return codes;",
+              "}",
+              "if (resp.status === 1 && resp.data) { saveEmptyMoveWorkflow(resp); }",
               "if (resp.status === 1 && resp.data && resp.data.sync_metadata) {",
               "    pm.collectionVariables.set('content_hash', resp.data.sync_metadata.content_hash);",
               "    pm.collectionVariables.set('workflow_version', resp.data.sync_metadata.workflow_version);",
-              "}"
-            ]
-          }
-        }
-      ]
-    },
-    {
-      "name": "05d — Refresh Job Detail (Post EM3)",
-      "request": {
-        "method": "GET",
-        "header": [
-          {
-            "key": "Authorization",
-            "value": "Bearer {{access_token}}"
-          }
-        ],
-        "url": "{{base_url}}/driver/jobs/movement/{{movement_job_id}}/",
-        "description": "Refresh state and assert allowed actions contain EM4."
-      },
-      "event": [
-        {
-          "listen": "test",
-          "script": {
-            "type": "text/javascript",
-            "exec": [
-              "var resp = pm.response.json();",
-              "pm.test(\"Status code is 200\", function () { pm.response.to.have.status(200); });",
-              "if (resp.data && resp.data.sync_metadata) {",
-              "    pm.collectionVariables.set(\"content_hash\", resp.data.sync_metadata.content_hash);",
-              "    pm.collectionVariables.set(\"workflow_version\", resp.data.sync_metadata.workflow_version);",
               "}",
-              "pm.test(\"Allowed actions contains EM4\", function() {",
-              "    var allowed = (resp.data && resp.data.workflow && resp.data.workflow.allowed_actions) || [];",
-              "    var codes = allowed.map(function(a) { return a.action_code; });",
-              "    pm.expect(codes).to.include(\"EM4\");",
+              "pm.test('job_closed after End Job', function () {",
+              "    pm.expect(exec.job_closed).to.eql(true);",
+              "});",
+              "var job = (resp.data && resp.data.job) || {};",
+              "var delivery = job.delivery_address || job.drop_address || {};",
+              "pm.test('to_address on closed job execute response', function () {",
+              "    pm.expect(delivery.to_address || delivery.display_name).to.exist;",
+              "    pm.expect(delivery.latitude).to.exist;",
+              "});",
+              "var steps = ((resp.data && resp.data.workflow) || {}).workflow_status || [];",
+              "var endStep = steps[steps.length - 1] || {};",
+              "pm.test('End Job workflow step has to_address', function () {",
+              "  var addr = endStep.address || {};",
+              "  pm.expect(addr.to_address || addr.display_name).to.exist;",
               "});"
             ]
           }
@@ -795,69 +1074,7 @@
       ]
     },
     {
-      "name": "06 — Execute EM4 Complete Movement",
-      "request": {
-        "method": "POST",
-        "header": [
-          {
-            "key": "Authorization",
-            "value": "Bearer {{access_token}}"
-          },
-          {
-            "key": "Content-Type",
-            "value": "application/json"
-          }
-        ],
-        "body": {
-          "mode": "raw",
-          "raw": "{\n  \"client_action_id\": \"{{execute_client_action_id}}\",\n  \"workflow_version\": \"{{workflow_version}}\",\n  \"content_hash\": \"{{content_hash}}\",\n  \"latitude\": {{delivery_latitude}},\n  \"longitude\": {{delivery_longitude}},\n  \"notes\": \"Complete empty move at Delivery (Makkah)\"\n}",
-          "options": {
-            "raw": {
-              "language": "json"
-            }
-          }
-        },
-        "url": "{{base_url}}/driver/jobs/movement/{{movement_job_id}}/actions/EM4/execute/",
-        "description": "EM4 — complete empty move. Status becomes Completed."
-      },
-      "event": [
-        {
-          "listen": "prerequest",
-          "script": {
-            "type": "text/javascript",
-            "exec": [
-              "function requireVar(name) {",
-              "    var v = pm.collectionVariables.get(name) || '';",
-              "    if (!v || String(v).indexOf('{{') >= 0) { throw new Error(name + ' missing — run prior steps first.'); }",
-              "}",
-              "requireVar('movement_job_id'); requireVar('content_hash'); requireVar('workflow_version'); requireVar('access_token');",
-              "pm.collectionVariables.set('execute_client_action_id', 'em-complete-' + pm.variables.replaceIn('{{$guid}}'));"
-            ]
-          }
-        },
-        {
-          "listen": "test",
-          "script": {
-            "type": "text/javascript",
-            "exec": [
-              "var resp = pm.response.json();",
-              "pm.test('Status 200 or 201', function () { pm.expect(pm.response.code).to.be.oneOf([200, 201]); });",
-              "pm.test('Job closed or no further actions', function () {",
-              "    var allowed = (resp.data.workflow && resp.data.workflow.allowed_actions) || [];",
-              "    var hint = (resp.data.next_action_hint || {});",
-              "    pm.expect(allowed.length === 0 || hint.job_closed === true).to.eql(true);",
-              "});",
-              "if (resp.status === 1 && resp.data && resp.data.sync_metadata) {",
-              "    pm.collectionVariables.set('content_hash', resp.data.sync_metadata.content_hash);",
-              "    pm.collectionVariables.set('workflow_version', resp.data.sync_metadata.workflow_version);",
-              "}"
-            ]
-          }
-        }
-      ]
-    },
-    {
-      "name": "06a — Final Refresh Job Detail (Post EM4)",
+      "name": "06a — Final Refresh Job Detail (after last step)",
       "request": {
         "method": "GET",
         "header": [
@@ -884,6 +1101,19 @@
               "pm.test(\"Allowed actions is empty\", function() {",
               "    var allowed = (resp.data && resp.data.workflow && resp.data.workflow.allowed_actions) || [];",
               "    pm.expect(allowed.length).to.eql(0);",
+              "});",
+              "var job = (resp.data && resp.data.job) || {};",
+              "var pickup = job.pickup_address || {};",
+              "var delivery = job.delivery_address || job.drop_address || {};",
+              "pm.test('Arrival address stored on delivery_address', function () {",
+              "    pm.expect(delivery.to_address || delivery.display_name).to.exist;",
+              "    pm.expect(delivery.latitude).to.exist;",
+              "});",
+              "pm.test('Arrival differs from departure when coords differ', function () {",
+              "    if (pickup.latitude && delivery.latitude) {",
+              "        var moved = pickup.latitude !== delivery.latitude || pickup.longitude !== delivery.longitude;",
+              "        if (moved) { pm.expect(delivery.awaiting_arrival_gps).to.not.eql(true); }",
+              "    }",
               "});"
             ]
           }
@@ -891,59 +1121,7 @@
       ]
     },
     {
-      "name": "07 — Execute Cancel Empty Move (Optional — Before Start Only)",
-      "request": {
-        "method": "POST",
-        "header": [
-          {
-            "key": "Authorization",
-            "value": "Bearer {{access_token}}"
-          },
-          {
-            "key": "Content-Type",
-            "value": "application/json"
-          }
-        ],
-        "body": {
-          "mode": "raw",
-          "raw": "{\n  \"client_action_id\": \"{{execute_client_action_id}}\",\n  \"workflow_version\": \"{{workflow_version}}\",\n  \"content_hash\": \"{{content_hash}}\",\n  \"latitude\": 24.7136,\n  \"longitude\": 46.6753,\n  \"notes\": \"Empty move cancelled — plan changed\"\n}",
-          "options": {
-            "raw": {
-              "language": "json"
-            }
-          }
-        },
-        "url": "{{base_url}}/driver/jobs/movement/{{movement_job_id}}/actions/A_EMPTY_CANCEL/execute/",
-        "description": "OPTIONAL STEP — CANCEL BEFORE STARTING ONLY.\nNOTE: action_code for empty move cancel may be named differently.\nCheck Action Master in database for the exact code where:\n  scope = On_Call AND category = Empty_Move AND sequence_number = 3\nReplace A_EMPTY_CANCEL in URL with that exact code.\nIMPORTANT RULES:\n  - Cancel is ONLY allowed when status is Scheduled.\n  - Once In Progress cancel is NOT allowed.\n  - Once Completed cancel is NOT allowed.\nWhen cancelled:\n  Movement Log status = Cancelled\n  Row stays in storage for audit (never deleted)\n  Row is excluded from all KPI calculations\nUse this if the trip was planned but never happened.\n\nPREREQUISITE: Run empty move execute requests in order and do not skip steps. content_hash/workflow_version auto-update after each successful execute. If you get 409 stale_content_hash, re-run Request 03 then retry."
-      },
-      "event": [
-        {
-          "listen": "prerequest",
-          "script": {
-            "type": "text/javascript",
-            "exec": [
-              "pm.collectionVariables.set('execute_client_action_id', 'em-cancel-' + pm.variables.replaceIn('{{$guid}}'));"
-            ]
-          }
-        },
-        {
-          "listen": "test",
-          "script": {
-            "type": "text/javascript",
-            "exec": [
-              "var resp = pm.response.json();",
-              "if (resp.status === 1 && resp.data && resp.data.sync_metadata) {",
-              "    pm.collectionVariables.set(\"content_hash\", resp.data.sync_metadata.content_hash);",
-              "    pm.collectionVariables.set(\"workflow_version\", resp.data.sync_metadata.workflow_version);",
-              "    pm.test(\"Sync hash updated from empty move execute\", function() { pm.expect(resp.data.sync_metadata.content_hash).to.exist; });",
-              "}"
-            ]
-          }
-        }
-      ]
-    },
-    {
-      "name": "08 — Report Issue During Empty Move (Optional)",
+      "name": "07 — Report Issue During Empty Move (Optional)",
       "request": {
         "method": "POST",
         "header": [

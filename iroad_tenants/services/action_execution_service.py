@@ -49,6 +49,8 @@ class ActionExecutionService:
         booking_item_type: str = '',
         exclude_log_id=None,
         previous_action_id=None,
+        allow_standalone_execution: bool = False,
+        hard_pod_custody_submission_id: str = '',
     ) -> str | None:
         return OperationExecutionService.validate_driver_action_execution(
             operation_action,
@@ -58,6 +60,8 @@ class ActionExecutionService:
             booking_item_type=booking_item_type,
             exclude_log_id=exclude_log_id,
             previous_action_id=previous_action_id,
+            allow_standalone_execution=allow_standalone_execution,
+            hard_pod_custody_submission_id=hard_pod_custody_submission_id,
         )
 
     @staticmethod
@@ -236,6 +240,7 @@ class ActionExecutionService:
         mobile_cod_amount=None,
         hard_pod_custody_submission_id: str = '',
         hard_pod_client_submission_id: str = '',
+        location_address: str = '',
     ) -> ActionExecutionResult:
         """
         Mobile-safe action execution: validate → persist log → side effects → optional sync.
@@ -261,6 +266,8 @@ class ActionExecutionService:
             shipment=shipment,
             movement=movement,
             booking_item_type=booking_item_type,
+            allow_standalone_execution=True,
+            hard_pod_custody_submission_id=hard_pod_custody_submission_id,
         )
         if policy_error:
             raise ValidationError(policy_error)
@@ -339,6 +346,9 @@ class ActionExecutionService:
             action_log._hard_pod_custody_submission_id = hard_pod_custody_submission_id.strip()
         if hard_pod_client_submission_id:
             action_log._hard_pod_client_submission_id = hard_pod_client_submission_id.strip()
+        route_address = (location_address or '').strip()
+        if route_address:
+            action_log._route_location_address = route_address[:500]
 
         try:
             with transaction.atomic():
@@ -355,6 +365,11 @@ class ActionExecutionService:
                     sync_shipment_status_from_action_log(shipment_after)
 
                     shipment_after.refresh_from_db()
+                    from iroad_tenants.operation_runtime.latest_state import (
+                        repair_shipment_status_before_hard_pod_promotion,
+                    )
+
+                    repair_shipment_status_before_hard_pod_promotion(shipment_after)
                     status_after_sync = shipment_after.shipment_status
 
                     if (

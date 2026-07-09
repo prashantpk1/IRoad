@@ -6,6 +6,7 @@ import json
 
 from django.utils import timezone
 
+from iroad_tenants.booking_status import OPERATION_ACTION_BOOKING_STATUS_CHOICES
 from tenant_workspace.models import (
     SalesInvoiceReport,
     SalesInvoiceReportBooking,
@@ -55,6 +56,11 @@ def operation_pod_type_options():
 
 def operation_pod_status_options():
     return tuple(choice[0] for choice in TenantShipment.PodStatus.choices)
+
+
+def operation_booking_status_options():
+    """PCS §3.4 / Platform Review — canonical booking status list for all forms."""
+    return tuple(value for value, _ in OPERATION_ACTION_BOOKING_STATUS_CHOICES)
 
 
 def operation_pod_status_is_complete(value) -> bool:
@@ -280,11 +286,13 @@ def operation_field_options_context(*, booking=None):
     """Template context keys shared by Booking and Shipment forms."""
     pod_type_options = operation_pod_type_options()
     pod_status_options = operation_pod_status_options()
+    booking_status_options = operation_booking_status_options()
     sales_report = operation_sales_report_linkage(booking)
     return {
         'operation_order_type_options': OPERATION_ORDER_TYPE_OPTIONS,
         'operation_pod_type_options': pod_type_options,
         'operation_pod_status_options': pod_status_options,
+        'operation_booking_status_options': booking_status_options,
         'operation_sales_report_status_options': OPERATION_SALES_REPORT_STATUS_OPTIONS,
         'operation_sales_report_options': operation_sales_report_options_for_booking(booking),
         'operation_sales_report': sales_report,

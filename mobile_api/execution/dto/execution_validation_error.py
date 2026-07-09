@@ -25,6 +25,7 @@ def build_validation_error(
     refresh_required: bool = True,
     next_action_hint: dict[str, Any] | None = None,
     field: str = '',
+    sync_metadata: dict[str, Any] | None = None,
 ) -> ExecutionValidationErrorBody:
     body: ExecutionValidationErrorBody = ExecutionValidationErrorBody(
         error_code=(error_code or 'execute_validation_failed').strip(),
@@ -36,6 +37,8 @@ def build_validation_error(
     field_name = (field or '').strip()
     if field_name:
         body['field'] = field_name
+    if sync_metadata:
+        body['sync_metadata'] = dict(sync_metadata)  # type: ignore[typeddict-unknown-key]
     return body
 
 

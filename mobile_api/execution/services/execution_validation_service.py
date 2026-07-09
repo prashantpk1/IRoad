@@ -34,7 +34,10 @@ from mobile_api.job_detail.helpers.booking_job_context import (
     resolve_pending_booking_item_type,
 )
 from mobile_api.job_detail.projections.workflow_projection import build_workflow_section
-from mobile_api.execution.services.execution_context_adapter import to_job_detail_context
+from mobile_api.execution.services.execution_context_adapter import (
+    finalize_execute_scope,
+    to_job_detail_context,
+)
 from mobile_api.utils.next_action_hint_builder import build_next_action_hint
 from tenant_workspace.models import TenantOperationAction
 
@@ -113,6 +116,7 @@ class ExecutionValidationService:
         _ = idempotency_keys
         self._stale.assert_not_stale(context)
         self.validate_action_master(context, request=request)
+        self._validate_pod_shipment_document(context)
         _ = ExecutionAuthoritativeContext.from_execute_context(context)
         self._validate_hard_pod_execute_requirements(context)
         self._attach_operational_issue_warnings(context)
@@ -129,17 +133,12 @@ class ExecutionValidationService:
         request: Any | None = None,
     ) -> None:
         """Resolve Action Master row and assert policy + allowed_actions membership."""
+        finalize_execute_scope(context)
         operation_action = self.resolve_operation_action(context)
         context.operation_action = operation_action
 
         with self._reconcile.apply_status_overlays(context):
-            policy_error = OperationExecutionService.validate_operation_action_allowed(
-                operation_action,
-                booking=context.booking,
-                shipment=context.shipment,
-                movement=context.movement,
-                booking_item_type=self._booking_item_type(context),
-            )
+            policy_error = self._policy_validate(context, operation_action)
             if policy_error:
                 raise self._forbidden_action(
                     policy_error,
@@ -153,6 +152,35 @@ class ExecutionValidationService:
                     context=context,
                     request=request,
                 )
+
+    def _validate_pod_shipment_document(self, context: ExecuteActionContext) -> None:
+        from django.core.exceptions import ValidationError as DjangoValidationError
+
+        from iroad_tenants.operation_runtime.pod_action import (
+            validate_shipment_document_for_pod_execute,
+        )
+        from mobile_api.pod_capture.policy.canonical_pod_action_registry import (
+            is_pod_upload_action,
+        )
+
+        action = context.operation_action
+        shipment = context.shipment
+        if action is None or shipment is None:
+            return
+        if not (
+            is_pod_upload_action(action) or getattr(action, 'auto_pod_post', False)
+        ):
+            return
+        try:
+            validate_shipment_document_for_pod_execute(shipment, action)
+        except DjangoValidationError as exc:
+            message = '; '.join(getattr(exc, 'messages', []) or [str(exc)])
+            raise self._validation_error(
+                error_code='shipment_document_required',
+                message=message,
+                refresh_required=False,
+                http_status=400,
+            ) from exc
 
     def resolve_operation_action(self, context: ExecuteActionContext) -> Any:
         """Load active Action Master row for ``context.action_code``."""
@@ -203,21 +231,169 @@ class ExecutionValidationService:
             return True
         if self._combined_pod_execute_allowed(context, operation_action):
             return True
+        if self._pod_digital_recovery_execute_allowed(context, operation_action):
+            return True
+        if self._collect_payment_execute_allowed(context, operation_action):
+            return True
+        if self._job_close_execute_allowed(context, operation_action):
+            return True
+        if self._hard_pod_promotion_execute_allowed(context, operation_action):
+            return True
+        if self._hard_pod_promoted_custody_replay_allowed(context, operation_action):
+            return True
         return self._hard_copy_execute_allowed(context, operation_action)
+
+    def _hard_pod_promotion_execute_allowed(
+        self,
+        context: ExecuteActionContext,
+        operation_action: Any,
+    ) -> bool:
+        """Label-only POD (OA-0009) step 2 — align allowed list with policy bypass."""
+        from iroad_tenants.operation_execution import (
+            _hard_pod_post_digital_promotion_allowed,
+        )
+
+        if context.shipment is None:
+            return False
+        if not _hard_pod_post_digital_promotion_allowed(
+            operation_action,
+            context.shipment,
+        ):
+            return False
+        policy_error = self._policy_validate(context, operation_action)
+        return policy_error is None
+
+    def _hard_pod_promoted_custody_replay_allowed(
+        self,
+        context: ExecuteActionContext,
+        operation_action: Any,
+    ) -> bool:
+        """Custody already promoted — safe idempotent replay for hard-copy execute."""
+        from iroad_tenants.operation_execution import (
+            _hard_pod_custody_promoted,
+            _is_hard_pod_kernel_promotion_action,
+        )
+
+        if context.shipment is None:
+            return False
+        if not _is_hard_pod_kernel_promotion_action(operation_action):
+            return False
+        if not _hard_pod_custody_promoted(context.shipment):
+            return False
+        submission_id = self._custody_submission_id_from_context(context)
+        if not submission_id:
+            return False
+        try:
+            from mobile_api.hard_pod.models import HardPODCustodySubmission
+
+            submission = (
+                HardPODCustodySubmission.objects.filter(pk=submission_id)
+                .first()
+            )
+        except Exception:
+            return False
+        if submission is None:
+            return False
+        if not (
+            getattr(submission, 'promoted_at', None)
+            and (submission.promotion_action_log_id or '').strip()
+        ):
+            return False
+        return True
+
+    @staticmethod
+    def _custody_submission_id_from_context(context: ExecuteActionContext) -> str:
+        payload = context.payload or {}
+        return str(
+            payload.get('custody_submission_id')
+            or context.resolver_meta.get('hard_pod_custody_submission_id')
+            or ''
+        ).strip()
+
+    def _policy_validate(
+        self,
+        context: ExecuteActionContext,
+        operation_action: Any,
+    ) -> str | None:
+        return OperationExecutionService.validate_operation_action_allowed(
+            operation_action,
+            booking=context.booking,
+            shipment=context.shipment,
+            movement=context.movement,
+            booking_item_type=self._booking_item_type(context),
+            hard_pod_custody_submission_id=self._custody_submission_id_from_context(
+                context
+            ),
+        )
+
+    def _pod_digital_recovery_execute_allowed(
+        self,
+        context: ExecuteActionContext,
+        operation_action: Any,
+    ) -> bool:
+        """POD capture after credit unloading marked Delivered before digital evidence."""
+        from iroad_tenants.operation_execution import (
+            _combined_pod_allows_digital_recovery,
+        )
+        from mobile_api.pod_capture.policy.canonical_pod_action_registry import (
+            is_pod_upload_action,
+        )
+
+        if context.shipment is None:
+            return False
+        if not _combined_pod_allows_digital_recovery(
+            operation_action,
+            context.shipment,
+        ):
+            return False
+        if not (
+            is_pod_upload_action(operation_action)
+            or getattr(operation_action, 'auto_pod_post', False)
+        ):
+            return False
+        policy_error = self._policy_validate(context, operation_action)
+        return policy_error is None
+
+    def _collect_payment_execute_allowed(
+        self,
+        context: ExecuteActionContext,
+        operation_action: Any,
+    ) -> bool:
+        """Payment Collection may be absent from workflow list while still policy-valid."""
+        from iroad_tenants.operation_execution import _is_collect_payment_action
+
+        if context.shipment is None or not _is_collect_payment_action(operation_action):
+            return False
+        policy_error = self._policy_validate(context, operation_action)
+        return policy_error is None
+
+    def _job_close_execute_allowed(
+        self,
+        context: ExecuteActionContext,
+        operation_action: Any,
+    ) -> bool:
+        """End Job may be absent from workflow list while still policy-valid."""
+        from iroad_tenants.operation_execution import _is_job_close_action
+
+        if context.shipment is None or not _is_job_close_action(operation_action):
+            return False
+        policy_error = self._policy_validate(context, operation_action)
+        return policy_error is None
 
     def _combined_pod_execute_allowed(
         self,
         context: ExecuteActionContext,
         operation_action: Any,
     ) -> bool:
-        """OA-0008 step 2 — hard-copy confirmation after digital POD execute."""
+        """Upload POD step 2 — hard-copy custody promotion after digital execute."""
         from iroad_tenants.operation_execution import (
             _combined_pod_allows_hard_copy_retry,
             _is_combined_upload_pod_action,
         )
+        from mobile_api.pod_capture.policy.canonical_pod_action_registry import (
+            is_pod_upload_action,
+        )
 
-        if not _is_combined_upload_pod_action(operation_action):
-            return False
         if context.shipment is None:
             return False
         if not _combined_pod_allows_hard_copy_retry(
@@ -225,13 +401,12 @@ class ExecutionValidationService:
             context.shipment,
         ):
             return False
-        policy_error = OperationExecutionService.validate_operation_action_allowed(
-            operation_action,
-            booking=context.booking,
-            shipment=context.shipment,
-            movement=context.movement,
-            booking_item_type=self._booking_item_type(context),
-        )
+        if not (
+            _is_combined_upload_pod_action(operation_action)
+            or is_pod_upload_action(operation_action)
+        ):
+            return False
+        policy_error = self._policy_validate(context, operation_action)
         return policy_error is None
 
     def _hard_copy_execute_allowed(
@@ -251,13 +426,7 @@ class ExecutionValidationService:
             return False
         if not _hard_copy_collection_shipment_allowed(context.shipment):
             return False
-        policy_error = OperationExecutionService.validate_operation_action_allowed(
-            operation_action,
-            booking=context.booking,
-            shipment=context.shipment,
-            movement=context.movement,
-            booking_item_type=self._booking_item_type(context),
-        )
+        policy_error = self._policy_validate(context, operation_action)
         return policy_error is None
 
     def _allowed_action_codes(
@@ -352,6 +521,7 @@ class ExecutionValidationService:
             shipment=context.shipment,
             booking=context.booking,
             driver=context.driver,
+            movement=context.movement,
             tenant_schema=(getattr(context, 'tenant_schema', None) or ''),
         )
 

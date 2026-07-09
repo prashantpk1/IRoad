@@ -64,7 +64,10 @@ def build_workflow_section(
 
     recon_block = entity_reconciliation_block(context)
     top_integrity = dict((context.reconciliation or {}).get('workflow_integrity') or {})
+    auth_status = authoritative_entity_status(context)
     reconciliation_out = _reconciliation_api_slice(recon_block)
+    if auth_status:
+        reconciliation_out['authoritative_status'] = auth_status
 
     cache = get_projection_cache(context)
     prefetched = None
@@ -76,7 +79,6 @@ def build_workflow_section(
             if context.job_type == 'booking'
             else cache.movement_logs
         )
-    auth_status = authoritative_entity_status(context)
 
     with apply_reconciled_status_overlays(context):
         if context.job_type == 'shipment':
@@ -183,6 +185,18 @@ def _build_booking_workflow(
         workflow['booking_item_type'] = booking_item_type
     if exec_ctx.get('backload_bootstrap'):
         workflow['backload_bootstrap_pending'] = True
+        primary = workflow.get('primary_action') or {}
+        primary_label = (
+            (primary.get('execution_label') or primary.get('action_name') or '').strip()
+            if isinstance(primary, dict)
+            else ''
+        )
+        if primary_label:
+            workflow['current_stage'] = primary_label
+        else:
+            workflow['current_stage'] = 'Return Trip'
+    if (context.resolver_meta or {}).get('backload_booking_redirect'):
+        workflow['backload_booking_redirect'] = True
     return workflow
 
 
@@ -225,6 +239,7 @@ def _build_movement_workflow(
         movement,
         logs,
         request=request,
+        tenant_schema=(getattr(context, 'tenant_schema', None) or ''),
     )
     return workflow
 
@@ -277,31 +292,60 @@ def _map_engine_payload(
 
 
 def _strip_hard_copy_from_driver_workflow(workflow: dict[str, Any]) -> dict[str, Any]:
-    """Hard POD (A7H) is completed inside Upload POD — not a separate workflow row."""
+    """Hard POD step 2 is inside Upload POD (OA-0009) — not a separate timeline row."""
+    from mobile_api.pod_capture.services.pod_capture_action_resolver import (
+        row_has_hard_copy_collection,
+    )
+    from iroad_tenants.operation_execution import _is_standalone_hard_copy_collection_action
+    from types import SimpleNamespace
+
+    def _strip_row(row: Any) -> bool:
+        if not isinstance(row, dict):
+            return False
+        if row_has_hard_copy_collection(row):
+            req = dict(row.get('execution_requirements') or {})
+            if req.get('auto_pod_post'):
+                return False
+            return True
+        code = str(row.get('action_code') or '').strip()
+        stub = SimpleNamespace(
+            action_code=code,
+            hard_copy_collection=bool(
+                dict(row.get('execution_requirements') or {}).get('hard_copy_collection'),
+            ),
+            auto_pod_post=bool(
+                dict(row.get('execution_requirements') or {}).get('auto_pod_post'),
+            ),
+            english_label=str(row.get('english_label') or row.get('label') or ''),
+        )
+        return _is_standalone_hard_copy_collection_action(stub)
+
     out = dict(workflow or {})
     actions = [
         row
         for row in (out.get('allowed_actions') or [])
-        if not _is_hard_copy_collection_action_row(row)
+        if not _strip_row(row)
     ]
     out['allowed_actions'] = actions
     for key in ('next_action', 'primary_action'):
         row = dict(out.get(key) or {})
-        if _is_hard_copy_collection_action_row(row):
+        if _strip_row(row):
             out[key] = dict(actions[0]) if actions else {}
     return out
 
 
 def _is_hard_copy_collection_action_row(row: Any) -> bool:
+    """Deprecated — use ``_strip_hard_copy_from_driver_workflow`` row predicate."""
     if not isinstance(row, dict):
         return False
-    code = str(row.get('action_code') or '').strip()
-    if code.upper() == 'A7H':
-        return True
-    requirements = row.get('execution_requirements') or {}
-    if requirements.get('auto_pod_post'):
+    from mobile_api.pod_capture.services.pod_capture_action_resolver import (
+        row_has_hard_copy_collection,
+    )
+
+    if not row_has_hard_copy_collection(row):
         return False
-    return bool(requirements.get('hard_copy_collection'))
+    requirements = row.get('execution_requirements') or {}
+    return not requirements.get('auto_pod_post')
 
 
 def _reconciliation_api_slice(block: dict[str, Any]) -> dict[str, Any]:

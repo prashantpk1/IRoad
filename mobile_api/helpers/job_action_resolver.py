@@ -14,7 +14,14 @@ from django_tenants.utils import schema_context
 
 from iroad_tenants.operation_execution import action_matches
 from iroad_tenants.operation_runtime.impacts import resolve_shipment_status_impact
-from iroad_tenants.operation_runtime.shipment_execution_stage import is_unloading_action
+from iroad_tenants.operation_runtime.shipment_execution_stage import (
+    is_delivery_arrival_action,
+    is_unloading_action,
+    is_unloading_completed_action,
+    shipment_delivery_arrival_done,
+    shipment_unloading_completed_done,
+    shipment_unloading_done,
+)
 from mobile_api.pod_capture.services.pod_capture_action_resolver import (
     action_code_from_action,
     find_allowed_action_row_by_impact,
@@ -25,6 +32,7 @@ from tenant_workspace.models import TenantOperationAction, TenantShipment
 CANONICAL_FALLBACK_COLLECT_PAYMENT_ACTION_CODE = 'A9'
 CANONICAL_FALLBACK_JOB_CLOSE_ACTION_CODE = 'A10'
 CANONICAL_FALLBACK_UNLOADING_ACTION_CODE = 'A8'
+CANONICAL_FALLBACK_DELIVERY_ARRIVAL_ACTION_CODE = 'A6'
 
 
 def _iter_active_actions(tenant_schema: str):
@@ -45,6 +53,7 @@ def _row_as_action(row: dict[str, Any]) -> SimpleNamespace:
         action_code=row.get('action_code'),
         english_label=(
             row.get('english_label')
+            or row.get('action_label')
             or row.get('label')
             or row.get('execution_label')
         ),
@@ -91,7 +100,31 @@ def resolve_unloading_action(tenant_schema: str) -> Any | None:
     return None
 
 
+def resolve_unloading_completed_action(tenant_schema: str) -> Any | None:
+    for action in _iter_active_actions(tenant_schema):
+        if is_unloading_completed_action(action):
+            return action
+    return None
+
+
+def resolve_delivery_arrival_action(tenant_schema: str) -> Any | None:
+    for action in _iter_active_actions(tenant_schema):
+        if is_delivery_arrival_action(action):
+            return action
+    return None
+
+
 def resolve_job_close_action(tenant_schema: str) -> Any | None:
+    schema = (tenant_schema or '').strip()
+    if schema:
+        from django_tenants.utils import schema_context
+
+        with schema_context(schema):
+            from iroad_tenants.operation_runtime.workflow_action_policy import (
+                resolve_job_close_operation_action,
+            )
+
+            return resolve_job_close_operation_action()
     for action in _iter_active_actions(tenant_schema):
         if action_is_job_close(action):
             return action
@@ -112,6 +145,20 @@ def resolve_unloading_action_code(tenant_schema: str) -> str:
     )
 
 
+def resolve_unloading_completed_action_code(tenant_schema: str) -> str:
+    return action_code_from_action(
+        resolve_unloading_completed_action(tenant_schema),
+        fallback='',
+    )
+
+
+def resolve_delivery_arrival_action_code(tenant_schema: str) -> str:
+    return action_code_from_action(
+        resolve_delivery_arrival_action(tenant_schema),
+        fallback=CANONICAL_FALLBACK_DELIVERY_ARRIVAL_ACTION_CODE,
+    )
+
+
 def resolve_job_close_action_code(tenant_schema: str) -> str:
     return action_code_from_action(
         resolve_job_close_action(tenant_schema),
@@ -121,12 +168,11 @@ def resolve_job_close_action_code(tenant_schema: str) -> str:
 
 def action_is_job_close(action: Any | None) -> bool:
     """True when Action Master row closes the shipment (impact → Closed)."""
-    if action is None:
-        return False
-    impact = resolve_shipment_status_impact(
-        getattr(action, 'shipment_status_impact', '') or '',
+    from iroad_tenants.operation_runtime.workflow_action_policy import (
+        action_is_job_close as _policy_action_is_job_close,
     )
-    return impact == TenantShipment.ShipmentStatus.CLOSED
+
+    return _policy_action_is_job_close(action)
 
 
 def action_code_is_job_close(
@@ -155,10 +201,20 @@ def action_is_collect_payment(action: Any | None) -> bool:
     return 'collect payment' in label
 
 
-def action_code_is_collect_payment(action_code: str | None) -> bool:
-    code = (action_code or '').strip().upper()
-    if code in {'A9', 'OA-0009'}:
+def action_code_is_collect_payment(
+    action_code: str | None,
+    *,
+    workflow: dict[str, Any] | None = None,
+    tenant_schema: str = '',
+) -> bool:
+    code = (action_code or '').strip()
+    if not code:
+        return False
+    if workflow and row_is_collect_payment_action(_resolve_action_row(workflow, code)):
         return True
+    action = _lookup_action_by_code(code, tenant_schema)
+    if action is not None:
+        return action_is_collect_payment(action)
     return False
 
 
@@ -168,19 +224,21 @@ def row_is_unloading_action(row: dict[str, Any] | None) -> bool:
     return is_unloading_action(_row_as_action(row))
 
 
+def row_is_unloading_completed_action(row: dict[str, Any] | None) -> bool:
+    if not row:
+        return False
+    return is_unloading_completed_action(_row_as_action(row))
+
+
+def row_is_delivery_arrival_action(row: dict[str, Any] | None) -> bool:
+    if not row:
+        return False
+    return is_delivery_arrival_action(_row_as_action(row))
+
+
 def row_is_start_job_action(row: dict[str, Any] | None) -> bool:
     if not row:
         return False
-    req = dict(row.get('execution_requirements') or {})
-    if req.get('direct_execute') is True:
-        label = str(
-            row.get('english_label')
-            or row.get('execution_label')
-            or row.get('label')
-            or '',
-        ).casefold()
-        if 'start' in label and 'job' in label:
-            return True
     return action_matches(_row_as_action(row), 'start job', 'action 1')
 
 
@@ -228,10 +286,16 @@ def row_is_job_close_action(row: dict[str, Any] | None) -> bool:
     label = str(
         row.get('english_label')
         or row.get('execution_label')
+        or row.get('action_label')
         or row.get('label')
         or '',
     ).casefold()
-    return 'job closed' in label or 'close job' in label
+    return any(needle in label for needle in (
+        'end job',
+        'job closed',
+        'close job',
+        'job close',
+    ))
 
 
 def resolve_unloading_action_code_from_context(
@@ -249,6 +313,40 @@ def resolve_unloading_action_code_from_context(
             if resolved:
                 return resolved
     return resolve_unloading_action_code(tenant_schema)
+
+
+def resolve_unloading_completed_action_code_from_context(
+    *,
+    workflow: dict[str, Any] | None = None,
+    tenant_schema: str = '',
+    next_code: str = '',
+) -> str:
+    code = (next_code or '').strip()
+    if code and row_is_unloading_completed_action(_resolve_action_row(workflow, code)):
+        return code
+    for row in (workflow or {}).get('allowed_actions') or []:
+        if isinstance(row, dict) and row_is_unloading_completed_action(row):
+            resolved = (row.get('action_code') or '').strip()
+            if resolved:
+                return resolved
+    return resolve_unloading_completed_action_code(tenant_schema)
+
+
+def resolve_delivery_arrival_action_code_from_context(
+    *,
+    workflow: dict[str, Any] | None = None,
+    tenant_schema: str = '',
+    next_code: str = '',
+) -> str:
+    code = (next_code or '').strip()
+    if code and row_is_delivery_arrival_action(_resolve_action_row(workflow, code)):
+        return code
+    for row in (workflow or {}).get('allowed_actions') or []:
+        if isinstance(row, dict) and row_is_delivery_arrival_action(row):
+            resolved = (row.get('action_code') or '').strip()
+            if resolved:
+                return resolved
+    return resolve_delivery_arrival_action_code(tenant_schema)
 
 
 def resolve_collect_payment_action_code_from_context(

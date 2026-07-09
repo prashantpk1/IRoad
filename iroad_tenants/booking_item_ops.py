@@ -171,20 +171,11 @@ def apply_booking_item_cancel(booking, line_type: str) -> list[str]:
 
 
 def resolve_r2_cancel_item_action():
-    from iroad_tenants.operation_runtime.action_master_catalog import PRODUCTION_ACTION_MASTER
-    from tenant_workspace.models import TenantOperationAction
-
-    row = TenantOperationAction.objects.filter(action_code__iexact='R2').first()
-    if row is not None:
-        return row
-    spec = next((s for s in PRODUCTION_ACTION_MASTER if s.action_code.upper() == 'R2'), None)
-    if spec is None:
-        return None
-    model_fields = {field.name for field in TenantOperationAction._meta.fields}
-    return TenantOperationAction.objects.create(
-        action_code=spec.action_code,
-        **spec.defaults(model_fields),
+    from iroad_tenants.operation_runtime.action_master_catalog import (
+        resolve_cancel_booking_item_action,
     )
+
+    return resolve_cancel_booking_item_action()
 
 
 def append_booking_r2_item_action_log(

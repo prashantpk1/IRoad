@@ -49,10 +49,10 @@ class EmptyMoveCreateAPIView(MobileAPIView):
     """
     Create an empty truck movement from the driver app (On Call mode).
 
-    Each endpoint requires either a tenant ``from_location_id`` / ``to_location_id``
-    or a Google Places snapshot (``from_address`` / ``to_address`` with matching
-    ``from_latitude`` / ``from_longitude`` and ``to_latitude`` / ``to_longitude``).
-    Route GPS and addresses are stored on the TML; EM1 fires automatically on create.
+    PCS §5.1: send ``empty_move_reason`` plus device GPS (``latitude`` /
+    ``longitude`` or ``from_latitude`` / ``from_longitude``). Optional
+    ``from_address`` may carry reverse-geocoded departure text. Arrival GPS is
+    captured when the driver completes the move (workflow complete action).
     """
 
     permission_classes = [IsMobileAuthenticated, IsDriver, HasViewMobileCapability]
@@ -139,6 +139,7 @@ class EmptyMoveCreateAPIView(MobileAPIView):
                 code=exc.code,
                 message_key=exc.message_key,
                 http_code=exc.http_status,
+                data=exc.data or None,
             )
 
         movement = data.get('empty_move') or {}

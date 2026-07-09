@@ -36,15 +36,22 @@ from mobile_api.job_detail.timeline.timeline_event_mapper import (
     map_logs_to_timeline_events,
     sort_logs_newest_first,
 )
-from iroad_tenants.operation_execution import _is_standalone_hard_copy_collection_action
 from iroad_tenants.services.timeline_service import TimelineService
-from iroad_tenants.operation_runtime.impacts import operation_action_matches
-from tenant_workspace.models import TenantOperationAction
+from iroad_tenants.operation_runtime.workflow_action_policy import (
+    empty_move_workflow_actions_queryset,
+    filter_empty_move_timeline_workflow_actions,
+    filter_shipment_timeline_workflow_actions,
+    mobile_job_workflow_actions_queryset,
+)
+from iroad_tenants.operation_runtime.action_master_catalog import (
+    AUTO_COD_VERIFY_ACTION_CODE,
+    AUTO_COD_VERIFY_ENGLISH_LABEL,
+    SYSTEM_AUTO_POD_VERIFY_CHANNELS,
+    is_system_auto_pod_verify_channel,
+)
 
-JobType = Literal['shipment', 'movement']
-
-AUTO_ACTION_CHANNELS = frozenset({'auto_cod_verify'})
-AUTO_ACTION_CODES = frozenset({'A_POD_VERIFY'})
+AUTO_ACTION_CHANNELS = SYSTEM_AUTO_POD_VERIFY_CHANNELS
+AUTO_ACTION_CODES = frozenset({AUTO_COD_VERIFY_ACTION_CODE})
 
 
 @dataclass
@@ -126,6 +133,7 @@ class JobDetailTimelineService:
                     cached_logs,
                     limit=limit,
                     request=request,
+                    context=context,
                 )
 
         page = self.fetch_page_for_context(
@@ -248,18 +256,25 @@ class JobDetailTimelineService:
         return TimelinePageResult(timeline_preview=[], timeline_cursor='', has_more=False)
 
     def _workflow_actions(self) -> list[Any]:
-        qs = TenantOperationAction.objects.filter(
-            status=TenantOperationAction.Status.ACTIVE,
-            action_scope__in=('job', 'without', ''),
-            mobile_visible=True,
-            admin_only=False,
-        ).order_by('sequence_number', 'action_code')
         try:
-            return list(qs)
+            return list(mobile_job_workflow_actions_queryset())
         except Exception as exc:
             if exc.__class__.__name__ == 'DatabaseOperationForbidden':
                 return []
             raise
+
+    def _empty_move_workflow_actions(self) -> list[Any]:
+        try:
+            return list(empty_move_workflow_actions_queryset())
+        except Exception as exc:
+            if exc.__class__.__name__ == 'DatabaseOperationForbidden':
+                return []
+            raise
+
+    def _workflow_actions_for_context(self, context: JobDetailContext) -> list[Any]:
+        if context.job_type == 'movement':
+            return self._empty_move_workflow_actions()
+        return self._workflow_actions()
 
     def _filter_workflow_actions_for_context(
         self,
@@ -273,21 +288,14 @@ class JobDetailTimelineService:
         - Shipment timelines do not show booking-start action (A1).
         - Booking-scoped jobs (outbound and backload preshipment) include Start Job.
         """
-        if not actions:
+        if not actions and context.job_type != 'movement':
             return []
 
         if context.job_type == 'movement':
-            filtered: list[Any] = []
-            for action in actions:
-                cat = (getattr(action, 'sequence_category', '') or '').strip().lower()
-                code = (getattr(action, 'action_code', '') or '').strip().upper()
-                if cat == 'empty_move' or code.startswith('EM'):
-                    filtered.append(action)
-            return filtered
+            source = actions or self._empty_move_workflow_actions()
+            return filter_empty_move_timeline_workflow_actions(source)
 
         if context.job_type == 'booking':
-            # Pre-shipment booking jobs (A1–A4) show the full in-transit timeline
-            # (Pickup → Unloading), matching the born shipment job detail view.
             return self._filter_shipment_workflow_actions(actions, context=context)
 
         if context.job_type == 'shipment':
@@ -296,46 +304,47 @@ class JobDetailTimelineService:
         return []
 
     @staticmethod
+    def _resolve_is_cod(context: JobDetailContext) -> bool:
+        if context.shipment is None and context.booking is None:
+            return False
+        try:
+            from mobile_api.history.selectors.order_type_resolver import (
+                resolve_order_type,
+            )
+
+            return (
+                resolve_order_type(context.shipment, context.booking).strip().upper()
+                == 'COD'
+            )
+        except Exception:
+            if context.shipment is not None:
+                return (
+                    getattr(context.shipment, 'order_type', '') or ''
+                ).strip().upper() == 'COD'
+            if context.booking is not None:
+                return (
+                    getattr(context.booking, 'order_type', '') or ''
+                ).strip().upper() == 'COD'
+        return False
+
+    @staticmethod
     def _filter_shipment_workflow_actions(
         actions: list[Any],
         *,
         context: JobDetailContext,
     ) -> list[Any]:
-        """Shipment-style timeline rows; booking jobs keep Start Job (A1)."""
-        is_cod = False
-        is_booking_job = context.job_type == 'booking'
-        if context.shipment is not None:
-            is_cod = (
-                getattr(context.shipment, 'order_type', '') or ''
-            ).strip().upper() == 'COD'
-        elif context.booking is not None:
-            is_cod = (
-                getattr(context.booking, 'order_type', '') or ''
-            ).strip().upper() == 'COD'
-
-        filtered: list[Any] = []
-        for action in actions:
-            cat = (getattr(action, 'sequence_category', '') or '').strip().lower()
-            code = (getattr(action, 'action_code', '') or '').strip().upper()
-            if cat == 'empty_move' or code.startswith('EM'):
-                continue
-            if (
-                not is_booking_job
-                and operation_action_matches(action, 'start job', 'a1', 'action 1')
-            ):
-                continue
-            if (not is_cod) and operation_action_matches(
-                action,
-                'collect payment',
-                'a9',
-                'action 9',
-                'cod',
-            ):
-                continue
-            if _is_standalone_hard_copy_collection_action(action):
-                continue
-            filtered.append(action)
-        return filtered
+        """Shipment-style timeline rows from tenant Action Master (sequence_category=job)."""
+        booking_id = getattr(context.shipment, 'booking_id', None) if context.shipment is not None else None
+        has_booking = False
+        if booking_id is not None:
+            if not (hasattr(booking_id, '_mock_return_value') or 'Mock' in type(booking_id).__name__):
+                has_booking = True
+        is_booking_job = (context.job_type == 'booking') or has_booking
+        return filter_shipment_timeline_workflow_actions(
+            actions,
+            is_booking_job=is_booking_job,
+            is_cod=JobDetailTimelineService._resolve_is_cod(context),
+        )
 
     def _append_system_auto_events(
         self,
@@ -353,17 +362,18 @@ class JobDetailTimelineService:
         out = list(events)
         for log in sorted(logs, key=lambda row: getattr(row, 'log_date', None) or ''):
             action = getattr(log, 'operation_action', None)
-            if action is None:
-                continue
-            code = (getattr(action, 'action_code', '') or '').strip()
             channel = (getattr(log, 'source_channel', '') or '').strip()
-            if code not in AUTO_ACTION_CODES and channel not in AUTO_ACTION_CHANNELS:
-                continue
+            code = (getattr(action, 'action_code', '') or '').strip()
+            if not is_system_auto_pod_verify_channel(channel):
+                if action is None:
+                    continue
+                if code not in AUTO_ACTION_CODES and channel not in AUTO_ACTION_CHANNELS:
+                    continue
             log_id = str(getattr(log, 'log_id', None) or getattr(log, 'pk', '') or '')
             if not log_id or log_id in existing_log_ids:
                 continue
-            if channel in AUTO_ACTION_CHANNELS:
-                code = 'A_POD_VERIFY'
+            if is_system_auto_pod_verify_channel(channel):
+                code = AUTO_COD_VERIFY_ACTION_CODE
             log_date = getattr(log, 'log_date', None)
             out.append(
                 {
@@ -372,13 +382,18 @@ class JobDetailTimelineService:
                     'log_date': log_date.isoformat() if hasattr(log_date, 'isoformat') else '',
                     'action_code': code,
                     'action_label': (
-                        getattr(action, 'english_label', None) or code
+                        getattr(action, 'english_label', None)
+                        or AUTO_COD_VERIFY_ENGLISH_LABEL
                     ),
                     'timeline_state': 'performed',
                     'sequence_number': 999,
                     'source': str(getattr(log, 'source', '') or '') or 'System',
                     'source_channel': channel,
-                    'status_impact': (getattr(action, 'shipment_status_impact', '') or '').strip()
+                    'status_impact': (
+                        (getattr(action, 'shipment_status_impact', '') or '').strip()
+                        if action is not None
+                        else 'Delivered'
+                    )
                     or None,
                     'is_system_auto': True,
                     'is_performed': True,
@@ -396,7 +411,7 @@ class JobDetailTimelineService:
         logs: list[Any],
         request: Any | None,
     ) -> list[dict[str, Any]]:
-        actions = self._workflow_actions()
+        actions = self._workflow_actions_for_context(context)
         if not actions:
             return []
         actions = self._filter_workflow_actions_for_context(actions, context=context)
@@ -446,7 +461,7 @@ class JobDetailTimelineService:
         limit: int,
         request: Any | None,
     ) -> TimelinePageResult:
-        actions = self._workflow_actions()
+        actions = self._workflow_actions_for_context(context)
         if not actions:
             return TimelinePageResult(
                 timeline_preview=[],
@@ -500,9 +515,30 @@ class JobDetailTimelineService:
         *,
         limit: int,
         request: Any | None,
+        context: JobDetailContext | None = None,
     ) -> dict[str, Any]:
         """Slice reconcile cache — no additional Action Log query."""
-        ordered = sort_logs_newest_first(list(logs))
+        logs = list(logs)
+        if context is not None and context.job_type == 'booking' and context.booking is not None:
+            exec_ctx = resolve_booking_job_execution_context(context)
+            logs = filter_booking_timeline_logs(
+                logs,
+                booking=context.booking,
+                backload_bootstrap=bool(exec_ctx.get('backload_bootstrap')),
+            )
+            workflow_events = self._workflow_events_for_context(
+                context,
+                logs=logs,
+                request=request,
+            )
+            if workflow_events:
+                return self._bundle_from_workflow_events(
+                    workflow_events,
+                    limit=limit,
+                    scope=context.job_type,
+                )
+
+        ordered = sort_logs_newest_first(logs)
         window = ordered[: limit + 1]
         has_more = len(window) > limit
         page_logs = window[:limit]

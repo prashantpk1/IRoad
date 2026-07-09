@@ -14,6 +14,19 @@ from mobile_api.execution.dto.execution_validation_error import build_validation
 from mobile_api.execution.exceptions import ExecuteActionError
 from mobile_api.execution.settings import mobile_execution_require_sync_metadata
 
+_SCOPE_REDIRECT_META_KEYS = (
+    'backload_booking_redirect',
+    'active_shipment_redirect',
+    'hard_pod_custody_shipment_redirect',
+    'closed_shipment_active_leg_redirect',
+)
+
+
+def execute_scope_was_redirected(context: ExecuteActionContext) -> bool:
+    """True when resolve/finalize pivoted job scope away from the request URL."""
+    meta = context.resolver_meta or {}
+    return any(meta.get(key) for key in _SCOPE_REDIRECT_META_KEYS)
+
 
 class StaleExecutionGuard:
     """
@@ -22,6 +35,9 @@ class StaleExecutionGuard:
     Accepts canonical API fields ``content_hash`` / ``workflow_version`` (and legacy
     ``expected_*`` aliases). Rejects on mismatch (HTTP 409, ``refresh_required``).
     Skipped for idempotent replay retries.
+
+    ``workflow_version`` is the execute concurrency token. When it matches the server,
+    a ``content_hash`` mismatch is ignored (hash is for UI polling / ETag only).
     """
 
     def assert_not_stale(self, context: ExecuteActionContext) -> None:
@@ -32,18 +48,25 @@ class StaleExecutionGuard:
         if context.idempotent_replay:
             return
 
+        payload = dict(context.payload or {})
+        if payload.get('execution_origin') == 'hard_pod_custody_submit':
+            return
+
+        if execute_scope_was_redirected(context):
+            return
+
         expectations = self.extract_client_sync_expectations(context)
         sync = self._server_sync(context)
 
         if mobile_execution_require_sync_metadata():
-            self._assert_required_sync_fields(expectations)
+            self._assert_required_sync_fields(context, expectations, sync)
 
         if not self._client_sent_stale_checks(expectations):
             return
 
         self._assert_content_hash(context, expectations, sync)
-        self._assert_workflow_version(expectations, sync)
-        self._assert_entity_versions(expectations, sync)
+        self._assert_workflow_version(context, expectations, sync)
+        self._assert_entity_versions(context, expectations, sync)
 
     def extract_client_sync_expectations(
         self,
@@ -78,7 +101,12 @@ class StaleExecutionGuard:
         auth = context.authoritative or {}
         return dict(context.sync_metadata or auth.get('sync_metadata') or {})
 
-    def _assert_required_sync_fields(self, expectations: dict[str, Any]) -> None:
+    def _assert_required_sync_fields(
+        self,
+        context: ExecuteActionContext,
+        expectations: dict[str, Any],
+        sync: dict[str, Any],
+    ) -> None:
         """Enterprise mode — client must send sync fingerprints on every fresh execute."""
         missing: list[str] = []
         if not expectations.get('expected_content_hash'):
@@ -87,9 +115,11 @@ class StaleExecutionGuard:
             missing.append('workflow_version')
         if missing:
             self._raise_stale(
+                context,
                 str(_('mobile.jobs.execute.stale_workflow'))
                 + f' (missing: {", ".join(missing)})',
                 error_code='stale_workflow',
+                sync=sync,
             )
 
     @staticmethod
@@ -102,6 +132,14 @@ class StaleExecutionGuard:
             return True
         return False
 
+    @staticmethod
+    def _workflow_versions_match(expectations: dict[str, Any], sync: dict[str, Any]) -> bool:
+        expected_version = str(expectations.get('expected_workflow_version') or '').strip()
+        server_version = str(sync.get('workflow_version') or '').strip()
+        if not expected_version or not server_version:
+            return False
+        return expected_version == server_version
+
     def _assert_content_hash(
         self,
         context: ExecuteActionContext,
@@ -111,15 +149,20 @@ class StaleExecutionGuard:
         expected_hash = expectations['expected_content_hash']
         if not expected_hash:
             return
+        if self._workflow_versions_match(expectations, sync):
+            return
         server_hash = str(sync.get('content_hash') or context.content_hash or '').strip()
         if server_hash and expected_hash != server_hash:
             self._raise_stale(
+                context,
                 str(_('mobile.jobs.execute.stale_content_hash')),
                 error_code='stale_content_hash',
+                sync=sync,
             )
 
     def _assert_workflow_version(
         self,
+        context: ExecuteActionContext,
         expectations: dict[str, Any],
         sync: dict[str, Any],
     ) -> None:
@@ -129,12 +172,15 @@ class StaleExecutionGuard:
         server_version = str(sync.get('workflow_version') or '').strip()
         if server_version and expected_version != server_version:
             self._raise_stale(
+                context,
                 str(_('mobile.jobs.execute.stale_workflow_version')),
                 error_code='stale_workflow_version',
+                sync=sync,
             )
 
     def _assert_entity_versions(
         self,
+        context: ExecuteActionContext,
         expectations: dict[str, Any],
         sync: dict[str, Any],
     ) -> None:
@@ -151,22 +197,39 @@ class StaleExecutionGuard:
                 mismatched.append(str(key))
         if mismatched:
             self._raise_stale(
+                context,
                 str(_('mobile.jobs.execute.stale_entity_version')),
                 error_code='stale_entity_version',
                 details_keys=mismatched,
+                sync=sync,
             )
 
     @staticmethod
     def _raise_stale(
+        context: ExecuteActionContext,
         message: str,
         *,
         error_code: str = 'stale_workflow',
         details_keys: list[str] | None = None,
+        sync: dict[str, Any] | None = None,
     ) -> None:
+        sync_payload = dict(sync or StaleExecutionGuard._server_sync(context))
+        public_sync = {
+            key: sync_payload.get(key)
+            for key in (
+                'content_hash',
+                'workflow_version',
+                'entity_versions',
+                'generated_at',
+                'last_action_log_id',
+            )
+            if sync_payload.get(key) is not None
+        }
         body = build_validation_error(
             error_code=error_code,
             message=message,
             refresh_required=True,
+            sync_metadata=public_sync or None,
         )
         if details_keys:
             body = dict(body)
@@ -179,3 +242,4 @@ class StaleExecutionGuard:
             refresh_required=True,
             validation_error=body,
         )
+

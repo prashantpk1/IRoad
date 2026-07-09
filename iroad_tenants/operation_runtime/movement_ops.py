@@ -15,6 +15,98 @@ from tenant_workspace.models import TenantShipment, TenantTruckMovementLog
 
 VALID_EMPTY_MOVE_REASONS = frozenset({'reposition', 'maintenance', 'noLoad'})
 
+_ARRIVAL_ROUTE_FIELDS = (
+    'to_latitude',
+    'to_longitude',
+    'to_location_address',
+    'to_location_map_link',
+)
+
+
+def empty_move_arrival_matches_departure(movement) -> bool:
+    """True when arrival route fields mirror departure (not a distinct End Job capture)."""
+    if movement is None:
+        return False
+    from_addr = (getattr(movement, 'from_location_address', '') or '').strip().casefold()
+    to_addr = (getattr(movement, 'to_location_address', '') or '').strip().casefold()
+    from_lat = (getattr(movement, 'from_latitude', '') or '').strip()
+    from_lng = (getattr(movement, 'from_longitude', '') or '').strip()
+    to_lat = (getattr(movement, 'to_latitude', '') or '').strip()
+    to_lng = (getattr(movement, 'to_longitude', '') or '').strip()
+    if to_addr and from_addr and to_addr == from_addr:
+        return True
+    return bool(
+        from_lat and from_lng and to_lat and to_lng and from_lat == to_lat and from_lng == to_lng
+    )
+
+
+def clear_stale_empty_move_arrival_fields(movement) -> bool:
+    """
+    Remove mirrored ``to_*`` route data so End Job cannot reuse Start Job GPS.
+
+    Returns True when any arrival field was cleared.
+    """
+    if movement is None or not empty_move_arrival_matches_departure(movement):
+        return False
+    update_fields: list[str] = []
+    for field_name in _ARRIVAL_ROUTE_FIELDS:
+        if (getattr(movement, field_name, '') or '').strip():
+            setattr(movement, field_name, '')
+            update_fields.append(field_name)
+    if not update_fields:
+        return False
+    update_fields.append('updated_at')
+    movement.save(update_fields=update_fields)
+    return True
+
+
+def apply_movement_endpoint_gps(
+    movement,
+    side: str,
+    *,
+    latitude: str = '',
+    longitude: str = '',
+    map_link: str = '',
+    address: str = '',
+    overwrite: bool = False,
+) -> None:
+    """Persist one route endpoint (``from`` departure or ``to`` arrival) when empty."""
+    if movement is None:
+        return
+    if side not in {'from', 'to'}:
+        return
+
+    from iroad_tenants.fleet_gps_tracking import build_google_maps_link
+
+    prefix = f'{side}_'
+    lat = (latitude or '').strip()[:32]
+    lng = (longitude or '').strip()[:32]
+    addr = (address or '').strip()[:500]
+    link = (map_link or '').strip()[:500]
+    if not link and lat and lng:
+        link = (build_google_maps_link(lat, lng) or '')[:500]
+
+    update_fields: list[str] = []
+    field_map = {
+        f'{prefix}latitude': lat,
+        f'{prefix}longitude': lng,
+        f'{prefix}location_map_link': link,
+        f'{prefix}location_address': addr,
+    }
+    for field_name, value in field_map.items():
+        if not value:
+            continue
+        current = (getattr(movement, field_name, '') or '').strip()
+        if current and not overwrite:
+            continue
+        setattr(movement, field_name, value)
+        update_fields.append(field_name)
+    if update_fields:
+        update_fields.append('updated_at')
+        movement.save(update_fields=update_fields)
+        if side == 'from':
+            clear_stale_empty_move_arrival_fields(movement)
+
 
 def apply_movement_route_map_links(
     movement,
@@ -26,56 +118,33 @@ def apply_movement_route_map_links(
     from_address: str = '',
     to_address: str = '',
 ) -> None:
-    """Persist planned route GPS and Google Places snapshots on the TML."""
+    """Persist route GPS snapshots on the TML (legacy manual create payloads)."""
     if movement is None:
         return
-    from iroad_tenants.fleet_gps_tracking import build_google_maps_link
-
-    update_fields: list[str] = []
-    from_lat = (from_latitude or '').strip()[:32]
-    from_lng = (from_longitude or '').strip()[:32]
-    to_lat = (to_latitude or '').strip()[:32]
-    to_lng = (to_longitude or '').strip()[:32]
-    from_addr = (from_address or '').strip()[:500]
-    to_addr = (to_address or '').strip()[:500]
-
-    from_link = build_google_maps_link(from_lat, from_lng)
-    to_link = build_google_maps_link(to_lat, to_lng)
-    if from_link and not (getattr(movement, 'from_location_map_link', '') or '').strip():
-        movement.from_location_map_link = from_link[:500]
-        update_fields.append('from_location_map_link')
-    if to_link and not (getattr(movement, 'to_location_map_link', '') or '').strip():
-        movement.to_location_map_link = to_link[:500]
-        update_fields.append('to_location_map_link')
-    if from_addr and not (getattr(movement, 'from_location_address', '') or '').strip():
-        movement.from_location_address = from_addr
-        update_fields.append('from_location_address')
-    if to_addr and not (getattr(movement, 'to_location_address', '') or '').strip():
-        movement.to_location_address = to_addr
-        update_fields.append('to_location_address')
-    if from_lat and not (getattr(movement, 'from_latitude', '') or '').strip():
-        movement.from_latitude = from_lat
-        update_fields.append('from_latitude')
-    if from_lng and not (getattr(movement, 'from_longitude', '') or '').strip():
-        movement.from_longitude = from_lng
-        update_fields.append('from_longitude')
-    if to_lat and not (getattr(movement, 'to_latitude', '') or '').strip():
-        movement.to_latitude = to_lat
-        update_fields.append('to_latitude')
-    if to_lng and not (getattr(movement, 'to_longitude', '') or '').strip():
-        movement.to_longitude = to_lng
-        update_fields.append('to_longitude')
-    if update_fields:
-        update_fields.append('updated_at')
-        movement.save(update_fields=update_fields)
+    apply_movement_endpoint_gps(
+        movement,
+        'from',
+        latitude=from_latitude,
+        longitude=from_longitude,
+        address=from_address,
+    )
+    apply_movement_endpoint_gps(
+        movement,
+        'to',
+        latitude=to_latitude,
+        longitude=to_longitude,
+        address=to_address,
+    )
+    clear_stale_empty_move_arrival_fields(movement)
 
 
 def sync_movement_route_evidence_from_action_log(action_log) -> None:
     """
     Copy mobile GPS evidence from an action log row onto the linked TML.
 
-    EM1 (Start) stamps ``from_location_map_link``; EM3/EM4 stamp ``to_location_map_link``.
-    Action Log from/to labels still resolve via ``truck_movement`` location masters.
+    Empty-move PCS §5.1:
+      - First sequence action: departure ``from_*`` GPS + map link
+      - Last sequence action: arrival ``to_*`` GPS + map link
     """
     movement = getattr(action_log, 'truck_movement', None)
     action = getattr(action_log, 'operation_action', None)
@@ -83,35 +152,56 @@ def sync_movement_route_evidence_from_action_log(action_log) -> None:
         return
 
     from iroad_tenants.fleet_gps_tracking import build_google_maps_link
-    from iroad_tenants.operation_runtime.movement_state_machine import (
-        is_movement_arrived_action,
-        is_movement_complete_action,
-        is_movement_start_action,
+    from mobile_api.helpers.empty_move_action_resolver import (
+        empty_move_route_endpoint_side,
     )
 
     lat = (getattr(action_log, 'latitude', '') or '').strip()
     lng = (getattr(action_log, 'longitude', '') or '').strip()
     map_link = (getattr(action_log, 'map_link', '') or '').strip()
-    if not map_link:
-        map_link = build_google_maps_link(lat, lng)
-    if not map_link:
+    if not map_link and lat and lng:
+        map_link = build_google_maps_link(lat, lng) or ''
+    if not lat and not lng and not map_link:
         return
 
-    update_fields: list[str] = []
-    if is_movement_start_action(action) and not (
-        getattr(movement, 'from_location_map_link', '') or ''
-    ).strip():
-        movement.from_location_map_link = map_link[:500]
-        update_fields.append('from_location_map_link')
-    elif (
-        is_movement_arrived_action(action) or is_movement_complete_action(action)
-    ) and not (getattr(movement, 'to_location_map_link', '') or '').strip():
-        movement.to_location_map_link = map_link[:500]
-        update_fields.append('to_location_map_link')
+    address = str(getattr(action_log, '_route_location_address', '') or '').strip()
+    side = empty_move_route_endpoint_side(action)
+    if side == 'from':
+        apply_movement_endpoint_gps(
+            movement,
+            'from',
+            latitude=lat,
+            longitude=lng,
+            map_link=map_link,
+            address=address,
+            overwrite=True,
+        )
+    elif side == 'to':
+        existing_addr = (getattr(movement, 'to_location_address', '') or '').strip()
+        apply_movement_endpoint_gps(
+            movement,
+            'to',
+            latitude=lat,
+            longitude=lng,
+            map_link=map_link,
+            address=address or existing_addr,
+            overwrite=True,
+        )
+    elif address:
+        from iroad_tenants.operation_runtime.movement_action_validator import (
+            is_empty_movement,
+        )
+        from iroad_tenants.operation_runtime.movement_state_machine import (
+            is_movement_in_transit_action,
+        )
 
-    if update_fields:
-        update_fields.append('updated_at')
-        movement.save(update_fields=update_fields)
+        if is_empty_movement(movement) and is_movement_in_transit_action(action):
+            apply_movement_endpoint_gps(
+                movement,
+                'to',
+                address=address,
+                overwrite=True,
+            )
 
 
 def auto_complete_loaded_movement_for_shipment(shipment):

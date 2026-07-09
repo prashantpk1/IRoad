@@ -171,6 +171,27 @@ def apply_eal_column_sort(
     return queryset.order_by(field)
 
 
+def build_eal_pagination_page_links(
+    page,
+    page_url_fn: Callable[[int], str],
+    *,
+    on_each_side: int = 1,
+    on_ends: int = 1,
+) -> list[tuple[Any, str | None]]:
+    """Build compact page links with ellipses for EAL list pagination controls."""
+    links: list[tuple[Any, str | None]] = []
+    for item in page.paginator.get_elided_page_range(
+        page.number,
+        on_each_side=on_each_side,
+        on_ends=on_ends,
+    ):
+        if item == Paginator.ELLIPSIS:
+            links.append((Paginator.ELLIPSIS, None))
+        else:
+            links.append((item, page_url_fn(item)))
+    return links
+
+
 def paginate_tenant_list(
     request,
     queryset,
@@ -213,7 +234,7 @@ def paginate_tenant_list(
         return eal_list_query_href(encoded)
 
     return page, {
-        'pagination_page_links': [(n, _page_url(n)) for n in page.paginator.page_range],
+        'pagination_page_links': build_eal_pagination_page_links(page, _page_url),
         'pagination_prev_url': _page_url(page.previous_page_number()) if page.has_previous() else None,
         'pagination_next_url': _page_url(page.next_page_number()) if page.has_next() else None,
         'pagination_start': ps,

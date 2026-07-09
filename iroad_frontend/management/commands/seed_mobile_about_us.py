@@ -22,12 +22,12 @@ def _mobile_about_seed_data():
         'page_title_en': 'About Us',
         'page_title_ar': 'من نحن',
         'meta_description_en': (
-            'About the IRoad Driver App: the field execution layer for our '
+            'About the IRoute Driver App: the field execution layer for our '
             'enterprise TMS and fleet platform - guided workflows, dispatch '
             'coordination, and logistics excellence.'
         ),
         'meta_description_ar': (
-            'تعرّف على تطبيق آيرواد للسائقين: طبقة التنفيذ الميداني لمنصة إدارة '
+            'تعرّف على تطبيق آيروت للسائقين: طبقة التنفيذ الميداني لمنصة إدارة '
             'النقل والأسطول للمؤسسات - سير عمل موجّه، وتنسيق مع غرف العمليات، '
             'وتميّز لوجستي.'
         ),
@@ -43,12 +43,12 @@ def _mobile_about_seed_data():
 
 _MOBILE_ABOUT_HTML_EN = """
 <section class="mobile-about-seed">
-  <h2>IRoad Driver App</h2>
+  <h2>IRoute Driver App</h2>
   <p><strong>Version</strong> 2.4.1</p>
 
   <h3>Driving Logistics Excellence</h3>
   <p>
-    IRoad is a private, enterprise-grade Transport Management System (TMS) and Fleet
+    IRoute is a private, enterprise-grade Transport Management System (TMS) and Fleet
     platform. Designed as a dedicated internal environment for transport companies, it
     enables the centralized management of end-to-end logistics administration and
     operational execution.
@@ -56,7 +56,7 @@ _MOBILE_ABOUT_HTML_EN = """
 
   <h3>The Field Execution Interface</h3>
   <p>
-    The IRoad Driver App serves as the intelligent field execution layer of the platform.
+    The IRoute Driver App serves as the intelligent field execution layer of the platform.
     Our mission is to empower drivers with a focused, &ldquo;One Action at a Time&rdquo;
     workflow that simplifies daily tasks through guided operational logging and seamless
     coordination with dispatchers.
@@ -71,19 +71,19 @@ _MOBILE_ABOUT_HTML_EN = """
 
 _MOBILE_ABOUT_HTML_AR = """
 <section class="mobile-about-seed" dir="rtl">
-  <h2>تطبيق آيرواد للسائقين</h2>
+  <h2>تطبيق آيروت للسائقين</h2>
   <p><strong>الإصدار</strong> 2.4.1</p>
 
   <h3>التميّز في إدارة اللوجستيات</h3>
   <p>
-    آيرواد نظام خاص على مستوى المؤسسات لإدارة النقل (TMS) ومنصة أسطول. صُمّم كبيئة
+    آيروت نظام خاص على مستوى المؤسسات لإدارة النقل (TMS) ومنصة أسطول. صُمّم كبيئة
     داخلية مخصّصة لشركات النقل، ويمكّن من إدارة مركزية لإدارة اللوجستيات والتنفيذ
     التشغيلي من البداية إلى النهاية.
   </p>
 
   <h3>واجهة التنفيذ الميداني</h3>
   <p>
-    يعمل تطبيق آيرواد للسائقين كطبقة التنفيذ الميداني الذكية للمنصة. مهمتنا تمكين
+    يعمل تطبيق آيروت للسائقين كطبقة التنفيذ الميداني الذكية للمنصة. مهمتنا تمكين
     السائقين من سير عمل مركّز &ldquo;إجراء واحد في كل مرة&rdquo; يبسّط المهام اليومية
     عبر تسجيل تشغيلي موجّه وتنسيق سلس مع مراكز التحكم والإرسال.
   </p>

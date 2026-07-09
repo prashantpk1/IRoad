@@ -5,6 +5,7 @@ from django.utils import timezone
 
 DB_STATUS_DRAFT = 'Draft'
 DB_STATUS_CONFIRMED = 'Confirmed'
+DB_STATUS_COMPLETED = 'Completed'
 DB_STATUS_CANCELLED = 'Cancelled'
 
 BOOKING_HEADER_DRAFT = 'Draft'
@@ -16,6 +17,7 @@ BOOKING_HEADER_CANCELLED = 'Cancelled'
 
 SHIPMENT_STATUS_CANCELLED = 'Cancelled'
 SHIPMENT_STATUS_CLOSED = 'Closed'
+SHIPMENT_STATUS_DELIVERED = 'Delivered'
 
 # PCS §9.3.1.1 — Operation Action Master "Booking Status Impact" dropdown.
 OPERATION_ACTION_BOOKING_STATUS_CHOICES = (
@@ -43,9 +45,11 @@ BOOKING_LINE_OPEN_STATUSES = frozenset(
 
 
 def display_stored_booking_status(booking_status: str) -> str:
-    """Map persisted booking_status to UI label (Confirmed stays Confirmed)."""
+    """Map persisted booking_status to UI label."""
     if booking_status == DB_STATUS_CONFIRMED:
         return BOOKING_HEADER_CONFIRMED
+    if booking_status == DB_STATUS_COMPLETED:
+        return BOOKING_HEADER_COMPLETED
     return booking_status or DB_STATUS_DRAFT
 
 
@@ -63,6 +67,8 @@ def booking_has_non_cancelled_shipment(booking) -> bool:
 
 def booking_can_cancel(booking) -> bool:
     if booking is None or booking.booking_status == DB_STATUS_CANCELLED:
+        return False
+    if booking.booking_status == DB_STATUS_COMPLETED:
         return False
     return not booking_has_non_cancelled_shipment(booking)
 
@@ -106,10 +112,13 @@ def derive_booking_line_status(booking, booking_item_type: str) -> str:
             else BOOKING_ITEM_DRAFT
         )
 
-    terminal = (SHIPMENT_STATUS_CANCELLED, SHIPMENT_STATUS_CLOSED)
+    terminal = (SHIPMENT_STATUS_CANCELLED, SHIPMENT_STATUS_CLOSED, SHIPMENT_STATUS_DELIVERED)
     if shipments.exclude(shipment_status__in=terminal).exists():
         return BOOKING_ITEM_IN_PROGRESS
-    if shipments.filter(shipment_status=SHIPMENT_STATUS_CLOSED).exists():
+    if (
+        shipments.filter(shipment_status=SHIPMENT_STATUS_CLOSED).exists()
+        or shipments.filter(shipment_status=SHIPMENT_STATUS_DELIVERED).exists()
+    ):
         return BOOKING_ITEM_COMPLETED
     if shipments.filter(shipment_status=SHIPMENT_STATUS_CANCELLED).exists():
         return BOOKING_ITEM_CANCELLED
@@ -130,15 +139,30 @@ def _booking_line_types(booking) -> list[str]:
     return ['Outbound']
 
 
-def sync_booking_status_after_item_change(booking) -> None:
-    """PCS §3.7.4 — align stored booking_status when item delete/cancel closes the booking."""
+def sync_booking_status_after_item_change(booking, *, save: bool = True) -> bool:
+    """
+    PCS §3.7.4 — align stored booking_status with derived header status.
+
+    Persists Cancelled when all legs are cancelled, and Completed when every
+    non-cancelled leg is business-complete (matches portal UI).
+    """
     if booking is None:
-        return
+        return False
     stored = (booking.booking_status or '').strip()
     if stored in {DB_STATUS_DRAFT, DB_STATUS_CANCELLED}:
-        return
-    if derive_booking_header_status(booking) == BOOKING_HEADER_CANCELLED:
-        booking.booking_status = DB_STATUS_CANCELLED
+        return False
+    derived = derive_booking_header_status(booking)
+    new_status = None
+    if derived == BOOKING_HEADER_CANCELLED:
+        new_status = DB_STATUS_CANCELLED
+    elif derived == BOOKING_HEADER_COMPLETED:
+        new_status = DB_STATUS_COMPLETED
+    if new_status is None or stored == new_status:
+        return False
+    booking.booking_status = new_status
+    if save:
+        booking.save(update_fields=['booking_status', 'updated_at'])
+    return True
 
 
 def derive_booking_header_status(booking) -> str:
@@ -152,6 +176,8 @@ def derive_booking_header_status(booking) -> str:
         return BOOKING_HEADER_DRAFT
     if booking.booking_status == DB_STATUS_CANCELLED:
         return BOOKING_HEADER_CANCELLED
+    if booking.booking_status == DB_STATUS_COMPLETED:
+        return BOOKING_HEADER_COMPLETED
 
     line_types = _booking_line_types(booking)
     if not line_types:
@@ -175,20 +201,11 @@ def derive_booking_header_status(booking) -> str:
 
 
 def resolve_r3_cancel_action():
-    from iroad_tenants.operation_runtime.action_master_catalog import PRODUCTION_ACTION_MASTER
-    from tenant_workspace.models import TenantOperationAction
-
-    row = TenantOperationAction.objects.filter(action_code__iexact='R3').first()
-    if row is not None:
-        return row
-    spec = next((s for s in PRODUCTION_ACTION_MASTER if s.action_code.upper() == 'R3'), None)
-    if spec is None:
-        return None
-    model_fields = {field.name for field in TenantOperationAction._meta.fields}
-    return TenantOperationAction.objects.create(
-        action_code=spec.action_code,
-        **spec.defaults(model_fields),
+    from iroad_tenants.operation_runtime.action_master_catalog import (
+        resolve_cancel_booking_action,
     )
+
+    return resolve_cancel_booking_action()
 
 
 def append_booking_r3_cancel_action_log(

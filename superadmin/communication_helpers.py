@@ -53,11 +53,11 @@ def _get_base_url():
 def _build_branding_context():
     """
     Resolve branding values from Legal Identity for email wrappers.
-    Falls back to default IR/iRoad when no logo/name configured.
+    Falls back to default IR/IRoute when no logo/name configured.
     Ensures brand_logo_url is absolute for external email clients.
     """
-    brand_name = 'iRoad'
-    brand_name_ar = 'iRoad'
+    brand_name = 'IRoute'
+    brand_name_ar = 'IRoute'
     # Default fallback image
     brand_logo_url = '/media/legal/Link.png'
     brand_initials = 'IR'
@@ -136,8 +136,8 @@ def _normalize_from_email_header(raw_from='', fallback_email=''):
     """
     fallback = (fallback_email or '').strip()
     display_name = (
-        getattr(settings, 'EMAIL_FROM_DISPLAY_NAME', 'Iroad Platform')
-        or 'Iroad Platform'
+        getattr(settings, 'EMAIL_FROM_DISPLAY_NAME', 'Iroute Platform')
+        or 'Iroute Platform'
     ).strip()
 
     name, addr = parseaddr((raw_from or '').strip())
@@ -207,7 +207,7 @@ _EMAIL_HEADER = (
     'padding:36px 40px 32px;text-align:center;border-radius:16px 16px 0 0;">'
     '<h1 style="color:#fff;margin:0;font-size:26px;font-weight:800;'
     'letter-spacing:-0.03em;font-family:Inter,-apple-system,BlinkMacSystemFont,sans-serif;">'
-    'iRoad</h1>'
+    'IRoute</h1>'
     '<p style="color:rgba(255,255,255,.75);font-size:13px;font-weight:500;'
     'margin:6px 0 0;letter-spacing:0.02em;font-family:Inter,sans-serif;">'
     'Logistics Management Platform</p>'
@@ -220,10 +220,10 @@ _EMAIL_FOOTER = (
     '<div style="background:#f8fafc;border-top:1px solid #e2e8f0;'
     'padding:28px 44px 32px;text-align:center;border-radius:0 0 16px 16px;">'
     '<p style="font-size:16px;font-weight:800;color:#4f46e5;'
-    'letter-spacing:-0.02em;margin:0 0 8px;font-family:Inter,sans-serif;">iRoad</p>'
+    'letter-spacing:-0.02em;margin:0 0 8px;font-family:Inter,sans-serif;">IRoute</p>'
     '<p style="font-size:12px;color:#94a3b8;line-height:1.8;margin:0;'
     'font-family:Inter,sans-serif;">'
-    '&copy; 2026 iRoad Logistics. All rights reserved.<br>'
+    '&copy; 2026 IRoute Logistics. All rights reserved.<br>'
     'This is an automated system notification. Please do not reply.</p>'
     '<div style="margin:14px 0 0;">'
     '<span style="display:inline-block;background:linear-gradient(135deg,#4f46e5,#6366f1);'
@@ -233,7 +233,7 @@ _EMAIL_FOOTER = (
     '</div>'
 )
 
-def _wrap_email_body(inner_html, email_title="Notification", preheader="Secure notification from iRoad", use_rtl=False):
+def _wrap_email_body(inner_html, email_title="Notification", preheader="Secure notification from IRoute", use_rtl=False):
     base_html = r"""
 <!DOCTYPE html>
 <html lang="en">
@@ -241,7 +241,7 @@ def _wrap_email_body(inner_html, email_title="Notification", preheader="Secure n
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta http-equiv="X-UA-Compatible" content="IE=edge">
-    <title>{{ brand_company_name|default:"iRoad Logistics" }}</title>
+    <title>{{ brand_company_name|default:"IRoute Logistics" }}</title>
     <!--[if mso]>
     <noscript>
         <xml>
@@ -385,7 +385,7 @@ def _wrap_email_body(inner_html, email_title="Notification", preheader="Secure n
                                 {{ brand_initials|default:"IR" }}
                             {% endif %}
                         </div>
-                        <h1 class="email-brand">{{ brand_company_name|default:"iRoad" }}</h1>
+                        <h1 class="email-brand">{{ brand_company_name|default:"IRoute" }}</h1>
                         <p class="email-brand-sub">Logistics Management Platform</p>
                     </div>
                     <div class="header-divider"></div>
@@ -395,9 +395,9 @@ def _wrap_email_body(inner_html, email_title="Notification", preheader="Secure n
                     </div>
 
                     <div class="email-footer">
-                        <div class="footer-logo-text">{{ brand_company_name|default:"iRoad" }}</div>
+                        <div class="footer-logo-text">{{ brand_company_name|default:"IRoute" }}</div>
                         <p class="footer-text">
-                            &copy; 2026 {{ brand_company_name|default:"iRoad Logistics" }}. All rights reserved.<br>
+                            &copy; 2026 {{ brand_company_name|default:"IRoute Logistics" }}. All rights reserved.<br>
                             This is an automated system notification. Please do not reply.
                         </p>
                         <div class="footer-badge">Secured &amp; Encrypted</div>
@@ -415,8 +415,8 @@ DEFAULT_NOTIFICATION_EMAIL_TEMPLATES = [
     {
         'template_name': 'AUTH_LOGIN_OTP',
         'category': 'Transactional',
-        'subject_en': 'Your iRoad Login Verification Code',
-        'subject_ar': 'رمز التحقق لتسجيل الدخول إلى iRoad',
+        'subject_en': 'Your IRoute Login Verification Code',
+        'subject_ar': 'رمز التحقق لتسجيل الدخول إلى IRoute',
         'body_en': (
             '<!DOCTYPE html><html><body style="margin:0;padding:0;background:#f1f5f9;">'
             '<table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" '
@@ -434,7 +434,7 @@ DEFAULT_NOTIFICATION_EMAIL_TEMPLATES = [
             '{% endif %}'
             '</div>'
             '<div style="color:#ffffff;font-size:26px;line-height:1.2;font-weight:800;letter-spacing:-0.02em;font-family:Arial,sans-serif;">'
-            '{{ brand_company_name|default:"iRoad" }}</div>'
+            '{{ brand_company_name|default:"IRoute" }}</div>'
             '<div style="color:rgba(255,255,255,0.7);font-size:13px;line-height:1.5;font-weight:500;'
             'font-family:Arial,sans-serif;margin-top:4px;">Logistics Management Platform</div>'
             '</td></tr>'
@@ -444,7 +444,7 @@ DEFAULT_NOTIFICATION_EMAIL_TEMPLATES = [
             '<p style="margin:0 0 16px;font-size:24px;line-height:1.6;color:#334e68;">'
             'Hello {{ user_name|default:"Admin" }},</p>'
             '<p style="margin:0 0 20px;font-size:24px;line-height:1.6;color:#334e68;">'
-            'Use the following one-time verification code to complete your iRoad login:</p>'
+            'Use the following one-time verification code to complete your IRoute login:</p>'
             '<table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" '
             'style="background:#dfe4f6;border:1px solid #b4c2f0;border-radius:14px;padding:16px 14px;">'
             '<tr><td style="font-size:12px;font-weight:700;letter-spacing:1px;color:#4b4cd6;'
@@ -457,16 +457,16 @@ DEFAULT_NOTIFICATION_EMAIL_TEMPLATES = [
             '<tr><td align="center" style="font-size:14px;color:#334e68;font-family:Arial,sans-serif;">'
             'Valid for <strong>5 minutes</strong> only.</td></tr></table>'
             '<p style="margin:18px 0 0;font-size:18px;line-height:1.7;color:#334e68;">'
-            'Do not share this code with anyone, including iRoad support staff.</p>'
+            'Do not share this code with anyone, including IRoute support staff.</p>'
             '<hr style="border:none;border-top:1px solid #d9e2ec;margin:20px 0;">'
             '<p style="margin:0;font-size:16px;line-height:1.7;color:#829ab1;">'
             'If you did not attempt to sign in, please contact your administrator immediately.</p>'
             '</td></tr>'
             '<tr><td style="background:#f8fafc;border-top:1px solid #e2e8f0;padding:24px;text-align:center;'
             'font-family:Arial,sans-serif;">'
-            '<div style="font-size:24px;font-weight:700;color:#4b4cd6;margin-bottom:8px;">iRoad</div>'
+            '<div style="font-size:24px;font-weight:700;color:#4b4cd6;margin-bottom:8px;">IRoute</div>'
             '<div style="font-size:13px;line-height:1.7;color:#829ab1;">'
-            '&copy; 2026 iRoad Logistics. All rights reserved.<br>'
+            '&copy; 2026 IRoute Logistics. All rights reserved.<br>'
             'This is an automated system notification. Please do not reply to this email.</div>'
             '<div style="font-size:13px;color:#4b4cd6;margin-top:12px;">Privacy Policy &nbsp; · &nbsp; Terms of Service &nbsp; · &nbsp; Support</div>'
             '<div style="display:inline-block;margin-top:12px;background:#5b5ce2;color:#ffffff;'
@@ -491,7 +491,7 @@ DEFAULT_NOTIFICATION_EMAIL_TEMPLATES = [
             '{% endif %}'
             '</div>'
             '<div style="color:#ffffff;font-size:26px;line-height:1.2;font-weight:800;letter-spacing:-0.02em;font-family:Arial,sans-serif;">'
-            '{{ brand_company_name|default:"iRoad" }}</div>'
+            '{{ brand_company_name|default:"IRoute" }}</div>'
             '<div style="color:rgba(255,255,255,0.7);font-size:13px;line-height:1.5;font-weight:500;'
             'font-family:Arial,sans-serif;margin-top:4px;">منصة إدارة الخدمات اللوجستية</div>'
             '</td></tr>'
@@ -501,7 +501,7 @@ DEFAULT_NOTIFICATION_EMAIL_TEMPLATES = [
             '<p style="margin:0 0 16px;font-size:24px;line-height:1.6;color:#334e68;">'
             'مرحباً {{ user_name|default:"Admin" }}،</p>'
             '<p style="margin:0 0 20px;font-size:24px;line-height:1.6;color:#334e68;">'
-            'استخدم رمز التحقق التالي لإكمال تسجيل الدخول إلى iRoad:</p>'
+            'استخدم رمز التحقق التالي لإكمال تسجيل الدخول إلى IRoute:</p>'
             '<table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" '
             'style="background:#dfe4f6;border:1px solid #b4c2f0;border-radius:14px;padding:16px 14px;">'
             '<tr><td style="font-size:12px;font-weight:700;letter-spacing:1px;color:#4b4cd6;'
@@ -514,16 +514,16 @@ DEFAULT_NOTIFICATION_EMAIL_TEMPLATES = [
             '<tr><td align="center" style="font-size:14px;color:#334e68;font-family:Arial,sans-serif;">'
             'صالح لمدة <strong>5 دقائق</strong> فقط.</td></tr></table>'
             '<p style="margin:18px 0 0;font-size:18px;line-height:1.7;color:#334e68;">'
-            'لا تشارك هذا الرمز مع أي شخص، بما في ذلك فريق دعم iRoad.</p>'
+            'لا تشارك هذا الرمز مع أي شخص، بما في ذلك فريق دعم IRoute.</p>'
             '<hr style="border:none;border-top:1px solid #d9e2ec;margin:20px 0;">'
             '<p style="margin:0;font-size:16px;line-height:1.7;color:#829ab1;">'
             'إذا لم تحاول تسجيل الدخول، يرجى التواصل مع المسؤول فوراً.</p>'
             '</td></tr>'
             '<tr><td style="background:#f8fafc;border-top:1px solid #e2e8f0;padding:24px;text-align:center;'
             'font-family:Arial,sans-serif;">'
-            '<div style="font-size:24px;font-weight:700;color:#4b4cd6;margin-bottom:8px;">iRoad</div>'
+            '<div style="font-size:24px;font-weight:700;color:#4b4cd6;margin-bottom:8px;">IRoute</div>'
             '<div style="font-size:13px;line-height:1.7;color:#829ab1;">'
-            '&copy; 2026 iRoad Logistics. All rights reserved.<br>'
+            '&copy; 2026 IRoute Logistics. All rights reserved.<br>'
             'هذه رسالة نظام آلية، يرجى عدم الرد على هذا البريد.</div>'
             '<div style="font-size:13px;color:#4b4cd6;margin-top:12px;">الخصوصية &nbsp; · &nbsp; الشروط &nbsp; · &nbsp; الدعم</div>'
             '<div style="display:inline-block;margin-top:12px;background:#5b5ce2;color:#ffffff;'
@@ -535,12 +535,12 @@ DEFAULT_NOTIFICATION_EMAIL_TEMPLATES = [
     {
         'template_name': 'AUTH_PASSWORD_RESET',
         'category': 'Transactional',
-        'subject_en': 'Reset Your iRoad Password',
-        'subject_ar': 'إعادة تعيين كلمة مرور iRoad',
+        'subject_en': 'Reset Your IRoute Password',
+        'subject_ar': 'إعادة تعيين كلمة مرور IRoute',
         'body_en': _wrap_email_body(
             '<h2>Reset Your Password 🔐</h2>'
             '<p>Hello {{ admin_user.first_name|default:"Admin" }},</p>'
-            '<p>We received a request to reset the password for your iRoad admin account. '
+            '<p>We received a request to reset the password for your IRoute admin account. '
             'Click the button below to set a new password:</p>'
             '<div style="text-align:center;margin:28px 0;">'
             '<a href="{{ reset_url }}" style="background:linear-gradient(135deg,#4f46e5,#6366f1);'
@@ -557,7 +557,7 @@ DEFAULT_NOTIFICATION_EMAIL_TEMPLATES = [
             '<div dir="rtl" style="text-align:right;">'
             '<h2>إعادة تعيين كلمة المرور 🔐</h2>'
             '<p>مرحباً {{ admin_user.first_name|default:"Admin" }}،</p>'
-            '<p>تلقينا طلباً لإعادة تعيين كلمة المرور لحسابك في iRoad. '
+            '<p>تلقينا طلباً لإعادة تعيين كلمة المرور لحسابك في IRoute. '
             'اضغط الزر أدناه لتعيين كلمة مرور جديدة:</p>'
             '<div style="text-align:center;margin:28px 0;">'
             '<a href="{{ reset_url }}" style="background:linear-gradient(135deg,#4f46e5,#6366f1);'
@@ -574,12 +574,12 @@ DEFAULT_NOTIFICATION_EMAIL_TEMPLATES = [
     {
         'template_name': 'MOBILE_FORGOT_PASSWORD_OTP',
         'category': 'Transactional',
-        'subject_en': 'Your iRoad Password Reset OTP',
-        'subject_ar': 'رمز OTP لإعادة تعيين كلمة مرور iRoad',
+        'subject_en': 'Your IRoute Password Reset OTP',
+        'subject_ar': 'رمز OTP لإعادة تعيين كلمة مرور IRoute',
         'body_en': _wrap_email_body(
             '<h2>Password Reset OTP 🔐</h2>'
             '<p>Hello {{ user_name|default:"Driver" }},</p>'
-            '<p>We received a password reset request for your iRoad mobile account. '
+            '<p>We received a password reset request for your IRoute mobile account. '
             'Use the OTP below to continue:</p>'
             '<div style="text-align:center;margin:28px 0;">'
             '<div style="display:inline-block;background:#1f2d49;color:#ffffff;border-radius:12px;'
@@ -595,7 +595,7 @@ DEFAULT_NOTIFICATION_EMAIL_TEMPLATES = [
             '<div dir="rtl" style="text-align:right;">'
             '<h2>رمز OTP لإعادة تعيين كلمة المرور 🔐</h2>'
             '<p>مرحباً {{ user_name|default:"Driver" }}،</p>'
-            '<p>تلقينا طلباً لإعادة تعيين كلمة مرور حساب iRoad على الجوال. '
+            '<p>تلقينا طلباً لإعادة تعيين كلمة مرور حساب IRoute على الجوال. '
             'استخدم رمز OTP التالي للمتابعة:</p>'
             '<div style="text-align:center;margin:28px 0;">'
             '<div style="display:inline-block;background:#1f2d49;color:#ffffff;border-radius:12px;'
@@ -612,12 +612,12 @@ DEFAULT_NOTIFICATION_EMAIL_TEMPLATES = [
     {
         'template_name': 'TENANT_PASSWORD_RESET',
         'category': 'Transactional',
-        'subject_en': 'Reset Your iRoad Tenant Password',
-        'subject_ar': 'إعادة تعيين كلمة مرور حساب المؤسسة في iRoad',
+        'subject_en': 'Reset Your IRoute Tenant Password',
+        'subject_ar': 'إعادة تعيين كلمة مرور حساب المؤسسة في IRoute',
         'body_en': _wrap_email_body(
             '<h2>Reset Your Password 🔐</h2>'
             '<p>Hello {{ tenant.company_name|default:admin_user.first_name|default:"Tenant" }},</p>'
-            '<p>We received a request to reset the password for your iRoad tenant account. '
+            '<p>We received a request to reset the password for your IRoute tenant account. '
             'Click the button below to set a new password:</p>'
             '<div style="text-align:center;margin:28px 0;">'
             '<a href="{{ reset_url }}" style="background:linear-gradient(135deg,#4f46e5,#6366f1);'
@@ -634,7 +634,7 @@ DEFAULT_NOTIFICATION_EMAIL_TEMPLATES = [
             '<div dir="rtl" style="text-align:right;">'
             '<h2>إعادة تعيين كلمة المرور 🔐</h2>'
             '<p>مرحباً {{ tenant.company_name|default:admin_user.first_name|default:"Tenant" }}،</p>'
-            '<p>تلقينا طلباً لإعادة تعيين كلمة المرور لحساب المؤسسة الخاص بك في iRoad. '
+            '<p>تلقينا طلباً لإعادة تعيين كلمة المرور لحساب المؤسسة الخاص بك في IRoute. '
             'اضغط الزر أدناه لتعيين كلمة مرور جديدة:</p>'
             '<div style="text-align:center;margin:28px 0;">'
             '<a href="{{ reset_url }}" style="background:linear-gradient(135deg,#4f46e5,#6366f1);'
@@ -651,12 +651,12 @@ DEFAULT_NOTIFICATION_EMAIL_TEMPLATES = [
     {
         'template_name': 'AUTH_ADMIN_INVITE',
         'category': 'Transactional',
-        'subject_en': 'Activate Your iRoad Admin Account',
-        'subject_ar': 'تفعيل حساب مدير iRoad',
+        'subject_en': 'Activate Your IRoute Admin Account',
+        'subject_ar': 'تفعيل حساب مدير IRoute',
         'body_en': _wrap_email_body(
             '<h2>You\'re Invited! 🎉</h2>'
             '<p>Hello {{ admin_user.first_name|default:"Admin" }},</p>'
-            '<p>You have been invited to join the <strong>iRoad</strong> admin panel. '
+            '<p>You have been invited to join the <strong>IRoute</strong> admin panel. '
             'Click the button below to activate your account and set up your credentials:</p>'
             '<div style="text-align:center;margin:28px 0;">'
             '<a href="{{ invite_url }}" style="background:linear-gradient(135deg,#4f46e5,#6366f1);'
@@ -672,7 +672,7 @@ DEFAULT_NOTIFICATION_EMAIL_TEMPLATES = [
             '<div dir="rtl" style="text-align:right;">'
             '<h2>لقد تمت دعوتك! 🎉</h2>'
             '<p>مرحباً {{ admin_user.first_name|default:"Admin" }}،</p>'
-            '<p>تمت دعوتك للانضمام إلى لوحة تحكم <strong>iRoad</strong>. '
+            '<p>تمت دعوتك للانضمام إلى لوحة تحكم <strong>IRoute</strong>. '
             'اضغط الزر أدناه لتفعيل حسابك وإعداد بيانات الدخول:</p>'
             '<div style="text-align:center;margin:28px 0;">'
             '<a href="{{ invite_url }}" style="background:linear-gradient(135deg,#4f46e5,#6366f1);'
@@ -689,8 +689,8 @@ DEFAULT_NOTIFICATION_EMAIL_TEMPLATES = [
     {
         'template_name': 'TENANT_WELCOME_EMAIL',
         'category': 'Transactional',
-        'subject_en': 'Welcome to iRoad — {{ company_name }}',
-        'subject_ar': 'مرحباً بك في iRoad — {{ company_name }}',
+        'subject_en': 'Welcome to IRoute — {{ company_name }}',
+        'subject_ar': 'مرحباً بك في IRoute — {{ company_name }}',
         'body_en': _wrap_email_body(
             '<h2>Welcome, {{ company_name }}! 🚀</h2>'
             '<p>Your subscriber workspace has been provisioned and is ready to use. '
@@ -713,7 +713,7 @@ DEFAULT_NOTIFICATION_EMAIL_TEMPLATES = [
         ),
         'body_ar': _wrap_email_body(
             '<div dir="rtl" style="text-align:right;">'
-            '<h2>مرحباً بك في iRoad، {{ company_name }}! 🚀</h2>'
+            '<h2>مرحباً بك في IRoute، {{ company_name }}! 🚀</h2>'
             '<p>تم تجهيز مساحة العمل الخاصة بك وهي جاهزة للاستخدام. يظهر بريدك الإلكتروني للدخول أدناه — '
             'استخدم الزر لفتح مساحة العمل وإكمال الإعداد.</p>'
             
@@ -738,13 +738,13 @@ DEFAULT_NOTIFICATION_EMAIL_TEMPLATES = [
     {
         'template_name': 'SUBADMIN_WELCOME',
         'category': 'Transactional',
-        'subject_en': 'Welcome to iRoad - Your Admin Credentials',
-        'subject_ar': 'مرحباً بك في iRoad - بيانات الدخول الخاصة بك',
+        'subject_en': 'Welcome to IRoute - Your Admin Credentials',
+        'subject_ar': 'مرحباً بك في IRoute - بيانات الدخول الخاصة بك',
         'body_en': _wrap_email_body(
             '<h2 style="color:#1e293b;margin:0 0 16px;font-size:22px;font-weight:700;">'
             'Welcome, {{ name }}! 🎉</h2>'
             '<p style="font-size:15px;color:#475569;line-height:1.7;margin:0 0 16px;">'
-            'Your iRoad admin account has been created successfully. Below are your login credentials '
+            'Your IRoute admin account has been created successfully. Below are your login credentials '
             'to access the Control Panel.</p>'
             '<div style="background:linear-gradient(135deg,#f8fafc,#f1f5f9);'
             'padding:20px 22px;border-radius:12px;border:1px solid #e2e8f0;margin-bottom:20px;">'
@@ -770,7 +770,7 @@ DEFAULT_NOTIFICATION_EMAIL_TEMPLATES = [
             '<h2 style="color:#1e293b;margin:0 0 16px;font-size:22px;font-weight:700;">'
             'مرحباً بك، {{ name }}! 🎉</h2>'
             '<p style="font-size:15px;color:#475569;line-height:1.7;margin:0 0 16px;">'
-            'تم إنشاء حساب المسؤول الخاص بك بنجاح في iRoad. فيما يلي بيانات الدخول الخاصة بك للوصول إلى لوحة التحكم.</p>'
+            'تم إنشاء حساب المسؤول الخاص بك بنجاح في IRoute. فيما يلي بيانات الدخول الخاصة بك للوصول إلى لوحة التحكم.</p>'
             '<div style="background:linear-gradient(135deg,#f8fafc,#f1f5f9);'
             'padding:20px 22px;border-radius:12px;border:1px solid #e2e8f0;margin-bottom:20px;">'
             '<p style="margin:0 0 8px;font-size:14px;color:#334155;">'
@@ -796,11 +796,11 @@ DEFAULT_NOTIFICATION_EMAIL_TEMPLATES = [
     {
         'template_name': 'TENANT_USER_WELCOME',
         'category': 'Transactional',
-        'subject_en': 'Welcome to iRoad - Your Tenant User Access',
-        'subject_ar': 'مرحباً بك في iRoad - بيانات دخول مستخدم المؤسسة',
+        'subject_en': 'Welcome to IRoute - Your Tenant User Access',
+        'subject_ar': 'مرحباً بك في IRoute - بيانات دخول مستخدم المؤسسة',
         'body_en': _wrap_email_body(
             '<h2>Welcome, {{ name }}! 👋</h2>'
-            '<p>Your tenant user account has been created successfully in iRoad.</p>'
+            '<p>Your tenant user account has been created successfully in IRoute.</p>'
             '<div style="background:linear-gradient(135deg,#f8fafc,#f1f5f9);'
             'padding:20px 22px;border-radius:12px;border:1px solid #e2e8f0;margin-bottom:20px;">'
             '<p style="margin:0 0 8px;font-size:14px;color:#334155;"><strong>Login Email:</strong> {{ email }}</p>'
@@ -821,7 +821,7 @@ DEFAULT_NOTIFICATION_EMAIL_TEMPLATES = [
         'body_ar': _wrap_email_body(
             '<div dir="rtl" style="text-align:right;">'
             '<h2>مرحباً بك، {{ name }}! 👋</h2>'
-            '<p>تم إنشاء حساب مستخدم المؤسسة الخاص بك بنجاح في iRoad.</p>'
+            '<p>تم إنشاء حساب مستخدم المؤسسة الخاص بك بنجاح في IRoute.</p>'
             '<div style="background:linear-gradient(135deg,#f8fafc,#f1f5f9);'
             'padding:20px 22px;border-radius:12px;border:1px solid #e2e8f0;margin-bottom:20px;">'
             '<p style="margin:0 0 8px;font-size:14px;color:#334155;"><strong>البريد الإلكتروني:</strong> {{ email }}</p>'
@@ -845,12 +845,12 @@ DEFAULT_NOTIFICATION_EMAIL_TEMPLATES = [
     {
         'template_name': 'TENANT_USER_PASSWORD_RESET',
         'category': 'Transactional',
-        'subject_en': 'iRoad Temporary Password Reset',
-        'subject_ar': 'إعادة تعيين كلمة المرور المؤقتة في iRoad',
+        'subject_en': 'IRoute Temporary Password Reset',
+        'subject_ar': 'إعادة تعيين كلمة المرور المؤقتة في IRoute',
         'body_en': _wrap_email_body(
             '<h2>Reset Your Password 🔐</h2>'
             '<p>Hello {{ name|default:"User" }},</p>'
-            '<p>We received a request to reset your iRoad tenant user password. '
+            '<p>We received a request to reset your IRoute tenant user password. '
             'Click the button below to continue and set a new password.</p>'
             '<div style="text-align:center;margin:28px 0;">'
             '<a href="{{ reset_url|default:login_url }}" style="background:linear-gradient(135deg,#4f46e5,#6366f1);'
@@ -866,7 +866,7 @@ DEFAULT_NOTIFICATION_EMAIL_TEMPLATES = [
             '<div dir="rtl" style="text-align:right;">'
             '<h2>إعادة تعيين كلمة المرور 🔐</h2>'
             '<p>مرحباً {{ name|default:"User" }}،</p>'
-            '<p>تلقينا طلباً لإعادة تعيين كلمة مرور مستخدم المؤسسة الخاص بك في iRoad. '
+            '<p>تلقينا طلباً لإعادة تعيين كلمة مرور مستخدم المؤسسة الخاص بك في IRoute. '
             'اضغط الزر أدناه للمتابعة وتعيين كلمة مرور جديدة.</p>'
             '<div style="text-align:center;margin:28px 0;">'
             '<a href="{{ reset_url|default:login_url }}" style="background:linear-gradient(135deg,#4f46e5,#6366f1);'
@@ -884,8 +884,8 @@ DEFAULT_NOTIFICATION_EMAIL_TEMPLATES = [
     {
         'template_name': 'TENANT_BRIDGE_ROTATED',
         'category': 'Transactional',
-        'subject_en': 'iRoad — API bridge key rotated — {{ company_name }}',
-        'subject_ar': 'iRoad — تم تغيير مفتاح الربط — {{ company_name }}',
+        'subject_en': 'IRoute — API bridge key rotated — {{ company_name }}',
+        'subject_ar': 'IRoute — تم تغيير مفتاح الربط — {{ company_name }}',
         'body_en': _wrap_email_body(
             '<h2 style="color:#1e293b;margin:0 0 16px;font-size:22px;font-weight:700;">'
             'API Bridge Key Rotated 🔑</h2>'
@@ -956,7 +956,7 @@ DEFAULT_NOTIFICATION_EMAIL_TEMPLATES = [
             '</p>'
             '</div>'
             '<p style="font-size:13px;color:#64748b;">'
-            'For detailed line items, open the invoice in your iRoad portal.'
+            'For detailed line items, open the invoice in your IRoute portal.'
             '</p>'
         ),
         'body_ar': _wrap_email_body(
@@ -985,7 +985,7 @@ DEFAULT_NOTIFICATION_EMAIL_TEMPLATES = [
             '</p>'
             '</div>'
             '<p style="font-size:13px;color:#64748b;">'
-            'للاطلاع على تفاصيل البنود، افتح الفاتورة من بوابة iRoad.'
+            'للاطلاع على تفاصيل البنود، افتح الفاتورة من بوابة IRoute.'
             '</p>'
             '</div>',
             use_rtl=True
@@ -994,13 +994,13 @@ DEFAULT_NOTIFICATION_EMAIL_TEMPLATES = [
     {
         'template_name': 'TESTING_EMAIL',
         'category': 'Transactional',
-        'subject_en': 'iRoad — Test Email Notification',
-        'subject_ar': 'iRoad — بريد إلكتروني تجريبي',
+        'subject_en': 'IRoute — Test Email Notification',
+        'subject_ar': 'IRoute — بريد إلكتروني تجريبي',
         'body_en': _wrap_email_body(
             '<h2 style="color:#1e293b;margin:0 0 16px;font-size:22px;font-weight:700;">'
             'Test Email Successful ✅</h2>'
             '<p style="font-size:15px;color:#475569;line-height:1.7;margin:0 0 20px;">'
-            'This is a <strong>test email</strong> sent from the iRoad Communication module '
+            'This is a <strong>test email</strong> sent from the IRoute Communication module '
             'to verify that the email delivery pipeline is working correctly.</p>'
             '<div style="background:linear-gradient(135deg,#f8fafc,#f1f5f9);'
             'padding:20px 22px;border-radius:12px;border:1px solid #e2e8f0;margin-bottom:20px;">'
@@ -1030,7 +1030,7 @@ DEFAULT_NOTIFICATION_EMAIL_TEMPLATES = [
             '<h2 style="color:#1e293b;margin:0 0 16px;font-size:22px;font-weight:700;">'
             'البريد التجريبي ناجح ✅</h2>'
             '<p style="font-size:15px;color:#475569;line-height:1.7;margin:0 0 20px;">'
-            'هذا <strong>بريد إلكتروني تجريبي</strong> تم إرساله من وحدة الاتصالات في iRoad '
+            'هذا <strong>بريد إلكتروني تجريبي</strong> تم إرساله من وحدة الاتصالات في IRoute '
             'للتحقق من أن خط أنابيب تسليم البريد يعمل بشكل صحيح.</p>'
             '<div style="background:linear-gradient(135deg,#f8fafc,#f1f5f9);'
             'padding:20px 22px;border-radius:12px;border:1px solid #e2e8f0;margin-bottom:20px;">'
@@ -1871,7 +1871,7 @@ def send_tenant_bridge_rotated_email(tenant, api_bridge_key_plain):
         recipient_email=tenant.primary_email,
         context_dict=ctx,
         language='en',
-        default_subject=f'iRoad — API bridge key rotated — {tenant.company_name}',
+        default_subject=f'IRoute — API bridge key rotated — {tenant.company_name}',
         trigger_source='TemplateName: TENANT_BRIDGE_ROTATED',
         force_django_smtp=True,
     ):
@@ -1879,5 +1879,5 @@ def send_tenant_bridge_rotated_email(tenant, api_bridge_key_plain):
 
     html = render_to_string('tenant/emails/api_bridge_rotated.html', ctx)
     text = strip_tags(html)
-    subject = f'iRoad — API bridge key rotated — {tenant.company_name}'
+    subject = f'IRoute — API bridge key rotated — {tenant.company_name}'
     return send_email_via_django_smtp(tenant.primary_email, subject, text, html)

@@ -4,6 +4,10 @@ Movement-only action classification and allow/deny rules.
 
 from __future__ import annotations
 
+from typing import Any
+
+from django.db.models import Q
+
 from iroad_tenants.operation_execution import action_matches
 from iroad_tenants.operation_runtime.movement_state_machine import (
     STAGE_ARRIVED,
@@ -41,6 +45,46 @@ def is_empty_movement(movement) -> bool:
     return source == 'empty' or bool(reason)
 
 
+def is_empty_move_catalog_action(action) -> bool:
+    """True for tenant Action Master rows in the empty-move sequence category."""
+    if action is None:
+        return False
+    cat = (getattr(action, 'sequence_category', None) or '').strip().casefold()
+    return cat in {'empty_move', 'empty move'}
+
+
+def empty_move_sequence_category_q() -> Q:
+    """Django Q matching Action Master ``sequence_category`` empty-move variants."""
+    return Q(sequence_category__iexact='empty_move') | Q(sequence_category__iexact='empty move')
+
+
+def is_without_scope_catalog_action(action) -> bool:
+    """True for tenant Operation Actions outside job / empty-move sequences."""
+    if action is None:
+        return False
+    scope = str(getattr(action, 'action_scope', '') or '').strip().casefold()
+    if scope == 'without':
+        return True
+    cat = str(getattr(action, 'sequence_category', '') or '').strip().casefold()
+    return cat == 'without'
+
+
+def is_on_call_catalog_action(action) -> bool:
+    """True for tenant Operation Actions in On Call workflow scope."""
+    if action is None:
+        return False
+    return str(getattr(action, 'action_scope', '') or '').strip().casefold() == 'on_call'
+
+
+def is_standalone_execution_action(action) -> bool:
+    """
+    Actions recorded via Action Log outside the sequenced job/empty-move chain.
+
+    Includes without-scope reversals (Incident Report, Cancel Shipment) and On Call rows.
+    """
+    return is_without_scope_catalog_action(action) or is_on_call_catalog_action(action)
+
+
 def is_movement_only_context(*, shipment=None, movement=None) -> bool:
     """Policy uses movement engine when no shipment is on the action context."""
     return movement is not None and shipment is None
@@ -50,6 +94,8 @@ def action_applies_to_movement_context(action, *, empty_move: bool) -> bool:
     """Filter Action Master rows for movement-only execution."""
     if action is None:
         return False
+    if empty_move and is_empty_move_catalog_action(action):
+        return True
     if action.auto_shipment_post and not (action.movement_status_impact or '').strip():
         return False
     if is_pickup_or_loading_action(action):
@@ -71,9 +117,127 @@ def action_applies_to_movement_context(action, *, empty_move: bool) -> bool:
     return bool(action.auto_movement_post)
 
 
+def _tenant_schema_for_empty_move_policy() -> str:
+    try:
+        from django.db import connection
+
+        schema = str(getattr(connection, 'schema_name', '') or '').strip()
+        if schema and schema != 'public':
+            return schema
+    except Exception:
+        pass
+    return ''
+
+
+def _ordered_empty_move_catalog_actions() -> list[Any]:
+    from mobile_api.helpers.empty_move_action_resolver import (
+        list_empty_move_workflow_actions,
+    )
+
+    actions = list_empty_move_workflow_actions(_tenant_schema_for_empty_move_policy())
+    return sorted(
+        actions,
+        key=lambda row: (
+            int(getattr(row, 'sequence_number', 0) or 0),
+            str(getattr(row, 'action_code', '') or ''),
+        ),
+    )
+
+
+def _empty_move_action_sequence_index(action) -> int | None:
+    action_id = str(getattr(action, 'action_id', '') or '').strip()
+    action_code = str(getattr(action, 'action_code', '') or '').strip().casefold()
+    ordered = _ordered_empty_move_catalog_actions()
+    for index, row in enumerate(ordered):
+        row_id = str(getattr(row, 'action_id', '') or '').strip()
+        row_code = str(getattr(row, 'action_code', '') or '').strip().casefold()
+        if action_id and row_id and action_id == row_id:
+            return index
+        if action_code and row_code and action_code == row_code:
+            return index
+    seq = int(getattr(action, 'sequence_number', 0) or 0)
+    if seq > 0:
+        for index, row in enumerate(ordered):
+            if int(getattr(row, 'sequence_number', 0) or 0) == seq:
+                return index
+    return None
+
+
+def empty_move_sequence_action_allowed(
+    action,
+    movement,
+    *,
+    exclude_log_id=None,
+) -> bool | None:
+    """
+    Sequence-category policy for ``empty_move`` Action Master rows.
+
+    Returns ``None`` when this action/movement pair is outside empty-move catalog scope.
+    """
+    if not is_empty_movement(movement) or not is_empty_move_catalog_action(action):
+        return None
+
+    ordered = _ordered_empty_move_catalog_actions()
+    if not ordered:
+        return None
+
+    position = _empty_move_action_sequence_index(action)
+    if position is None:
+        return None
+
+    flags = movement_log_milestone_flags(movement, exclude_log_id=exclude_log_id)
+    stage = derive_movement_execution_stage(movement, exclude_log_id=exclude_log_id)
+    total = len(ordered)
+
+    if position == 0:
+        return stage == STAGE_CREATED and not flags['start_done']
+
+    if position == total - 1:
+        if flags['complete_done']:
+            return False
+        if validate_movement_completion_stage(movement, exclude_log_id=exclude_log_id):
+            return False
+        return True
+
+    if is_movement_arrived_action(action) or (
+        total >= 4 and position == total - 2
+    ):
+        return flags['in_transit_done'] and not flags['arrived_done']
+
+    return flags['start_done'] and not flags['in_transit_done']
+
+
+def _empty_move_catalog_has_arrived_action() -> bool:
+    """True when tenant empty-move workflow includes a distinct arrival step."""
+    try:
+        from django.db import connection
+
+        schema = str(getattr(connection, 'schema_name', '') or '').strip()
+        if not schema or schema == 'public':
+            return True
+        from mobile_api.helpers.empty_move_action_resolver import (
+            list_empty_move_workflow_actions,
+        )
+
+        return any(
+            is_movement_arrived_action(action)
+            for action in list_empty_move_workflow_actions(schema)
+        )
+    except Exception:
+        return True
+
+
 def validate_movement_completion_stage(movement, *, exclude_log_id=None) -> str | None:
     stage = derive_movement_execution_stage(movement, exclude_log_id=exclude_log_id)
     flags = movement_log_milestone_flags(movement, exclude_log_id=exclude_log_id)
+    if flags['complete_done'] or flags['arrived_done'] or stage == STAGE_ARRIVED:
+        return None
+    if (
+        is_empty_movement(movement)
+        and flags['in_transit_done']
+        and not _empty_move_catalog_has_arrived_action()
+    ):
+        return None
     if stage not in (STAGE_ARRIVED,) and not flags['arrived_done']:
         return (
             'Movement must reach Arrived before Completed. '
@@ -117,11 +281,29 @@ def movement_prerequisites_met(
     }
     if not required:
         return True
+    if is_empty_movement(movement) and is_empty_move_catalog_action(action):
+        position = _empty_move_action_sequence_index(action)
+        if position == 0:
+            return True
     executed = _movement_executed_action_codes(
         movement,
         exclude_log_id=exclude_log_id,
     )
-    return required.issubset(executed)
+    if required.issubset(executed):
+        return True
+    if not is_empty_movement(movement):
+        return False
+    flags = movement_log_milestone_flags(movement, exclude_log_id=exclude_log_id)
+    if is_movement_in_transit_action(action) and flags['start_done']:
+        return True
+    if is_movement_arrived_action(action) and flags['in_transit_done']:
+        return True
+    if is_movement_complete_action(action):
+        if flags['arrived_done']:
+            return True
+        if flags['in_transit_done'] and not _empty_move_catalog_has_arrived_action():
+            return True
+    return False
 
 
 def movement_lifecycle_action_allowed(
@@ -184,6 +366,14 @@ def movement_action_is_allowed(
         return False
 
     empty_move = is_empty_movement(movement)
+    sequence_allowed = empty_move_sequence_action_allowed(
+        action,
+        movement,
+        exclude_log_id=exclude_log_id,
+    )
+    if sequence_allowed is not None:
+        return sequence_allowed
+
     if not action_applies_to_movement_context(action, empty_move=empty_move):
         return False
 

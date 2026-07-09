@@ -1,5 +1,5 @@
 """
-Seed ContactPageContent singleton from designer IRoad-landing/contact.html.
+Seed ContactPageContent singleton from designer IRoute-landing/contact.html.
 Idempotent: refreshes all text fields each run. No child models.
 """
 
@@ -11,26 +11,26 @@ from iroad_frontend.models import ContactPageContent
 
 def _contact_singleton_from_designer():
     return {
-        'page_title_en': 'Contact IRoad',
-        'page_title_ar': 'تواصل مع آيروود',
+        'page_title_en': 'Contact IRoute',
+        'page_title_ar': 'تواصل مع آيروت',
         'meta_description_en': (
-            'Contact IRoad to request a demo, ask about pricing, or speak '
+            'Contact IRoute to request a demo, ask about pricing, or speak '
             'with our transport SaaS team.'
         ),
         'meta_description_ar': (
-            'تواصل مع آيرواد لطلب عرض أو الاستفسار عن الأسعار أو التحدث مع '
+            'تواصل مع آيروت لطلب عرض أو الاستفسار عن الأسعار أو التحدث مع '
             'فريق منصة النقل.'
         ),
-        'page_header_h1_en': 'Contact IRoad',
-        'page_header_h1_ar': 'تواصل مع آيرواد',
+        'page_header_h1_en': 'Contact IRoute',
+        'page_header_h1_ar': 'تواصل مع آيروت',
         'breadcrumb_current_en': 'Contact',
         'breadcrumb_current_ar': 'تواصل',
         'section_kicker_en': 'contact Us',
         'section_kicker_ar': 'تواصل معنا',
         'section_heading_en': (
-            'Get in touch with our team to explore IRoad'
+            'Get in touch with our team to explore IRoute'
         ),
-        'section_heading_ar': 'تواصل مع فريقنا لاستكشاف آيرواد',
+        'section_heading_ar': 'تواصل مع فريقنا لاستكشاف آيروت',
         'form_title_en': 'Request a Demo',
         'form_title_ar': 'اطلب عرضاً',
         'form_fname_placeholder_en': 'First Name',
@@ -56,9 +56,9 @@ def _contact_singleton_from_designer():
         'form_submit_label_ar': 'احجز عرضاً',
         'form_action_url': '/contact/submit/',
         'sidebar_heading_en': (
-            'Start your digital transport journey with IRoad'
+            'Start your digital transport journey with IRoute'
         ),
-        'sidebar_heading_ar': 'ابدأ رحلتك الرقمية في النقل مع آيرواد',
+        'sidebar_heading_ar': 'ابدأ رحلتك الرقمية في النقل مع آيروت',
         'support_label_en': 'Our Support',
         'support_label_ar': 'الدعم',
         'support_hours_en': 'Monday - Friday : 9:00 AM - 6:00 PM',
@@ -71,8 +71,8 @@ def _contact_singleton_from_designer():
         'info_phone_2': '+91 91234 56789',
         'info_email_label_en': 'Email',
         'info_email_label_ar': 'البريد',
-        'info_email_1': 'support@iroad.com',
-        'info_email_2': 'sales@iroad.com',
+        'info_email_1': 'support@iroute.com',
+        'info_email_2': 'sales@iroute.com',
         'info_platform_label_en': (
             'Cloud-Based Platform - Accessible Worldwide'
         ),

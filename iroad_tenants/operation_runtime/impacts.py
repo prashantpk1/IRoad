@@ -25,6 +25,20 @@ def operation_action_matches(action, *needles) -> bool:
     return any(needle.lower() in blob for needle in needles)
 
 
+def is_shipment_cancel_action(action) -> bool:
+    """True when the Operation Action row represents admin Cancel Shipment (R1)."""
+    if action is None:
+        return False
+    if operation_action_matches(action, 'cancel shipment', 'r1'):
+        return True
+    from iroad_tenants.operation_runtime.action_master_catalog import (
+        WITHOUT_SCOPE_CANCEL_SHIPMENT_LABEL,
+    )
+
+    label = (getattr(action, 'english_label', '') or '').strip().casefold()
+    return label == WITHOUT_SCOPE_CANCEL_SHIPMENT_LABEL.casefold()
+
+
 def resolve_shipment_status_impact(raw_value):
     """Map Action Master shipment_status_impact to TenantShipment.ShipmentStatus."""
     resolved = resolve_shipment_status_impact_token(raw_value)
@@ -46,6 +60,7 @@ def resolve_movement_status_impact(raw_value):
 
 __all__ = [
     'operation_action_matches',
+    'is_shipment_cancel_action',
     'resolve_shipment_status_impact',
     'resolve_movement_status_impact',
     'canonical_shipment_status_impact_value',

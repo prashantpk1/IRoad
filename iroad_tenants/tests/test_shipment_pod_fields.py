@@ -5,7 +5,10 @@ from types import SimpleNamespace
 from unittest import TestCase
 from unittest.mock import MagicMock
 
-from iroad_tenants.views import _resolve_shipment_pod_fields_for_save
+from iroad_tenants.views import (
+    _resolve_shipment_pod_fields_for_save,
+    _tenant_shipment_prepare_form_errors_for_ui,
+)
 from tenant_workspace.models import TenantShipment
 
 
@@ -51,3 +54,27 @@ class ResolveShipmentPodFieldsTests(TestCase):
         )
         self.assertEqual(pod_type, TenantShipment.PodType.SOFT)
         self.assertEqual(pod_status, TenantShipment.PodStatus.NOT_COMPLETED)
+
+
+class ShipmentFormErrorUiTests(TestCase):
+    def test_maps_non_field_error_to_shipment_status_for_highlighting(self):
+        prepared = _tenant_shipment_prepare_form_errors_for_ui(
+            {
+                '__all__': (
+                    'Shipment cannot move to Delivered until POD is compliant '
+                    '(all delivery-note documents verified).'
+                ),
+            }
+        )
+        self.assertEqual(
+            prepared['shipment_status'],
+            'Shipment cannot move to Delivered until POD is compliant '
+            '(all delivery-note documents verified).',
+        )
+        self.assertNotIn('__all__', prepared)
+
+    def test_preserves_field_specific_errors(self):
+        prepared = _tenant_shipment_prepare_form_errors_for_ui(
+            {'booking_no': 'Booking No is required.'}
+        )
+        self.assertEqual(prepared['booking_no'], 'Booking No is required.')

@@ -25,6 +25,197 @@ from tenant_workspace.models import (
     TenantShipmentPodPage,
 )
 
+AUTO_DN_DOCUMENT_REF_PLACEHOLDER = 'PENDING'
+AUTO_DN_SCAFFOLD_NOTE_MARKER = 'Auto-created delivery note scaffold'
+POD_REQUIRES_SHIPMENT_DOCUMENT_MSG = (
+    'Shipment Document has not been created for this shipment. '
+    'Create it in Operations → Shipment Documents before the driver uploads POD.'
+)
+
+
+def _tenant_schema_lookup(tenant_schema: str = ''):
+    """Enter tenant schema for Shipment Document ORM reads when caller is outside schema_context."""
+    from contextlib import nullcontext
+
+    schema = (tenant_schema or '').strip()
+    if schema:
+        return schema_context(schema)
+    return nullcontext()
+
+
+def pod_upload_requires_shipment_document(shipment, action) -> bool:
+    """True when POD birth/posting needs a Layer-0 Shipment Document row."""
+    if shipment is None or action is None:
+        return False
+    from iroad_tenants.operation_runtime.proof_pipeline import (
+        shipment_auto_pod_document_flow,
+    )
+    from mobile_api.pod_capture.policy.canonical_pod_action_registry import (
+        is_pod_upload_action,
+    )
+
+    if getattr(action, 'auto_pod_post', False):
+        return True
+    if not is_pod_upload_action(action):
+        return False
+    return shipment_auto_pod_document_flow(shipment)
+
+
+def shipment_has_layer_zero_document(shipment) -> bool:
+    return _resolve_pod_source_shipment_document(shipment) is not None
+
+
+def _resolve_booking_for_shipment(shipment):
+    booking = getattr(shipment, 'booking', None)
+    if booking is not None:
+        return booking
+    booking_id = getattr(shipment, 'booking_id', None)
+    if not booking_id:
+        return None
+    from tenant_workspace.models import TenantBooking
+
+    return TenantBooking.objects.filter(pk=booking_id).first()
+
+
+def _booking_shipment_leg_count(booking) -> int:
+    from tenant_workspace.models import TenantShipment
+
+    if booking is None:
+        return 0
+    return TenantShipment.objects.filter(booking_id=booking.pk).count()
+
+
+def _portal_preshipment_document_for_booking(booking) -> bool:
+    """Booking-scoped Layer-0 rows before they are linked to a shipment."""
+    if booking is None:
+        return False
+    return (
+        TenantShipmentDocument.objects.filter(
+            booking_id=booking.pk,
+            shipment__isnull=True,
+        )
+        .exclude(document_type__iexact='pod')
+        .exists()
+    )
+
+
+def portal_shipment_document_exists(shipment, *, tenant_schema: str = '') -> bool:
+    """
+    True when Operations created a Shipment Document for this job leg.
+
+    Round-trip bookings require a document on **this shipment** once both legs
+    exist — the outbound document must not satisfy the backload gate (and vice versa).
+    """
+    if shipment is None:
+        return False
+    with _tenant_schema_lookup(tenant_schema):
+        if shipment_has_layer_zero_document(shipment):
+            return True
+        booking = _resolve_booking_for_shipment(shipment)
+        if booking is None:
+            return False
+        trip_type = (getattr(booking, 'trip_type', None) or '').strip()
+        if trip_type == 'Round':
+            if _booking_shipment_leg_count(booking) > 1:
+                return False
+            return _portal_preshipment_document_for_booking(booking)
+        return _portal_preshipment_document_for_booking(booking)
+
+
+def validate_shipment_document_for_pod_execute(shipment, action) -> None:
+    """
+    Block POD execute early when portal must create the delivery note first.
+
+    When ``pod_doc_count`` is zero, mobile may auto-scaffold the delivery note
+  on execute — no manual Shipment Document row is required.
+    """
+    from iroad_tenants.operation_field_catalog import operation_shipment_uses_hard_copy_pod
+
+    if operation_shipment_uses_hard_copy_pod(shipment):
+        if not portal_shipment_document_exists(shipment):
+            raise ValidationError(POD_REQUIRES_SHIPMENT_DOCUMENT_MSG)
+        return
+    if not pod_upload_requires_shipment_document(shipment, action):
+        return
+    if shipment_has_layer_zero_document(shipment):
+        return
+    from iroad_tenants.operation_runtime.proof_pipeline import (
+        shipment_auto_pod_document_flow,
+    )
+
+    if shipment_auto_pod_document_flow(shipment):
+        raise ValidationError(POD_REQUIRES_SHIPMENT_DOCUMENT_MSG)
+
+
+def ensure_shipment_document_for_pod_upload(
+    shipment,
+    action,
+    *,
+    created_by_label: str = '',
+) -> TenantShipmentDocument | None:
+    """Create delivery-note scaffold when allowed; raise when portal must create it."""
+    if not pod_upload_requires_shipment_document(shipment, action):
+        return None
+    existing = _resolve_pod_source_shipment_document(shipment)
+    if existing is not None:
+        return existing
+    from iroad_tenants.operation_runtime.proof_pipeline import (
+        shipment_auto_pod_document_flow,
+    )
+
+    if shipment_auto_pod_document_flow(shipment):
+        raise ValidationError(POD_REQUIRES_SHIPMENT_DOCUMENT_MSG)
+    return _birth_delivery_note_scaffold(
+        shipment,
+        created_by_label=created_by_label or 'mobile_pod_execute',
+    )
+
+
+def build_shipment_document_gate(
+    shipment,
+    *,
+    action=None,
+    tenant_schema: str = '',
+) -> dict[str, Any]:
+    """Mobile gate — surface missing Shipment Document before POD Next/execute."""
+    if shipment is None:
+        return {'required': False, 'ready': True, 'message': ''}
+    from iroad_tenants.operation_field_catalog import operation_shipment_uses_hard_copy_pod
+
+    hard_pod = operation_shipment_uses_hard_copy_pod(shipment)
+    required = pod_upload_requires_shipment_document(shipment, action) if action else False
+    if not required:
+        from iroad_tenants.operation_runtime.proof_pipeline import (
+            shipment_auto_pod_document_flow,
+        )
+
+        required = shipment_auto_pod_document_flow(shipment)
+    if hard_pod:
+        required = True
+    with _tenant_schema_lookup(tenant_schema):
+        ready = portal_shipment_document_exists(shipment, tenant_schema=tenant_schema)
+    message = ''
+    if required and not ready:
+        booking = _resolve_booking_for_shipment(shipment)
+        shipment_no = str(getattr(shipment, 'shipment_no', '') or '').strip()
+        if (
+            booking is not None
+            and (getattr(booking, 'trip_type', '') or '').strip() == 'Round'
+            and _booking_shipment_leg_count(booking) > 1
+            and shipment_no
+        ):
+            message = (
+                f'Shipment Document has not been created for {shipment_no}. '
+                'Create it in Operations → Shipment Documents for this leg '
+                'before the driver uploads POD.'
+            )
+        else:
+            message = POD_REQUIRES_SHIPMENT_DOCUMENT_MSG
+    return {
+        'required': required,
+        'ready': ready or not required,
+        'message': message,
+    }
 
 def _shipment_requires_hard_pod_mode(shipment) -> bool:
     """Hard POD compliance must survive A7 digital evidence posting."""
@@ -124,8 +315,8 @@ def _sync_shipment_pod_doc_count_from_booking(shipment) -> int:
     return target
 
 
-def _ensure_delivery_note_pages(document, *, page_count: int, doc_ref: str) -> None:
-    """Create or extend delivery-note page rows up to ``page_count``."""
+def _ensure_delivery_note_pages(document, *, page_count: int, doc_ref: str = '') -> None:
+    """Create or extend delivery-note page rows up to ``page_count`` (portal users fill line details)."""
     page_count = max(int(page_count or 1), 1)
     existing = list(
         TenantShipmentDocumentPage.objects.filter(document=document).order_by('line_no'),
@@ -133,17 +324,19 @@ def _ensure_delivery_note_pages(document, *, page_count: int, doc_ref: str) -> N
     if int(document.page_count or 0) != page_count:
         document.page_count = page_count
         document.save(update_fields=['page_count', 'updated_at'])
-    doc_ref = (doc_ref or document.document_ref_no or document.record_no or '').strip()
     for line_no in range(1, page_count + 1):
         if line_no <= len(existing):
             continue
+        line_doc_ref = ''
+        if doc_ref:
+            line_doc_ref = f'{doc_ref}-P{line_no:03d}'
         TenantShipmentDocumentPage.objects.create(
             document=document,
             line_no=line_no,
             physical_page_no=line_no,
-            doc_ref_no=f'{doc_ref}-P{line_no:03d}',
+            doc_ref_no=line_doc_ref,
             completion_status=TenantShipmentDocumentPage.CompletionStatus.NOT_COMPLETED,
-            signer_location=TenantShipmentDocumentPage.SignerLocation.WITH_DRIVER,
+            signer_location='',
         )
 
 
@@ -167,12 +360,10 @@ def _birth_delivery_note_scaffold(
         .first()
     )
     page_count = _sync_shipment_pod_doc_count_from_booking(shipment)
-    doc_ref = (getattr(shipment, 'shipment_no', None) or '').strip()
     if existing is not None:
         _ensure_delivery_note_pages(
             existing,
             page_count=page_count,
-            doc_ref=doc_ref or existing.document_ref_no,
         )
         return existing
 
@@ -189,19 +380,22 @@ def _birth_delivery_note_scaffold(
         form_label=SHIPMENT_DOCUMENTS_AUTO_FORM_LABEL,
         prefix=SHIPMENT_DOCUMENTS_REF_PREFIX,
     )
-    header_status = status or TenantShipmentDocument.Status.UPLOADED
+    header_status = status or TenantShipmentDocument.Status.DRAFT
+    scaffold_notes = (notes or '').strip() or (
+        f'{AUTO_DN_SCAFFOLD_NOTE_MARKER}. Complete Details and subform lines in portal.'
+    )
     source_document = TenantShipmentDocument(
         record_no=record_no,
         record_sequence=record_sequence,
         record_date=timezone.localdate(),
         document_type='delivery_note',
-        document_ref_no=doc_ref or record_no,
+        document_ref_no=AUTO_DN_DOCUMENT_REF_PLACEHOLDER,
         document_date=timezone.localdate(),
         is_delivery_note=True,
-        physical_location='With Driver',
+        physical_location='',
         page_count=page_count,
         status=header_status,
-        notes=notes,
+        notes=scaffold_notes,
         created_by_label=(created_by_label or '')[:200] or 'auto_delivery_note_scaffold',
     )
     _tenant_shipment_document_apply_foreign_keys(
@@ -213,9 +407,24 @@ def _birth_delivery_note_scaffold(
     _ensure_delivery_note_pages(
         source_document,
         page_count=page_count,
-        doc_ref=source_document.document_ref_no,
     )
     return source_document
+
+
+def _resolve_pod_source_shipment_document(shipment):
+    """
+    Latest Layer-0 Shipment Document for POD birth.
+
+    ``is_delivery_note`` may be true or false; POD child rows are excluded.
+    """
+    if shipment is None:
+        return None
+    return (
+        TenantShipmentDocument.objects.filter(shipment=shipment)
+        .exclude(document_type__iexact='pod')
+        .order_by('-created_at')
+        .first()
+    )
 
 
 def birth_pod_from_action_log(action_log, *, created_by_label=''):
@@ -230,26 +439,18 @@ def birth_pod_from_action_log(action_log, *, created_by_label=''):
         'a7',
         'action 7',
     )
-    is_auto_pod_post = bool(getattr(action, 'auto_pod_post', False))
-    source_document = (
-        TenantShipmentDocument.objects.filter(
-            shipment=shipment,
-            is_delivery_note=True,
+    source_document = _resolve_pod_source_shipment_document(shipment)
+    if source_document is None and getattr(action, 'auto_pod_post', False):
+        source_document = ensure_shipment_document_for_pod_upload(
+            shipment,
+            action,
+            created_by_label=created_by_label,
         )
-        .order_by('-created_at')
-        .first()
-    )
     if source_document is None:
-        if is_upload_pod_action or is_auto_pod_post:
-            source_document = _auto_create_delivery_note_for_a7(
-                action_log,
-                shipment=shipment,
-                created_by_label=created_by_label,
-            )
-        else:
-            raise ValidationError(
-                'Auto POD Post requires at least one delivery-note document on the shipment.'
-            )
+        validate_shipment_document_for_pod_execute(shipment, action)
+        source_document = _resolve_pod_source_shipment_document(shipment)
+    if source_document is None:
+        raise ValidationError(POD_REQUIRES_SHIPMENT_DOCUMENT_MSG)
     existing_pod = _find_existing_pod_for_source(
         shipment=shipment,
         source_document=source_document,
@@ -349,24 +550,19 @@ def birth_pod_from_action_log(action_log, *, created_by_label=''):
             attachment_label=row.get('attachment_label') or '',
         )
 
+    document.page_count = TenantShipmentPodPage.objects.filter(document=document).count()
+    document.save(update_fields=['page_count', 'updated_at'])
+    from iroad_tenants.views import _tenant_shipment_apply_pod_doc_count
+
+    _tenant_shipment_apply_pod_doc_count(
+        shipment,
+        TenantShipmentPodPage.objects.filter(document=document).count(),
+    )
+
     if is_upload_pod_action:
         apply_a7_shipment_pod_type_classification(shipment)
 
     return document
-
-
-def _auto_create_delivery_note_for_a7(action_log, *, shipment, created_by_label=''):
-    """
-    A7 mobile flow may stage POD evidence before office creates Shipment Document.
-    Create delivery-note source rows from booking line ``pod_doc_count``.
-    """
-    _ = action_log
-    return _birth_delivery_note_scaffold(
-        shipment,
-        created_by_label=created_by_label,
-        status=TenantShipmentDocument.Status.UPLOADED,
-        notes='Auto-created during A7 to satisfy POD source document requirement.',
-    )
 
 
 def _apply_a7_hard_pod_digital_posting(
@@ -572,14 +768,7 @@ def sync_a7_pod_evidence_attachments(
     if shipment is None:
         shipment = getattr(action_log, 'shipment', None)
     if pod_document is None and shipment is not None:
-        source_document = (
-            TenantShipmentDocument.objects.filter(
-                shipment=shipment,
-                is_delivery_note=True,
-            )
-            .order_by('-created_at')
-            .first()
-        )
+        source_document = _resolve_pod_source_shipment_document(shipment)
         pod_document = _find_existing_pod_for_source(
             shipment=shipment,
             source_document=source_document,
@@ -652,15 +841,13 @@ def _apply_a7h_hard_pod_physical_posting_body(
         if document_id and line_no != '0':
             confirmed_keys.add(('line', f'{document_id}:{line_no}'))
 
-    dn_documents = TenantShipmentDocument.objects.filter(
-        shipment=shipment,
-        is_delivery_note=True,
+    dn_documents = TenantShipmentDocument.objects.filter(shipment=shipment).exclude(
+        document_type__iexact='pod',
     )
     if not dn_documents.exists() and getattr(shipment, 'booking_id', None):
         dn_documents = TenantShipmentDocument.objects.filter(
             booking_id=shipment.booking_id,
-            is_delivery_note=True,
-        )
+        ).exclude(document_type__iexact='pod')
 
     for document in dn_documents.prefetch_related('document_pages'):
         pod_child = (

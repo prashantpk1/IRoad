@@ -40,7 +40,7 @@ def prepare_a7_execute_evidence(
     """
     if context.idempotent_replay:
         return
-    if not _is_a7_shipment_execute(context):
+    if not _is_pod_shipment_execute(context):
         return
 
     payload = dict(context.payload or {})
@@ -149,10 +149,33 @@ def promote_merged_a7_media(
     )
 
 
-def _is_a7_shipment_execute(context: ExecuteActionContext) -> bool:
+def _is_pod_shipment_execute(context: ExecuteActionContext) -> bool:
+    """True when execute targets tenant Upload POD (``auto_pod_post`` / dynamic OA-* code)."""
     if (context.job_type or '').strip().casefold() != 'shipment':
         return False
-    return (context.action_code or '').strip().upper() == 'A7'
+    operation_action = context.operation_action
+    if operation_action is not None:
+        if bool(getattr(operation_action, 'auto_pod_post', False)):
+            return True
+        from mobile_api.pod_capture.policy.canonical_pod_action_registry import (
+            is_pod_upload_action,
+        )
+
+        return is_pod_upload_action(operation_action)
+    from types import SimpleNamespace
+
+    from mobile_api.pod_capture.policy.canonical_pod_action_registry import (
+        is_pod_upload_action,
+    )
+
+    code = (context.action_code or '').strip()
+    if not code:
+        return False
+    return is_pod_upload_action(SimpleNamespace(action_code=code, english_label=''))
+
+
+# Backward-compatible alias for tests and legacy imports.
+_is_a7_shipment_execute = _is_pod_shipment_execute
 
 
 def _inline_media_dicts(payload: dict[str, Any]) -> list[dict[str, Any]]:

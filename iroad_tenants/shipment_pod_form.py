@@ -59,12 +59,18 @@ def delivery_note_doc_no_options(*, include_document_id=None):
             booking = shipment.booking
         booking_item = (shipment.booking_item_ref or '').strip() if shipment else ''
         pod_type = ''
+        pod_status = TenantShipment.PodStatus.NOT_COMPLETED
         if shipment:
+            from iroad_tenants.operation_field_catalog import normalize_operation_pod_status
             from iroad_tenants.views import _normalize_shipment_pod_type
 
             pod_type = _normalize_shipment_pod_type(
                 shipment.pod_type or getattr(booking, 'pod_type', ''),
                 default=TenantShipment.PodType.DIGITAL,
+            )
+            pod_status = normalize_operation_pod_status(
+                shipment.pod_status,
+                default=TenantShipment.PodStatus.NOT_COMPLETED,
             )
         record_no = (row.record_no or '').strip()
         document_ref_no = (row.document_ref_no or '').strip()
@@ -80,6 +86,7 @@ def delivery_note_doc_no_options(*, include_document_id=None):
                 'booking_no': booking.booking_no if booking else '',
                 'booking_item': booking_item,
                 'pod_type': pod_type,
+                'pod_status': pod_status,
                 'document_type': row.document_type or '',
                 'document_date': row.document_date.isoformat() if row.document_date else '',
                 'page_count': row.page_count or 1,
@@ -98,7 +105,7 @@ def doc_ref_options_map():
         refs: list[dict] = []
         seen: set[str] = set()
         header_ref = (document.document_ref_no or '').strip()
-        if header_ref:
+        if header_ref and header_ref.upper() != 'PENDING':
             refs.append({'value': header_ref, 'label': header_ref})
             seen.add(header_ref)
         for page in document.document_pages.order_by('line_no'):
@@ -115,8 +122,10 @@ def doc_ref_options_map():
 
 def apply_doc_no_linkage(form_data: dict, form_errors: dict):
     """
-    Resolve shipment/booking/pod fields from selected Doc No (PCS §5.3).
-    Returns the delivery-note TenantShipmentDocument or None.
+    Resolve delivery-note identity from Doc No (PCS §5.3).
+
+    Document Info (ref, type, date, page count) comes from the selected DN.
+    Booking/shipment, POD status, and POD page lines are filled manually in the portal.
     """
     doc_id = (form_data.get('doc_no') or form_data.get('source_document_id') or '').strip()
     if not doc_id:
@@ -132,28 +141,21 @@ def apply_doc_no_linkage(form_data: dict, form_errors: dict):
         return None
     form_data['doc_no'] = str(document.pk)
     form_data['source_document_id'] = str(document.pk)
-    shipment = document.shipment if document.shipment_id else None
-    booking = document.booking
-    if booking is None and shipment and shipment.booking_id:
-        booking = shipment.booking
-    if shipment is None:
+    if document.shipment_id is None:
         form_errors['doc_no'] = 'Selected document is not linked to a shipment.'
         return document
-    form_data['shipment_id'] = str(shipment.pk)
-    form_data['shipment_no'] = shipment.shipment_no
-    form_data['booking_item'] = (shipment.booking_item_ref or '').strip()
-    if booking:
-        form_data['booking_id'] = str(booking.pk)
-        form_data['booking_no'] = booking.booking_no
-    from iroad_tenants.views import _normalize_shipment_pod_type
-
-    form_data['pod_type'] = _normalize_shipment_pod_type(
-        shipment.pod_type or getattr(booking, 'pod_type', ''),
-        default=TenantShipment.PodType.DIGITAL,
-    )
     selected_ref = (form_data.get('document_ref_no') or '').strip()
     if not selected_ref:
-        form_data['document_ref_no'] = document.document_ref_no
+        header_ref = (document.document_ref_no or '').strip()
+        if header_ref.upper() == 'PENDING':
+            header_ref = ''
+        form_data['document_ref_no'] = header_ref
+    if not (form_data.get('document_type') or '').strip():
+        form_data['document_type'] = document.document_type or 'delivery_note'
+    if not (form_data.get('document_date') or '').strip() and document.document_date:
+        form_data['document_date'] = document.document_date.isoformat()
+    if not (form_data.get('page_count') or '').strip():
+        form_data['page_count'] = str(document.page_count or 1)
     return document
 
 

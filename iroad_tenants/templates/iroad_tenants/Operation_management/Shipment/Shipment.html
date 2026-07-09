@@ -36,6 +36,21 @@
       <!-- Shipment Form -->
       <form id="shipmentForm" method="post">
         {% csrf_token %}
+        {% if form_errors %}
+        <div
+          id="shipmentValidationBanner"
+          class="alert alert-danger alert-dismissible fade show mb-3"
+          role="alert"
+        >
+          <strong>Please fix the following:</strong>
+          <ul class="mb-0 mt-2 ps-3">
+            {% for field_name, error_message in form_errors.items %}
+            <li>{{ error_message }}</li>
+            {% endfor %}
+          </ul>
+          <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+        </div>
+        {% endif %}
         <!-- Section 1: Shipment Info -->
         <div class="form-card" data-section="1">
           <div class="form-card-header">
@@ -565,13 +580,14 @@
                       <td class="ops-col-weight">
                         <input
                           type="number"
-                          class="form-control shipment-cargo-weight"
+                          class="form-control shipment-cargo-weight {% if form_errors.cargo_weight %}is-invalid{% endif %}"
                           id="cargoWeight"
                           name="cargo_weight_1"
                           min="0"
                           step="0.01"
                           value="{{ shipment_form_data.cargo_weight|default:'0' }}"
                         />
+                        {% if form_errors.cargo_weight %}<div class="invalid-feedback d-block">{{ form_errors.cargo_weight }}</div>{% endif %}
                       </td>
                       <td class="ops-col-unit">
                         <input type="text" class="form-control" id="cargoUnit" name="cargo_unit_1" data-no-digits="1" placeholder="e.g. PCS, Box, Pallet" value="{{ shipment_form_data.cargo_unit|default:'' }}" />
@@ -579,13 +595,14 @@
                       <td class="ops-col-qty">
                         <input
                           type="number"
-                          class="form-control shipment-cargo-qty"
+                          class="form-control shipment-cargo-qty {% if form_errors.cargo_qty %}is-invalid{% endif %}"
                           id="cargoQty"
                           name="cargo_qty_1"
                           min="0.01"
                           step="0.01"
                           value="{{ shipment_form_data.cargo_qty|default:'0' }}"
                         />
+                        {% if form_errors.cargo_qty %}<div class="invalid-feedback d-block">{{ form_errors.cargo_qty }}</div>{% endif %}
                       </td>
                     </tr>
                   </tbody>
@@ -1181,6 +1198,21 @@
           cargoSelect.addEventListener("change", function () {
             syncCargoFromOption(true);
           });
+        }
+
+        var validationBanner = document.getElementById("shipmentValidationBanner");
+        var firstInvalidField = document.querySelector(
+          "#shipmentForm .is-invalid, #shipmentForm .invalid-feedback"
+        );
+        if (validationBanner) {
+          validationBanner.scrollIntoView({ behavior: "smooth", block: "center" });
+        } else if (firstInvalidField) {
+          var scrollTarget = firstInvalidField.classList.contains("is-invalid")
+            ? firstInvalidField
+            : firstInvalidField.previousElementSibling || firstInvalidField;
+          if (scrollTarget && scrollTarget.scrollIntoView) {
+            scrollTarget.scrollIntoView({ behavior: "smooth", block: "center" });
+          }
         }
       })();
     </script>

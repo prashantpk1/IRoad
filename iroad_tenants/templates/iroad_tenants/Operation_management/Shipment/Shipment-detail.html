@@ -51,13 +51,15 @@
           <span>Print</span>
         </a>
         {% if can_cancel_shipment %}
-        <form method="post" action="{{ cancel_shipment_url }}" class="d-inline" onsubmit="return confirm('Cancel shipment {{ shipment.shipment_no|escapejs }}? An R1 action log entry will be recorded.');">
-          {% csrf_token %}
-          <button type="submit" class="eal-btn eal-btn-outline text-warning">
-            <i class="bi bi-x-circle"></i>
-            <span>Cancel</span>
-          </button>
-        </form>
+        <button
+          type="button"
+          class="eal-btn eal-btn-outline text-warning"
+          data-bs-toggle="modal"
+          data-bs-target="#cancelShipmentModal"
+        >
+          <i class="bi bi-x-circle"></i>
+          <span>Cancel</span>
+        </button>
         {% endif %}
         <a href="{{ edit_shipment_url }}" class="eal-btn eal-btn-primary">
           <i class="bi bi-pencil-square"></i>
@@ -504,6 +506,36 @@
             <p class="detail-view-value">{{ booking.total_cargo_weight|floatformat:2 }}</p>
           </div>
         </div>
+      </div>
+    </div>
+  </div>
+</div>
+{% endif %}
+
+{% if can_cancel_shipment %}
+<div class="modal fade" id="cancelShipmentModal" tabindex="-1" aria-labelledby="cancelShipmentModalLabel" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h2 class="modal-title h5" id="cancelShipmentModalLabel">Cancel shipment</h2>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body">
+        Cancel <strong>{{ shipment.shipment_no }}</strong>?
+        This will set the shipment status to <strong>Cancelled</strong>
+        {% if shipment_cancel_action %}
+        and record an action log entry using
+        <strong>{{ shipment_cancel_action.action_code }} — {{ shipment_cancel_action.english_label }}</strong>.
+        {% else %}
+        and record an action log entry using the configured <strong>Cancel Shipment</strong> operation action.
+        {% endif %}
+      </div>
+      <div class="modal-footer gap-2">
+        <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Keep shipment</button>
+        <form method="post" action="{{ cancel_shipment_url }}">
+          {% csrf_token %}
+          <button type="submit" class="btn btn-danger">Confirm cancel</button>
+        </form>
       </div>
     </div>
   </div>

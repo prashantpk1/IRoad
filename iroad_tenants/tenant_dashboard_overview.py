@@ -175,6 +175,206 @@ def _is_unlimited_cap(cap: int) -> bool:
     return cap < 0
 
 
+_RESOURCE_DISPLAY: tuple[tuple[str, str, str], ...] = (
+    ("users", "Internal Users", "indigo"),
+    ("trucks", "Internal Trucks", "purple"),
+    ("drivers", "Active Drivers", "green"),
+    ("shipments", "Monthly Shipments", "cyan"),
+    ("storage", "Storage GB", "amber"),
+)
+
+_DONUT_COLORS: dict[str, str] = {
+    "users": "#8b5cf6",
+    "trucks": "#6366f1",
+    "drivers": "#10b981",
+    "shipments": "#06b6d4",
+    "storage": "#f59e0b",
+}
+
+
+def _resource_row(
+    key: str,
+    label: str,
+    used: int,
+    cap: int,
+    bar_class: str,
+) -> dict[str, Any]:
+    unlimited = _is_unlimited_cap(cap)
+    if unlimited:
+        total_display = "∞"
+        pct_int = 0
+        pct_label = "Unlimited"
+        bar_w = min(12, max(2, used * 3)) if used else 2
+    else:
+        total_display = _fmt_int(cap) if cap > 0 else "0"
+        pct_int = _pct_used(used, cap) if cap > 0 else 0
+        pct_label = f"{pct_int}%"
+        bar_w = pct_int
+    return {
+        "key": key,
+        "label": label,
+        "current_display": _fmt_int(used),
+        "total_display": total_display,
+        "pct_int": pct_int,
+        "pct_label": pct_label,
+        "bar_class": bar_class,
+        "bar_width": bar_w,
+        "unlimited": unlimited,
+    }
+
+
+def _workspace_usage_map(ws: _WorkspaceSnapshot) -> dict[str, int]:
+    return {
+        "users": ws.internal_users,
+        "trucks": ws.internal_trucks,
+        "drivers": ws.active_insource_drivers,
+        "shipments": ws.monthly_shipments,
+        "storage": ws.storage_gb_used,
+    }
+
+
+def _resource_caps(profile: TenantProfile, plan) -> dict[str, int]:
+    return {
+        "users": _effective_cap(
+            profile.active_max_users,
+            getattr(plan, "max_internal_users", None) if plan else None,
+        ),
+        "trucks": _effective_cap(
+            profile.active_max_internal_trucks,
+            getattr(plan, "max_internal_trucks", None) if plan else None,
+        ),
+        "drivers": _effective_cap(
+            profile.active_max_drivers,
+            getattr(plan, "max_active_drivers", None) if plan else None,
+        ),
+        "shipments": int(getattr(plan, "max_monthly_shipments", -1) or -1) if plan else -1,
+        "storage": int(getattr(plan, "max_storage_gb", -1) or -1) if plan else -1,
+    }
+
+
+def _plan_pricing_lines(plan) -> tuple[str, str]:
+    price_line = "—"
+    cycle_label = "/ month"
+    if not plan:
+        return price_line, cycle_label
+    pricing = (
+        PlanPricingCycle.objects.filter(plan=plan, number_of_cycles=1)
+        .select_related("currency")
+        .order_by("currency_id")
+        .first()
+    )
+    if pricing:
+        cur = pricing.currency
+        price_line = _money_str(
+            pricing.price,
+            getattr(cur, "currency_code", "") or "",
+            getattr(cur, "currency_symbol", "") or "",
+        )
+        if int(pricing.number_of_cycles or 1) != 1:
+            cycle_label = f"/ {int(pricing.number_of_cycles)} cycles"
+    return price_line, cycle_label
+
+
+def _plan_panel_fields(profile: TenantProfile, plan) -> dict[str, str]:
+    plan_name = (plan.plan_name_en if plan else "") or "No active plan"
+    renewal = profile.subscription_expiry_date
+    renewal_display = renewal.strftime("%d %b %Y") if renewal else "—"
+    price_line, cycle_label = _plan_pricing_lines(plan)
+    driver_attr = (
+        "Driver App: Active"
+        if (plan and plan.has_driver_app)
+        else "Driver App: Not included"
+    )
+    backup_level = plan.get_backup_restore_level_display() if plan else "Standard"
+    backup_attr = f"Backup Restore Level: {backup_level}"
+    return {
+        "plan_name": plan_name,
+        "plan_price_line": price_line,
+        "plan_cycle_label": cycle_label,
+        "plan_renewal_display": renewal_display,
+        "plan_driver_attr": driver_attr,
+        "plan_backup_attr": backup_attr,
+    }
+
+
+def _build_quota_resource_bundle(
+    profile: TenantProfile,
+    plan,
+    ws: _WorkspaceSnapshot,
+) -> dict[str, Any]:
+    caps = _resource_caps(profile, plan)
+    usage = _workspace_usage_map(ws)
+    resource_rows = [
+        _resource_row(key, label, usage[key], caps[key], bar_class)
+        for key, label, bar_class in _RESOURCE_DISPLAY
+    ]
+
+    donut_segments: list[dict[str, Any]] = []
+    donut_weights: list[tuple[str, float]] = []
+    for key, label, _bar_class in _RESOURCE_DISPLAY:
+        used = usage[key]
+        cap = caps[key]
+        color = _DONUT_COLORS[key]
+        unlimited = _is_unlimited_cap(cap)
+        if unlimited:
+            pct_int = 0
+            pct_label = "Unlimited"
+            weight = float(used) if used > 0 else 0.0
+        else:
+            pct_int = _pct_used(used, cap) if cap > 0 else 0
+            pct_label = f"{pct_int}%"
+            weight = float(pct_int) if cap > 0 else (1.0 if used > 0 else 0.0)
+        if weight <= 0 and used <= 0:
+            weight = 0.0
+        donut_weights.append((color, weight))
+        donut_segments.append(
+            {
+                "key": key,
+                "label": label,
+                "color": color,
+                "used": int(used),
+                "used_display": _fmt_int(used),
+                "total_display": "∞" if unlimited else (_fmt_int(cap) if cap > 0 else "0"),
+                "pct_label": pct_label,
+                "pct_int": pct_int,
+                "unlimited": unlimited,
+                "weight": weight,
+            }
+        )
+
+    return {
+        "resource_rows": resource_rows,
+        "donut_segments": donut_segments,
+        "donut_style": f"background: {_build_conic_gradient(donut_weights)};",
+    }
+
+
+def build_tenant_resource_stats_payload(tenant: TenantProfile) -> dict[str, Any]:
+    """Live JSON payload for dashboard resource matrix + quota donut refresh."""
+    profile = (
+        TenantProfile.objects.select_related("current_plan")
+        .filter(pk=tenant.pk)
+        .first()
+    )
+    if profile is None:
+        profile = tenant
+
+    plan = profile.current_plan
+    registry = TenantRegistry.objects.filter(tenant_profile_id=profile.pk).first()
+    schema_name = (registry.schema_name if registry else "") or ""
+    ws = (
+        _workspace_counts(schema_name)
+        if schema_name
+        else _WorkspaceSnapshot(0, 0, 0, 0, 0)
+    )
+    quota = _build_quota_resource_bundle(profile, plan, ws)
+    return {
+        **_plan_panel_fields(profile, plan),
+        **quota,
+        "updated_at": timezone.now().isoformat(),
+    }
+
+
 def _time_ago_label(dt: datetime | None) -> str:
     if dt is None:
         return "—"
@@ -791,131 +991,18 @@ def build_tenant_dashboard_overview(tenant: TenantProfile) -> dict[str, Any]:
         else _WorkspaceSnapshot(0, 0, 0, 0, 0)
     )
 
-    cap_users = _effective_cap(
-        profile.active_max_users,
-        getattr(plan, "max_internal_users", None) if plan else None,
-    )
-    cap_trucks = _effective_cap(
-        profile.active_max_internal_trucks,
-        getattr(plan, "max_internal_trucks", None) if plan else None,
-    )
-    cap_drivers = _effective_cap(
-        profile.active_max_drivers,
-        getattr(plan, "max_active_drivers", None) if plan else None,
-    )
-    cap_shipments = int(getattr(plan, "max_monthly_shipments", -1) or -1) if plan else -1
-    cap_storage = int(getattr(plan, "max_storage_gb", -1) or -1) if plan else -1
+    plan_fields = _plan_panel_fields(profile, plan)
+    plan_name = plan_fields["plan_name"]
+    renewal_display = plan_fields["plan_renewal_display"]
+    price_line = plan_fields["plan_price_line"]
+    cycle_label = plan_fields["plan_cycle_label"]
+    driver_attr = plan_fields["plan_driver_attr"]
+    backup_attr = plan_fields["plan_backup_attr"]
 
-    plan_name = (plan.plan_name_en if plan else "") or "No active plan"
-    renewal = profile.subscription_expiry_date
-    renewal_display = renewal.strftime("%d %b %Y") if renewal else "—"
-
-    price_line = "—"
-    cycle_label = "/ month"
-    if plan:
-        pricing = (
-            PlanPricingCycle.objects.filter(plan=plan, number_of_cycles=1)
-            .select_related("currency")
-            .order_by("currency_id")
-            .first()
-        )
-        if pricing:
-            cur = pricing.currency
-            price_line = _money_str(
-                pricing.price,
-                getattr(cur, "currency_code", "") or "",
-                getattr(cur, "currency_symbol", "") or "",
-            )
-            if int(pricing.number_of_cycles or 1) != 1:
-                cycle_label = f"/ {int(pricing.number_of_cycles)} cycles"
-
-    driver_attr = (
-        "Driver App: Active"
-        if (plan and plan.has_driver_app)
-        else "Driver App: Not included"
-    )
-    backup_level = plan.get_backup_restore_level_display() if plan else "Standard"
-    backup_attr = f"Backup Restore Level: {backup_level}"
-
-    def resource_row(
-        label: str,
-        used: int,
-        cap: int,
-        bar_class: str,
-    ) -> dict[str, Any]:
-        unlimited = _is_unlimited_cap(cap)
-        if unlimited:
-            total_display = "∞"
-            pct_int = 0
-            pct_label = "Unlimited"
-            bar_w = min(12, max(2, used * 3)) if used else 2
-        else:
-            total_display = _fmt_int(cap) if cap > 0 else "0"
-            pct_int = _pct_used(used, cap) if cap > 0 else 0
-            pct_label = f"{pct_int}%"
-            bar_w = pct_int
-        return {
-            "label": label,
-            "current_display": _fmt_int(used),
-            "total_display": total_display,
-            "pct_int": pct_int,
-            "pct_label": pct_label,
-            "bar_class": bar_class,
-            "bar_width": bar_w,
-            "unlimited": unlimited,
-        }
-
-    resource_rows = [
-        resource_row("Internal Users", ws.internal_users, cap_users, "indigo"),
-        resource_row("Internal Trucks", ws.internal_trucks, cap_trucks, "purple"),
-        resource_row(
-            "Active Drivers", ws.active_insource_drivers, cap_drivers, "green"
-        ),
-        resource_row(
-            "Monthly Shipments", ws.monthly_shipments, cap_shipments, "cyan"
-        ),
-        resource_row(
-            "Storage GB", ws.storage_gb_used, cap_storage, "amber"
-        ),
-    ]
-
-    donut_segment_defs = [
-        ("users", "Users", "#8b5cf6", ws.internal_users, cap_users),
-        ("trucks", "Trucks", "#6366f1", ws.internal_trucks, cap_trucks),
-        ("drivers", "Driver", "#10b981", ws.active_insource_drivers, cap_drivers),
-        ("shipments", "Shipments", "#06b6d4", ws.monthly_shipments, cap_shipments),
-        ("storage", "Storage GB", "#f59e0b", ws.storage_gb_used, cap_storage),
-    ]
-    donut_segments: list[dict[str, Any]] = []
-    donut_weights: list[tuple[str, float]] = []
-    for key, label, color, used, cap in donut_segment_defs:
-        unlimited = _is_unlimited_cap(cap)
-        if unlimited:
-            pct_int = 0
-            pct_label = "Unlimited"
-            weight = float(used) if used > 0 else 0.0
-        else:
-            pct_int = _pct_used(used, cap) if cap > 0 else 0
-            pct_label = f"{pct_int}%"
-            weight = float(pct_int) if cap > 0 else (1.0 if used > 0 else 0.0)
-        if weight <= 0 and used <= 0:
-            weight = 0.0
-        donut_weights.append((color, weight))
-        donut_segments.append(
-            {
-                "key": key,
-                "label": label,
-                "color": color,
-                "used": int(used),
-                "used_display": _fmt_int(used),
-                "total_display": "∞" if unlimited else (_fmt_int(cap) if cap > 0 else "0"),
-                "pct_label": pct_label,
-                "pct_int": pct_int,
-                "unlimited": unlimited,
-                "weight": weight,
-            }
-        )
-    donut_style = f"background: {_build_conic_gradient(donut_weights)};"
+    quota_bundle = _build_quota_resource_bundle(profile, plan, ws)
+    resource_rows = quota_bundle["resource_rows"]
+    donut_segments = quota_bundle["donut_segments"]
+    donut_style = quota_bundle["donut_style"]
 
     if schema_name:
         chart_months, chart_y_ticks, y_max, y_divisions = _fleet_chart_months(schema_name)

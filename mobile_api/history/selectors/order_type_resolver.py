@@ -17,32 +17,29 @@ def resolve_order_type(shipment: Any, booking: Any | None = None) -> str:
       2. ``booking.order_type``
       3. matched virtual booking line (same logic as portal shipment form)
     """
-    if shipment is None:
-        return ''
+    if shipment is not None:
+        on_shipment = str(getattr(shipment, 'order_type', None) or '').strip()
+        if on_shipment:
+            return on_shipment
 
-    on_shipment = str(getattr(shipment, 'order_type', None) or '').strip()
-    if on_shipment:
-        return on_shipment
+    booking = booking if booking is not None else (getattr(shipment, 'booking', None) if shipment is not None else None)
+    if booking is not None:
+        on_booking = str(getattr(booking, 'order_type', None) or '').strip()
+        if on_booking:
+            return on_booking
 
-    booking = booking if booking is not None else getattr(shipment, 'booking', None)
-    if booking is None:
-        return ''
+        if shipment is not None:
+            try:
+                from iroad_tenants.views import _tenant_shipment_match_booking_line
 
-    on_booking = str(getattr(booking, 'order_type', None) or '').strip()
-    if on_booking:
-        return on_booking
-
-    try:
-        from iroad_tenants.views import _tenant_shipment_match_booking_line
-
-        matched = _tenant_shipment_match_booking_line(
-            booking,
-            booking_item=str(getattr(shipment, 'booking_item_ref', '') or ''),
-            booking_item_type=str(getattr(shipment, 'booking_item_type', '') or ''),
-        )
-        if matched:
-            return str(matched.get('order_type') or '').strip()
-    except Exception:
-        return ''
+                matched = _tenant_shipment_match_booking_line(
+                    booking,
+                    booking_item=str(getattr(shipment, 'booking_item_ref', '') or ''),
+                    booking_item_type=str(getattr(shipment, 'booking_item_type', '') or ''),
+                )
+                if matched:
+                    return str(matched.get('order_type') or '').strip()
+            except Exception:
+                return ''
 
     return ''

@@ -1,9 +1,9 @@
 """
 Create driver-initiated empty truck movements (On Call mode).
 
-Endpoints accept tenant Location Master UUIDs and/or Google Places snapshots
-(``from_address`` / ``to_address`` with coordinates). Route GPS is stored on
-the TML. The driver starts the move manually with EM1 after create (PCS §14.7.4).
+PCS §5.1 — driver selects a reason and presses Start with device GPS.
+Departure (``from_*``) is stored at create; arrival (``to_*``) is stamped when
+the complete-movement workflow action executes with GPS.
 """
 from __future__ import annotations
 
@@ -28,6 +28,9 @@ from mobile_api.dashboard.selectors.dashboard_booking_selector import (
 from mobile_api.dashboard.selectors.dashboard_movement_selector import (
     DashboardMovementSelector,
 )
+from mobile_api.dashboard.selectors.movement_selection_policy import (
+    is_active_empty_move,
+)
 from mobile_api.empty_move.exceptions import EmptyMoveError
 from mobile_api.helpers.mobile_execution_guard import (
     MobileExecutionContext,
@@ -35,6 +38,8 @@ from mobile_api.helpers.mobile_execution_guard import (
 )
 from mobile_api.job_detail.guards.ownership import driver_pk
 from mobile_api.job_detail.projections.job_location_projection import (
+    _empty_move_arrival_endpoint_block,
+    gps_empty_move_endpoint_block,
     serialize_location_point,
 )
 from tenant_workspace.models import (
@@ -135,7 +140,12 @@ def _resolve_location(location_id) -> TenantLocationMaster | None:
     return location
 
 
-def _assert_on_call_state(driver: Any, *, tenant_schema: str) -> None:
+def _assert_on_call_state(
+    driver: Any,
+    *,
+    tenant_schema: str,
+    request: Any | None = None,
+) -> None:
     booking_sel = DashboardBookingSelector().select_current_driver_booking(
         driver,
         tenant_schema=tenant_schema,
@@ -157,17 +167,38 @@ def _assert_on_call_state(driver: Any, *, tenant_schema: str) -> None:
         driver,
         tenant_schema=tenant_schema,
     )
-    if existing is not None:
+    if existing is not None and is_active_empty_move(existing.movement):
         _log_debug(
             'blocked_existing_empty_move',
             driver_id=getattr(driver, 'pk', ''),
             tenant_schema=tenant_schema,
+            movement_id=getattr(existing.movement, 'pk', ''),
         )
+        movement = existing.movement
+        if hasattr(movement, 'refresh_from_db'):
+            movement.refresh_from_db()
+        resume_payload = {
+            'empty_move': _project_movement_response(
+                movement,
+                request=request,
+                workflow_started=existing.movement_stage not in ('', 'created'),
+            ),
+            'resume_existing': True,
+            'resume_job': {
+                'job_type': 'movement',
+                'job_id': str(
+                    getattr(movement, 'movement_id', None) or getattr(movement, 'pk', '') or ''
+                ),
+                'job_no': str(getattr(movement, 'movement_no', '') or ''),
+                'entity_type': 'movement',
+            },
+        }
         raise EmptyMoveError(
             str(_('mobile.empty_move.already_active')),
             code='empty_move_already_active',
             http_status=409,
             message_key='mobile.empty_move.already_active',
+            data=resume_payload,
         )
 
 
@@ -186,12 +217,27 @@ def _resolve_start_gps(payload: Mapping[str, Any]) -> tuple[str, str]:
     return _coord_str(payload.get('latitude')), _coord_str(payload.get('longitude'))
 
 
+def _resolve_destination_gps(payload: Mapping[str, Any]) -> tuple[str, str]:
+    """Optional planned arrival GPS from empty-move create payload."""
+    return _coord_str(payload.get('to_latitude')), _coord_str(payload.get('to_longitude'))
+
+
 def _movement_endpoint_projection(
     movement: Any,
     side: str,
     *,
     request: Any | None = None,
 ) -> dict[str, Any]:
+    if side == 'to':
+        return _empty_move_arrival_endpoint_block(movement, request=request)
+    if side == 'from':
+        block = gps_empty_move_endpoint_block(
+            movement,
+            'from',
+            request=request,
+        )
+        if block:
+            return block
     prefix = f'{side}_'
     return serialize_location_point(
         getattr(movement, f'{prefix}location_point', None),
@@ -201,6 +247,18 @@ def _movement_endpoint_projection(
         latitude=getattr(movement, f'{prefix}latitude', '') or '',
         longitude=getattr(movement, f'{prefix}longitude', '') or '',
     )
+
+
+def _empty_move_workflow_contract() -> dict[str, Any]:
+    """Mobile routing contract — GPS on Start Job (from) and End Job (to)."""
+    return {
+        'route_capture_mode': 'gps',
+        'manual_location_picker': False,
+        'departure_captured_on': 'start_action',
+        'arrival_captured_on': 'complete_action',
+        'gps_endpoints': ['from', 'to'],
+        'workflow_steps_after_reason': ['start_with_gps', 'movement_actions'],
+    }
 
 
 def _project_movement_response(
@@ -221,6 +279,7 @@ def _project_movement_response(
         'from_location': _movement_endpoint_projection(movement, 'from', request=request),
         'to_location': _movement_endpoint_projection(movement, 'to', request=request),
         'workflow_started': workflow_started,
+        'workflow_contract': _empty_move_workflow_contract(),
     }
 
 
@@ -258,7 +317,7 @@ class EmptyMoveCreateService:
         client_action_id = str(payload.get('client_action_id') or '').strip()
 
         with schema_context(schema):
-            _assert_on_call_state(driver, tenant_schema=schema)
+            _assert_on_call_state(driver, tenant_schema=schema, request=request)
 
             truck = _resolve_driver_truck(driver, payload.get('truck_id'))
             if truck is None:
@@ -283,8 +342,7 @@ class EmptyMoveCreateService:
             from_address = str(payload.get('from_address') or '').strip()
             to_address = str(payload.get('to_address') or '').strip()
             start_lat, start_lng = _resolve_start_gps(payload)
-            to_lat = _coord_str(payload.get('to_latitude'))
-            to_lng = _coord_str(payload.get('to_longitude'))
+            to_lat, to_lng = _resolve_destination_gps(payload)
 
             with transaction.atomic():
                 movement = birth_empty_move_for_driver(
@@ -324,6 +382,7 @@ class EmptyMoveCreateService:
                 request=request,
                 workflow_started=False,
             ),
+            'workflow_contract': _empty_move_workflow_contract(),
         }
 
     @staticmethod
@@ -340,15 +399,11 @@ class EmptyMoveCreateService:
         latitude: Any,
         longitude: Any,
     ) -> bool:
-        from iroad_tenants.operation_runtime.action_master_catalog import (
-            ensure_empty_move_action_master_rows,
+        from mobile_api.helpers.empty_move_action_resolver import (
+            resolve_empty_move_start_action,
         )
 
-        ensure_empty_move_action_master_rows()
-        em1 = TenantOperationAction.objects.filter(
-            action_code__iexact='EM1',
-            status=TenantOperationAction.Status.ACTIVE,
-        ).first()
+        em1 = resolve_empty_move_start_action(tenant_schema)
         if em1 is None:
             return False
 
