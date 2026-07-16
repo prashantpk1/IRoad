@@ -1064,34 +1064,12 @@ a {
 }
 
 .notification-settings {
-  display: flex;
-  justify-content: flex-end;
-  margin-bottom: 16px;
+  display: none !important;
 }
 
 .settings-btn {
-  width: 36px;
-  height: 36px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background: transparent;
-  border: none;
-  color: var(--text-muted);
-  border-radius: var(--radius-sm);
-  cursor: pointer;
-  transition: var(--transition-fast);
+  display: none !important;
 }
-
-.settings-btn:hover {
-  background: var(--bg-white);
-  color: var(--primary-color);
-}
-
-.settings-btn i {
-  font-size: 18px;
-}
-
 /* Preferences Popup */
 .preferences-popup {
   position: absolute;

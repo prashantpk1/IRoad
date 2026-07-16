@@ -2233,8 +2233,12 @@ function initNotificationPanel() {
     // Close notification panel
     function closeNotificationPanel() {
       notificationPanel.classList.remove("active");
-      notificationOverlay.classList.remove("active");
-      preferencesPopup.classList.remove("active");
+      if (notificationOverlay) {
+        notificationOverlay.classList.remove("active");
+      }
+      if (preferencesPopup) {
+        preferencesPopup.classList.remove("active");
+      }
       document.body.style.overflow = "";
     }
 

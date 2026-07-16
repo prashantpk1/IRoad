@@ -1,0 +1,23 @@
+<svg width="1400" height="500" viewBox="0 0 1400 500" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <style>
+      .iRoute-white-text {
+        font-family: Arial, Helvetica, sans-serif;
+        font-size: 200px;
+        font-weight: 900;
+        letter-spacing: -5px;
+        fill: #FFFFFF;
+      }
+    </style>
+    
+    <filter id="whiteShadow" x="-50%" y="-30%" width="200%" height="200%">
+      <feDropShadow dx="0" dy="4" stdDeviation="6" flood-opacity="0.2"/>
+    </filter>
+  </defs>
+  
+  <!-- Blue Background -->
+  <rect width="1400" height="500" fill="#3B82F6"/>
+  
+  <!-- IRoute Text - White -->
+  <text x="80" y="330" class="iRoute-white-text" filter="url(#whiteShadow)" font-weight="bold">IRoute</text>
+</svg>

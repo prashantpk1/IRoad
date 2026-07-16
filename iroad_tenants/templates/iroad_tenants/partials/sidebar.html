@@ -606,19 +606,6 @@
 
       <!-- Panel Content -->
       <div class="notification-content">
-        <!-- Settings Button -->
-        <div class="notification-settings">
-          <button
-            class="settings-btn"
-            id="notificationSettingsBtn"
-            aria-label="Settings"
-          >
-            <i class="bi bi-gear"></i>
-          </button>
-        </div>
-
-        
-
         {% if tenant_notification_items %}
         <div class="notification-list" id="tenantNotificationList">
           {% for item in tenant_notification_items %}

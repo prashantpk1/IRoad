@@ -36,4 +36,5 @@ services:
       redis:
         condition: service_healthy
     ports:
-      - "8001:8001"
+      # Host 8011 so local runserver + cloudflared can own 8001 without conflict.
+      - "8011:8001"

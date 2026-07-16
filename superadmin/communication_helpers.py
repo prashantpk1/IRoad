@@ -50,18 +50,41 @@ def _get_base_url():
     return 'http://127.0.0.1:8000'
 
 
+def _normalize_iroute_brand_name(name, fallback='IRoute'):
+    """Map legacy IRoad / iRoad names to the current IRoute brand."""
+    cleaned = (name or '').strip()
+    if not cleaned:
+        return fallback
+    compact = cleaned.lower().replace(' ', '').replace('_', '').replace('-', '')
+    if compact in {'iroad', 'iroadplatform', 'iroadadmin', 'iroadlogistics'}:
+        return fallback
+    if compact.startswith('iroad'):
+        return fallback
+    return cleaned
+
+
+def _default_email_logo_url():
+    """
+    White IRoute wordmark for dark/purple email headers (brand system).
+    Prefer media copy so email clients can load it without collectstatic.
+    """
+    media_rel = Path(settings.MEDIA_ROOT) / 'legal' / 'iroute-logo-white.png'
+    if media_rel.is_file():
+        return '/media/legal/iroute-logo-white.png'
+    return '/static/images/brand/iroute-logo-white.png'
+
+
 def _build_branding_context():
     """
     Resolve branding values from Legal Identity for email wrappers.
-    Falls back to default IR/IRoute when no logo/name configured.
+    Falls back to IRoute + official wordmark when no logo/name configured.
     Ensures brand_logo_url is absolute for external email clients.
     """
     brand_name = 'IRoute'
     brand_name_ar = 'IRoute'
-    # Default fallback image
-    brand_logo_url = '/media/legal/Link.png'
+    brand_logo_url = _default_email_logo_url()
     brand_initials = 'IR'
-    
+
     brand_company_name_ar = brand_name_ar
 
     try:
@@ -72,13 +95,18 @@ def _build_branding_context():
         ).first()
         if legal:
             if (legal.company_name_en or '').strip():
-                brand_name = legal.company_name_en.strip()
+                brand_name = _normalize_iroute_brand_name(legal.company_name_en)
             if (legal.company_name_ar or '').strip():
-                brand_name_ar = legal.company_name_ar.strip()
+                brand_name_ar = _normalize_iroute_brand_name(legal.company_name_ar)
 
             if getattr(legal, 'company_logo', None):
                 try:
-                    brand_logo_url = legal.company_logo.url or brand_logo_url
+                    logo_name = (legal.company_logo.name or '').lower()
+                    # Skip legacy placeholders; always ship the official IRoute mark.
+                    if legal.company_logo and not any(
+                        bad in logo_name for bad in ('link.png', 'verify_logo', 'iroad_logo')
+                    ):
+                        brand_logo_url = legal.company_logo.url or brand_logo_url
                 except Exception:
                     pass
 
@@ -205,9 +233,15 @@ def _send_via_fallback_smtp(to_email, subject, text_body, html_body=None):
 _EMAIL_HEADER = (
     '<div style="background:linear-gradient(135deg,#4f46e5 0%,#6366f1 50%,#818cf8 100%);'
     'padding:36px 40px 32px;text-align:center;border-radius:16px 16px 0 0;">'
+    '<div style="margin:0 auto 12px;text-align:center;">'
+    '{% if brand_logo_url %}'
+    '<img src="{{ brand_logo_url }}" alt="{{ brand_company_name|default:\'IRoute\' }}" '
+    'style="display:block;margin:0 auto;height:48px;width:auto;max-width:220px;border:0;">'
+    '{% endif %}'
+    '</div>'
     '<h1 style="color:#fff;margin:0;font-size:26px;font-weight:800;'
     'letter-spacing:-0.03em;font-family:Inter,-apple-system,BlinkMacSystemFont,sans-serif;">'
-    'IRoute</h1>'
+    '{{ brand_company_name|default:"IRoute" }}</h1>'
     '<p style="color:rgba(255,255,255,.75);font-size:13px;font-weight:500;'
     'margin:6px 0 0;letter-spacing:0.02em;font-family:Inter,sans-serif;">'
     'Logistics Management Platform</p>'
@@ -276,22 +310,16 @@ def _wrap_email_body(inner_html, email_title="Notification", preheader="Secure n
             text-align: center;
         }
         .email-logo-box {
-            width: 52px;
-            height: 52px;
-            line-height: 52px;
             margin: 0 auto 14px;
-            border-radius: 14px;
-            background: rgba(255, 255, 255, 0.2);
-            color: #ffffff;
-            font-size: 20px;
-            font-weight: 800;
-            overflow: hidden;
-            border: 2px solid rgba(255, 255, 255, 0.3);
+            text-align: center;
         }
         .email-logo-img {
-            width: 100%;
-            height: 100%;
-            object-fit: cover;
+            display: block;
+            margin: 0 auto;
+            height: 48px;
+            width: auto;
+            max-width: 220px;
+            object-fit: contain;
         }
         .email-brand {
             color: #ffffff;
@@ -380,9 +408,9 @@ def _wrap_email_body(inner_html, email_title="Notification", preheader="Secure n
                     <div class="email-header">
                         <div class="email-logo-box">
                             {% if brand_logo_url %}
-                                <img src="{{ brand_logo_url }}" class="email-logo-img" alt="{{ brand_company_name }}">
+                                <img src="{{ brand_logo_url }}" class="email-logo-img" alt="{{ brand_company_name|default:'IRoute' }}">
                             {% else %}
-                                {{ brand_initials|default:"IR" }}
+                                <span class="email-brand">{{ brand_company_name|default:"IRoute" }}</span>
                             {% endif %}
                         </div>
                         <h1 class="email-brand">{{ brand_company_name|default:"IRoute" }}</h1>
@@ -424,13 +452,10 @@ DEFAULT_NOTIFICATION_EMAIL_TEMPLATES = [
             '<table role="presentation" width="640" cellspacing="0" cellpadding="0" border="0" '
             'style="width:640px;max-width:640px;background:#ffffff;border-radius:16px;overflow:hidden;">'
             '<tr><td style="background:linear-gradient(135deg,#4f46e5 0%,#6366f1 50%,#818cf8 100%);padding:28px 24px;text-align:center;">'
-            '<div style="width:52px;height:52px;line-height:52px;margin:0 auto 12px;border-radius:14px;'
-            'background:rgba(255,255,255,0.2);color:#ffffff;font-size:20px;font-weight:800;'
-            'overflow:hidden;border:2px solid rgba(255,255,255,0.3);">'
+            '<div style="margin:0 auto 12px;text-align:center;">'
             '{% if brand_logo_url %}'
-            '<img src="{{ brand_logo_url }}" style="width:100%;height:100%;object-fit:cover;" alt="{{ brand_company_name }}">'
-            '{% else %}'
-            '{{ brand_initials|default:"IR" }}'
+            '<img src="{{ brand_logo_url }}" alt="{{ brand_company_name|default:\'IRoute\' }}" '
+            'style="display:block;margin:0 auto;height:48px;width:auto;max-width:220px;border:0;">'
             '{% endif %}'
             '</div>'
             '<div style="color:#ffffff;font-size:26px;line-height:1.2;font-weight:800;letter-spacing:-0.02em;font-family:Arial,sans-serif;">'
@@ -481,13 +506,10 @@ DEFAULT_NOTIFICATION_EMAIL_TEMPLATES = [
             '<table role="presentation" width="640" cellspacing="0" cellpadding="0" border="0" '
             'style="width:640px;max-width:640px;background:#ffffff;border-radius:16px;overflow:hidden;">'
             '<tr><td style="background:linear-gradient(135deg,#4f46e5 0%,#6366f1 50%,#818cf8 100%);padding:28px 24px;text-align:center;">'
-            '<div style="width:52px;height:52px;line-height:52px;margin:0 auto 12px;border-radius:14px;'
-            'background:rgba(255,255,255,0.2);color:#ffffff;font-size:20px;font-weight:800;'
-            'overflow:hidden;border:2px solid rgba(255,255,255,0.3);">'
+            '<div style="margin:0 auto 12px;text-align:center;">'
             '{% if brand_logo_url %}'
-            '<img src="{{ brand_logo_url }}" style="width:100%;height:100%;object-fit:cover;" alt="{{ brand_company_name }}">'
-            '{% else %}'
-            '{{ brand_initials|default:"IR" }}'
+            '<img src="{{ brand_logo_url }}" alt="{{ brand_company_name|default:\'IRoute\' }}" '
+            'style="display:block;margin:0 auto;height:48px;width:auto;max-width:220px;border:0;">'
             '{% endif %}'
             '</div>'
             '<div style="color:#ffffff;font-size:26px;line-height:1.2;font-weight:800;letter-spacing:-0.02em;font-family:Arial,sans-serif;">'
@@ -1449,6 +1471,56 @@ def refresh_tenant_welcome_email_template_from_defaults():
     )
 
 
+def refresh_auth_login_otp_email_template_from_defaults():
+    """
+    Overwrite AUTH_LOGIN_OTP from code defaults (IRoute logo + brand copy).
+    Safe to call repeatedly.
+    """
+    from superadmin.models import NotificationTemplate
+
+    item = next(
+        (
+            t
+            for t in DEFAULT_NOTIFICATION_EMAIL_TEMPLATES
+            if t['template_name'] == 'AUTH_LOGIN_OTP'
+        ),
+        None,
+    )
+    if not item:
+        return 0
+    return NotificationTemplate.objects.filter(
+        template_name='AUTH_LOGIN_OTP',
+        channel_type='Email',
+    ).update(
+        subject_en=item['subject_en'],
+        subject_ar=item['subject_ar'],
+        body_en=item['body_en'],
+        body_ar=item['body_ar'],
+    )
+
+
+def refresh_all_default_notification_email_templates():
+    """
+    Overwrite every DEFAULT_NOTIFICATION_EMAIL_TEMPLATES row from code.
+    Keeps DB HTML (IRoute logo header/footer) in sync. Idempotent.
+    """
+    from superadmin.models import NotificationTemplate
+
+    updated = 0
+    for item in DEFAULT_NOTIFICATION_EMAIL_TEMPLATES:
+        updated += NotificationTemplate.objects.filter(
+            template_name=item['template_name'],
+            channel_type='Email',
+        ).update(
+            subject_en=item['subject_en'],
+            subject_ar=item['subject_ar'],
+            body_en=item['body_en'],
+            body_ar=item['body_ar'],
+            category=item['category'],
+        )
+    return updated
+
+
 def ensure_default_notification_templates(created_by=None):
     """
     Ensure required email templates exist for auth + tenant notifications.
@@ -1506,8 +1578,8 @@ def ensure_default_notification_templates(created_by=None):
             },
         )
 
-    # Keep stored HTML in sync with code (welcome mail is DB-rendered; stale rows kept secrets).
-    refresh_tenant_welcome_email_template_from_defaults()
+    # Keep stored HTML in sync with code defaults (IRoute branding + content).
+    refresh_all_default_notification_email_templates()
     return created
 
 

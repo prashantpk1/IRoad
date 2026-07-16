@@ -1124,14 +1124,11 @@ a {
 }
 
 .notification-settings {
-  display: flex;
-  justify-content: flex-end;
-  margin-bottom: 16px;
-  position: sticky;
-  top: 0;
-  z-index: 1;
-  background: var(--bg-light);
-  padding-bottom: 8px;
+  display: none !important;
+}
+
+.settings-btn {
+  display: none !important;
 }
 
 .notification-list {
@@ -1203,26 +1200,7 @@ a.notification-item-main:hover .notification-item-title {
 }
 
 .settings-btn {
-  width: 36px;
-  height: 36px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background: transparent;
-  border: none;
-  color: var(--text-muted);
-  border-radius: var(--radius-sm);
-  cursor: pointer;
-  transition: var(--transition-fast);
-}
-
-.settings-btn:hover {
-  background: var(--bg-white);
-  color: var(--primary-color);
-}
-
-.settings-btn i {
-  font-size: 18px;
+  display: none !important;
 }
 
 /* Preferences Popup */
