@@ -6,7 +6,9 @@
 
 # ─────────────────────────────────────────────
 # Python
-# ─────────────────────────────────────────────__pycache__/
+# ─────────────────────────────────────────────
+__pycache__/
+**/__pycache__/
 *.py[cod]
 *$py.class
 *.so
@@ -69,7 +71,7 @@ celerybeat-schedule
 celerybeat.pid
 
 # ─────────────────────────────────────────────
-# Environment & secrets
+# Environment & secrets (never deploy via git)
 # ─────────────────────────────────────────────
 .env
 .env.*
@@ -79,6 +81,10 @@ celerybeat.pid
 *.p12
 secrets/
 credentials.json
+firebase/
+*firebase-adminsdk*.json
+*-firebase-adminsdk-*.json
+serviceAccount*.json
 
 # ─────────────────────────────────────────────
 # Docker / local infra
@@ -182,10 +188,12 @@ views.py.bak*
 *.lnk
 
 # ─────────────────────────────────────────────
-# Local documentation / design exports (not for VCS)
+# Local documentation / design exports (not for deploy)
 # ─────────────────────────────────────────────
 IROAD DOC/
 designerDesign/
+docs/
+t templates/
 
 # ─────────────────────────────────────────────
 # Project-specific test / integration scripts (local only)
@@ -193,6 +201,22 @@ designerDesign/
 twilio_test.py
 real_twilio_test.py
 *twilio*test*.py
+/debug_*.py
+/apply_ui_standard.py
+/check_email.py
+/final_verify.py
+/fix_templates.py
+/fix_translation_load.py
+/force_update_templates.py
+/notification_previewer.html
+/merged_templates_out.json
+/test_wrapper.py
+/translate.txt
+/update_branding_test.py
+/update_forms.py
+/update_lists.py
+/use_i18n.py
+**/push_debug_log.py
 
 # ─────────────────────────────────────────────
 # Notes / walkthrough text dumps (keep requirements tracked)
@@ -210,3 +234,6 @@ REDIS_*.txt
 task.txt
 walkthrough.txt
 event_mapping_check.txt
+commands_server.txt
+time.txt
+push_from_login_to_send.txt

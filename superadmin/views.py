@@ -7584,10 +7584,21 @@ class PushNotificationCreateView(LoginRequiredMixin, View):
         obj = form.save(commit=False)
         obj.created_by = request.user
         obj.save()
+        from superadmin.push_debug_log import append_push_debug
         from superadmin.push_helpers import queue_push_notification
 
+        append_push_debug(
+            f'PUSH_CREATE_SAVE name={obj.internal_name!r} '
+            f'trigger={obj.trigger_mode} audience={obj.target_audience} '
+            f'status={obj.dispatch_status} scheduled_at={obj.scheduled_at!r}'
+        )
         if obj.trigger_mode == 'Manual_Broadcast' and obj.dispatch_status == 'Scheduled':
             queue_push_notification(obj)
+        else:
+            append_push_debug(
+                f'PUSH_CREATE_SKIP queue (need Manual_Broadcast + Scheduled) '
+                f'got trigger={obj.trigger_mode} status={obj.dispatch_status}'
+            )
         messages.success(request, 'Push notification created successfully.')
         return redirect(reverse('push_notif_list'))
 
@@ -7625,10 +7636,21 @@ class PushNotificationUpdateView(LoginRequiredMixin, View):
                 {'form': form, 'is_edit': True, 'push_item': push_item},
             )
         updated = form.save()
+        from superadmin.push_debug_log import append_push_debug
         from superadmin.push_helpers import queue_push_notification
 
+        append_push_debug(
+            f'PUSH_UPDATE_SAVE name={updated.internal_name!r} '
+            f'trigger={updated.trigger_mode} audience={updated.target_audience} '
+            f'status={updated.dispatch_status} scheduled_at={updated.scheduled_at!r}'
+        )
         if updated.trigger_mode == 'Manual_Broadcast' and updated.dispatch_status == 'Scheduled':
             queue_push_notification(updated)
+        else:
+            append_push_debug(
+                f'PUSH_UPDATE_SKIP queue (need Manual_Broadcast + Scheduled) '
+                f'got trigger={updated.trigger_mode} status={updated.dispatch_status}'
+            )
         messages.success(request, 'Push notification updated successfully.')
         return redirect(reverse('push_notif_list'))
 

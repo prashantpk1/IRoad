@@ -20,8 +20,9 @@ class DriverLoginSerializer(serializers.Serializer):
     discovered from credentials alone (login does **not** use ``X-Tenant-ID``).
 
     Device fields (mobile clients):
-      ``device_id`` — Firebase Cloud Messaging (FCM) registration token.
+      ``fcm_token`` — Firebase Cloud Messaging (FCM) registration token.
       ``device_platform`` — OS family, e.g. ``iOS`` or ``Android``.
+      ``device_type`` — optional ``0`` (iOS) or ``1`` (Android); if omitted, derived from platform.
       ``device_name`` — Human-readable model, e.g. ``iPhone 16``, ``Samsung Galaxy S24``.
     """
     email = serializers.EmailField(
@@ -59,7 +60,7 @@ class DriverLoginSerializer(serializers.Serializer):
         max_length=64,
         write_only=True,
     )
-    device_id = serializers.CharField(
+    fcm_token = serializers.CharField(
         required=False,
         allow_blank=True,
         max_length=2048,
@@ -69,6 +70,13 @@ class DriverLoginSerializer(serializers.Serializer):
         required=False,
         allow_blank=True,
         max_length=32,
+        write_only=True,
+    )
+    device_type = serializers.IntegerField(
+        required=False,
+        allow_null=True,
+        min_value=0,
+        max_value=1,
         write_only=True,
     )
     device_name = serializers.CharField(

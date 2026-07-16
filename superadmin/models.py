@@ -1343,6 +1343,9 @@ class PushDeviceToken(models.Model):
         ('Driver', 'Driver'),
         ('Admin', 'Admin'),
     ]
+    # 0 = iOS, 1 = Android (mobile). Null for web / unknown.
+    DEVICE_TYPE_IOS = 0
+    DEVICE_TYPE_ANDROID = 1
 
     token_id = models.UUIDField(primary_key=True, default=uuid.uuid4)
     tenant = models.ForeignKey(
@@ -1357,7 +1360,12 @@ class PushDeviceToken(models.Model):
         max_length=100,
         help_text='Domain entity ID, e.g. tenant user ID or driver ID',
     )
-    device_token = models.CharField(max_length=512, unique=True)
+    device_token = models.CharField(max_length=2048, unique=True)
+    device_type = models.PositiveSmallIntegerField(
+        null=True,
+        blank=True,
+        help_text='0=iOS, 1=Android; null if unknown/web',
+    )
     is_active = models.BooleanField(default=True)
     updated_at = models.DateTimeField(auto_now=True)
 

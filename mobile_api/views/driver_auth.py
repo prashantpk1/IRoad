@@ -119,15 +119,16 @@ class DriverLoginView(MobileAPIView):
     POST /api/v1/mobile/driver/auth/login/
 
     Request body:
-      { "email": "...", "password": "...", "device_platform": "iOS"|"Android", "device_id": "<FCM token>", "device_name": "..." }
+      { "email": "...", "password": "...", "device_platform": "iOS"|"Android", "fcm_token": "<FCM token>", "device_name": "..." }
 
     Optional: ``tenant_id`` (subscriber UUID or ``schema_name``) only when the
     same email/password exists on more than one tenant. Tenant is otherwise
     resolved from credentials only (``X-Tenant-ID`` is ignored for login).
 
     Optional device fields (mobile apps):
-      ``device_id`` — FCM registration token (long string).
+      ``fcm_token`` — FCM registration token (long string).
       ``device_platform`` — e.g. ``iOS`` or ``Android``.
+      ``device_type`` — optional ``0`` (iOS) or ``1`` (Android).
       ``device_name`` — marketing name, e.g. ``iPhone 16``, ``Samsung Galaxy S24``.
 
     Response success (non-exhaustive):
@@ -174,8 +175,9 @@ class DriverLoginView(MobileAPIView):
                 )
             tenant_schema = str(reg.schema_name).strip()
         device = {
-            'device_id': (serializer.validated_data.get('device_id') or '').strip(),
+            'fcm_token': (serializer.validated_data.get('fcm_token') or '').strip(),
             'platform': (serializer.validated_data.get('device_platform') or '').strip(),
+            'device_type': serializer.validated_data.get('device_type'),
             'name': (serializer.validated_data.get('device_name') or '').strip(),
         }
 

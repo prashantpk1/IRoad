@@ -1618,7 +1618,7 @@ class PushNotificationForm(ArabicTextFormMixin, forms.ModelForm):
             'action_link': _('Action link'),
             'linked_event': _('Linked event'),
             'target_audience': _('Target audience'),
-            'specific_target_id': _('Specific target ID'),
+            'specific_target_id': _('Specific target / FCM token'),
             'scheduled_at': _('Scheduled at'),
             'dispatch_status': _('Dispatch status'),
             'is_active': _('Is active'),
@@ -1680,7 +1680,8 @@ class PushNotificationForm(ArabicTextFormMixin, forms.ModelForm):
                     _('Specific target ID is required when '
                       'audience is Specific.')
                 )
-            if target_audience != 'Specific':
+            # Keep specific_target_id for Drivers as optional raw FCM override.
+            if target_audience not in ('Specific', 'Drivers'):
                 cleaned['specific_target_id'] = ''
             # Manual broadcast does not use linked_event/is_active rule flags.
             cleaned['linked_event'] = None

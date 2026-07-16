@@ -390,6 +390,19 @@ CELERY_BEAT_SCHEDULE = {
 FCM_SERVER_KEY = config('FCM_SERVER_KEY', default='')
 FCM_SEND_URL = config('FCM_SEND_URL', default='https://fcm.googleapis.com/fcm/send')
 FCM_WEB_VAPID_KEY = config('FCM_WEB_VAPID_KEY', default='')
+_firebase_default_candidates = [
+    BASE_DIR / 'firebase' / 'iroute-ce8e3-firebase-adminsdk-fbsvc-ece6dce6ec.json',
+    BASE_DIR / 'IROAD DOC' / 'iroute-ce8e3-firebase-adminsdk-fbsvc-ece6dce6ec.json',
+]
+_firebase_default_path = next(
+    (str(candidate) for candidate in _firebase_default_candidates if candidate.exists()),
+    str(_firebase_default_candidates[0]),
+)
+FIREBASE_SERVICE_ACCOUNT_FILE = config(
+    'FIREBASE_SERVICE_ACCOUNT_FILE',
+    default=_firebase_default_path,
+)
+FIREBASE_APP_NAME = config('FIREBASE_APP_NAME', default='iroad-fcm')
 FIREBASE_WEB_API_KEY = config('FIREBASE_WEB_API_KEY', default='')
 FIREBASE_WEB_AUTH_DOMAIN = config('FIREBASE_WEB_AUTH_DOMAIN', default='')
 FIREBASE_WEB_PROJECT_ID = config('FIREBASE_WEB_PROJECT_ID', default='')

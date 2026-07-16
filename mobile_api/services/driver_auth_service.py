@@ -928,6 +928,83 @@ def send_driver_reset_otp_email(
 # ── API 1: Login ──────────────────────────────────────────────────
 
 
+def _upsert_driver_push_device_token(
+    *,
+    fcm_token: str,
+    driver_id: str,
+    device_type=None,
+    tenant_profile=None,
+) -> None:
+    """
+    Persist driver FCM registration token + device_type for Super Admin push.
+
+    Stored in public ``PushDeviceToken`` with ``user_domain=Driver``.
+    Deactivates older tokens for the same driver so Drivers audience stays current.
+    Login must not fail if upsert fails — caller should catch exceptions.
+    """
+    token = (fcm_token or '').strip()
+    ref = (driver_id or '').strip()
+    if not token or not ref:
+        from superadmin.push_debug_log import append_push_debug
+
+        append_push_debug(
+            f'TOKEN_STORE FAIL missing fcm_token_or_driver_id '
+            f'token_present={bool(token)} driver_id={ref!r}'
+        )
+        return
+
+    if len(token) > 2048:
+        logger.warning(
+            'mobile.driver_login fcm_token truncated from %s to 2048 chars driver_id=%s',
+            len(token),
+            ref,
+        )
+        token = token[:2048]
+
+    dtype = device_type
+    if dtype is not None:
+        try:
+            dtype = int(dtype)
+        except (TypeError, ValueError):
+            dtype = None
+        if dtype not in (0, 1):
+            dtype = None
+
+    from superadmin.models import PushDeviceToken
+    from superadmin.push_debug_log import append_push_debug
+
+    with schema_context('public'):
+        obj, created = PushDeviceToken.objects.update_or_create(
+            device_token=token,
+            defaults={
+                'tenant': tenant_profile,
+                'user_domain': 'Driver',
+                'reference_id': ref[:100],
+                'device_type': dtype,
+                'is_active': True,
+            },
+        )
+        # Keep only this token active for the driver (multi-device: latest login wins).
+        PushDeviceToken.objects.filter(
+            user_domain='Driver',
+            reference_id=ref[:100],
+            is_active=True,
+        ).exclude(device_token=token).update(is_active=False)
+
+    append_push_debug(
+        'TOKEN_STORE OK created={created} driver_id={driver_id} '
+        'device_type={device_type} token_len={token_len} token_preview={preview!r} '
+        'tenant={tenant}'.format(
+            created=created,
+            driver_id=ref,
+            device_type=dtype,
+            token_len=len(token),
+            preview=(token[:24] + '...') if len(token) > 24 else token,
+            tenant=getattr(tenant_profile, 'pk', None),
+        )
+    )
+
+
 def _clear_expired_login_lockout(tenant_user, max_attempts: int, lockout_minutes: int) -> None:
     """Reset counter when the lockout window has passed (best-effort in-DB)."""
     if max_attempts <= 0 or lockout_minutes <= 0:
@@ -1210,13 +1287,42 @@ def driver_login(
     except Exception:
         pass
 
-    if device.get('platform') or device.get('device_id'):
+    if device.get('platform') or device.get('fcm_token'):
         logger.info(
             'mobile.driver_login device schema=%s user_id=%s platform=%s',
             tenant_schema,
             tenant_user.pk,
             (device.get('platform') or '')[:64],
         )
+
+    raw_device_platform = (device.get('platform') or '').strip().lower()
+    raw_device_type = device.get('device_type')
+    response_device_type = None
+    if raw_device_type is not None and raw_device_type != '':
+        try:
+            parsed_type = int(raw_device_type)
+            if parsed_type in (0, 1):
+                response_device_type = parsed_type
+        except (TypeError, ValueError):
+            response_device_type = None
+    if response_device_type is None:
+        if raw_device_platform == 'ios':
+            response_device_type = 0
+        elif raw_device_platform == 'android':
+            response_device_type = 1
+    response_device_token = (device.get('fcm_token') or '').strip()
+
+    print(
+        '[mobile.driver_login] device_platform=%r device_type=%r '
+        'device_token_present=%s device_token_len=%s device_token_preview=%r'
+        % (
+            device.get('platform') or '',
+            response_device_type,
+            bool(response_device_token),
+            len(response_device_token),
+            (response_device_token[:24] + '...') if len(response_device_token) > 24 else response_device_token,
+        )
+    )
 
     profile_block: dict = {}
     try:
@@ -1247,6 +1353,7 @@ def driver_login(
     }
 
     organization: dict = {}
+    tenant_profile = None
     try:
         from iroad_tenants.models import TenantRegistry
 
@@ -1256,6 +1363,7 @@ def driver_login(
             .first()
         )
         if reg and reg.tenant_profile:
+            tenant_profile = reg.tenant_profile
             organization = {
                 'tenant_id': str(reg.tenant_profile_id),
                 'schema_name': reg.schema_name,
@@ -1263,6 +1371,46 @@ def driver_login(
             }
     except Exception as exc:
         logger.error('driver_login organization block error: %s', exc)
+
+    if response_device_token:
+        try:
+            _upsert_driver_push_device_token(
+                fcm_token=response_device_token,
+                driver_id=str(driver.driver_id),
+                device_type=response_device_type,
+                tenant_profile=tenant_profile,
+            )
+            print(
+                '[mobile.driver_login] PushDeviceToken SAVED '
+                'driver_id=%s user_domain=Driver device_type=%r tenant=%s'
+                % (
+                    driver.driver_id,
+                    response_device_type,
+                    getattr(tenant_profile, 'tenant_id', None) or getattr(tenant_profile, 'pk', None),
+                )
+            )
+        except Exception as exc:
+            print('[mobile.driver_login] PushDeviceToken SAVE FAILED: %s' % exc)
+            from superadmin.push_debug_log import append_push_debug
+
+            append_push_debug(f'TOKEN_STORE FAIL exception={exc}')
+            logger.error(
+                'driver_login push token upsert failed schema=%s driver_id=%s error=%s',
+                tenant_schema,
+                driver.driver_id,
+                exc,
+            )
+    else:
+        print(
+            '[mobile.driver_login] no fcm_token in request — '
+            'device_token/device_type will be empty/null; PushDeviceToken NOT saved'
+        )
+        from superadmin.push_debug_log import append_push_debug
+
+        append_push_debug(
+            'TOKEN_STORE FAIL no fcm_token in login request '
+            f'device_type={response_device_type!r} platform={device.get("platform")!r}'
+        )
 
     permissions = {
         'role_name': tenant_user.role_name,
@@ -1276,6 +1424,8 @@ def driver_login(
         'token_type': 'Bearer',
         'expires_in': tokens['access_expires_in'],
         'refresh_expires_in': tokens['refresh_expires_in'],
+        'device_type': response_device_type,
+        'device_token': response_device_token,
         'driver': driver_data,
         'organization': organization,
         'assigned_truck': profile_block.get('current_truck'),
@@ -1284,6 +1434,11 @@ def driver_login(
         'permissions': permissions,
         'profile': profile_block,
     }
+
+    print(
+        '[mobile.driver_login] RESPONSE fields device_type=%r device_token_len=%s'
+        % (data.get('device_type'), len(data.get('device_token') or ''))
+    )
 
     logger.info(
         'mobile.driver_login success schema=%s user_id=%s driver_id=%s ip=%s',

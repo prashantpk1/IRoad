@@ -70,10 +70,12 @@
       const mode = trigger ? trigger.value : '';
       const isSystem = mode === 'System_Event';
       const isSpecificTarget = audienceInput && audienceInput.value === 'Specific';
+      const isDrivers = audienceInput && audienceInput.value === 'Drivers';
       linked.style.display = isSystem ? '' : 'none';
       active.style.display = isSystem ? '' : 'none';
       audience.style.display = isSystem ? 'none' : '';
-      target.style.display = isSystem ? 'none' : (isSpecificTarget ? '' : 'none');
+      // Specific: required target. Drivers: optional raw FCM token for testing.
+      target.style.display = isSystem ? 'none' : ((isSpecificTarget || isDrivers) ? '' : 'none');
       schedule.style.display = isSystem ? 'none' : '';
       dispatch.style.display = isSystem ? 'none' : '';
     }
