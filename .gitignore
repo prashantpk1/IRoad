@@ -216,7 +216,6 @@ real_twilio_test.py
 /update_forms.py
 /update_lists.py
 /use_i18n.py
-**/push_debug_log.py
 
 # ─────────────────────────────────────────────
 # Notes / walkthrough text dumps (keep requirements tracked)
