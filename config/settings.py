@@ -784,10 +784,11 @@ MOBILE_API_AUTH_ENDPOINTS_REQUIRE_TENANT_HINT = config(
 )
 
 # When True, driver login never uses cross-tenant auto-discovery; tenant_id or
-# X-Tenant-ID is mandatory. Defaults to True when DEBUG is False.
+# X-Tenant-ID is mandatory. Default False — tenant_id is optional; send it only
+# when the same credentials exist on multiple tenants (tenant_ambiguous).
 MOBILE_API_LOGIN_REQUIRE_EXPLICIT_TENANT = config(
     'MOBILE_API_LOGIN_REQUIRE_EXPLICIT_TENANT',
-    default=not DEBUG,
+    default=False,
     cast=bool,
 )
 
