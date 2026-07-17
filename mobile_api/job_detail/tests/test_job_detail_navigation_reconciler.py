@@ -244,6 +244,126 @@ class JobDetailNavigationReconcilerTests(SimpleTestCase):
         self.assertEqual(workflow['primary_action']['action_code'], 'OA-0010')
         self.assertEqual(hint['action'], 'go_to_payment_collection')
 
+    def test_promotes_end_job_when_payment_collection_already_performed(self):
+        """Stale Collect Payment CTA must yield to End Job after payment is green."""
+        preview = [
+            _timeline_row(seq=9, code='OA-0009', label='POD', performed=True),
+            _timeline_row(
+                seq=10,
+                code='OA-0010',
+                label='Payment Collection',
+                performed=True,
+                execution_requirements={'auto_treasury_post': True},
+            ),
+            _timeline_row(seq=11, code='OA-0011', label='End Job', performed=False),
+        ]
+        shipment = SimpleNamespace(order_type='COD', pk='sh-1')
+        workflow, hint = reconcile_job_detail_cta(
+            {
+                'primary_action': {
+                    'action': 'go_to_payment_collection',
+                    'action_code': 'OA-0010',
+                    'screen': 'collect_payment',
+                },
+            },
+            {
+                'action': 'go_to_payment_collection',
+                'screen': 'collect_payment',
+                'action_code': 'OA-0010',
+            },
+            timeline={'timeline_preview': preview},
+            pod_cod={
+                'pod_pending': False,
+                'pod_compliant': True,
+                'hard_pod_pending': False,
+                'cod_collected': True,
+                'cod_pending': False,
+            },
+            shipment=shipment,
+        )
+        self.assertEqual(workflow['primary_action']['action_code'], 'OA-0011')
+        self.assertEqual(workflow['primary_action']['action_label'], 'End Job')
+        self.assertNotEqual(hint.get('action'), 'go_to_payment_collection')
+        self.assertEqual(hint.get('action_code'), 'OA-0011')
+
+    def test_promotes_end_job_when_payment_green_even_if_cod_flag_lags(self):
+        """Timeline Payment Collection performed wins over stale payment CTA."""
+        preview = [
+            _timeline_row(seq=9, code='OA-0009', label='POD', performed=True),
+            _timeline_row(
+                seq=10,
+                code='OA-0010',
+                label='Payment Collection',
+                performed=True,
+                execution_requirements={'auto_treasury_post': True},
+            ),
+            _timeline_row(seq=11, code='OA-0011', label='End Job', performed=False),
+        ]
+        workflow, hint = reconcile_job_detail_cta(
+            {
+                'primary_action': {
+                    'action': 'go_to_payment_collection',
+                    'action_code': 'OA-0010',
+                },
+            },
+            {
+                'action': 'go_to_payment_collection',
+                'action_code': 'OA-0010',
+            },
+            timeline={'timeline_preview': preview},
+            pod_cod={
+                'pod_pending': False,
+                'pod_compliant': True,
+                'cod_collected': False,
+                'cod_pending': True,
+            },
+            shipment=SimpleNamespace(order_type='COD', pk='sh-1'),
+        )
+        self.assertEqual(workflow['primary_action']['action_code'], 'OA-0011')
+        self.assertNotEqual(hint.get('action'), 'go_to_payment_collection')
+
+    def test_finalize_promotes_end_job_over_stale_payment_hint(self):
+        preview = [
+            _timeline_row(seq=9, code='OA-0009', label='POD', performed=True),
+            _timeline_row(
+                seq=10,
+                code='OA-0010',
+                label='Payment Collection',
+                performed=True,
+                execution_requirements={'auto_treasury_post': True},
+            ),
+            _timeline_row(seq=11, code='OA-0011', label='End Job', performed=False),
+        ]
+        workflow = {
+            'primary_action': {
+                'action': 'go_to_payment_collection',
+                'action_code': 'OA-0010',
+                'screen': 'collect_payment',
+            },
+            'next_action': {'action_code': 'OA-0010'},
+            'allowed_actions': [],
+        }
+        hint = {
+            'action': 'go_to_payment_collection',
+            'screen': 'collect_payment',
+            'action_code': 'OA-0010',
+            'screen_title': 'Collect Payment',
+        }
+        workflow, hint = finalize_job_detail_workflow_cta(
+            workflow,
+            hint,
+            timeline={'timeline_preview': preview},
+            pod_cod={
+                'pod_pending': False,
+                'pod_compliant': True,
+                'cod_collected': True,
+                'cod_pending': False,
+            },
+            shipment=SimpleNamespace(order_type='COD', pk='sh-1'),
+        )
+        self.assertEqual(workflow['primary_action']['action_code'], 'OA-0011')
+        self.assertNotEqual(hint.get('action'), 'go_to_payment_collection')
+
     def test_finalize_promotes_delivery_arrival_sticky_button_after_departure(self):
         """Regression: delivery arrival pending must expose Next on primary_action + hint."""
         preview = [

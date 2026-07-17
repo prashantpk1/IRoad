@@ -382,6 +382,17 @@ def _promote_first_pending_timeline_cta(
     return out_wf, out_hint
 
 
+def _timeline_has_pending_collect_payment(preview: list[Any] | None) -> bool:
+    from mobile_api.helpers.job_action_resolver import row_is_collect_payment_action
+
+    return bool(
+        _first_pending_timeline_row(
+            preview,
+            matcher=lambda row: row_is_collect_payment_action(row),
+        ),
+    )
+
+
 def _should_promote_first_pending_timeline_cta(
     workflow: dict[str, Any],
     hint: dict[str, Any],
@@ -396,11 +407,29 @@ def _should_promote_first_pending_timeline_cta(
         return True
     if hint_action == 'go_to_pod_capture':
         return True
+    # Stale Collect Payment CTA after Payment Collection is already green.
+    if hint_action == 'go_to_payment_collection':
+        from mobile_api.helpers.job_action_resolver import (
+            row_is_collect_payment_action,
+            row_is_job_close_action,
+        )
+
+        pending_normalized = _normalize_timeline_row(first_pending)
+        if row_is_job_close_action(pending_normalized):
+            return True
+        if not row_is_collect_payment_action(pending_normalized):
+            if not _timeline_has_pending_collect_payment(preview):
+                return True
     primary = dict((workflow or {}).get('primary_action') or {})
     pending_code = str(first_pending.get('action_code') or '').strip()
     hint_code = str(hint.get('action_code') or '').strip()
     if pending_code and hint_code and pending_code != hint_code:
-        if hint_action in {'go_to_evidence_capture', 'execute_action', ''}:
+        if hint_action in {
+            'go_to_evidence_capture',
+            'execute_action',
+            'go_to_payment_collection',
+            '',
+        }:
             return True
     if not _row_has_sticky_cta(primary) and not _hint_has_sticky_cta(hint):
         return True
@@ -571,12 +600,13 @@ def reconcile_job_detail_cta(
                 == 'COD'
             )
         )
+        hint_action = str(hint.get('action') or '').strip()
         if cod_due and not pod.get('hard_pod_pending'):
             pay_row = _first_pending_timeline_row(
                 preview,
                 matcher=lambda row: row_is_collect_payment_action(row),
             )
-            if pay_row and str(hint.get('action') or '').strip() in {
+            if pay_row and hint_action in {
                 '',
                 'refresh_job_detail',
                 'go_to_pod_capture',
@@ -596,7 +626,15 @@ def reconcile_job_detail_cta(
             preview,
             matcher=lambda row: row_is_job_close_action(row),
         )
-        if close_row and str(hint.get('action') or '').strip() in {'', 'refresh_job_detail'}:
+        # Advance past a stale Collect Payment CTA once Payment Collection is green.
+        payment_still_pending = _timeline_has_pending_collect_payment(preview)
+        if close_row and hint_action in {
+            '',
+            'refresh_job_detail',
+            'go_to_payment_collection',
+        }:
+            if hint_action == 'go_to_payment_collection' and payment_still_pending:
+                return out_wf, hint
             close_row = _enrich_pending_workflow_row(
                 close_row,
                 shipment=shipment,
