@@ -295,6 +295,27 @@ def map_action_to_pending_timeline_event(
         'timeline_state': 'pending',
         'is_performed': False,
         'sequence_number': int(getattr(action, 'sequence_number', 0) or 0),
+        # Persist flags so re-enrich (without Action Master row) still routes correctly.
+        'execution_requirements': {
+            'auto_treasury_post': bool(getattr(action, 'auto_treasury_post', False)),
+            'auto_pod_post': bool(getattr(action, 'auto_pod_post', False)),
+            'auto_shipment_post': bool(getattr(action, 'auto_shipment_post', False)),
+            'auto_movement_post': bool(getattr(action, 'auto_movement_post', False)),
+            'hard_copy_collection': bool(getattr(action, 'hard_copy_collection', False)),
+            'shipment_status_impact': (
+                getattr(action, 'shipment_status_impact', '') or ''
+            ).strip(),
+            'movement_status_impact': (
+                getattr(action, 'movement_status_impact', '') or ''
+            ).strip(),
+            'booking_status_impact': (
+                getattr(action, 'booking_status_impact', '') or ''
+            ).strip(),
+            'sequence_category': (
+                getattr(action, 'sequence_category', '') or ''
+            ).strip(),
+        },
+        'english_label': str(getattr(action, 'english_label', '') or ''),
     }
     event = enrich_timeline_event_navigation(
         event,

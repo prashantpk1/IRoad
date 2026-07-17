@@ -84,11 +84,7 @@ def _lookup_action_by_code(action_code: str, tenant_schema: str) -> Any | None:
 
 def resolve_collect_payment_action(tenant_schema: str) -> Any | None:
     for action in _iter_active_actions(tenant_schema):
-        if getattr(action, 'auto_treasury_post', False):
-            return action
-    for action in _iter_active_actions(tenant_schema):
-        label = (getattr(action, 'english_label', None) or '').strip().casefold()
-        if 'collect payment' in label:
+        if action_is_collect_payment(action):
             return action
     return None
 
@@ -193,12 +189,29 @@ def action_code_is_job_close(
 
 
 def action_is_collect_payment(action: Any | None) -> bool:
+    """True for COD Payment Collection rows (any tenant label / code)."""
     if action is None:
         return False
     if getattr(action, 'auto_treasury_post', False):
         return True
-    label = (getattr(action, 'english_label', None) or '').casefold()
-    return 'collect payment' in label
+    if action_is_job_close(action):
+        return False
+    from mobile_api.pod_capture.policy.canonical_pod_action_registry import (
+        is_pod_upload_action,
+    )
+
+    if is_pod_upload_action(action):
+        return False
+    condition = (getattr(action, 'condition_code', '') or '').strip().casefold()
+    if condition and 'cod' in condition and 'order_type' in condition:
+        return True
+    return action_matches(
+        action,
+        'collect payment',
+        'payment collection',
+        'cod payment',
+        'action 9',
+    )
 
 
 def action_code_is_collect_payment(

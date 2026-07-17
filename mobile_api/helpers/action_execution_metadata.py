@@ -106,7 +106,12 @@ def infer_requires_note(action) -> bool:
     if bool(getattr(action, 'auto_treasury_post', False)):
         return True
     label = (getattr(action, 'english_label', None) or '').casefold()
-    if 'collect payment' in label or 'cod' in label:
+    if (
+        'collect payment' in label
+        or 'payment collection' in label
+        or 'cod payment' in label
+        or 'cod' in label
+    ):
         return True
     return bool((getattr(action, 'booking_status_impact', None) or '').strip())
 

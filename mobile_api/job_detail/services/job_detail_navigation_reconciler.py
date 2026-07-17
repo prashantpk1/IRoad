@@ -441,6 +441,13 @@ def _hint_from_navigation_row(
         'requires_evidence_capture',
         'direct_execute',
         'show_close_job_button',
+        'payment_collect_endpoint',
+        'amount_due',
+        'expected_cod_amount',
+        'cod_amount',
+        'currency',
+        'field_configuration',
+        'collection_rules',
     ):
         if row.get(key) not in (None, '', []):
             hint[key] = row[key]
@@ -449,6 +456,24 @@ def _hint_from_navigation_row(
         hint.setdefault(
             'reason',
             'Upload proof of delivery. Capture photos and video evidence, then tap Next.',
+        )
+    if hint.get('action') == 'go_to_payment_collection':
+        label = str(
+            hint.get('action_label')
+            or row.get('action_label')
+            or hint.get('screen_title')
+            or 'Collect Payment',
+        ).strip()
+        hint['button_label'] = label
+        hint['execution_label'] = label
+        hint['action_name'] = label
+        hint['requires_evidence_capture'] = False
+        hint['direct_execute'] = False
+        hint.setdefault('reason', 'Collect cash from the customer to continue.')
+        hint.setdefault(
+            'payment_collect_endpoint',
+            row.get('payment_collect_endpoint')
+            or '/api/v1/mobile/driver/payments/collect/',
         )
     if hint.get('action') == 'go_to_evidence_capture' and str(
         row.get('ui_mode') or '',

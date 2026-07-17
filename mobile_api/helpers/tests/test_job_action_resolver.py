@@ -86,6 +86,16 @@ class JobActionResolverTests(TestCase):
             ),
         )
 
+    def test_payment_collection_label_is_collect_payment_action(self):
+        self.assertTrue(
+            row_is_collect_payment_action(
+                {
+                    'action_code': 'OA-0010',
+                    'english_label': 'Payment Collection',
+                },
+            ),
+        )
+
     def test_row_is_unloading_action_by_label_not_legacy_code(self):
         self.assertTrue(
             row_is_unloading_action(

@@ -136,6 +136,36 @@ class ActionNavigationMetadataTests(TestCase):
         self.assertEqual(event['action'], 'go_to_payment_collection')
         self.assertEqual(event['screen'], 'collect_payment')
 
+    def test_payment_collection_label_routes_to_payment_not_evidence(self):
+        """Dynamic OA label 'Payment Collection' must not open evidence execute."""
+        shipment = SimpleNamespace(
+            pk=uuid.uuid4(),
+            pod_type=TenantShipment.PodType.DIGITAL,
+            order_type='COD',
+        )
+        event = enrich_timeline_event_navigation(
+            {
+                'action_code': 'OA-0010',
+                'action_label': 'Payment Collection',
+                'english_label': 'Payment Collection',
+                'timeline_state': 'pending',
+                'action': 'go_to_evidence_capture',
+                'screen': 'evidence_capture',
+                'requires_evidence_capture': True,
+            },
+            None,
+            shipment=shipment,
+            tenant_schema='tenant_a',
+        )
+        self.assertEqual(event['action'], 'go_to_payment_collection')
+        self.assertEqual(event['screen'], 'collect_payment')
+        self.assertFalse(event.get('requires_evidence_capture'))
+        self.assertNotIn('capture_ui', event)
+        self.assertEqual(
+            event['payment_collect_endpoint'],
+            '/api/v1/mobile/driver/payments/collect/',
+        )
+
     def test_sync_workflow_primary_from_payment_hint(self):
         workflow = {
             'primary_action': {

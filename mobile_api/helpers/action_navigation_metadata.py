@@ -715,14 +715,29 @@ def _action_like_from_row(row: dict[str, Any]) -> Any:
 def _row_is_collect_payment_navigation_target(
     row: dict[str, Any],
     action: Any | None = None,
+    *,
+    tenant_schema: str = '',
 ) -> bool:
+    if str(row.get('action') or '').strip() == 'go_to_payment_collection':
+        return True
+    if str(row.get('screen') or '').strip() == 'collect_payment':
+        return True
+    if str(row.get('ui_mode') or '').strip() == 'collect_payment':
+        return True
     act = action or _action_like_from_row(row)
     if action_is_collect_payment(act):
         return True
     if row_is_collect_payment_action(row):
         return True
     code = str(row.get('action_code') or '').strip()
-    return action_code_is_collect_payment(code)
+    # Prefer in-memory row/action semantics. Schema lookup is optional and
+    # skipped when schema is empty so unit tests stay offline.
+    if not (tenant_schema or '').strip():
+        return action_code_is_collect_payment(code)
+    try:
+        return action_code_is_collect_payment(code, tenant_schema=tenant_schema)
+    except Exception:
+        return action_code_is_collect_payment(code)
 
 
 def apply_collect_payment_navigation_to_action_row(
@@ -734,7 +749,11 @@ def apply_collect_payment_navigation_to_action_row(
     log_evidence: dict[str, bool] | None = None,
 ) -> dict[str, Any]:
     """Bottom CTA + timeline — open Collect Payment screen (not execute-action)."""
-    if not _row_is_collect_payment_navigation_target(row, action):
+    if not _row_is_collect_payment_navigation_target(
+        row,
+        action,
+        tenant_schema=tenant_schema,
+    ):
         return dict(row)
     out = dict(row)
     act = action or _action_like_from_row(row)
@@ -750,13 +769,48 @@ def apply_collect_payment_navigation_to_action_row(
             log_evidence=log_evidence,
         )
     booking = getattr(shipment, 'booking', None)
+    # Clear evidence-capture contract so mobile never opens evidence then execute.
+    for key in (
+        'capture_ui',
+        'submit_contract',
+        'allow_submit_without_media',
+        'show_pod_capture_button',
+        'show_close_job_button',
+        'pod_capture_steps',
+        'hard_copy_confirmation',
+        'confirmation_ui',
+    ):
+        out.pop(key, None)
+    requirements = dict(out.get('execution_requirements') or {})
+    requirements.update(
+        {
+            'auto_treasury_post': True,
+            'direct_execute': False,
+            'requires_evidence_capture': False,
+            'capture_mode': 'collect_payment',
+            'gps': False,
+            'photo_enabled': False,
+            'video_enabled': False,
+            'note': False,
+            'note_required': False,
+        },
+    )
+    out['execution_requirements'] = requirements
+    label = str(
+        out.get('action_label')
+        or out.get('execution_label')
+        or out.get('action_name')
+        or getattr(act, 'english_label', None)
+        or 'Collect Payment',
+    ).strip()
     out.update(
         {
             'action': 'go_to_payment_collection',
             'screen': 'collect_payment',
             'ui_mode': 'collect_payment',
-            'screen_title': 'Collect Payment',
+            'screen_title': label or 'Collect Payment',
             'direct_execute': False,
+            'requires_evidence_capture': False,
             'requires_gps': False,
             'requires_photo': False,
             'requires_video': False,
@@ -768,7 +822,7 @@ def apply_collect_payment_navigation_to_action_row(
         },
     )
     out.update(build_cod_payment_display(shipment=shipment, booking=booking))
-    return out
+    return sync_row_evidence_flags(out)
 
 
 def apply_job_close_navigation_to_action_row(
@@ -1227,7 +1281,11 @@ def _enrich_driver_action_row(
     normalized = _normalize_row_action_labels(row)
     if row_is_unloading_completed_action(normalized):
         return apply_evidence_capture_navigation_to_action_row(dict(row))
-    if _row_is_collect_payment_navigation_target(row, action):
+    if _row_is_collect_payment_navigation_target(
+        row,
+        action,
+        tenant_schema=tenant_schema,
+    ):
         return apply_collect_payment_navigation_to_action_row(
             dict(row),
             action=action,
