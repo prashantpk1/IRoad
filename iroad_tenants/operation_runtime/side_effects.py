@@ -441,6 +441,12 @@ def _shipment_job_close_gates_satisfied_for_advance(shipment) -> bool:
     if not _mobile_pod_compliance_satisfied(shipment):
         return False
     if (shipment.order_type or '').strip().upper() == 'COD':
+        from iroad_tenants.operation_execution import (
+            _ensure_cod_collected_when_payment_logged,
+        )
+
+        if not _ensure_cod_collected_when_payment_logged(shipment):
+            return False
         if (
             getattr(shipment, 'collection_status', None)
             != TenantShipment.CollectionStatus.COLLECTED

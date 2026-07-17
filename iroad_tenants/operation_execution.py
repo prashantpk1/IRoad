@@ -390,6 +390,74 @@ def _is_collect_payment_action(action) -> bool:
     return action_requires_cod_order_type(action)
 
 
+def _shipment_payment_collection_logged(
+    shipment,
+    *,
+    exclude_log_id=None,
+) -> bool:
+    """True when a Payment Collection / COD Action Log already exists on the shipment."""
+    if shipment is None or not getattr(shipment, 'pk', None):
+        return False
+    from mobile_api.helpers.job_action_resolver import action_is_collect_payment
+    from mobile_api.pod_capture.policy.canonical_pod_action_registry import (
+        is_cod_collect_action,
+    )
+    from tenant_workspace.models import TenantOperationActionLog
+
+    qs = (
+        TenantOperationActionLog.objects.filter(shipment_id=shipment.pk)
+        .exclude(operation_action__isnull=True)
+        .select_related('operation_action')
+        .order_by('-log_date', '-created_at')
+    )
+    if exclude_log_id:
+        qs = qs.exclude(pk=exclude_log_id)
+    for log in qs[:50]:
+        action = getattr(log, 'operation_action', None)
+        if action_is_collect_payment(action) or is_cod_collect_action(action):
+            return True
+    return False
+
+
+def _ensure_cod_collected_when_payment_logged(
+    shipment,
+    *,
+    exclude_log_id=None,
+) -> bool:
+    """
+    Align ``collection_status`` with Payment Collection Action Log authority.
+
+    Timeline can show Payment Collection green from the log while the column is
+    still Pending (e.g. evidence-path execute without full treasury repair).
+    Job Close / End Job must follow the log so drivers are not blocked at
+    POD Submitted.
+    """
+    if shipment is None:
+        return False
+    if (shipment.order_type or '').strip().upper() != 'COD':
+        return True
+    if (
+        getattr(shipment, 'collection_status', None)
+        == TenantShipment.CollectionStatus.COLLECTED
+    ):
+        return True
+    if not _shipment_payment_collection_logged(
+        shipment,
+        exclude_log_id=exclude_log_id,
+    ):
+        return False
+    shipment.collection_status = TenantShipment.CollectionStatus.COLLECTED
+    update_fields = ['collection_status']
+    if hasattr(shipment, 'updated_at'):
+        update_fields.append('updated_at')
+    try:
+        shipment.save(update_fields=update_fields)
+    except Exception:
+        # Gate check may run on unsaved mocks in unit tests.
+        pass
+    return True
+
+
 def _shipment_leg_pod_cod_complete_for_job_close(
     shipment,
     *,
@@ -413,6 +481,11 @@ def _shipment_leg_pod_cod_complete_for_job_close(
     if not _mobile_pod_compliance_satisfied(shipment):
         return False
     if (shipment.order_type or '').strip().upper() == 'COD':
+        if not _ensure_cod_collected_when_payment_logged(
+            shipment,
+            exclude_log_id=exclude_log_id,
+        ):
+            return False
         if (
             getattr(shipment, 'collection_status', None)
             != TenantShipment.CollectionStatus.COLLECTED

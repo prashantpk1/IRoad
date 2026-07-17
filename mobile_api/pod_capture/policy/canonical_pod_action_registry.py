@@ -29,7 +29,14 @@ from tenant_workspace.models import TenantShipment
 # Canonical short codes (case-insensitive substring match on code + english label).
 A7_UPLOAD_POD_NEEDLES = ('a7', 'action 7', 'upload pod')
 A8_UNLOADING_NEEDLES = ('a8', 'action 8', 'unloading')
-A9_COD_NEEDLES = ('a9', 'action 9', 'collect payment', 'cod')
+A9_COD_NEEDLES = (
+    'a9',
+    'action 9',
+    'collect payment',
+    'payment collection',
+    'cod payment',
+    'cod',
+)
 
 POD_UPLOAD_LABEL_NEEDLES = (
     'pod',
@@ -140,6 +147,8 @@ def is_hard_pod_action(action: Any | None) -> bool:
 def is_cod_collect_action(action: Any | None) -> bool:
     if action is None:
         return False
+    if getattr(action, 'auto_treasury_post', False):
+        return True
     return operation_action_matches(action, *A9_COD_NEEDLES)
 
 
