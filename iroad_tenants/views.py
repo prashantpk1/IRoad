@@ -22786,6 +22786,24 @@ def _client_account_settings_template_dict(settings_obj):
     }
 
 
+def _client_account_form_page_context(
+    form_data,
+    form_errors,
+    tenant_registry,
+    settings_obj,
+    **extra,
+):
+    return {
+        'form_data': form_data,
+        'form_errors': form_errors,
+        'tenant_schema_name': tenant_registry.schema_name,
+        'currency_options': _active_currency_options(),
+        'country_options': _active_country_options(),
+        'settings_data': _client_account_settings_template_dict(settings_obj),
+        **extra,
+    }
+
+
 def _apply_client_account_defaults_from_settings(form_data, settings_obj):
     """Pre-fill new-client form from tenant-scoped Client Account Settings."""
     if settings_obj.default_client_status:
@@ -23255,13 +23273,12 @@ class TenantClientAccountCreateView(View):
             form_data['created_at'] = _format_client_account_created_at(timezone.now())
             _apply_client_account_defaults_from_settings(form_data, settings_obj)
             context.update(
-                {
-                    'form_data': form_data,
-                    'form_errors': {},
-                    'tenant_schema_name': tenant_registry.schema_name,
-                    'currency_options': _active_currency_options(),
-                    'settings_data': _client_account_settings_template_dict(settings_obj),
-                }
+                _client_account_form_page_context(
+                    form_data,
+                    {},
+                    tenant_registry,
+                    settings_obj,
+                )
             )
             return render(request, self.template_name, context)
         finally:
@@ -23309,13 +23326,12 @@ class TenantClientAccountCreateView(View):
             if form_errors:
                 form_data['account_no'] = self._build_preview_account_no()
                 context.update(
-                    {
-                        'form_data': form_data,
-                        'form_errors': form_errors,
-                        'tenant_schema_name': tenant_registry.schema_name,
-                        'currency_options': _active_currency_options(),
-                        'settings_data': _client_account_settings_template_dict(settings_obj),
-                    }
+                    _client_account_form_page_context(
+                        form_data,
+                        form_errors,
+                        tenant_registry,
+                        settings_obj,
+                    )
                 )
                 messages.error(request, 'Please fix the highlighted errors.', extra_tags='tenant')
                 return render(request, self.template_name, context)
@@ -23350,13 +23366,12 @@ class TenantClientAccountCreateView(View):
                 _merge_validation_error_into_form_errors(exc, form_errors)
                 form_data['account_no'] = self._build_preview_account_no()
                 context.update(
-                    {
-                        'form_data': form_data,
-                        'form_errors': form_errors,
-                        'tenant_schema_name': tenant_registry.schema_name,
-                        'currency_options': _active_currency_options(),
-                        'settings_data': _client_account_settings_template_dict(settings_obj),
-                    }
+                    _client_account_form_page_context(
+                        form_data,
+                        form_errors,
+                        tenant_registry,
+                        settings_obj,
+                    )
                 )
                 messages.error(request, 'Please fix the highlighted errors.', extra_tags='tenant')
                 return render(request, self.template_name, context)
@@ -23413,15 +23428,14 @@ class TenantClientAccountEditView(TenantClientAccountCreateView):
             settings_obj = _get_singleton_client_account_settings()
             form_data = self._form_data_from_account(account)
             context.update(
-                {
-                    'form_data': form_data,
-                    'form_errors': {},
-                    'tenant_schema_name': tenant_registry.schema_name,
-                    'is_edit_mode': True,
-                    'editing_account_no': account.account_no,
-                    'currency_options': _active_currency_options(),
-                    'settings_data': _client_account_settings_template_dict(settings_obj),
-                }
+                _client_account_form_page_context(
+                    form_data,
+                    {},
+                    tenant_registry,
+                    settings_obj,
+                    is_edit_mode=True,
+                    editing_account_no=account.account_no,
+                )
             )
             return render(request, self.template_name, context)
         finally:
@@ -23473,15 +23487,14 @@ class TenantClientAccountEditView(TenantClientAccountCreateView):
 
             if form_errors:
                 context.update(
-                    {
-                        'form_data': form_data,
-                        'form_errors': form_errors,
-                        'tenant_schema_name': tenant_registry.schema_name,
-                        'is_edit_mode': True,
-                        'editing_account_no': account.account_no,
-                        'currency_options': _active_currency_options(),
-                        'settings_data': _client_account_settings_template_dict(settings_obj),
-                    }
+                    _client_account_form_page_context(
+                        form_data,
+                        form_errors,
+                        tenant_registry,
+                        settings_obj,
+                        is_edit_mode=True,
+                        editing_account_no=account.account_no,
+                    )
                 )
                 messages.error(request, 'Please fix the highlighted errors.', extra_tags='tenant')
                 return render(request, self.template_name, context)
@@ -23506,15 +23519,14 @@ class TenantClientAccountEditView(TenantClientAccountCreateView):
             except ValidationError as exc:
                 _merge_validation_error_into_form_errors(exc, form_errors)
                 context.update(
-                    {
-                        'form_data': form_data,
-                        'form_errors': form_errors,
-                        'tenant_schema_name': tenant_registry.schema_name,
-                        'is_edit_mode': True,
-                        'editing_account_no': account.account_no,
-                        'currency_options': _active_currency_options(),
-                        'settings_data': _client_account_settings_template_dict(settings_obj),
-                    }
+                    _client_account_form_page_context(
+                        form_data,
+                        form_errors,
+                        tenant_registry,
+                        settings_obj,
+                        is_edit_mode=True,
+                        editing_account_no=account.account_no,
+                    )
                 )
                 messages.error(request, 'Please fix the highlighted errors.', extra_tags='tenant')
                 return render(request, self.template_name, context)
@@ -35768,6 +35780,15 @@ def _active_currency_options():
         Currency.objects.filter(is_active=True)
         .order_by('name_en', 'currency_code')
         .values('currency_code', 'name_en')
+    )
+
+
+def _active_country_options():
+    """Active ISO countries from superadmin master data (``master_countries``)."""
+    return list(
+        Country.objects.filter(is_active=True)
+        .order_by('name_en')
+        .values('country_code', 'name_en')
     )
 
 

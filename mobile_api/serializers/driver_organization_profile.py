@@ -23,9 +23,9 @@ Driver instructions (single DB column)
 
 Null / missing values
 ---------------------
-All response values are strings. Absent text → ``''``. Absent logo → ``logo_url``
-is ``''`` (never omitted). ``instance`` may be ``None`` → all-empty dict without
-raising.
+Support contact and driver instruction fields return ``'-'`` when empty
+(same as tenant Organization Profile view). ``logo_url`` stays ``''`` when
+absent. ``instance`` may be ``None`` → dash placeholders for support fields.
 """
 from __future__ import annotations
 
@@ -48,6 +48,12 @@ def _str_or_empty(value: Any) -> str:
     return s
 
 
+def _str_or_dash(value: Any) -> str:
+    """Empty support/instruction fields show ``-`` (tenant portal parity)."""
+    s = _str_or_empty(value)
+    return s if s else '-'
+
+
 class DriverOrganizationProfileSerializer(LocalizedSerializerMixin, serializers.Serializer):
     """
     Flat organization/support snapshot for mobile clients.
@@ -61,10 +67,10 @@ class DriverOrganizationProfileSerializer(LocalizedSerializerMixin, serializers.
         request = self.context.get('request')
         empty = {
             'organization_name': '',
-            'support_email': '',
-            'support_mobile_number_1': '',
-            'support_mobile_number_2': '',
-            'driver_instructions': '',
+            'support_email': '-',
+            'support_mobile_number_1': '-',
+            'support_mobile_number_2': '-',
+            'driver_instructions': '-',
             'logo_url': '',
         }
         if instance is None:
@@ -80,15 +86,15 @@ class DriverOrganizationProfileSerializer(LocalizedSerializerMixin, serializers.
 
         return {
             **name_part,
-            'support_email': _str_or_empty(getattr(instance, 'support_email', None)),
-            'support_mobile_number_1': _str_or_empty(
+            'support_email': _str_or_dash(getattr(instance, 'support_email', None)),
+            'support_mobile_number_1': _str_or_dash(
                 getattr(instance, 'support_mobile_1', None)
             ),
-            'support_mobile_number_2': _str_or_empty(
+            'support_mobile_number_2': _str_or_dash(
                 getattr(instance, 'support_mobile_2', None)
             ),
             # Single DB field: identical for all Accept-Language values.
-            'driver_instructions': _str_or_empty(
+            'driver_instructions': _str_or_dash(
                 getattr(instance, 'driver_instructions', None)
             ),
             'logo_url': _str_or_empty(logo),

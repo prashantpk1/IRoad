@@ -333,13 +333,10 @@
                     name="country"
                     required
                   >
-                    <option value="" disabled>-Select country-</option>
-                    <option value="SA" {% if form_data.country == 'SA' %}selected{% endif %}>Saudi Arabia</option>
-                    <option value="AE" {% if form_data.country == 'AE' %}selected{% endif %}>United Arab Emirates</option>
-                    <option value="KW" {% if form_data.country == 'KW' %}selected{% endif %}>Kuwait</option>
-                    <option value="BH" {% if form_data.country == 'BH' %}selected{% endif %}>Bahrain</option>
-                    <option value="QA" {% if form_data.country == 'QA' %}selected{% endif %}>Qatar</option>
-                    <option value="OM" {% if form_data.country == 'OM' %}selected{% endif %}>Oman</option>
+                    <option value="" disabled {% if not form_data.country %}selected{% endif %}>-Select country-</option>
+                    {% for country in country_options %}
+                    <option value="{{ country.country_code }}" {% if form_data.country == country.country_code %}selected{% endif %}>{{ country.name_en }}</option>
+                    {% endfor %}
                   </select>
                   {% if form_errors.country %}<div class="invalid-feedback d-block">{{ form_errors.country }}</div>{% endif %}
                   
