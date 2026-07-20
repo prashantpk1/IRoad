@@ -9285,14 +9285,10 @@ class TenantOperationShipmentPodCreateView(View):
                 form_errors['pod_type'] = 'Select a valid POD type.'
 
             booking, shipment = _tenant_shipment_document_resolve_linkage(form_data, form_errors)
-            if shipment is not None:
-                pending_ids = set(
-                    _tenant_shipment_pod_pending_shipments_queryset(
-                        include_shipment_id=shipment.pk,
-                    ).values_list('pk', flat=True)
-                )
-                if shipment.pk not in pending_ids:
-                    form_errors['shipment_id'] = 'Shipment must have pending POD work.'
+            if shipment is not None and (
+                shipment.shipment_status == TenantShipment.ShipmentStatus.CANCELLED
+            ):
+                form_errors['shipment_id'] = 'Cancelled shipments cannot be used for POD.'
             source_document = _tenant_shipment_pod_resolve_source_document(
                 form_data,
                 form_errors,
@@ -18851,7 +18847,7 @@ def _tenant_shipment_pod_status_is_pending(pod_status):
 
 
 def _tenant_shipment_pod_pending_shipments_queryset(*, include_shipment_id=None):
-    """Shipments with pending POD work (spec: filter pending PODs)."""
+    """Shipments with pending POD work (Document Handover and legacy pending-only gates)."""
     pending_doc_statuses = [
         TenantShipmentDocument.Status.PENDING,
         TenantShipmentDocument.Status.DRAFT,
@@ -18872,11 +18868,26 @@ def _tenant_shipment_pod_pending_shipments_queryset(*, include_shipment_id=None)
     return qs.order_by('-created_at')[:500]
 
 
+def _tenant_shipment_pod_linkage_shipments_queryset(*, include_shipment_id=None):
+    """
+    Portal Shipment POD dropdown — all active shipments (not Cancelled).
+
+    Completed/Closed legs remain selectable so office staff can create or
+    maintain POD records after mobile execution; mobile workflow is unchanged.
+    """
+    _ = include_shipment_id  # kept for call-site compatibility; all rows are eligible
+    return (
+        TenantShipment.objects.select_related('booking')
+        .exclude(shipment_status=TenantShipment.ShipmentStatus.CANCELLED)
+        .order_by('-created_at')[:500]
+    )
+
+
 def _tenant_shipment_pod_linkage_options(*, include_shipment_id=None):
-    """FK-backed shipment rows limited to pending POD shipments."""
+    """FK-backed shipment rows for portal Shipment POD create/edit."""
     shipment_rows = []
     seen_shipment_ids = set()
-    for shipment in _tenant_shipment_pod_pending_shipments_queryset(
+    for shipment in _tenant_shipment_pod_linkage_shipments_queryset(
         include_shipment_id=include_shipment_id
     ):
         shipment_id = str(shipment.pk)
@@ -20871,14 +20882,10 @@ class TenantOperationShipmentPodCreateView(View):
                 form_errors['pod_type'] = 'Select a valid POD type.'
 
             booking, shipment = _tenant_shipment_document_resolve_linkage(form_data, form_errors)
-            if shipment is not None:
-                pending_ids = set(
-                    _tenant_shipment_pod_pending_shipments_queryset(
-                        include_shipment_id=shipment.pk,
-                    ).values_list('pk', flat=True)
-                )
-                if shipment.pk not in pending_ids:
-                    form_errors['shipment_id'] = 'Shipment must have pending POD work.'
+            if shipment is not None and (
+                shipment.shipment_status == TenantShipment.ShipmentStatus.CANCELLED
+            ):
+                form_errors['shipment_id'] = 'Cancelled shipments cannot be used for POD.'
             source_document = _tenant_shipment_pod_resolve_source_document(
                 form_data,
                 form_errors,

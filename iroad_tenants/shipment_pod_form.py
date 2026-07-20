@@ -161,6 +161,10 @@ def apply_doc_no_linkage(form_data: dict, form_errors: dict):
 
 def action_log_option_rows(*, shipment=None, limit=300):
     """Action log dropdown rows filtered on header shipment (PCS §5.6.1)."""
+    from iroad_tenants.operation_runtime.action_master_catalog import (
+        exclude_admin_hidden_system_logs,
+    )
+
     qs = (
         TenantOperationActionLog.objects.select_related('operation_action')
         .prefetch_related(
@@ -172,6 +176,7 @@ def action_log_option_rows(*, shipment=None, limit=300):
         )
         .order_by('-log_date', '-created_at')
     )
+    qs = exclude_admin_hidden_system_logs(qs)
     if shipment is not None:
         qs = qs.filter(shipment=shipment)
     rows = []
